@@ -1595,24 +1595,21 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         title="Nuevo Lugar de Extraccion"
         size="md"
       >
-        {idProveedor ? (
-          <FormLugarExtraccion
-            idProveedor={Number(idProveedor)}
-            onSuccess={(nuevo) => {
-              setLugaresExtraccion((prev) => [...prev, nuevo]);
-              if (targetLugarIdx !== null) {
-                handleLineaChange(
-                  targetLugarIdx,
-                  "id_lugar_extraccion",
-                  nuevo.id_lugar_extraccion,
-                );
-              }
-              closeNuevoLugar();
-              setTargetLugarIdx(null);
-            }}
-            onCancel={closeNuevoLugar}
-          />
-        ) : null}
+        <FormLugarExtraccion
+          onSuccess={(nuevo) => {
+            setLugaresExtraccion((prev) => [...prev, nuevo]);
+            if (targetLugarIdx !== null) {
+              handleLineaChange(
+                targetLugarIdx,
+                "id_lugar_extraccion",
+                nuevo.id_lugar_extraccion,
+              );
+            }
+            closeNuevoLugar();
+            setTargetLugarIdx(null);
+          }}
+          onCancel={closeNuevoLugar}
+        />
       </ModalEstandar>
     </Stack>
   );

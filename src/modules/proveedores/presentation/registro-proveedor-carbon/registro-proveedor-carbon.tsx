@@ -14,10 +14,9 @@ import {
 import {
   IconDeviceFloppy,
   IconExclamationCircle,
-  IconMapPin,
   IconTrash,
   IconUser,
-  IconX,
+  IconPlus,
 } from "@tabler/icons-react";
 
 import { useRegistroProveedorCarbon } from "../../hooks/useRegistroProveedorCarbon";
@@ -28,11 +27,10 @@ import {
   ModalPersonalExterno,
   type PersonalLocal,
 } from "../../../../presentation/utils/modal-personal-externo";
-import type {
-  RES_Departamento,
-  RES_Distrito,
-  RES_Provincia,
-} from "../../../../service/responses/ubicacion";
+import { FormLugarExtraccion } from "../../../../presentation/utils/form-lugar-extraccion";
+import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
+import type { RES_LugarExtraccionCarbon } from "../../../../service/responses/lugar-extraccion-carbon";
 import type { ProveedorResponse } from "../../service/proveedores.responses";
 import { AuxService } from "../../../../service/auxiliar.service";
 import { TipoCarbonService } from "../../../tipo-carbon/service/tipo-carbon.service";
@@ -61,6 +59,9 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
     personal,
     tiposCarbon,
     lugaresExtraccion,
+    setLugaresExtraccion,
+    contratosNuevos,
+    setContratosFiles,
     loading,
     error,
     handleChange,
@@ -68,86 +69,45 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
     addpersonal,
     removepersonal,
     setTiposCarbonSeleccionados,
-    addLugarExtraccion,
-    removeLugarExtraccion,
     submit,
   } = useRegistroProveedorCarbon((p) => onSuccess(p));
 
   const [openRepresentante, setOpenRepresentante] = useState(false);
+  const [modalNuevoLugarAbierto, setModalNuevoLugarAbierto] = useState(false);
 
   const [todosTipos, setTodosTipos] = useState<RES_TipoCarbon[]>([]);
   const [loadingTipos, setLoadingTipos] = useState(false);
   const [searchTipo, setSearchTipo] = useState("");
 
-  // Ubigeo: las 3 listas se cargan al montar y se filtran en cliente.
-  const [departamentos, setDepartamentos] = useState<RES_Departamento[]>([]);
-  const [provincias, setProvincias] = useState<RES_Provincia[]>([]);
-  const [distritos, setDistritos] = useState<RES_Distrito[]>([]);
-  const [loadingUbigeo, setLoadingUbigeo] = useState(false);
-  const [searchDpto, setSearchDpto] = useState("");
-  const [searchProv, setSearchProv] = useState("");
-  const [searchDist, setSearchDist] = useState("");
+  // Catalogo GLOBAL de lugares de extraccion + busqueda del MultiSelect.
+  const [catalogoLugares, setCatalogoLugares] = useState<
+    RES_LugarExtraccionCarbon[]
+  >([]);
+  const [loadingLugares, setLoadingLugares] = useState(false);
+  const [searchLugar, setSearchLugar] = useState("");
 
-  // Estado local del formulario de "nuevo lugar".
-  const [lugarDpto, setLugarDpto] = useState<string | null>(null);
-  const [lugarProv, setLugarProv] = useState<string | null>(null);
-  const [lugarDist, setLugarDist] = useState<string | null>(null);
-  const [lugarDireccion, setLugarDireccion] = useState("");
-  const [lugarError, setLugarError] = useState<string | null>(null);
-
-  // Carga unica al montar: tipos de carbon + dptos + provs + dists en paralelo.
+  // Carga unica al montar: tipos de carbon + catalogo global de lugares.
   useEffect(() => {
     let cancel = false;
     (async () => {
       setLoadingTipos(true);
-      setLoadingUbigeo(true);
-      const [tiposRes, dptosRes, provsRes, distsRes] = await Promise.all([
+      setLoadingLugares(true);
+      const [tiposRes, lugaresRes] = await Promise.all([
         TipoCarbonService.getTipos({ para_compra: true }),
-        AuxService.get_departamentos(),
-        AuxService.get_provincias(),
-        AuxService.get_distritos(),
+        AuxService.get_lugar_extraccion_carbon_catalogo(),
       ]);
       if (cancel) return;
       if (tiposRes.success) setTodosTipos(tiposRes.data);
-      if (dptosRes.success)
-        setDepartamentos((dptosRes.data ?? []) as RES_Departamento[]);
-      if (provsRes.success)
-        setProvincias((provsRes.data ?? []) as RES_Provincia[]);
-      if (distsRes.success)
-        setDistritos((distsRes.data ?? []) as RES_Distrito[]);
+      if (lugaresRes.success) {
+        setCatalogoLugares(lugaresRes.data ?? []);
+      }
       setLoadingTipos(false);
-      setLoadingUbigeo(false);
+      setLoadingLugares(false);
     })();
     return () => {
       cancel = true;
     };
   }, []);
-
-  const dptosVisibles = useMemo(() => {
-    const q = searchDpto.trim();
-    if (!q) return departamentos;
-    return getCoincidencias(departamentos, q, { keys: ["nombre"] }).map(
-      (r) => r.item,
-    );
-  }, [departamentos, searchDpto]);
-
-  const provVisibles = useMemo(() => {
-    const base = lugarDpto
-      ? provincias.filter((p) => String(p.id_departamento) === lugarDpto)
-      : provincias;
-    const q = searchProv.trim();
-    if (!q) return base;
-    return getCoincidencias(base, q, { keys: ["nombre"] }).map((r) => r.item);
-  }, [provincias, lugarDpto, searchProv]);
-
-  const distVisibles = useMemo(() => {
-    const base = lugarProv
-      ? distritos.filter((d) => String(d.id_provincia) === lugarProv)
-      : distritos;
-    const q = searchDist.trim();
-    if (!q) return base;
-    return getCoincidencias(base, q, { keys: ["nombre"] }).map((r) => r.item);
-  }, [distritos, lugarProv, searchDist]);
 
   const tiposData = useMemo(
     () =>
@@ -169,6 +129,30 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
     }));
   }, [tiposData, todosTipos, searchTipo]);
 
+  const lugaresFiltrados = useMemo(() => {
+    const q = searchLugar.trim();
+    if (!q) {
+      return catalogoLugares.map((c) => ({
+        value: String(c.id_lugar_extraccion),
+        label: c.direccion,
+        departamento_nombre: c.departamento_nombre,
+        provincia_nombre: c.provincia_nombre,
+        distrito_nombre: c.distrito_nombre,
+        direccion: c.direccion,
+      }));
+    }
+    return getCoincidencias(catalogoLugares, q, {
+      keys: ["direccion", "departamento_nombre", "provincia_nombre", "distrito_nombre"],
+    }).map((r) => ({
+      value: String(r.item.id_lugar_extraccion),
+      label: r.item.direccion,
+      departamento_nombre: r.item.departamento_nombre,
+      provincia_nombre: r.item.provincia_nombre,
+      distrito_nombre: r.item.distrito_nombre,
+      direccion: r.item.direccion,
+    }));
+  }, [catalogoLugares, searchLugar]);
+
   const handleRepresentanteCreado = (p: PersonalLocal) => {
     addpersonal(p);
   };
@@ -178,63 +162,48 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
     setTiposCarbonSeleccionados(ids, todosTipos);
   };
 
-  const handleDptoChange = (v: string | null) => {
-    setLugarDpto(v);
-    setLugarProv(null);
-    setLugarDist(null);
-    setLugarError(null);
-  };
-
-  const handleProvChange = (v: string | null) => {
-    setLugarProv(v);
-    setLugarDist(null);
-    setLugarError(null);
-  };
-
-  const handleDistChange = (v: string | null) => {
-    setLugarDist(v);
-    setLugarError(null);
-  };
-
-  const handleDireccionChange = (v: string) => {
-    setLugarDireccion(v);
-    if (lugarError) setLugarError(null);
-  };
-
-  const handleAgregarLugar = () => {
-    if (!lugarDpto || !lugarProv || !lugarDist) {
-      setLugarError("Selecciona departamento, provincia y distrito");
-      return;
+  const handleLugaresChange = (values: string[]) => {
+    const nuevos: LugarExtraccionTemporal[] = [];
+    for (const v of values) {
+      const id = Number(v);
+      if (!Number.isFinite(id)) continue;
+      const c = catalogoLugares.find((x) => x.id_lugar_extraccion === id);
+      if (!c) continue;
+      nuevos.push({
+        id_lugar_extraccion_carbon: c.id_lugar_extraccion,
+        id_departamento: c.id_departamento,
+        departamento_nombre: c.departamento_nombre,
+        id_provincia: c.id_provincia,
+        provincia_nombre: c.provincia_nombre,
+        id_distrito: c.id_distrito,
+        distrito_nombre: c.distrito_nombre,
+        direccion: c.direccion,
+      });
     }
-    const dirTrim = lugarDireccion.trim();
-    if (!dirTrim) {
-      setLugarError("La dirección es obligatoria");
-      return;
-    }
-    const dep = departamentos.find((d) => String(d.id) === lugarDpto);
-    const prov = provincias.find((p) => String(p.id) === lugarProv);
-    const dist = distritos.find((d) => String(d.id) === lugarDist);
-    if (!dep || !prov || !dist) {
-      setLugarError("Ubicación inválida");
-      return;
-    }
+    // Reemplaza el set completo (set semantico del PUT).
+    setLugaresExtraccion(nuevos);
+  };
 
-    const nuevo: LugarExtraccionTemporal = {
-      id_departamento: dep.id,
-      departamento_nombre: dep.nombre,
-      id_provincia: prov.id,
-      provincia_nombre: prov.nombre,
-      id_distrito: dist.id,
-      distrito_nombre: dist.nombre,
-      direccion: dirTrim,
-    };
-    addLugarExtraccion(nuevo);
-
-    setLugarDpto(null);
-    setLugarProv(null);
-    setLugarDist(null);
-    setLugarDireccion("");
-    setLugarError(null);
+  const handleNuevoLugarCreado = (nuevo: RES_LugarExtraccionCarbon) => {
+    setCatalogoLugares((prev: RES_LugarExtraccionCarbon[]) => [...prev, nuevo]);
+    setLugaresExtraccion((prev: LugarExtraccionTemporal[]) =>
+      prev.some((x: LugarExtraccionTemporal) => x.id_lugar_extraccion_carbon === nuevo.id_lugar_extraccion)
+        ? prev
+        : [
+            ...prev,
+            {
+              id_lugar_extraccion_carbon: nuevo.id_lugar_extraccion,
+              id_departamento: nuevo.id_departamento,
+              departamento_nombre: nuevo.departamento_nombre,
+              id_provincia: nuevo.id_provincia,
+              provincia_nombre: nuevo.provincia_nombre,
+              id_distrito: nuevo.id_distrito,
+              distrito_nombre: nuevo.distrito_nombre,
+              direccion: nuevo.direccion,
+            },
+          ],
+    );
+    setModalNuevoLugarAbierto(false);
   };
 
   return (
@@ -265,8 +234,7 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            withAsterisk
-            label="RUC"
+            label="RUC (opc)"
             placeholder={
               payload.tipo_entidad === TipoEntidad.Natural
                 ? "10xxxxxxxxx (persona natural)"
@@ -352,7 +320,35 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
             classNames={fieldClasses}
           />
         </Grid.Col>
+        <Grid.Col span={12}>
+          <TextInput
+            label="Codigo REINFO (opcional)"
+            placeholder="Ej. REINFO-XXXX-YYYY"
+            radius="xl"
+            size="xs"
+            maxLength={64}
+            value={payload.codigo_reinfo ?? ""}
+            onChange={(e) =>
+              handleChange(
+                "codigo_reinfo",
+                e.currentTarget.value.toUpperCase(),
+              )
+            }
+            classNames={{
+              input:
+                "bg-zinc-900/50 border-zinc-800 text-white uppercase placeholder:text-zinc-500 placeholder:normal-case focus:border-zinc-300 transition-all",
+              label: "text-zinc-400 font-medium text-xs",
+            }}
+          />
+        </Grid.Col>
       </Grid>
+
+      <MultiFilePicker
+        label="Archivos del contrato (opcional)"
+        description="PDF, JPG, PNG, etc. Se subiran al guardar."
+        files={contratosNuevos}
+        onFilesChange={setContratosFiles}
+      />
 
       {/* Tipos de Carbon (opcional) */}
       <div className="flex flex-col gap-3">
@@ -398,168 +394,86 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
             Lugares de extracción
           </Text>
           <Text size="xs" className="text-zinc-500">
-            Añade las zonas de donde este proveedor extrae carbón. Cada lugar
-            guarda su departamento, provincia, distrito y dirección.
+            Selecciona los sitios de donde este proveedor extrae carbón. Cada
+            sitio vive en el catálogo global; usa el botón "+" para agregar uno
+            nuevo.
           </Text>
         </div>
 
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 4 }}>
-            <Select
-              label="Departamento"
+        <Group gap="xs" align="flex-end" wrap="nowrap">
+          <div className="flex-1">
+            <MultiSelect
+              label="Lugares de extracción"
               placeholder={
-                loadingUbigeo && departamentos.length === 0
-                  ? "Cargando..."
-                  : "Seleccione"
+                loadingLugares
+                  ? "Cargando catálogo..."
+                  : "Selecciona uno o más sitios"
               }
               radius="xl"
-              clearable
               searchable
-              searchValue={searchDpto}
-              onSearchChange={setSearchDpto}
-              nothingFoundMessage="Sin coincidencias"
-              data={dptosVisibles.map((d) => ({
-                value: String(d.id),
-                label: d.nombre,
-              }))}
-              value={lugarDpto}
-              onChange={handleDptoChange}
-              disabled={loadingUbigeo && departamentos.length === 0}
-              classNames={selectClasses}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 4 }}>
-            <Select
-              label="Provincia"
-              placeholder={
-                !lugarDpto
-                  ? "Seleccione un departamento"
-                  : "Seleccione"
-              }
-              radius="xl"
               clearable
-              searchable
-              searchValue={searchProv}
-              onSearchChange={setSearchProv}
+              data={lugaresFiltrados}
+              value={lugaresExtraccion.map((l) =>
+                String(l.id_lugar_extraccion_carbon),
+              )}
+              onChange={handleLugaresChange}
+              searchValue={searchLugar}
+              onSearchChange={setSearchLugar}
               nothingFoundMessage="Sin coincidencias"
-              data={provVisibles.map((p) => ({
-                value: String(p.id),
-                label: p.nombre,
-              }))}
-              value={lugarProv}
-              onChange={handleProvChange}
-              disabled={!lugarDpto}
-              classNames={selectClasses}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 4 }}>
-            <Select
-              label="Distrito"
-              placeholder={
-                !lugarProv
-                  ? "Seleccione una provincia"
-                  : "Seleccione"
-              }
-              radius="xl"
-              clearable
-              searchable
-              searchValue={searchDist}
-              onSearchChange={setSearchDist}
-              nothingFoundMessage="Sin coincidencias"
-              data={distVisibles.map((d) => ({
-                value: String(d.id),
-                label: d.nombre,
-              }))}
-              value={lugarDist}
-              onChange={handleDistChange}
-              disabled={!lugarProv}
-              classNames={selectClasses}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 9 }}>
-            <TextInput
-              label="Dirección"
-              placeholder="Ej. Av. Principal 123, Ciudad"
-              radius="xl"
-              value={lugarDireccion}
-              onChange={(e) => handleDireccionChange(e.currentTarget.value)}
-              classNames={fieldClasses}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
-            <div className="flex h-full items-end">
-              <Button
-                leftSection={<IconMapPin size={14} />}
-                radius="xl"
-                size="sm"
-                variant="filled"
-                color="orange"
-                onClick={handleAgregarLugar}
-                className="w-full font-semibold shadow-md shadow-orange-900/30"
-              >
-                Agregar lugar
-              </Button>
-            </div>
-          </Grid.Col>
-        </Grid>
-
-        {lugarError && (
-          <Alert
-            icon={<IconExclamationCircle size={16} />}
-            color="red"
-            variant="light"
-            className="mt-1"
-          >
-            {lugarError}
-          </Alert>
-        )}
-
-        {lugaresExtraccion.length === 0 ? (
-          <div className="text-zinc-500 text-xs italic px-3 py-2 border border-dashed border-zinc-800 rounded-lg">
-            Sin lugares registrados.
-          </div>
-        ) : (
-          <Stack gap="xs">
-            {lugaresExtraccion.map((l, idx) => (
-              <div
-                key={`${l.id_departamento}-${l.id_provincia}-${l.id_distrito}-${idx}`}
-                className="flex items-center justify-between gap-3 p-3 bg-linear-to-r from-zinc-900/60 to-zinc-900/30 border border-zinc-800 rounded-xl hover:border-orange-700/60 transition-colors"
-              >
-                <Group gap="sm" wrap="nowrap">
-                  <Badge
-                    variant="filled"
-                    color="orange"
-                    radius="xl"
-                    size="lg"
-                    className="shrink-0"
-                  >
-                    <IconMapPin size={14} stroke={1.8} />
-                  </Badge>
-                  <div className="flex flex-col min-w-0">
-                    <Text size="sm" fw={500} className="text-zinc-100 truncate">
-                      {l.departamento_nombre} / {l.provincia_nombre} /{" "}
-                      {l.distrito_nombre}
+              disabled={loadingLugares && catalogoLugares.length === 0}
+              classNames={{
+                input:
+                  "bg-zinc-900/50 border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder:text-zinc-500",
+                label: "text-zinc-300 mb-1 font-medium text-xs",
+                pill: "bg-indigo-500/20 text-indigo-200",
+              }}
+              renderOption={({ option }) => {
+                const o = option as unknown as {
+                  departamento_nombre?: string | null;
+                  provincia_nombre?: string | null;
+                  distrito_nombre?: string | null;
+                  direccion: string;
+                };
+                const geo = [
+                  o.departamento_nombre,
+                  o.provincia_nombre,
+                  o.distrito_nombre,
+                ]
+                  .filter(Boolean)
+                  .join(" / ");
+                return (
+                  <div className="flex flex-col py-1">
+                    <Text size="xs" c="dimmed" className="leading-tight">
+                      {geo || "—"}
                     </Text>
-                    <Text size="xs" className="text-zinc-500 truncate">
-                      {l.direccion}
+                    <Text
+                      size="sm"
+                      fw={500}
+                      className="text-zinc-100 leading-tight"
+                    >
+                      {o.direccion}
                     </Text>
                   </div>
-                </Group>
-                <Button
-                  variant="subtle"
-                  color="red"
-                  size="xs"
-                  radius="xl"
-                  leftSection={<IconX size={14} />}
-                  onClick={() => removeLugarExtraccion(idx)}
-                  className="shrink-0"
-                >
-                  Quitar
-                </Button>
-              </div>
-            ))}
-          </Stack>
-        )}
+                );
+              }}
+            />
+          </div>
+          <Button
+            leftSection={<IconPlus size={14} />}
+            radius="xl"
+            size="sm"
+            variant="filled"
+            color="indigo"
+            onClick={() => setModalNuevoLugarAbierto(true)}
+            className="font-semibold shadow-md shadow-indigo-900/30"
+          >
+            Nuevo
+          </Button>
+        </Group>
+
+        <Text size="xs" className="text-zinc-500">
+          {lugaresExtraccion.length} lugar(es) seleccionado(s).
+        </Text>
       </div>
 
       {/* personal (opcional, antes de guardar) */}
@@ -656,6 +570,18 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         initialEsRepresentante={true}
         onCreateLocal={handleRepresentanteCreado}
       />
+
+      <ModalEstandar
+        opened={modalNuevoLugarAbierto}
+        close={() => setModalNuevoLugarAbierto(false)}
+        title="Nuevo lugar de extracción"
+        size="lg"
+      >
+        <FormLugarExtraccion
+          onSuccess={handleNuevoLugarCreado}
+          onCancel={() => setModalNuevoLugarAbierto(false)}
+        />
+      </ModalEstandar>
     </form>
   );
 };

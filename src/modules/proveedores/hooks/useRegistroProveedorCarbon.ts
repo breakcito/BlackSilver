@@ -11,6 +11,7 @@ import type { ProveedorResponse } from "../service/proveedores.responses";
 import type { RES_PersonalExterno } from "../../../service/responses/personal-externo";
 import { AuxService } from "../../../service/auxiliar.service";
 import type { PersonalLocal } from "../../../presentation/utils/modal-personal-externo";
+import { subirContratos } from "../service/upload-contratos";
 
 /**
  * Tipo de carbon capturado en el formulario de registro antes de
@@ -24,16 +25,19 @@ export interface TipoCarbonTemporal {
 }
 
 /**
- * Lugar de extraccion capturado en el formulario antes de persistir.
- * Se guarda con setLugaresExtraccionPorProveedor (PUT que reemplaza todo).
+ * Lugar de extraccion seleccionado en el formulario antes de persistir.
+ * Tras el cambio a catalogo global, guardamos el ID del sitio del catalogo
+ * `lugar_extraccion_carbon` (no los datos del sitio: el sitio vive aparte y
+ * puede reutilizarse entre proveedores).
  */
 export interface LugarExtraccionTemporal {
-  id_departamento: number;
-  departamento_nombre: string;
-  id_provincia: number;
-  provincia_nombre: string;
-  id_distrito: number;
-  distrito_nombre: string;
+  id_lugar_extraccion_carbon: number;
+  id_departamento: number | null;
+  departamento_nombre: string | null;
+  id_provincia: number | null;
+  provincia_nombre: string | null;
+  id_distrito: number | null;
+  distrito_nombre: string | null;
   direccion: string;
 }
 
@@ -55,9 +59,17 @@ export const useRegistroProveedorCarbon = (
     direccion: "",
     telefono: "",
     correo: "",
+    codigo_reinfo: "",
+    contratos: [],
   });
 
   const [personal, setpersonal] = useState<PersonalLocal[]>([]);
+  /**
+   * Archivos del contrato seleccionados en el formulario y pendientes de subir
+   * al storage. El submit los sube primero, concatena las URLs resultantes
+   * con los contratos ya persistidos (en edicion) y envia el set completo.
+   */
+  const [contratosNuevos, setContratosNuevos] = useState<File[]>([]);
 
   const [tiposCarbon, setTiposCarbon] = useState<TipoCarbonTemporal[]>([]);
 
@@ -85,6 +97,11 @@ export const useRegistroProveedorCarbon = (
     }
   };
 
+  const setContratosFiles = (files: File[]) => {
+    setContratosNuevos(files);
+    if (error) setError(null);
+  };
+
   const addpersonal = (r: PersonalLocal) => {
     setpersonal((prev) => [...prev, r]);
   };
@@ -106,28 +123,6 @@ export const useRegistroProveedorCarbon = (
   setTiposCarbon(next);
 };
 
-  const addLugarExtraccion = (l: LugarExtraccionTemporal) => {
-    setLugaresExtraccion((prev) => {
-      // Evitar duplicados exactos por (dpto+prov+dist+dir normalizada).
-      const key = `${l.id_departamento}-${l.id_provincia}-${l.id_distrito}-${l.direccion.trim().toLowerCase()}`;
-      if (
-        prev.some(
-          (x) =>
-            `${x.id_departamento}-${x.id_provincia}-${x.id_distrito}-${x.direccion
-              .trim()
-              .toLowerCase()}` === key,
-        )
-      ) {
-        return prev;
-      }
-      return [...prev, l];
-    });
-  };
-
-  const removeLugarExtraccion = (idx: number) => {
-    setLugaresExtraccion((prev) => prev.filter((_, i) => i !== idx));
-  };
-
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -140,11 +135,34 @@ export const useRegistroProveedorCarbon = (
 
     setLoading(true);
     try {
+      // 0) subir archivos del contrato al storage antes del POST. Si falla
+      //    algun archivo, avisamos y no creamos el proveedor (asi no queda
+      //    un proveedor huerfano con archivos "por subir").
+      let contratosSubidos: Awaited<
+        ReturnType<typeof subirContratos>
+      > = [];
+      if (contratosNuevos.length > 0) {
+        try {
+          contratosSubidos = await subirContratos(contratosNuevos);
+        } catch (err) {
+          console.error(err);
+          const msg =
+            err instanceof Error
+              ? err.message
+              : "No se pudieron subir los archivos del contrato";
+          setError(msg);
+          notifyError(msg);
+          return;
+        }
+      }
+
       // 1) crear proveedor (forzamos para_carbon=true aqui tambien
       //    por si el payload lo mutaron fuera del hook).
       const created = await ProveedoresService.crearProveedor({
         ...validation.data,
         para_carbon: true,
+        codigo_reinfo: (validation.data.codigo_reinfo ?? "").trim(),
+        contratos: contratosSubidos,
       });
 
       // 2) crear personal en secuencia. Un fallo aqui no revierte
@@ -197,12 +215,9 @@ export const useRegistroProveedorCarbon = (
             await ProveedoresService.setLugaresExtraccionPorProveedor(
               created.id_proveedor,
               {
-                lugares: lugaresExtraccion.map((l) => ({
-                  id_departamento: l.id_departamento,
-                  id_provincia: l.id_provincia,
-                  id_distrito: l.id_distrito,
-                  direccion: l.direccion.trim(),
-                })),
+                lugares: lugaresExtraccion.map(
+                  (l) => l.id_lugar_extraccion_carbon,
+                ),
               },
             );
           lugaresFallaron = !respLugares.success;
@@ -247,6 +262,9 @@ export const useRegistroProveedorCarbon = (
     personal,
     tiposCarbon,
     lugaresExtraccion,
+    setLugaresExtraccion,
+    contratosNuevos,
+    setContratosFiles,
     loading,
     error,
     handleChange,
@@ -254,8 +272,6 @@ export const useRegistroProveedorCarbon = (
     addpersonal,
     removepersonal,
     setTiposCarbonSeleccionados,
-    addLugarExtraccion,
-    removeLugarExtraccion,
     submit,
   };
 };

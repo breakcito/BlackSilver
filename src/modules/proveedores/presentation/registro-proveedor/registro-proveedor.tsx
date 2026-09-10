@@ -48,8 +48,7 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            withAsterisk
-            label="RUC"
+            label="RUC (opc)"
             placeholder={
               payload.tipo_entidad === TipoEntidad.Natural
                 ? "10xxxxxxxxx (persona natural)"

@@ -19,7 +19,6 @@ import type { RES_LugarExtraccionCarbon } from "../../service/responses/lugar-ex
 import { useNotify } from "../../hooks/useNotify";
 
 export interface FormLugarExtraccionProps {
-  idProveedor: number;
   onSuccess: (nuevo: RES_LugarExtraccionCarbon) => void;
   onCancel?: () => void;
 }
@@ -30,8 +29,13 @@ const inputClasses = {
   label: "text-zinc-300 mb-1 font-medium text-xs",
 };
 
+/**
+ * Formulario del CATALOGO de lugares de extraccion de carbon (global, sin
+ * proveedor asociado). Direccion obligatoria; departamento/provincia/distrito
+ * opcionales pero con busqueda tolerante (Fuse + FlexSearch via
+ * getCoincidencias en el padre consumidor si fuera necesario).
+ */
 export const FormLugarExtraccion = ({
-  idProveedor,
   onSuccess,
   onCancel,
 }: FormLugarExtraccionProps) => {
@@ -81,47 +85,41 @@ export const FormLugarExtraccion = ({
   }, []);
 
   const provinciasFiltradas = useMemo(
-    () => provincias.filter((p) => p.id_departamento === Number(idDepartamento)),
+    () =>
+      idDepartamento
+        ? provincias.filter((p) => p.id_departamento === Number(idDepartamento))
+        : provincias,
     [provincias, idDepartamento],
   );
 
   const distritosFiltrados = useMemo(
-    () => distritos.filter((d) => d.id_provincia === Number(idProvincia)),
+    () =>
+      idProvincia
+        ? distritos.filter((d) => d.id_provincia === Number(idProvincia))
+        : distritos,
     [distritos, idProvincia],
   );
 
-  const validate = (): string | null => {
-    if (!idDepartamento) return "Selecciona un departamento";
-    if (!idProvincia) return "Selecciona una provincia";
-    if (!idDistrito) return "Selecciona un distrito";
-    if (!direccion.trim() || direccion.trim().length < 3) {
-      return "La direccion es obligatoria (min 3 caracteres)";
-    }
-    return null;
-  };
-
   const submitValido = useMemo(
-    () =>
-      Boolean(idDepartamento && idProvincia && idDistrito) &&
-      direccion.trim().length >= 3,
-    [idDepartamento, idProvincia, idDistrito, direccion],
+    () => direccion.trim().length >= 3,
+    [direccion],
   );
 
   const onSubmit = async () => {
     setError(null);
-    const ve = validate();
-    if (ve) {
-      setError(ve);
+    const dirTrim = direccion.trim();
+    if (!dirTrim) {
+      setError("La direccion es obligatoria");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await AuxService.crear_lugar_extraccion_carbon(idProveedor, {
-        id_departamento: Number(idDepartamento),
-        id_provincia: Number(idProvincia),
-        id_distrito: Number(idDistrito),
-        direccion: direccion.trim(),
+      const res = await AuxService.crear_lugar_extraccion_carbon({
+        id_departamento: idDepartamento ? Number(idDepartamento) : null,
+        id_provincia: idProvincia ? Number(idProvincia) : null,
+        id_distrito: idDistrito ? Number(idDistrito) : null,
+        direccion: dirTrim,
       });
 
       if (res.success && res.data) {
@@ -156,11 +154,25 @@ export const FormLugarExtraccion = ({
 
       <Grid>
         <Grid.Col span={{ base: 12 }}>
-          <Select
-            label="Departamento"
-            placeholder={loadingUbigeo ? "Cargando..." : "Seleccione"}
+          <TextInput
+            label="Direccion"
+            placeholder="Ej. Av. Principal 123, zona industrial"
             withAsterisk
             radius="xl"
+            value={direccion}
+            onChange={(e) => {
+              setDireccion(e.target.value);
+              if (error) setError(null);
+            }}
+            classNames={inputClasses}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12 }}>
+          <Select
+            label="Departamento (opc)"
+            placeholder={loadingUbigeo ? "Cargando..." : "Seleccione"}
+            radius="xl"
+            clearable
             data={departamentos.map((d) => ({
               value: String(d.id),
               label: d.nombre,
@@ -179,16 +191,16 @@ export const FormLugarExtraccion = ({
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Select
-            label="Provincia"
+            label="Provincia (opc)"
             placeholder={
               !idDepartamento
-                ? "Selecciona un departamento"
+                ? "Seleccione un departamento"
                 : loadingUbigeo
                   ? "Cargando..."
                   : "Seleccione"
             }
-            withAsterisk
             radius="xl"
+            clearable
             data={provinciasFiltradas.map((p) => ({
               value: String(p.id),
               label: p.nombre,
@@ -207,16 +219,16 @@ export const FormLugarExtraccion = ({
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Select
-            label="Distrito"
+            label="Distrito (opc)"
             placeholder={
               !idProvincia
-                ? "Selecciona una provincia"
+                ? "Seleccione una provincia"
                 : loadingUbigeo
                   ? "Cargando..."
                   : "Seleccione"
             }
-            withAsterisk
             radius="xl"
+            clearable
             data={distritosFiltrados.map((d) => ({
               value: String(d.id),
               label: d.nombre,
@@ -232,25 +244,11 @@ export const FormLugarExtraccion = ({
             nothingFoundMessage="Sin distritos"
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12 }}>
-          <TextInput
-            label="Direccion"
-            placeholder="Ej. Av. Principal 123, zona industrial"
-            withAsterisk
-            radius="xl"
-            value={direccion}
-            onChange={(e) => {
-              setDireccion(e.target.value);
-              if (error) setError(null);
-            }}
-            classNames={inputClasses}
-          />
-        </Grid.Col>
       </Grid>
 
       <Text size="xs" c="dimmed">
-        El lugar de extraccion quedara asociado al proveedor actual y disponible
-        inmediatamente para asignarlo a un item de la compra.
+        El lugar se agrega al catalogo global y queda disponible para asociarlo
+        a uno o varios proveedores desde el formulario del proveedor.
       </Text>
 
       <div className="flex justify-end gap-3 mt-2 pt-4 border-t border-zinc-800">

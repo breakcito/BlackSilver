@@ -26,6 +26,8 @@ export const useRegistroProveedor = (
     direccion: "",
     telefono: "",
     correo: "",
+    codigo_reinfo: null,
+    contratos: [],
   });
 
   const handleChange = <K extends keyof CrearProveedorRequest>(
@@ -73,6 +75,8 @@ export const useRegistroProveedor = (
         direccion: "",
         telefono: "",
         correo: "",
+        codigo_reinfo: null,
+        contratos: [],
       });
       onSuccess(created);
     } catch (e) {

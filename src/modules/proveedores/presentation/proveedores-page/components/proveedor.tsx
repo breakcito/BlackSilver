@@ -11,6 +11,7 @@ import {
 import {
   IconBuildingBank,
   IconBuilding,
+  IconClipboardText,
   IconDotsVertical,
   IconFlame,
   IconMail,
@@ -36,6 +37,7 @@ interface Props {
   onOpenPersonal: (proveedor: ProveedorResponse) => void;
   onOpenTiposCarbon?: (proveedor: ProveedorResponse) => void;
   onOpenLugaresExtraccion?: (proveedor: ProveedorResponse) => void;
+  onOpenContrato?: (proveedor: ProveedorResponse) => void;
   onEditar: (proveedor: ProveedorResponse) => void;
   onEliminar: (proveedor: ProveedorResponse) => void;
   eliminandoId: number | null;
@@ -49,6 +51,7 @@ export const Proveedor = ({
   onOpenPersonal,
   onOpenTiposCarbon,
   onOpenLugaresExtraccion,
+  onOpenContrato,
   onEditar,
   onEliminar,
   eliminandoId,
@@ -147,6 +150,33 @@ export const Proveedor = ({
     ...(modoCarbon
       ? [
           {
+            accessor: "codigo_reinfo" as const,
+            title: "REINFO",
+            width: 160,
+            textAlign: "center" as const,
+            render: (r: ProveedorResponse) =>
+              r.codigo_reinfo ? (
+                <Badge
+                  color="pink"
+                  variant="light"
+                  size="sm"
+                  radius="xl"
+                  className="font-mono tracking-wide truncate max-w-40"
+                  title={r.codigo_reinfo}
+                >
+                  {r.codigo_reinfo}
+                </Badge>
+              ) : (
+                <Text size="xs" className="text-zinc-500">
+                  —
+                </Text>
+              ),
+          },
+        ]
+      : []),
+    ...(modoCarbon
+      ? [
+          {
             accessor: "cantidad_tipos_carbon" as const,
             title: "Tipos Carbon",
             width: 130,
@@ -186,7 +216,7 @@ export const Proveedor = ({
           {
             accessor: "cantidad_lugares_extraccion" as const,
             title: "Lugares Extraccion",
-            width: 150,
+            width: 170,
             textAlign: "center" as const,
             render: (r: ProveedorResponse) => (
               <Group gap="xs" justify="center" wrap="nowrap">
@@ -219,6 +249,48 @@ export const Proveedor = ({
                 )}
               </Group>
             ),
+          },
+          {
+            accessor: "contratos" as const,
+            title: "Contrato",
+            width: 150,
+            textAlign: "center" as const,
+            render: (r: ProveedorResponse) => {
+              const n = Array.isArray(r.contratos) ? r.contratos.length : 0;
+              return (
+                <Group gap="xs" justify="center" wrap="nowrap">
+                  <Badge
+                    color={n > 0 ? "yellow" : "gray"}
+                    variant="light"
+                    size="sm"
+                    radius="xl"
+                  >
+                    {n === 0
+                      ? "Sin archivos"
+                      : n === 1
+                        ? "1 archivo"
+                        : `${n} archivos`}
+                  </Badge>
+                  {onOpenContrato && (
+                    <Tooltip
+                      label="Ver archivos del contrato"
+                      withArrow
+                      position="left"
+                    >
+                      <ActionIcon
+                        variant="subtle"
+                        color="yellow"
+                        radius="xl"
+                        size="sm"
+                        onClick={() => onOpenContrato(r)}
+                      >
+                        <IconClipboardText size={16} stroke={1.5} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+              );
+            },
           },
         ]
       : []),
@@ -264,6 +336,11 @@ export const Proveedor = ({
       accessor: "indicadores",
       title: "Indicadores",
       textAlign: "center",
+      // En modo carbon la columna no aporta: las flags para_mantenimiento /
+      // para_transporte son de logistica y la pagina ya esta filtrada a
+      // proveedores de carbon. La omision libera ancho para que Contacto y
+      // Lugares Extraccion respiren.
+      hidden: modoCarbon,
       render: (r: ProveedorResponse) => {
         const badges = [];
         if (r.para_mantenimiento) {

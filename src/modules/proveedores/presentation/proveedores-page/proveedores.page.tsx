@@ -30,6 +30,7 @@ import { CuentasBancarias } from "../cuentas-bancarias/cuentas-bancarias";
 import { PersonalExternoProveedor } from "../personal-externo-proveedor/personal-externo-proveedor";
 import { TiposCarbonProveedor } from "../tipos-carbon-proveedor/tipos-carbon-proveedor";
 import { LugaresExtraccionProveedor } from "../lugares-extraccion-proveedor/lugares-extraccion-proveedor";
+import { ContratoProveedor } from "../contrato-proveedor/contrato-proveedor";
 import type {
   CuentaBancariaResponse,
   LugarExtraccionResponse,
@@ -95,6 +96,8 @@ export const ProveedoresPage = () => {
     useState<ProveedorResponse | null>(null);
   const [proveedorLugares, setProveedorLugares] =
     useState<ProveedorResponse | null>(null);
+  const [proveedorContrato, setProveedorContrato] =
+    useState<ProveedorResponse | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
   const proveedorEnGestion =
@@ -122,6 +125,13 @@ export const ProveedoresPage = () => {
       ? (proveedores.find(
           (p) => p.id_proveedor === proveedorLugares.id_proveedor,
         ) ?? proveedorLugares)
+      : null;
+
+  const proveedorContratoEnGestion =
+    proveedorContrato
+      ? (proveedores.find(
+          (p) => p.id_proveedor === proveedorContrato.id_proveedor,
+        ) ?? proveedorContrato)
       : null;
 
   const actualizarCuentas = (
@@ -380,6 +390,7 @@ export const ProveedoresPage = () => {
             onOpenPersonal={(p) => setProveedorPersonal(p)}
             onOpenTiposCarbon={(p) => setProveedorTiposCarbon(p)}
             onOpenLugaresExtraccion={(p) => setProveedorLugares(p)}
+            onOpenContrato={(p) => setProveedorContrato(p)}
             onEditar={(p) => setProveedorEnEdicion(p)}
             onEliminar={(p) => {
               void eliminarProveedor(p.id_proveedor);
@@ -548,6 +559,22 @@ export const ProveedoresPage = () => {
               setProveedorLugares(null);
             }}
           />
+        )}
+      </ModalEstandar>
+
+      {/* Modal: Archivos del Contrato del proveedor (solo tab Carbon, read-only) */}
+      <ModalEstandar
+        opened={!!proveedorContrato}
+        close={() => setProveedorContrato(null)}
+        title={
+          proveedorContratoEnGestion
+            ? `Archivos del Contrato: ${proveedorContratoEnGestion.razon_social}`
+            : "Archivos del Contrato"
+        }
+        size="md"
+      >
+        {proveedorContratoEnGestion && (
+          <ContratoProveedor proveedor={proveedorContratoEnGestion} />
         )}
       </ModalEstandar>
     </div>

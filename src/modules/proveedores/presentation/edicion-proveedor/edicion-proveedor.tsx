@@ -1,8 +1,23 @@
-import { IconDeviceFloppy, IconExclamationCircle } from "@tabler/icons-react";
-import { Alert, Button, Grid, Select, Switch, TextInput } from "@mantine/core";
+import {
+  IconDeviceFloppy,
+  IconExclamationCircle,
+  IconTrash,
+} from "@tabler/icons-react";
+import {
+  Alert,
+  Button,
+  Grid,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+} from "@mantine/core";
 import { useEdicionProveedor } from "../../hooks/useEdicionProveedor";
 import { TipoEntidad } from "../../../../shared/enums/_generic/tipo-entidad";
 import type { ProveedorResponse } from "../../service/proveedores.responses";
+import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
+import { ArchivoCard } from "../../../../presentation/utils/archivo/archivo-card";
 
 interface Props {
   proveedor: ProveedorResponse;
@@ -28,10 +43,21 @@ export const EdicionProveedor = ({
   onCancel,
   onSuccess,
 }: Props) => {
-  const { payload, handleChange, handleSelectChange, submit, loading, error } =
-    useEdicionProveedor(proveedor, onSuccess);
+  const {
+    payload,
+    handleChange,
+    handleSelectChange,
+    submit,
+    loading,
+    error,
+    contratosPersistidos,
+    contratosNuevos,
+    setContratosFiles,
+    quitarContratoPersistido,
+  } = useEdicionProveedor(proveedor, onSuccess);
 
   const esNatural = payload.tipo_entidad === TipoEntidad.Natural;
+  const esCarbon = !!proveedor.para_carbon;
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
@@ -63,8 +89,7 @@ export const EdicionProveedor = ({
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            withAsterisk
-            label="RUC"
+            label="RUC (opc)"
             placeholder={
               esNatural
                 ? "10xxxxxxxxx (persona natural)"
@@ -146,6 +171,34 @@ export const EdicionProveedor = ({
           />
         </Grid.Col>
 
+        {/* REINFO va dentro del Grid (despues de Correo) solo si el proveedor
+            ya es de carbon: asi viaja con los demas atributos de la tabla
+            proveedor, no en una seccion aparte. */}
+        {esCarbon && (
+          <Grid.Col span={12}>
+            <TextInput
+              label="Codigo REINFO (opcional)"
+              placeholder="Ej. REINFO-XXXX-YYYY"
+              radius="xl"
+              size="xs"
+              maxLength={64}
+              value={payload.codigo_reinfo ?? ""}
+              onChange={(e) =>
+                handleChange(
+                  "codigo_reinfo",
+                  e.currentTarget.value.toUpperCase(),
+                )
+              }
+              disabled={loading}
+              classNames={{
+                input:
+                  "bg-zinc-900/50 border-zinc-800 text-white uppercase placeholder:text-zinc-500 placeholder:normal-case focus:border-zinc-300 transition-all",
+                label: "text-zinc-400 font-medium text-xs",
+              }}
+            />
+          </Grid.Col>
+        )}
+
         {!modoCarbon && (
           <>
             <Grid.Col span={{ base: 12 }}>
@@ -197,6 +250,52 @@ export const EdicionProveedor = ({
           </>
         )}
       </Grid>
+
+      {/* Archivos del Contrato. Solo si el proveedor ya es de carbon:
+          en logistica el backend ignora estos campos. */}
+      {esCarbon && (
+        <div className="flex flex-col gap-3">
+          {contratosPersistidos.length > 0 && (
+            <Stack gap="xs">
+              <Text
+                size="xs"
+                fw={600}
+                className="text-zinc-400 uppercase tracking-widest"
+              >
+                Archivos vigentes
+              </Text>
+              {contratosPersistidos.map((a) => (
+                <div
+                  key={a.path_relativo}
+                  className="flex items-center gap-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <ArchivoCard archivo={a} />
+                  </div>
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="xs"
+                    radius="xl"
+                    leftSection={<IconTrash size={14} />}
+                    onClick={() => quitarContratoPersistido(a.path_relativo)}
+                    disabled={loading}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+            </Stack>
+          )}
+
+          <MultiFilePicker
+            label="Archivos del contrato (opcional)"
+            description="PDF, JPG, PNG, etc. Se subiran al guardar."
+            files={contratosNuevos}
+            onFilesChange={setContratosFiles}
+          />
+        </div>
+      )}
 
       <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-zinc-800">
         <Button

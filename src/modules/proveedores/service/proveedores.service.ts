@@ -50,6 +50,8 @@ export const ProveedoresService = {
       direccion: payload.direccion,
       telefono: payload.telefono,
       correo: payload.correo,
+      codigo_reinfo: payload.codigo_reinfo ?? null,
+      contratos: payload.contratos ?? [],
     });
     return data.data;
   },
@@ -87,6 +89,8 @@ export const ProveedoresService = {
         direccion: payload.direccion,
         telefono: payload.telefono,
         correo: payload.correo,
+        codigo_reinfo: payload.codigo_reinfo ?? null,
+        contratos: payload.contratos ?? [],
       },
     );
     return data;

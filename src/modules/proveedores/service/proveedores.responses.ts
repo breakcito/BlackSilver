@@ -2,6 +2,7 @@ import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Moneda } from "../../../shared/enums/_generic/moneda";
 import type { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
+import type { IArchivo } from "../../../shared/interfaces/archivo";
 
 export interface ProveedorResponse {
   id_proveedor: number;
@@ -15,6 +16,16 @@ export interface ProveedorResponse {
   direccion: string | null;
   telefono: string | null;
   correo: string | null;
+  /**
+   * Codigo REINFO. Solo aplica a proveedores de carbon; en logistica el
+   * backend siempre lo devuelve null.
+   */
+  codigo_reinfo: string | null;
+  /**
+   * Archivos del contrato. Solo aplica a proveedores de carbon; el backend
+   * lo expone como `[]` en logistica.
+   */
+  contratos: IArchivo[];
   estado: EstadoBase;
   cambios_log?: RES_CambiosLog[] | string | null;
   cantidad_cuentas_bancarias: number;
@@ -45,12 +56,12 @@ export interface TipoCarbonProveedorResponse {
 }
 
 export interface LugarExtraccionResponse {
-  id_proveedor: number;
-  id_departamento: number;
-  departamento_nombre: string;
-  id_provincia: number;
-  provincia_nombre: string;
-  id_distrito: number;
-  distrito_nombre: string;
+  id_lugar_extraccion: number;
+  id_departamento: number | null;
+  departamento_nombre: string | null;
+  id_provincia: number | null;
+  provincia_nombre: string | null;
+  id_distrito: number | null;
+  distrito_nombre: string | null;
   direccion: string;
 }

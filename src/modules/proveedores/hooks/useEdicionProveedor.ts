@@ -7,6 +7,8 @@ import {
 } from "../service/proveedores.requests";
 import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 import type { ProveedorResponse } from "../service/proveedores.responses";
+import type { IArchivo } from "../../../shared/interfaces/archivo";
+import { subirContratos } from "../service/upload-contratos";
 
 /**
  * Hook de edicion de proveedor (logistica y carbon).
@@ -37,7 +39,20 @@ export const useEdicionProveedor = (
     direccion: "",
     telefono: "",
     correo: "",
+    codigo_reinfo: "",
+    contratos: [],
   });
+
+  /**
+   * Contratos ya persistidos en BD al cargar el proveedor. Es lo que el
+   * usuario NO elimina de la lista visible. Sobreviven al PUT siempre que
+   * el usuario no los marque para borrar.
+   */
+  const [contratosPersistidos, setContratosPersistidos] = useState<IArchivo[]>(
+    [],
+  );
+  /** Archivos del contrato recien seleccionados, pendientes de subir. */
+  const [contratosNuevos, setContratosNuevos] = useState<File[]>([]);
 
   // Hidratacion desde el proveedor recibido.
   useEffect(() => {
@@ -53,9 +68,26 @@ export const useEdicionProveedor = (
       direccion: proveedor.direccion ?? "",
       telefono: proveedor.telefono ?? "",
       correo: proveedor.correo ?? "",
+      codigo_reinfo: proveedor.codigo_reinfo ?? "",
+      contratos: Array.isArray(proveedor.contratos) ? proveedor.contratos : [],
     });
+    setContratosPersistidos(
+      Array.isArray(proveedor.contratos) ? proveedor.contratos : [],
+    );
+    setContratosNuevos([]);
     setError(null);
   }, [proveedor]);
+
+  const setContratosFiles = (files: File[]) => {
+    setContratosNuevos(files);
+    if (error) setError(null);
+  };
+
+  const quitarContratoPersistido = (pathRelativo: string) => {
+    setContratosPersistidos((prev) =>
+      prev.filter((a) => a.path_relativo !== pathRelativo),
+    );
+  };
 
   const handleChange = <K extends keyof ActualizarProveedorRequest>(
     field: K,
@@ -94,9 +126,40 @@ export const useEdicionProveedor = (
 
     setLoading(true);
     try {
+      // 0) subir archivos del contrato nuevos al storage. Si falla, NO
+      //    pisamos los contratos persistidos: avisamos y abortamos.
+      let subidos: Awaited<ReturnType<typeof subirContratos>> = [];
+      if (contratosNuevos.length > 0) {
+        try {
+          subidos = await subirContratos(contratosNuevos);
+        } catch (err) {
+          console.error(err);
+          const msg =
+            err instanceof Error
+              ? err.message
+              : "No se pudieron subir los archivos del contrato";
+          setError(msg);
+          notifyError(msg);
+          return;
+        }
+      }
+
+      // Construir la lista final = persistidos (aun visibles) + subidos.
+      // Solo proveedores de carbon mandan estos campos; el backend los
+      // ignora si para_carbon=0 (defensa).
+      const contratosFinal: IArchivo[] = proveedor.para_carbon
+        ? [...contratosPersistidos, ...subidos]
+        : [];
+
       const resp = await ProveedoresService.actualizarProveedor(
         proveedor.id_proveedor,
-        validation.data,
+        {
+          ...validation.data,
+          codigo_reinfo: proveedor.para_carbon
+            ? (validation.data.codigo_reinfo ?? "").trim()
+            : "",
+          contratos: contratosFinal,
+        },
       );
       if (!resp.success) {
         setError(resp.message);
@@ -112,5 +175,16 @@ export const useEdicionProveedor = (
     }
   };
 
-  return { payload, handleChange, handleSelectChange, submit, loading, error };
+  return {
+    payload,
+    handleChange,
+    handleSelectChange,
+    submit,
+    loading,
+    error,
+    contratosPersistidos,
+    contratosNuevos,
+    setContratosFiles,
+    quitarContratoPersistido,
+  };
 };

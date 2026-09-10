@@ -668,7 +668,9 @@ export const AuxService = {
   },
 
   /**
-   * Lista los lugares de extraccion de carbon de un proveedor.
+   * Lista los lugares de extraccion de carbon asociados a un proveedor.
+   * (Vista JOIN: catalogo lugar_extraccion_carbon + puente
+   * lugar_extraccion_proveedor).
    */
   get_lugares_extraccion_carbon: async (
     idProveedor: number,
@@ -680,20 +682,31 @@ export const AuxService = {
   },
 
   /**
-   * Crea un lugar de extraccion para un proveedor (sin tocar los existentes).
-   * Pensado para el boton "+" del formulario de Compra de Carbon.
+   * Lista el catalogo GLOBAL de lugares de extraccion de carbon (sitios
+   * nombrados, sin asociacion a proveedor). Usado para alimentar los
+   * Selects de los formularios de proveedor de carbon y de compra.
    */
-  crear_lugar_extraccion_carbon: async (
-    idProveedor: number,
-    nuevo: {
-      id_departamento: number;
-      id_provincia: number;
-      id_distrito: number;
-      direccion: string;
-    },
-  ): Promise<IRespuesta<RES_LugarExtraccionCarbon>> => {
+  get_lugar_extraccion_carbon_catalogo: async (): Promise<
+    IRespuesta<RES_LugarExtraccionCarbon[]>
+  > => {
+    const { data } = await api.get<IRespuesta<RES_LugarExtraccionCarbon[]>>(
+      `/lugar-extraccion-carbon`,
+    );
+    return data;
+  },
+
+  /**
+   * Crea un nuevo sitio en el catalogo GLOBAL. Direccion obligatoria;
+   * departamento / provincia / distrito opcionales.
+   */
+  crear_lugar_extraccion_carbon: async (nuevo: {
+    id_departamento?: number | null;
+    id_provincia?: number | null;
+    id_distrito?: number | null;
+    direccion: string;
+  }): Promise<IRespuesta<RES_LugarExtraccionCarbon>> => {
     const { data } = await api.post<IRespuesta<RES_LugarExtraccionCarbon>>(
-      `/proveedores/${idProveedor}/lugares-extraccion`,
+      `/lugar-extraccion-carbon`,
       nuevo,
     );
     return data;
