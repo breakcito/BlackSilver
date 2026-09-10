@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LotesService } from "../service/lotes.service";
 import type { RES_Lote } from "../service/lotes.responses";
+import { useNotify } from "../../../hooks/useNotify";
 import { useUIStore } from "../../../stores/ui.store";
 import type { RES_TicketLote } from "../../../service/responses/lote-producto";
 import { AuxService } from "../../../service/auxiliar.service";
@@ -12,6 +13,7 @@ import { useAuditoriaStore } from "../../../stores/auditoria.store";
 export const useLotesPage = () => {
   const { en_modo_auditable } = useAuditoriaStore();
   const setTitle = useUIStore((state) => state.setTitle);
+  const { notifySuccess, notifyError } = useNotify();
 
   const [searchParams] = useSearchParams();
   const initialAlmacenId = searchParams.get("idAlmacen");
@@ -22,6 +24,7 @@ export const useLotesPage = () => {
   const [loading, setLoading] = useState(false);
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Filters
   const [idAlmacen, setIdAlmacen] = useState<string | null>(initialAlmacenId);
@@ -181,6 +184,39 @@ export const useLotesPage = () => {
         prev.map((l) => (l.id_lote === lote.id_lote ? lote : l)),
       );
     },
+    eliminarLote: useCallback(
+      async (id_lote: number): Promise<boolean> => {
+        const confirmar = window.confirm(
+          "¿Está seguro de eliminar este lote? Esta acción lo desactivará del almacén (soft-delete).",
+        );
+        if (!confirmar) return false;
+
+        setDeletingId(id_lote);
+        try {
+          const resp = await LotesService.eliminar(id_lote);
+          if (resp.success) {
+            notifySuccess(resp.message);
+            // Reemplazamos la fila por la versión devuelta (estado=Inactivo)
+            setLotes((prev) =>
+              prev.map((l) =>
+                l.id_lote === id_lote ? resp.data : l,
+              ),
+            );
+            return true;
+          }
+          notifyError(resp.message);
+          return false;
+        } catch (err) {
+          console.error(err);
+          notifyError("Error inesperado al eliminar el lote.");
+          return false;
+        } finally {
+          setDeletingId(null);
+        }
+      },
+      [notifySuccess, notifyError],
+    ),
+    deletingId,
     selectedLotes,
     setSelectedLotes,
     toggleSelectAll: () => {

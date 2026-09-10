@@ -1,12 +1,21 @@
 import {
+  ActionIcon,
   Badge,
   Group,
+  Menu,
   Text,
   ThemeIcon,
-  ActionIcon,
   Tooltip,
 } from "@mantine/core";
-import { IconBuilding, IconUser, IconBuildingBank } from "@tabler/icons-react";
+import {
+  IconBuilding,
+  IconUser,
+  IconBuildingBank,
+  IconDotsVertical,
+  IconPencil,
+  IconHistory,
+  IconTrash,
+} from "@tabler/icons-react";
 import { DataTableEstandar } from "../../../../../presentation/utils/datatable-estandar";
 import type { ClienteResponse } from "../../../service/clientes.responses";
 
@@ -14,9 +23,21 @@ interface Props {
   clientes: ClienteResponse[];
   loading: boolean;
   onOpenCuentas: (cliente: ClienteResponse) => void;
+  onEdit: (cliente: ClienteResponse) => void;
+  onHistory: (cliente: ClienteResponse) => void;
+  onDelete: (cliente: ClienteResponse) => void;
+  deletingId: number | null;
 }
 
-export const Cliente = ({ clientes, loading, onOpenCuentas }: Props) => {
+export const Cliente = ({
+  clientes,
+  loading,
+  onOpenCuentas,
+  onEdit,
+  onHistory,
+  onDelete,
+  deletingId,
+}: Props) => {
   return (
     <DataTableEstandar
       idAccessor="id_cliente"
@@ -138,6 +159,53 @@ export const Cliente = ({ clientes, loading, onOpenCuentas }: Props) => {
             >
               {r.estado}
             </Badge>
+          ),
+        },
+        {
+          accessor: "actions",
+          title: "",
+          width: 70,
+          textAlign: "right",
+          render: (r: ClienteResponse) => (
+            <Menu shadow="md" width={200} position="bottom-end" withArrow>
+              <Menu.Target>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Abrir acciones del cliente"
+                  title="Acciones"
+                >
+                  <IconDotsVertical className="w-5 h-5" />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown className="bg-zinc-900 border-zinc-800">
+                <Menu.Label className="text-zinc-500">Acciones</Menu.Label>
+                <Menu.Item
+                  leftSection={<IconPencil className="w-4 h-4" />}
+                  onClick={() => onEdit(r)}
+                  className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                >
+                  Editar
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconHistory className="w-4 h-4" />}
+                  onClick={() => onHistory(r)}
+                  className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                >
+                  Ver historial
+                </Menu.Item>
+                <Menu.Divider className="border-zinc-800" />
+                <Menu.Item
+                  leftSection={<IconTrash className="w-4 h-4" />}
+                  color="red"
+                  onClick={() => onDelete(r)}
+                  disabled={deletingId === r.id_cliente}
+                  className="hover:bg-red-900/20"
+                >
+                  Eliminar
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           ),
         },
       ]}

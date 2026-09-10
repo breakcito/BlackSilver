@@ -75,12 +75,12 @@ export const useEdicionEmpleado = (
     }
   }, [cargarCatalogos, tieneContratoVigente]);
 
+  // En edicion NO filtramos por area: mostramos TODOS los cargos siempre.
+  // Esto garantiza que el cargo actual del empleado SIEMPRE este presente
+  // en el data del Select, sin depender de data inconsistency con id_area.
   const cargos = useMemo(() => {
-    const sinArea = todosCargos.filter((c) => c.id_area === null);
-    if (!idArea) return todosCargos;
-    const delArea = todosCargos.filter((c) => c.id_area === idArea);
-    return [...delArea, ...sinArea];
-  }, [todosCargos, idArea]);
+    return todosCargos;
+  }, [todosCargos]);
 
   const setField = <K extends keyof DTO_ActualizarEmpleado>(
     field: K,

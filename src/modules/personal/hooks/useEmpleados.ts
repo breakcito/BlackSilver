@@ -289,6 +289,22 @@ export const useEmpleados = () => {
       return false;
     },
 
+    // Eliminar (borrado logico: cambia estado a Inactivo)
+    eliminarEmpleado: async (idEmpleado: number) => {
+      try {
+        const resp = await EmpleadosService.eliminar_empleado(idEmpleado);
+        if (resp.success) {
+          setEmpleados((prev) =>
+            prev.filter((e) => e.id_empleado !== idEmpleado),
+          );
+          return true;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      return false;
+    },
+
     // Selección masiva
     seleccionados,
     empleadosSeleccionados,

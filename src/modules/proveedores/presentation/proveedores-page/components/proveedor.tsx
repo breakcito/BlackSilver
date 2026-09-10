@@ -1,6 +1,7 @@
 import {
   Badge,
   ActionIcon,
+  Menu,
   Tooltip,
   Group,
   Stack,
@@ -10,10 +11,13 @@ import {
 import {
   IconBuildingBank,
   IconBuilding,
+  IconDotsVertical,
   IconFlame,
   IconMail,
   IconMapPin,
+  IconPencil,
   IconPhone,
+  IconTrash,
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
@@ -32,6 +36,9 @@ interface Props {
   onOpenPersonal: (proveedor: ProveedorResponse) => void;
   onOpenTiposCarbon?: (proveedor: ProveedorResponse) => void;
   onOpenLugaresExtraccion?: (proveedor: ProveedorResponse) => void;
+  onEditar: (proveedor: ProveedorResponse) => void;
+  onEliminar: (proveedor: ProveedorResponse) => void;
+  eliminandoId: number | null;
 }
 
 export const Proveedor = ({
@@ -42,6 +49,9 @@ export const Proveedor = ({
   onOpenPersonal,
   onOpenTiposCarbon,
   onOpenLugaresExtraccion,
+  onEditar,
+  onEliminar,
+  eliminandoId,
 }: Props) => {
   const columnas: Col[] = [
     {
@@ -296,6 +306,47 @@ export const Proveedor = ({
           {r.estado}
         </Badge>
       ),
+    },
+    {
+      accessor: "acciones",
+      title: "",
+      width: 70,
+      textAlign: "right",
+      render: (r: ProveedorResponse) => {
+        const estaEliminando = eliminandoId === r.id_proveedor;
+        return (
+          <Menu shadow="md" width={170} position="bottom-end" withArrow>
+            <Menu.Target>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                loading={estaEliminando}
+                aria-label="Abrir acciones del proveedor"
+              >
+                <IconDotsVertical size={18} stroke={1.5} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown className="bg-zinc-900 border-zinc-800">
+              <Menu.Label className="text-zinc-500">Acciones</Menu.Label>
+              <Menu.Item
+                leftSection={<IconPencil size={16} stroke={1.5} />}
+                onClick={() => onEditar(r)}
+                className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+              >
+                Editar
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconTrash size={16} stroke={1.5} />}
+                color="red"
+                onClick={() => onEliminar(r)}
+                className="hover:bg-red-900/20"
+              >
+                Eliminar
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        );
+      },
     },
   ];
 

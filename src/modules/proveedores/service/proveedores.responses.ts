@@ -1,6 +1,7 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Moneda } from "../../../shared/enums/_generic/moneda";
 import type { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface ProveedorResponse {
   id_proveedor: number;
@@ -15,6 +16,7 @@ export interface ProveedorResponse {
   telefono: string | null;
   correo: string | null;
   estado: EstadoBase;
+  cambios_log?: RES_CambiosLog[] | string | null;
   cantidad_cuentas_bancarias: number;
   cuentas_bancarias?: CuentaBancariaResponse[];
   cantidad_tipos_carbon: number;

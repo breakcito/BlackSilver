@@ -35,8 +35,6 @@ export const useRegistroCliente = (
       setPayload((prev) => ({
         ...prev,
         tipo_entidad: value as TipoEntidad,
-        dni: "", // Limpiar para evitar basura entre tipos
-        ruc: "",
       }));
       if (error) setError(null);
     }

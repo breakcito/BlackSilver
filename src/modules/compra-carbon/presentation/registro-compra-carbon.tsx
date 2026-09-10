@@ -373,10 +373,13 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     () =>
       transportistas.map((t) => ({
         value: String(t.id_transportista),
-        label:
-          t.tipo_entidad === TipoEntidad.Natural
-            ? `${t.razon_social} · DNI ${t.dni ?? "—"}`
-            : `${t.razon_social} · RUC ${t.ruc ?? "—"}`,
+        // RUC es obligatorio en registros nuevos; se cae al DNI solo para
+        // registros previos que no tengan RUC cargado.
+        label: t.ruc
+          ? `${t.razon_social} · RUC ${t.ruc}`
+          : t.dni
+            ? `${t.razon_social} · DNI ${t.dni}`
+            : t.razon_social,
       })),
     [transportistas],
   );

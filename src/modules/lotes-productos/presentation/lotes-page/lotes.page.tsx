@@ -12,6 +12,8 @@ import { useTitlePage } from "../../../../hooks/useTitlePage";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { RegistroLote } from "../registro-lote";
 import { AjusteStockModal } from "../ajuste-stock";
+import { EditarLoteModal } from "../components/editar-lote-modal";
+import { HistorialLoteModal } from "../components/historial-lote-modal";
 import { LotesFilter } from "./lotes-filter";
 import { ProductGroupCard } from "./product-group-card/product-group-card";
 import { TicketLotePDF } from "../../../../presentation/utils/ticket-lote-pdf";
@@ -39,6 +41,8 @@ export const LotesPage = () => {
     productosUnicos,
     addLote,
     updateLote,
+    eliminarLote,
+    deletingId,
     armarTicket,
     selectedLotes,
     setSelectedLotes,
@@ -52,6 +56,15 @@ export const LotesPage = () => {
     useDisclosure(false);
   const [loteParaAjustar, setLoteParaAjustar] = useState<RES_Lote | null>(null);
   const [openedAjuste, { open: openAjuste, close: closeAjuste }] =
+    useDisclosure(false);
+
+  const [loteParaEditar, setLoteParaEditar] = useState<RES_Lote | null>(null);
+  const [openedEdicion, { open: openEdicion, close: closeEdicion }] =
+    useDisclosure(false);
+
+  const [loteParaHistorial, setLoteParaHistorial] =
+    useState<RES_Lote | null>(null);
+  const [openedHistorial, { open: openHistorial, close: closeHistorial }] =
     useDisclosure(false);
 
   const { print } = usePrint();
@@ -83,6 +96,26 @@ export const LotesPage = () => {
     });
   };
 
+  const handleOpenEdit = (record: RES_Lote) => {
+    setLoteParaEditar(record);
+    openEdicion();
+  };
+
+  const handleCloseEdit = () => {
+    setLoteParaEditar(null);
+    closeEdicion();
+  };
+
+  const handleOpenHistory = (record: RES_Lote) => {
+    setLoteParaHistorial(record);
+    openHistorial();
+  };
+
+  const handleCloseHistory = () => {
+    setLoteParaHistorial(null);
+    closeHistorial();
+  };
+
   // Grouping logic concentrada en hook abstracto
   const groupedProducts = useGroupedProducts(records);
 
@@ -93,6 +126,12 @@ export const LotesPage = () => {
       setLoteParaAjustar(record);
       openAjuste();
     },
+    onEdit: handleOpenEdit,
+    onDelete: (record) => {
+      void eliminarLote(record.id_lote);
+    },
+    onHistory: handleOpenHistory,
+    deletingId,
   });
 
   return (
@@ -201,6 +240,41 @@ export const LotesPage = () => {
             onCancel={closeAjuste}
           />
         )}
+      </ModalEstandar>
+
+      <ModalEstandar
+        opened={openedEdicion}
+        close={handleCloseEdit}
+        title={
+          loteParaEditar
+            ? `Editar lote: ${loteParaEditar.correlativo}`
+            : "Editar lote"
+        }
+        size="lg"
+      >
+        {loteParaEditar && (
+          <EditarLoteModal
+            lote={loteParaEditar}
+            onSuccess={(editado) => {
+              updateLote(editado);
+              handleCloseEdit();
+            }}
+            onCancel={handleCloseEdit}
+          />
+        )}
+      </ModalEstandar>
+
+      <ModalEstandar
+        opened={openedHistorial}
+        close={handleCloseHistory}
+        title={
+          loteParaHistorial
+            ? `Historial de cambios: ${loteParaHistorial.correlativo}`
+            : "Historial de cambios"
+        }
+        size="xl"
+      >
+        {loteParaHistorial && <HistorialLoteModal lote={loteParaHistorial} />}
       </ModalEstandar>
     </div>
   );

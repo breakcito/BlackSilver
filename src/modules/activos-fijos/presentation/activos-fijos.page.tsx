@@ -25,6 +25,7 @@ import { BotonRecargar } from "../../../presentation/utils/boton-recargar";
 import { RegistroActivo } from "./registro-activo/registro-activo";
 import { EditarActivo } from "./editar-activo/editar-activo";
 import { HistorialUbicacionActivo } from "./historial-ubicacion/historial-ubicacion";
+import { HistorialActivoModal } from "./components/historial-activo-modal";
 import {
   ProductGroupCard,
   type GroupedActivoProducto,
@@ -50,6 +51,8 @@ export const ActivosFijosPage = () => {
     recargar,
     addActivo,
     updateActivo,
+    eliminarActivo,
+    deletingId,
   } = useActivosMain();
 
   // Modals
@@ -65,7 +68,18 @@ export const ActivosFijosPage = () => {
     useDisclosure(false);
   const [openedMantenimiento, { open: openMantenimiento, close: closeMantenimiento }] =
     useDisclosure(false);
+  const [openedHistorial, { open: openHistorial, close: closeHistorial }] =
+    useDisclosure(false);
   const [tipoMantenimiento, setTipoMantenimiento] = useState<"horometro" | "odometro" | "vueltas">("horometro");
+
+  const handleOpenHistory = (record: RES_ActivoFijoResumen) => {
+    setSelectedActivo(record);
+    openHistorial();
+  };
+  const handleCloseHistory = () => {
+    setSelectedActivo(null);
+    closeHistorial();
+  };
 
   const groupedProducts = useMemo<GroupedActivoProducto[]>(() => {
     const groups: Record<number, GroupedActivoProducto> = {};
@@ -219,7 +233,7 @@ export const ActivosFijosPage = () => {
                 setSelectedActivo(record);
                 openUbicacion();
               }}
-              onVerHistorial={() => {}}
+              onVerHistorial={handleOpenHistory}
               onConfigurarAlertas={(record) => {
                 setSelectedActivo(record);
                 openAlertas();
@@ -233,6 +247,8 @@ export const ActivosFijosPage = () => {
                 setSelectedActivo(record);
                 openEdit();
               }}
+              onEliminarActivo={(record) => void eliminarActivo(record.id_activo)}
+              deletingId={deletingId}
             />
           ))}
         </Stack>
@@ -321,6 +337,22 @@ export const ActivosFijosPage = () => {
           />
         </>
       )}
+
+      {/* Modal: Historial de Cambios */}
+      <ModalEstandar
+        opened={openedHistorial}
+        close={handleCloseHistory}
+        title={
+          selectedActivo
+            ? `Historial: ${selectedActivo.producto} — ${selectedActivo.correlativo}`
+            : "Historial de Cambios"
+        }
+        size="xl"
+      >
+        {selectedActivo && (
+          <HistorialActivoModal activo={selectedActivo} />
+        )}
+      </ModalEstandar>
     </div>
   );
 };

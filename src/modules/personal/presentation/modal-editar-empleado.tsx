@@ -304,6 +304,7 @@ export const ModalEditarEmpleado = ({
               disabled={loadingCatalogos || loading}
               comboboxProps={{ withinPortal: true }}
               className="flex-1"
+              key={`area-${areas.length}-${idArea ?? "x"}`}
             />
             <Select
               label="Cargo"
@@ -334,6 +335,7 @@ export const ModalEditarEmpleado = ({
               searchable
               comboboxProps={{ withinPortal: true }}
               className="flex-1"
+              key={`cargo-${cargosSelectData.length}-${form.id_cargo ?? "x"}`}
             />
           </Group>
           <Select
@@ -356,6 +358,7 @@ export const ModalEditarEmpleado = ({
             disabled={loadingCatalogos || loading}
             searchable
             comboboxProps={{ withinPortal: true }}
+            key={`empresa-${empresas.length}-${form.id_empresa ?? "x"}`}
           />
         </>
       )}

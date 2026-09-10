@@ -56,6 +56,65 @@ export const Schema_CrearProveedor = z
 
 export type CrearProveedorRequest = z.infer<typeof Schema_CrearProveedor>;
 
+/**
+ * Edición de proveedor. Mismas reglas que el registro pero SIN `para_carbon`:
+ * ese flag define en qué pestaña vive el proveedor y no se edita (el backend
+ * lo preserva). `para_mantenimiento` / `para_transporte` sí viajan siempre:
+ * en el formulario de carbón no se muestran, pero el hook reenvía los valores
+ * actuales para no borrarlos.
+ */
+export const Schema_ActualizarProveedor = z
+  .object({
+    tipo_entidad: z.enum(TipoEntidad),
+    para_mantenimiento: z.boolean(),
+    para_transporte: z.boolean(),
+    dni: z.string().optional().nullable(),
+    ruc: z.string().min(1, "El RUC es obligatorio"),
+    razon_social: z.string().min(3, "La razón social o nombre es muy corto"),
+    direccion: z.string().optional().nullable(),
+    telefono: z.string().optional().nullable(),
+    correo: z.email("Correo no válido").optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (!/^\d{11}$/.test(data.ruc)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El RUC debe tener exactamente 11 dígitos",
+        path: ["ruc"],
+      });
+    } else if (
+      data.tipo_entidad === TipoEntidad.Juridica &&
+      !data.ruc.startsWith("20")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El RUC de una persona jurídica debe comenzar con 20",
+        path: ["ruc"],
+      });
+    } else if (
+      data.tipo_entidad === TipoEntidad.Natural &&
+      !data.ruc.startsWith("10")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El RUC de una persona natural debe comenzar con 10",
+        path: ["ruc"],
+      });
+    }
+
+    if (data.dni && !/^\d{8}$/.test(data.dni)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El DNI debe tener exactamente 8 dígitos",
+        path: ["dni"],
+      });
+    }
+  });
+
+export type ActualizarProveedorRequest = z.infer<
+  typeof Schema_ActualizarProveedor
+>;
+
 export const Schema_CrearBanco = z.object({
   nombre: z.string().min(1, "El nombre del banco es requerido"),
   abreviatura: z.string().min(1, "La abreviatura es requerida"),

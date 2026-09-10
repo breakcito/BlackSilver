@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Button,
   Group,
@@ -17,6 +17,7 @@ import {
   CubeIcon,
   ClockIcon,
   EllipsisVerticalIcon,
+  EyeIcon,
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
@@ -28,6 +29,7 @@ import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { useProductos } from "../hooks/useProductos";
 import { RegistroProducto } from "./registro-producto";
 import { HistorialCostos } from "./components/historial-costos";
+import { parseCambiosLog } from "../../../presentation/utils/parse-cambios-log";
 import type {
   RES_LogCostoPromedio,
   RES_ProductoResumen,
@@ -41,6 +43,24 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 
 dayjs.locale("es");
+
+interface CambioProductoGlobal {
+  id: string;
+  id_producto: number;
+  producto: string;
+  fecha: string;
+  id_empleado: number | null;
+  nombre_empleado: string;
+  campo: string;
+  valor_anterior: unknown;
+  valor_nuevo: unknown;
+}
+
+const formatValorCambio = (v: unknown): string => {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  return String(v);
+};
 
 export const ProductosPage = () => {
   useTitlePage("Catálogo de Productos");
@@ -68,6 +88,37 @@ export const ProductosPage = () => {
     useDisclosure(false);
   const [selectedLog, setSelectedLog] = useState<RES_LogCostoPromedio[]>([]);
   const [selectedProdName, setSelectedProdName] = useState("");
+
+  const [openedCambios, { open: openCambios, close: closeCambios }] =
+    useDisclosure(false);
+
+  const cambiosGlobal = useMemo<CambioProductoGlobal[]>(() => {
+    const lista: CambioProductoGlobal[] = [];
+    productos.forEach((p) => {
+      const logs = parseCambiosLog(p.cambios_log);
+      logs.forEach((log) => {
+        const nombreEmpleado = log.nombre_empleado?.trim() || "—";
+        log.cambios.forEach((cambio) => {
+          lista.push({
+            id: `${p.id_producto}-${log.update_at}-${cambio.campo_bd ?? cambio.campo ?? Math.random()}`,
+            id_producto: p.id_producto,
+            producto: p.nombre,
+            fecha: log.update_at,
+            id_empleado: log.id_empleado ?? null,
+            nombre_empleado: nombreEmpleado,
+            campo: cambio.campo ?? cambio.campo_bd ?? "—",
+            valor_anterior: cambio.valor_anterior,
+            valor_nuevo: cambio.valor_nuevo,
+          });
+        });
+      });
+    });
+    // Más recientes primero
+    lista.sort(
+      (a, b) => dayjs(b.fecha).valueOf() - dayjs(a.fecha).valueOf(),
+    );
+    return lista;
+  }, [productos]);
 
   const handleOpenHistory = (r: RES_ProductoResumen) => {
     try {
@@ -311,6 +362,75 @@ export const ProductosPage = () => {
     },
   ];
 
+  const cambiosColumns: DataTableColumn<CambioProductoGlobal>[] = [
+    {
+      accessor: "index",
+      title: "#",
+      textAlign: "center",
+      width: 50,
+    },
+    {
+      accessor: "producto",
+      title: "Producto",
+      width: 220,
+      render: (r) => (
+        <Text size="sm" className="text-zinc-200 font-medium">
+          {r.producto}
+        </Text>
+      ),
+    },
+    {
+      accessor: "campo",
+      title: "Campo",
+      width: 180,
+      render: (r) => (
+        <Badge color="indigo" variant="light" size="sm" radius="sm">
+          {r.campo}
+        </Badge>
+      ),
+    },
+    {
+      accessor: "valor_anterior",
+      title: "Valor Anterior",
+      width: 160,
+      render: (r) => (
+        <Text size="xs" className="text-zinc-400 line-through">
+          {formatValorCambio(r.valor_anterior)}
+        </Text>
+      ),
+    },
+    {
+      accessor: "valor_nuevo",
+      title: "Valor Nuevo",
+      width: 160,
+      render: (r) => (
+        <Text size="xs" className="text-emerald-300 font-semibold">
+          {formatValorCambio(r.valor_nuevo)}
+        </Text>
+      ),
+    },
+    {
+      accessor: "nombre_empleado",
+      title: "Modificado por",
+      width: 200,
+      render: (r) => (
+        <Text size="xs" className="text-zinc-300">
+          {r.nombre_empleado}
+        </Text>
+      ),
+    },
+    {
+      accessor: "fecha",
+      title: "Fecha",
+      width: 170,
+      render: (r) => (
+        <Text size="xs" className="text-zinc-400">
+          {dayjs(r.fecha).format("DD MMM YYYY, HH:mm:ss")}
+        </Text>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Stack gap="lg">
@@ -336,6 +456,23 @@ export const ProductosPage = () => {
           </div>
           <div className="flex gap-2 items-center shrink-0">
             <BotonRecargar onReload={recargar} loading={loading} />
+            <Tooltip
+              label="Ver historial de cambios"
+              position="bottom"
+              withArrow
+            >
+              <ActionIcon
+                variant="default"
+                color="zinc.4"
+                radius="lg"
+                size={36}
+                onClick={openCambios}
+                className="border border-zinc-700/50"
+                aria-label="Ver historial de cambios"
+              >
+                <EyeIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
             <Button
               leftSection={<PlusIcon className="w-5 h-5" />}
               onClick={openRegistro}
@@ -404,6 +541,34 @@ export const ProductosPage = () => {
             }}
             onCancel={handleCloseEdicion}
           />
+        )}
+      </ModalEstandar>
+
+      <ModalEstandar
+        opened={openedCambios}
+        close={closeCambios}
+        title="Historial de Cambios de Productos"
+        size="min(1250px, 95vw)"
+      >
+        {cambiosGlobal.length === 0 ? (
+          <Stack align="center" gap="md" py={60}>
+            <EyeIcon className="w-10 h-10 text-zinc-700" />
+            <Text size="sm" fw={700} className="text-zinc-400 uppercase tracking-widest">
+              Sin cambios registrados
+            </Text>
+            <Text size="xs" c="dimmed">
+              Aún no se han registrado modificaciones en los productos.
+            </Text>
+          </Stack>
+        ) : (
+          <div className="mt-2">
+            <DataTableEstandar
+              idAccessor="id"
+              columns={cambiosColumns}
+              records={cambiosGlobal}
+              loading={false}
+            />
+          </div>
         )}
       </ModalEstandar>
     </div>

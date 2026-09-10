@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Badge, Divider, Group, Stack, Text, Tooltip } from "@mantine/core";
 import {
   BanknotesIcon,
@@ -9,6 +10,8 @@ import {
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
+import { AuxService } from "../../../../service/auxiliar.service";
+import type { RES_LoteMineral } from "../../../../service/responses/lote-mineral";
 import type {
   RES_ResumenEntregasReq,
   RES_Consumo,
@@ -41,6 +44,30 @@ const origenCostoLabel: Record<string, { label: string; color: string }> = {
 
 export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
   const costoUnitDetalle = Number(record.costo_unitario_base ?? 0);
+  const [lotesMineral, setLotesMineral] = useState<RES_LoteMineral[]>([]);
+
+  useEffect(() => {
+    const cargarLotes = async () => {
+      try {
+        const resp = await AuxService.get_lotes_mineral();
+        if (resp.success && resp.data) {
+          setLotesMineral(resp.data);
+        }
+      } catch (err) {
+        console.error("Error al cargar lotes mineral para historial:", err);
+      }
+    };
+    cargarLotes();
+  }, []);
+
+  const contratistasPorLote = useMemo(() => {
+    const map = new Map<number, string>();
+    lotesMineral.forEach((lm) => {
+      map.set(lm.id_lote_mineral, lm.contratista);
+    });
+    return map;
+  }, [lotesMineral]);
+
   return (
     <div className="p-5 bg-zinc-950/40 border-l-2 border-indigo-500/40 pl-6 py-4 flex flex-col gap-3">
       <Group justify="space-between" wrap="wrap" gap="xs">
@@ -84,6 +111,10 @@ export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
             const origenMeta =
               origenCostoLabel[origenCosto] ?? origenCostoLabel.sin_costo;
             const costoTotalConsumo = Number(c.costo_total_consumo ?? 0);
+            const contratistaLote =
+              c.id_lote_mineral != null
+                ? contratistasPorLote.get(c.id_lote_mineral)
+                : undefined;
             return (
               <div
                 key={c.id_consumo}
@@ -116,35 +147,57 @@ export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
 
                     {(c.para_produccion === true ||
                       Number(c.para_produccion) === 1) && (
-                      <Tooltip
-                        label={
-                          <Stack gap={2}>
-                            {c.mina_lote_mineral && (
-                              <Text size="10px" c="zinc.2">
-                                Mina: <span className="text-zinc-100">{c.mina_lote_mineral}</span>
-                              </Text>
-                            )}
-                            {c.labor_lote_mineral && (
-                              <Text size="10px" c="zinc.2">
-                                Labor: <span className="text-zinc-100">{c.labor_lote_mineral}</span>
-                              </Text>
-                            )}
-                          </Stack>
-                        }
-                        multiline
-                        w={210}
-                        withArrow
-                      >
-                        <Badge
-                          size="xs"
-                          color="teal"
-                          variant="light"
-                          className="font-semibold uppercase tracking-wider py-1 border border-current/15 cursor-help"
+                      <>
+                        <Tooltip
+                          label={
+                            <Stack gap={2}>
+                              {contratistaLote && (
+                                <Text size="10px" c="zinc.2">
+                                  Contratista: <span className="text-zinc-100">{contratistaLote}</span>
+                                </Text>
+                              )}
+                              {c.mina_lote_mineral && (
+                                <Text size="10px" c="zinc.2">
+                                  Mina: <span className="text-zinc-100">{c.mina_lote_mineral}</span>
+                                </Text>
+                              )}
+                              {c.labor_lote_mineral && (
+                                <Text size="10px" c="zinc.2">
+                                  Labor: <span className="text-zinc-100">{c.labor_lote_mineral}</span>
+                                </Text>
+                              )}
+                            </Stack>
+                          }
+                          multiline
+                          w={240}
+                          withArrow
                         >
-                          <BeakerIcon className="w-3 h-3 mr-1" />
-                          Prod.: {c.codigo_lote_mineral || "S/L"}
-                        </Badge>
-                      </Tooltip>
+                          <Badge
+                            size="xs"
+                            color="teal"
+                            variant="light"
+                            className="font-semibold uppercase tracking-wider py-1 border border-current/15 cursor-help"
+                          >
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <BeakerIcon className="w-3 h-3" />
+                              Prod.: {c.codigo_lote_mineral || "S/L"}
+                            </span>
+                          </Badge>
+                        </Tooltip>
+                        {contratistaLote && (
+                          <Badge
+                            size="xs"
+                            color="gray"
+                            variant="light"
+                            className="font-semibold tracking-wider py-1 border border-current/15"
+                          >
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <UserIcon className="w-3 h-3" />
+                              {contratistaLote}
+                            </span>
+                          </Badge>
+                        )}
+                      </>
                     )}
 
                     {c.labor && (
@@ -154,8 +207,10 @@ export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
                         variant="light"
                         className="font-semibold uppercase tracking-wider py-1 border border-current/15"
                       >
-                        <MapPinIcon className="w-3 h-3 mr-1" />
-                        Labor: {c.labor}
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <MapPinIcon className="w-3 h-3" />
+                          Labor: {c.labor}
+                        </span>
                       </Badge>
                     )}
 
@@ -191,8 +246,10 @@ export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
                           variant="light"
                           className="font-semibold uppercase tracking-wider py-1 border border-current/15 cursor-help"
                         >
-                          <CogIcon className="w-3 h-3 mr-1" />
-                          Mant.: {c.correlativo_activo_fijo_consumidor || "S/A"}
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <CogIcon className="w-3 h-3" />
+                            Mant.: {c.correlativo_activo_fijo_consumidor || "S/A"}
+                          </span>
                         </Badge>
                       </Tooltip>
                     )}
@@ -220,10 +277,12 @@ export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
                           size="xs"
                           color={origenMeta.color}
                           variant="light"
-                          className="font-extrabold uppercase tracking-wider py-1 border border-current/15 cursor-help"
+                          className="font-extrabold uppercase tracking-wider py-1.5 border border-current/15 cursor-help"
                         >
-                          <BanknotesIcon className="w-3 h-3 mr-1" />
-                          Costo: {formatMonto(costoTotalConsumo, record.moneda)}
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <BanknotesIcon className="w-3 h-3" />
+                            Costo: {formatMonto(costoTotalConsumo, record.moneda)}
+                          </span>
                         </Badge>
                       </Tooltip>
                     )}

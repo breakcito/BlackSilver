@@ -22,6 +22,7 @@ import {
   IdentificationIcon,
   CreditCardIcon,
   EllipsisVerticalIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { Menu } from "@mantine/core";
 import { type DataTableColumn } from "mantine-datatable";
@@ -60,6 +61,8 @@ export const TabEmpleados = ({ controller, onOpenCuentas }: TabEmpleadosProps) =
     abrirModalEdicion,
     cerrarModalEdicion,
     actualizarEmpleadoEnLista,
+    // Eliminar
+    eliminarEmpleado,
     // Selección masiva (usada en la columna de checkbox)
     seleccionados,
     toggleSeleccion,
@@ -490,7 +493,7 @@ export const TabEmpleados = ({ controller, onOpenCuentas }: TabEmpleadosProps) =
     },
     {
       accessor: "fecha_nacimiento",
-      title: "Fecha de Nacimiento",
+      title: "F. Nacimiento",
       width: 160,
       render: (r) => {
         if (!r.fecha_nacimiento) {
@@ -519,7 +522,7 @@ export const TabEmpleados = ({ controller, onOpenCuentas }: TabEmpleadosProps) =
       accessor: "estado",
       title: "Estado",
       textAlign: "center",
-      width: 110,
+      width: 90,
       render: (r) => (
         <Badge
           variant="light"
@@ -532,7 +535,7 @@ export const TabEmpleados = ({ controller, onOpenCuentas }: TabEmpleadosProps) =
     },
     {
       accessor: "acciones",
-      title: "Acciones",
+      title: "",
       textAlign: "center",
       width: 80,
       render: (r) => (
@@ -555,6 +558,29 @@ export const TabEmpleados = ({ controller, onOpenCuentas }: TabEmpleadosProps) =
               onClick={() => abrirModalEdicion(r)}
             >
               Editar
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<TrashIcon className="w-4 h-4" />}
+              color="red"
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    `¿Eliminar a ${r.nombre} ${r.apellido}? Esta accion es reversible solo si reactivas su estado.`,
+                  )
+                ) {
+                  return;
+                }
+                const ok = await eliminarEmpleado(r.id_empleado);
+                if (ok) {
+                  notifySuccess(
+                    `${r.nombre} ${r.apellido} eliminado correctamente`,
+                  );
+                } else {
+                  notifyError("No se pudo eliminar el empleado");
+                }
+              }}
+            >
+              Eliminar
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

@@ -2,7 +2,15 @@ import { type DataTableColumn } from "mantine-datatable";
 import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
 import type { RES_ActivoFijoResumen } from "../../service/activos.responses";
 import { ProductGroupHeader } from "./product-group-header";
-import { Badge, Text, Group, Stack, Tooltip, Button } from "@mantine/core";
+import {
+  Badge,
+  Text,
+  Group,
+  Stack,
+  Tooltip,
+  ActionIcon,
+  Menu,
+} from "@mantine/core";
 import {
   MapPinIcon,
   MapIcon,
@@ -13,6 +21,9 @@ import {
   ArrowPathIcon,
   DocumentTextIcon,
   PencilSquareIcon,
+  EllipsisVerticalIcon,
+  EyeIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 
@@ -39,6 +50,8 @@ interface ProductGroupCardProps {
     tipo: "horometro" | "odometro" | "vueltas",
   ) => void;
   onEditarActivo: (record: RES_ActivoFijoResumen) => void;
+  onEliminarActivo: (record: RES_ActivoFijoResumen) => void;
+  deletingId: number | null;
 }
 
 /**
@@ -57,6 +70,9 @@ export const ProductGroupCard = ({
   onConfigurarAlertas,
   onResolverMantenimiento,
   onEditarActivo,
+  onVerHistorial,
+  onEliminarActivo,
+  deletingId,
 }: ProductGroupCardProps) => {
   const columns: DataTableColumn<RES_ActivoFijoResumen>[] = [
     {
@@ -472,28 +488,60 @@ export const ProductGroupCard = ({
     {
       accessor: "acciones",
       title: "Acciones",
-      width: 220,
-      textAlign: "center",
+      width: 130,
+      textAlign: "right",
       render: (record) => (
-        <Group justify="center" gap="xs" wrap="nowrap">
-          <Button
-            variant="light"
-            size="compact-xs"
-            color="indigo"
-            leftSection={<PencilSquareIcon className="w-3.5 h-3.5" />}
-            onClick={() => onEditarActivo(record)}
-          >
-            Editar
-          </Button>
-          <Button
-            variant="light"
-            size="compact-xs"
-            color="cyan"
-            leftSection={<AdjustmentsHorizontalIcon className="w-3.5 h-3.5" />}
-            onClick={() => onConfigurarAlertas(record)}
-          >
-            Alertas
-          </Button>
+        <Group justify="flex-end" gap="xs" wrap="nowrap">
+          <Tooltip label="Configurar alertas" withArrow>
+            <ActionIcon
+              variant="subtle"
+              color="cyan"
+              radius="xl"
+              size="md"
+              onClick={() => onConfigurarAlertas(record)}
+            >
+              <AdjustmentsHorizontalIcon className="w-4 h-4" />
+            </ActionIcon>
+          </Tooltip>
+          <Menu shadow="md" width={210} position="bottom-end" withArrow>
+            <Menu.Target>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                aria-label="Más acciones del activo"
+                title="Más acciones"
+              >
+                <EllipsisVerticalIcon className="w-5 h-5" />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown className="bg-zinc-900 border-zinc-800">
+              <Menu.Label className="text-zinc-500">Acciones</Menu.Label>
+              <Menu.Item
+                leftSection={<PencilSquareIcon className="w-4 h-4" />}
+                onClick={() => onEditarActivo(record)}
+                className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+              >
+                Editar
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<EyeIcon className="w-4 h-4" />}
+                onClick={() => onVerHistorial(record)}
+                className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+              >
+                Ver historial
+              </Menu.Item>
+              <Menu.Divider className="border-zinc-800" />
+              <Menu.Item
+                leftSection={<TrashIcon className="w-4 h-4" />}
+                color="red"
+                onClick={() => onEliminarActivo(record)}
+                disabled={deletingId === record.id_activo}
+                className="hover:bg-red-900/20"
+              >
+                Eliminar
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       ),
     },

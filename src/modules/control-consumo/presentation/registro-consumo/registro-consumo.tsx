@@ -434,15 +434,17 @@ export const RegistroConsumo = ({
               ) : (
                 <Select
                   label="Lote en Producción"
-                  placeholder={loadingLotes ? "Cargando lotes..." : "Seleccione lote mineral..."}
+                  placeholder={loadingLotes ? "Cargando lotes..." : "Seleccione lote mineral (opcional)..."}
                   data={lotesMineral.map((lm) => ({
                     value: String(lm.id_lote_mineral),
-                    label: lm.codigo,
+                    label: lm.contratista
+                      ? `${lm.codigo} - ${lm.contratista}`
+                      : lm.codigo,
                   }))}
                   value={formLoteMineral}
                   onChange={setFormLoteMineral}
                   searchable
-                  required
+                  clearable
                   radius="lg"
                   size="sm"
                   classNames={modalFieldClasses}

@@ -1,6 +1,7 @@
 import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
+  ActualizarProveedorRequest,
   CrearBancoRequest,
   CrearCuentaBancariaRequest,
   CrearProveedorRequest,
@@ -11,6 +12,7 @@ import type {
 } from "./proveedores.requests";
 
 export type {
+  ActualizarProveedorRequest,
   CrearBancoRequest,
   CrearCuentaBancariaRequest,
   CrearProveedorRequest,
@@ -59,6 +61,45 @@ export const ProveedoresService = {
       `/proveedores/cuentas-bancarias/${idProveedor}`,
     );
     return data.data;
+  },
+
+  /**
+   * Actualiza un proveedor (logistica o carbon).
+   *
+   * A diferencia de `crearProveedor`, devuelve el `IRespuesta` completo en vez
+   * de `data.data`: el backend responde con HTTP 200 y `success: false` en los
+   * errores de negocio (RUC duplicado, no existe), asi que hay que poder
+   * leer `success` y `message` para no reportar un exito falso.
+   */
+  actualizarProveedor: async (
+    idProveedor: number,
+    payload: ActualizarProveedorRequest,
+  ): Promise<IRespuesta<ProveedorResponse>> => {
+    const { data } = await api.put<IRespuesta<ProveedorResponse>>(
+      `/proveedores/${idProveedor}`,
+      {
+        tipo_entidad: payload.tipo_entidad,
+        paraMantenimiento: payload.para_mantenimiento,
+        paraTransporte: payload.para_transporte,
+        dni: payload.dni,
+        ruc: payload.ruc,
+        razon_social: payload.razon_social,
+        direccion: payload.direccion,
+        telefono: payload.telefono,
+        correo: payload.correo,
+      },
+    );
+    return data;
+  },
+
+  /** Eliminacion logica (estado -> Inactivo). */
+  eliminarProveedor: async (
+    idProveedor: number,
+  ): Promise<IRespuesta<ProveedorResponse>> => {
+    const { data } = await api.delete<IRespuesta<ProveedorResponse>>(
+      `/proveedores/${idProveedor}`,
+    );
+    return data;
   },
 
   crearCuentaBancaria: async (

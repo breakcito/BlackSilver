@@ -101,6 +101,13 @@ export class EmpleadosService {
     return data;
   };
 
+  public static eliminar_empleado = async (
+    idEmpleado: number,
+  ): Promise<IRespuesta<null>> => {
+    const { data } = await api.delete(`${this.PATH}/${idEmpleado}`);
+    return data;
+  };
+
   public static get_cuentas_bancarias = async (
     idEmpleado: number,
   ): Promise<IRespuesta<RES_CuentaBancariaEmpleado[]>> => {
@@ -190,6 +197,13 @@ export class ContratistasService {
     dto: DTO_ActualizarContratista,
   ): Promise<IRespuesta<RES_ContratistaResumen>> => {
     const { data } = await api.put(`${this.PATH}/${idContratista}`, dto);
+    return data;
+  };
+
+  public static eliminar_contratista = async (
+    idContratista: number,
+  ): Promise<IRespuesta<null>> => {
+    const { data } = await api.delete(`${this.PATH}/${idContratista}`);
     return data;
   };
   public static get_labores_disponibles = async (

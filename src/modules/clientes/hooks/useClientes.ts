@@ -6,8 +6,9 @@ import { useNotify } from "../../../hooks/useNotify";
 export const useClientes = () => {
   const [clientes, setClientes] = useState<ClienteResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const { notifyError } = useNotify();
+  const { notifySuccess, notifyError } = useNotify();
 
   const fetchClientes = useCallback(async () => {
     setLoading(true);
@@ -49,6 +50,44 @@ export const useClientes = () => {
     );
   };
 
+  /**
+   * Soft-delete via cambiar estado a Inactivo. El backend devuelve el cliente
+   * actualizado con cambios_log; reemplazamos la fila en la lista local para
+   * reflejar el nuevo estado.
+   */
+  const eliminarCliente = useCallback(
+    async (idCliente: number): Promise<boolean> => {
+      if (
+        !window.confirm(
+          "¿Está seguro de eliminar este cliente? Esta acción lo desactivará (soft-delete).",
+        )
+      ) {
+        return false;
+      }
+
+      setDeletingId(idCliente);
+      try {
+        const resp = await ClientesService.eliminarCliente(idCliente);
+        if (resp.success) {
+          notifySuccess(resp.message);
+          setClientes((prev) =>
+            prev.map((c) => (c.id_cliente === idCliente ? resp.data : c)),
+          );
+          return true;
+        }
+        notifyError(resp.message);
+        return false;
+      } catch (err) {
+        console.error(err);
+        notifyError("Error inesperado al eliminar el cliente.");
+        return false;
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [notifySuccess, notifyError],
+  );
+
   return {
     clientes,
     loading,
@@ -56,5 +95,7 @@ export const useClientes = () => {
     recargar: fetchClientes,
     insertCliente,
     updateCliente,
+    eliminarCliente,
+    deletingId,
   };
 };

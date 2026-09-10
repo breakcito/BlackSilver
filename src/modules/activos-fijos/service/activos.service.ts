@@ -117,12 +117,24 @@ export const ActivosService = {
   actualizarActivo: async (
     id_activo: number,
     payload: REQ_ActualizarActivo,
-  ) => {
+  ): Promise<IRespuesta<RES_ActivoFijoResumen>> => {
     const { data } = await api.put<IRespuesta<RES_ActivoFijoResumen>>(
       `${path}/${id_activo}`,
       payload,
     );
     return data;
+  },
+
+  /**
+   * Desactivar (soft delete) un activo fijo. Cambia estado a "Dado de Baja".
+   */
+  eliminarActivo: async (
+    id_activo: number,
+  ): Promise<IRespuesta<RES_ActivoFijoResumen>> => {
+    const response = await api.delete<IRespuesta<RES_ActivoFijoResumen>>(
+      `${path}/${id_activo}`,
+    );
+    return response.data;
   },
 
   configurarAlertas: async (payload: {

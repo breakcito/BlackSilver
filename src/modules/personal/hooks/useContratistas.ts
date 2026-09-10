@@ -286,6 +286,24 @@ export const useContratistas = () => {
       return false;
     },
 
+    // Eliminar (borrado logico: cambia estado a Inactivo)
+    eliminarContratista: async (idContratista: number) => {
+      try {
+        const resp = await ContratistasService.eliminar_contratista(
+          idContratista,
+        );
+        if (resp.success) {
+          setContratistas((prev) =>
+            prev.filter((c) => c.id_contratista !== idContratista),
+          );
+          return true;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      return false;
+    },
+
     // Selección masiva
     seleccionados,
     contratistasSeleccionados,

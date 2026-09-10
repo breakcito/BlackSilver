@@ -22,3 +22,20 @@ export const Schema_RegistroCategoria = z.object({
 });
 
 export type DTO_RegistroCategoria = z.infer<typeof Schema_RegistroCategoria>;
+
+/**
+ * Edición de categoría. Reutiliza la forma del registro pero exige
+ * `clasificacion_bien` (el backend la valida como requerida en el PUT) y
+ * omite `ids_categorias_consumidoras`, que no se gestiona desde este flujo.
+ */
+export const Schema_ActualizarCategoria = Schema_RegistroCategoria.omit({
+  ids_categorias_consumidoras: true,
+}).extend({
+  clasificacion_bien: z.enum(TipoBien, {
+    message: "Debe seleccionar una clasificación",
+  }),
+});
+
+export type DTO_ActualizarCategoria = z.infer<
+  typeof Schema_ActualizarCategoria
+>;

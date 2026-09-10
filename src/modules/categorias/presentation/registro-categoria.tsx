@@ -53,6 +53,8 @@ interface RegistroCategoriaProps {
   coincidencias: SearchResult<RES_CategoriaResumen>[];
   error: string;
   loading: boolean;
+  /** Cambia el label del botón cuando el formulario opera en modo edición. */
+  isEdit?: boolean;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -85,6 +87,7 @@ export const RegistroCategoria = ({
   coincidencias,
   error,
   loading,
+  isEdit = false,
   onSave,
   onCancel,
 }: RegistroCategoriaProps) => {
@@ -430,7 +433,7 @@ export const RegistroCategoria = ({
           text-zinc-900 font-semibold hover:from-white hover:to-zinc-200 
           shadow-lg border-0"
         >
-          Guardar
+          {isEdit ? "Guardar cambios" : "Guardar"}
         </Button>
       </Group>
     </Stack>

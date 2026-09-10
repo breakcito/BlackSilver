@@ -9,7 +9,8 @@ import { useNotify } from "../../../hooks/useNotify";
 export const useProveedores = (paraCarbon?: boolean) => {
   const [proveedores, setProveedores] = useState<ProveedorResponse[]>([]);
   const [loading, setLoading] = useState(false);
-  const { notifyError } = useNotify();
+  const [eliminandoId, setEliminandoId] = useState<number | null>(null);
+  const { notifyError, notifySuccess } = useNotify();
 
   const fetchProveedores = async () => {
     setLoading(true);
@@ -62,12 +63,62 @@ export const useProveedores = (paraCarbon?: boolean) => {
     );
   };
 
+  /**
+   * Reemplaza la fila completa con la version devuelta por la API, para que
+   * refleje exactamente el shape del backend (incluye cambios_log y los
+   * contadores/colecciones anidadas).
+   */
+  const replaceProveedor = (editado: ProveedorResponse) => {
+    setProveedores((prev) =>
+      prev.map((p) =>
+        p.id_proveedor === editado.id_proveedor ? editado : p,
+      ),
+    );
+  };
+
+  /**
+   * Eliminacion logica. El backend devuelve el proveedor ya Inactivo, pero el
+   * listado filtra los inactivos, asi que el efecto visible es que desaparece.
+   */
+  const eliminarProveedor = async (idProveedor: number): Promise<boolean> => {
+    if (
+      !window.confirm(
+        "¿Está seguro de eliminar este proveedor? Esta acción lo desactivará del listado.",
+      )
+    ) {
+      return false;
+    }
+
+    setEliminandoId(idProveedor);
+    try {
+      const resp = await ProveedoresService.eliminarProveedor(idProveedor);
+      if (resp.success) {
+        notifySuccess(resp.message);
+        setProveedores((prev) =>
+          prev.filter((p) => p.id_proveedor !== idProveedor),
+        );
+        return true;
+      }
+      notifyError(resp.message);
+      return false;
+    } catch (e) {
+      console.error(e);
+      notifyError("Ocurrió un error al eliminar el proveedor");
+      return false;
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
   return {
     proveedores,
     loading,
     fetchProveedores,
     insertProveedor,
     updateProveedor,
+    replaceProveedor,
+    eliminarProveedor,
+    eliminandoId,
     updateCuentaEnProveedor,
     recargar: fetchProveedores,
   };

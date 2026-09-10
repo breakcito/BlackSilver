@@ -22,6 +22,7 @@ import {
   DocumentTextIcon,
   CheckBadgeIcon,
   EllipsisVerticalIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { Menu } from "@mantine/core";
 
@@ -75,6 +76,8 @@ export const TabContratistas = ({
     abrirModalEdicion,
     cerrarModalEdicion,
     actualizarContratistaEnLista,
+    // Eliminar
+    eliminarContratista,
   } = controller;
 
   const handleUpdateFoto = async (id: number, file: File | null) => {
@@ -544,7 +547,7 @@ export const TabContratistas = ({
     },
     {
       accessor: "acciones",
-      title: "Acciones",
+      title: "",
       textAlign: "center",
       width: 80,
       render: (r) => (
@@ -567,6 +570,29 @@ export const TabContratistas = ({
               onClick={() => abrirModalEdicion(r)}
             >
               Editar
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<TrashIcon className="w-4 h-4" />}
+              color="red"
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    `¿Eliminar a ${r.nombre} ${r.apellido}? Esta accion es reversible solo si reactivas su estado.`,
+                  )
+                ) {
+                  return;
+                }
+                const ok = await eliminarContratista(r.id_contratista);
+                if (ok) {
+                  notifySuccess(
+                    `${r.nombre} ${r.apellido} eliminado correctamente`,
+                  );
+                } else {
+                  notifyError("No se pudo eliminar el contratista");
+                }
+              }}
+            >
+              Eliminar
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

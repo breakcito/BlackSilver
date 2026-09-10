@@ -1,5 +1,6 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { EstadoVencimientoProducto } from "../../../shared/enums/_generic/estado-vencimiento-producto";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface RES_Lote {
   id_lote: number;
@@ -31,7 +32,13 @@ export interface RES_Lote {
   costo_por_unidad: number | null;
   serie_factura_compra: string | null;
   numero_factura_compra: string | null;
+  // Snapshot original del lote (sin coalesce con OC); la union con la OC
+  // se aplica en serie_factura_compra/numero_factura_compra para vistas.
+  serie_factura_lote: string | null;
+  numero_factura_lote: string | null;
   id_orden_compra: number | null;
   id_orden_compra_comprobante: number | null;
   id_orden_compra_detalle: number | null;
+  // Trazabilidad de cambios (edicion/soft-delete)
+  cambios_log: RES_CambiosLog[] | null;
 }

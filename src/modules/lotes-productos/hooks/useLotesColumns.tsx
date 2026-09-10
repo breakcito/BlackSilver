@@ -1,11 +1,21 @@
 import { useMemo } from "react";
-import { ActionIcon, Badge, Divider, Group, Stack, Text } from "@mantine/core";
+import {
+  ActionIcon,
+  Badge,
+  Divider,
+  Group,
+  Menu,
+  Stack,
+  Text,
+} from "@mantine/core";
 import {
   CalendarDaysIcon,
   ClockIcon,
+  EllipsisVerticalIcon,
   PencilSquareIcon,
   PrinterIcon,
   DocumentTextIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { type DataTableColumn } from "mantine-datatable";
@@ -18,11 +28,19 @@ import { useAuditoriaStore } from "../../../stores/auditoria.store";
 interface UseLotesColumnsProps {
   onPrint: (lote: RES_Lote) => void;
   onEditAjuste: (lote: RES_Lote) => void;
+  onEdit: (lote: RES_Lote) => void;
+  onDelete: (lote: RES_Lote) => void;
+  onHistory: (lote: RES_Lote) => void;
+  deletingId: number | null;
 }
 
 export const useLotesColumns = ({
   onPrint,
   onEditAjuste,
+  onEdit,
+  onDelete,
+  onHistory,
+  deletingId,
 }: UseLotesColumnsProps) => {
   const { en_modo_auditable } = useAuditoriaStore();
   return useMemo(() => {
@@ -116,6 +134,7 @@ export const useLotesColumns = ({
                   size="lg"
                   onClick={() => onEditAjuste(record)}
                   className="hover:bg-zinc-800 transition-colors rounded-xl"
+                  title="Corrección de Inventario"
                 >
                   <PencilSquareIcon className="w-5 h-5 text-zinc-400" />
                 </ActionIcon>
@@ -330,8 +349,55 @@ export const useLotesColumns = ({
           </Badge>
         ),
       },
+      {
+        accessor: "actions",
+        title: "",
+        width: 70,
+        textAlign: "right",
+        render: (record) => (
+          <Menu shadow="md" width={200} position="bottom-end" withArrow>
+            <Menu.Target>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                aria-label="Abrir acciones del lote"
+                title="Acciones"
+              >
+                <EllipsisVerticalIcon className="w-5 h-5" />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown className="bg-zinc-900 border-zinc-800">
+              <Menu.Label className="text-zinc-500">Acciones</Menu.Label>
+              <Menu.Item
+                leftSection={<PencilSquareIcon className="w-4 h-4" />}
+                onClick={() => onEdit(record)}
+                className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+              >
+                Editar
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<ClockIcon className="w-4 h-4" />}
+                onClick={() => onHistory(record)}
+                className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+              >
+                Ver historial
+              </Menu.Item>
+              <Menu.Divider className="border-zinc-800" />
+              <Menu.Item
+                leftSection={<TrashIcon className="w-4 h-4" />}
+                color="red"
+                onClick={() => onDelete(record)}
+                disabled={deletingId === record.id_lote}
+                className="hover:bg-red-900/20"
+              >
+                Eliminar
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        ),
+      },
     ];
 
     return columns;
-  }, [onPrint, onEditAjuste, en_modo_auditable]);
+  }, [onPrint, onEditAjuste, onEdit, onDelete, onHistory, deletingId, en_modo_auditable]);
 };

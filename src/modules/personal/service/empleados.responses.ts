@@ -1,5 +1,6 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Genero } from "../../../shared/enums/_generic/genero";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface RES_EmpleadoResumen {
   id_empleado: number;
@@ -29,6 +30,7 @@ export interface RES_EmpleadoResumen {
   telefono: string | null;
   email: string | null;
   url_foto: string | null;
+  cambios_log: RES_CambiosLog[] | null;
   estado: EstadoBase;
   cantidad_cuentas_bancarias?: number;
 }
@@ -62,6 +64,7 @@ export interface RES_ContratistaResumen {
   telefono: string | null;
   email: string | null;
   url_foto: string | null;
+  cambios_log: RES_CambiosLog[] | null;
   con_contrato?: boolean | number | string | null;
   id_contrato_vigente?: number | null;
   contrato_fecha_fin?: string | null;

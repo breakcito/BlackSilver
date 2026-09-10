@@ -19,6 +19,15 @@ export const useCategoriasPage = () => {
     openedCreate,
     openCreate,
     closeCreate,
+    openedEdit,
+    openedCambios,
+    openCambios,
+    closeCambios,
+    categoriaEnEdicion,
+    abrirModalEdicion,
+    cerrarModalEdicion,
+    eliminarCategoria,
+    eliminandoId,
     onCategoriaGuardada,
     categorias,
     recargar,
@@ -28,6 +37,18 @@ export const useCategoriasPage = () => {
     categoriasExistentes: categorias,
     onSuccess: onCategoriaGuardada,
     onClose: closeCreate,
+  });
+
+  /**
+   * Instancia separada del hook para la edición. Se mantiene aparte del de
+   * registro para que ambos formularios no compartan estado (y así el modal
+   * de "Nueva Categoría" no aparezca pre-rellenado con lo último editado).
+   */
+  const edicion = useRegistroCategoria({
+    categoriasExistentes: categorias,
+    onSuccess: onCategoriaGuardada,
+    onClose: cerrarModalEdicion,
+    categoriaEdicion: categoriaEnEdicion,
   });
 
   return {
@@ -45,11 +66,21 @@ export const useCategoriasPage = () => {
     openedCreate,
     openCreate,
     closeCreate,
+    openedEdit,
+    openedCambios,
+    openCambios,
+    closeCambios,
+    categoriaEnEdicion,
+    abrirModalEdicion,
+    cerrarModalEdicion,
+    eliminarCategoria,
+    eliminandoId,
     onCategoriaGuardada,
     categorias,
     recargar,
 
     // useRegistroCategoria
     registro,
+    edicion,
   };
 };

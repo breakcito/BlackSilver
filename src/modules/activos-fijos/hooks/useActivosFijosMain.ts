@@ -5,7 +5,7 @@ import { useNotify } from "../../../hooks/useNotify";
 import { useAuditoriaStore } from "../../../stores/auditoria.store";
 
 export const useActivosMain = () => {
-  const { notifyError } = useNotify();
+  const { notifySuccess, notifyError } = useNotify();
   const { en_modo_auditable } = useAuditoriaStore();
 
   const [activos, setActivos] = useState<RES_ActivoFijoResumen[]>([]);
@@ -90,6 +90,44 @@ export const useActivosMain = () => {
     );
   };
 
+  /**
+   * Soft-delete: cambia estado a "Dado de Baja" en el backend. La respuesta
+   * trae el activo actualizado con el nuevo estado y el entry en cambios_log.
+   */
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const eliminarActivo = useCallback(
+    async (idActivo: number): Promise<boolean> => {
+      if (
+        !window.confirm(
+          "¿Está seguro de eliminar este activo? Esta acción lo desactivará.",
+        )
+      ) {
+        return false;
+      }
+
+      setDeletingId(idActivo);
+      try {
+        const resp = await ActivosService.eliminarActivo(idActivo);
+        if (resp.success) {
+          notifySuccess(resp.message);
+          setActivos((prev) =>
+            prev.map((a) => (a.id_activo === idActivo ? resp.data : a)),
+          );
+          return true;
+        }
+        notifyError(resp.message);
+        return false;
+      } catch (err) {
+        console.error(err);
+        notifyError("Error inesperado al dar de baja el activo.");
+        return false;
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [notifySuccess, notifyError],
+  );
+
   return {
     activos: activosFiltrados,
     almacenesFiltro,
@@ -105,5 +143,7 @@ export const useActivosMain = () => {
     recargar: () => fetchActivos(true),
     addActivo,
     updateActivo,
+    eliminarActivo,
+    deletingId,
   };
 };

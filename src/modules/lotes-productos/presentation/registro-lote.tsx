@@ -425,6 +425,7 @@ export const RegistroLote = ({
             periodo_espera_vencimiento: null,
             dias_espera_vencimiento: p.dias_espera_vencimiento,
             estado: EstadoBase.Activo,
+            cambios_log: null,
           }))}
           onSuccess={(nuevo) => {
             recargarProductos();

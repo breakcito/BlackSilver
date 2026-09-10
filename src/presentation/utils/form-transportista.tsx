@@ -43,8 +43,6 @@ export const FormTransportista = ({
   const handleTipoEntidadChange = (val: string | null) => {
     if (val) {
       setTipoEntidad(val as TipoEntidad);
-      setRuc("");
-      setDni("");
       setError(null);
     }
   };
@@ -53,14 +51,17 @@ export const FormTransportista = ({
     if (!razonSocial.trim() || razonSocial.trim().length < 3) {
       return "Razon social o nombre es requerido (min 3 caracteres)";
     }
-    if (tipoEntidad === TipoEntidad.Natural) {
-      if (!dni || !/^\d{8}$/.test(dni)) {
-        return "El DNI debe tener exactamente 8 digitos";
-      }
-    } else {
-      if (!ruc || !/^\d{11}$/.test(ruc)) {
-        return "El RUC debe tener 11 digitos";
-      }
+    if (!ruc || !/^\d{11}$/.test(ruc)) {
+      return "El RUC debe tener exactamente 11 digitos";
+    }
+    if (tipoEntidad === TipoEntidad.Juridica && !ruc.startsWith("20")) {
+      return "El RUC de una persona jurídica debe comenzar con 20";
+    }
+    if (tipoEntidad === TipoEntidad.Natural && !ruc.startsWith("10")) {
+      return "El RUC de una persona natural debe comenzar con 10";
+    }
+    if (dni && !/^\d{8}$/.test(dni)) {
+      return "El DNI debe tener exactamente 8 digitos";
     }
     if (telefono && !/^\d{6,15}$/.test(telefono)) {
       return "Telefono invalido (solo digitos, 6-15 caracteres)";
@@ -83,8 +84,8 @@ export const FormTransportista = ({
       const res = await AuxService.crear_transportista({
         tipo_entidad: tipoEntidad,
         razon_social: razonSocial.trim(),
-        ruc: tipoEntidad === TipoEntidad.Juridica ? ruc : null,
-        dni: tipoEntidad === TipoEntidad.Natural ? dni : null,
+        ruc: ruc.trim() || null,
+        dni: dni.trim() || null,
         telefono: telefono.trim() || null,
       });
 
@@ -135,20 +136,31 @@ export const FormTransportista = ({
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
             withAsterisk
-            label={tipoEntidad === TipoEntidad.Natural ? "DNI" : "RUC"}
+            label="RUC"
             placeholder={
-              tipoEntidad === TipoEntidad.Natural ? "12345678" : "12345678901"
+              tipoEntidad === TipoEntidad.Natural
+                ? "10xxxxxxxxx (persona natural)"
+                : "20xxxxxxxxx (persona jurídica)"
             }
             radius="xl"
-            maxLength={tipoEntidad === TipoEntidad.Natural ? 8 : 11}
-            value={tipoEntidad === TipoEntidad.Natural ? dni : ruc}
+            maxLength={11}
+            value={ruc}
             onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
-              if (tipoEntidad === TipoEntidad.Natural) {
-                setDni(val);
-              } else {
-                setRuc(val);
-              }
+              setRuc(e.target.value.replace(/\D/g, ""));
+              if (error) setError(null);
+            }}
+            classNames={inputClasses}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, md: 6 }}>
+          <TextInput
+            label="DNI (opcional)"
+            placeholder="12345678"
+            radius="xl"
+            maxLength={8}
+            value={dni}
+            onChange={(e) => {
+              setDni(e.target.value.replace(/\D/g, ""));
               if (error) setError(null);
             }}
             classNames={inputClasses}

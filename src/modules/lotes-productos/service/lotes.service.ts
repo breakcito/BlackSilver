@@ -1,7 +1,11 @@
 import type { RES_TicketLote } from "../../../service/responses/lote-producto";
 import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
-import type { DTO_AjustarStock, DTO_CrearLote } from "./lotes.requests";
+import type {
+  DTO_ActualizarLote,
+  DTO_AjustarStock,
+  DTO_CrearLote,
+} from "./lotes.requests";
 import type { RES_Lote } from "./lotes.responses";
 import dayjs from "dayjs";
 
@@ -36,6 +40,38 @@ export class LotesService {
     const response = await api.post<IRespuesta<RES_Lote>>(
       `${this.PATH}`,
       payload,
+    );
+    return response.data;
+  }
+
+  /**
+   * Actualizar campos administrativos de un lote.
+   * El backend calcula el diff y lo apendea a cambios_log.
+   * El estado NO se envía: lo gestiona eliminar_lote (soft-delete).
+   */
+  static async actualizar(idLote: number, dto: DTO_ActualizarLote) {
+    const payload = {
+      descripcion: dto.descripcion ?? "",
+      serie_factura_compra: dto.serie_factura_compra ?? "",
+      numero_factura_compra: dto.numero_factura_compra ?? "",
+      fecha_hora_ingreso: dto.fecha_hora_ingreso
+        ? dayjs(dto.fecha_hora_ingreso).format("YYYY-MM-DD HH:mm:ss")
+        : null,
+    };
+
+    const response = await api.put<IRespuesta<RES_Lote>>(
+      `${this.PATH}/${idLote}`,
+      payload,
+    );
+    return response.data;
+  }
+
+  /**
+   * Desactivar (soft delete) un lote. Cambia estado a Inactivo.
+   */
+  static async eliminar(idLote: number) {
+    const response = await api.delete<IRespuesta<RES_Lote>>(
+      `${this.PATH}/${idLote}`,
     );
     return response.data;
   }

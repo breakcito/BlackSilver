@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Tabs,
   rem,
@@ -6,6 +6,11 @@ import {
   TextInput,
   Button,
   Group,
+  ActionIcon,
+  Tooltip,
+  Stack,
+  Badge,
+  Text,
 } from "@mantine/core";
 import {
   UserGroupIcon,
@@ -13,6 +18,7 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   MapPinIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
 
 import { useTitlePage } from "../../../hooks/useTitlePage";
@@ -29,9 +35,35 @@ import { useAsignacionLaboresContratista } from "../hooks/useAsignacionLaboresCo
 import { ModalFotocheck } from "./modal-fotocheck";
 import { ModalFotocheckContratista } from "./modal-fotocheck-contratista";
 import { CuentasBancarias } from "./cuentas-bancarias/cuentas-bancarias";
-import type { RES_EmpleadoResumen } from "../service/empleados.responses";
+import type {
+  RES_EmpleadoResumen,
+  RES_ContratistaResumen,
+} from "../service/empleados.responses";
+import { parseCambiosLog } from "../../../presentation/utils/parse-cambios-log";
+import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
+import type { DataTableColumn } from "mantine-datatable";
 
 import { BotonRecargar } from "../../../presentation/utils/boton-recargar";
+import dayjs from "dayjs";
+
+interface CambioPersonalGlobal {
+  id: string;
+  tipo: "Empleado" | "Contratista";
+  id_persona: number;
+  persona: string;
+  fecha: string;
+  id_empleado: number | null;
+  nombre_empleado: string;
+  campo: string;
+  valor_anterior: unknown;
+  valor_nuevo: unknown;
+}
+
+const formatValorCambio = (v: unknown): string => {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  return String(v);
+};
 
 export const PersonalPage = () => {
   useTitlePage("Trabajadores / Personal");
@@ -48,6 +80,132 @@ export const PersonalPage = () => {
     useDisclosure(false);
   const [openedRegCon, { open: openRegCon, close: closeRegCon }] =
     useDisclosure(false);
+  const [openedCambios, { open: openCambios, close: closeCambios }] =
+    useDisclosure(false);
+
+  const cambiosGlobal = useMemo<CambioPersonalGlobal[]>(() => {
+    const lista: CambioPersonalGlobal[] = [];
+
+    const consumir = (
+      registros: (RES_EmpleadoResumen | RES_ContratistaResumen)[],
+      tipo: "Empleado" | "Contratista",
+    ) => {
+      registros.forEach((r) => {
+        const idPersona =
+          tipo === "Empleado"
+            ? (r as RES_EmpleadoResumen).id_empleado
+            : (r as RES_ContratistaResumen).id_contratista;
+        const logs = parseCambiosLog(r.cambios_log);
+        const nombreCompleto = `${r.nombre} ${r.apellido}`;
+        logs.forEach((log) => {
+          const nombreEmpleado = log.nombre_empleado?.trim() || "—";
+          log.cambios.forEach((cambio) => {
+            lista.push({
+              id: `${tipo}-${idPersona}-${log.update_at}-${cambio.campo_bd ?? cambio.campo ?? Math.random()}`,
+              tipo,
+              id_persona: idPersona,
+              persona: nombreCompleto,
+              fecha: log.update_at,
+              id_empleado: log.id_empleado ?? null,
+              nombre_empleado: nombreEmpleado,
+              campo: cambio.campo ?? cambio.campo_bd ?? "—",
+              valor_anterior: cambio.valor_anterior,
+              valor_nuevo: cambio.valor_nuevo,
+            });
+          });
+        });
+      });
+    };
+
+    consumir(empleadosCtrl.empleados, "Empleado");
+    consumir(contratistasCtrl.contratistas, "Contratista");
+
+    // Mas recientes primero
+    lista.sort(
+      (a, b) => dayjs(b.fecha).valueOf() - dayjs(a.fecha).valueOf(),
+    );
+    return lista;
+  }, [empleadosCtrl.empleados, contratistasCtrl.contratistas]);
+
+  const cambiosColumns: DataTableColumn<CambioPersonalGlobal>[] = [
+    {
+      accessor: "index",
+      title: "#",
+      textAlign: "center",
+      width: 50,
+    },
+    {
+      accessor: "persona",
+      title: "Persona",
+      width: 240,
+      render: (r) => (
+        <Stack gap={2}>
+          <Text size="sm" fw={600} className="text-zinc-200 leading-tight">
+            {r.persona}
+          </Text>
+          <Badge
+            size="xs"
+            color={r.tipo === "Empleado" ? "indigo" : "pink"}
+            variant="light"
+            radius="sm"
+            className="font-bold w-fit"
+          >
+            {r.tipo}
+          </Badge>
+        </Stack>
+      ),
+    },
+    {
+      accessor: "campo",
+      title: "Campo",
+      width: 180,
+      render: (r) => (
+        <Badge color="indigo" variant="light" size="sm" radius="sm">
+          {r.campo}
+        </Badge>
+      ),
+    },
+    {
+      accessor: "valor_anterior",
+      title: "Valor Anterior",
+      width: 160,
+      render: (r) => (
+        <Text size="xs" className="text-zinc-400 line-through">
+          {formatValorCambio(r.valor_anterior)}
+        </Text>
+      ),
+    },
+    {
+      accessor: "valor_nuevo",
+      title: "Valor Nuevo",
+      width: 160,
+      render: (r) => (
+        <Text size="xs" className="text-emerald-300 font-semibold">
+          {formatValorCambio(r.valor_nuevo)}
+        </Text>
+      ),
+    },
+    {
+      accessor: "nombre_empleado",
+      title: "Modificado por",
+      width: 200,
+      render: (r) => (
+        <Text size="xs" className="text-zinc-300">
+          {r.nombre_empleado}
+        </Text>
+      ),
+    },
+    {
+      accessor: "fecha",
+      title: "Fecha",
+      width: 170,
+      render: (r) => (
+        <Text size="xs" className="text-zinc-400">
+          {dayjs(r.fecha).format("DD MMM YYYY, HH:mm:ss")}
+        </Text>
+      ),
+    },
+  ];
 
   const iconStyle = { width: rem(18), height: rem(18) };
 
@@ -182,6 +340,23 @@ export const PersonalPage = () => {
                   : contratistasCtrl.loading
               }
             />
+            <Tooltip
+              label="Ver historial de cambios"
+              position="bottom"
+              withArrow
+            >
+              <ActionIcon
+                variant="default"
+                color="zinc.4"
+                radius="lg"
+                size={36}
+                onClick={openCambios}
+                className="border border-zinc-700/50"
+                aria-label="Ver historial de cambios"
+              >
+                <EyeIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
             <Button
               leftSection={<PlusIcon className="w-5 h-5" />}
               onClick={activeTab === "empleados" ? openRegEmp : openRegCon}
@@ -296,6 +471,35 @@ export const PersonalPage = () => {
             empleado={selectedEmpleadoCuentas}
             onCuentaAddedGlobal={empleadosCtrl.recargar}
           />
+        )}
+      </ModalEstandar>
+
+      {/* Modal: Historial global de cambios (Empleados + Contratistas) */}
+      <ModalEstandar
+        opened={openedCambios}
+        close={closeCambios}
+        title="Historial de Cambios de Personal"
+        size="min(1250px, 95vw)"
+      >
+        {cambiosGlobal.length === 0 ? (
+          <Stack align="center" gap="md" py={60}>
+            <EyeIcon className="w-10 h-10 text-zinc-700" />
+            <Text size="sm" fw={700} className="text-zinc-400 uppercase tracking-widest">
+              Sin cambios registrados
+            </Text>
+            <Text size="xs" c="dimmed">
+              Aún no se han registrado modificaciones en el personal.
+            </Text>
+          </Stack>
+        ) : (
+          <div className="mt-2">
+            <DataTableEstandar
+              idAccessor="id"
+              columns={cambiosColumns}
+              records={cambiosGlobal}
+              loading={false}
+            />
+          </div>
         )}
       </ModalEstandar>
     </div>

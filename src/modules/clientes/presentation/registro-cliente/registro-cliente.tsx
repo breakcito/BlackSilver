@@ -49,27 +49,18 @@ export const RegistroCliente = ({ onCancel, onSuccess }: Props) => {
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
             withAsterisk
-            label={payload.tipo_entidad === TipoEntidad.Natural ? "DNI" : "RUC"}
+            label="RUC"
             placeholder={
               payload.tipo_entidad === TipoEntidad.Natural
-                ? "12345678"
-                : "20345678901"
+                ? "10xxxxxxxxx (persona natural)"
+                : "20xxxxxxxxx (persona jurídica)"
             }
             radius="xl"
-            maxLength={payload.tipo_entidad === TipoEntidad.Natural ? 8 : 11}
-            value={
-              payload.tipo_entidad === TipoEntidad.Natural
-                ? payload.dni || ""
-                : payload.ruc || ""
+            maxLength={11}
+            value={payload.ruc || ""}
+            onChange={(e) =>
+              handleChange("ruc", e.target.value.replace(/\D/g, ""))
             }
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
-              if (payload.tipo_entidad === TipoEntidad.Natural) {
-                handleChange("dni", val);
-              } else {
-                handleChange("ruc", val);
-              }
-            }}
             classNames={{
               input:
                 "bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-500 focus:border-zinc-300 transition-all",
@@ -77,7 +68,24 @@ export const RegistroCliente = ({ onCancel, onSuccess }: Props) => {
             }}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12 }}>
+        <Grid.Col span={{ base: 12, md: 6 }}>
+          <TextInput
+            label="DNI (opcional)"
+            placeholder="12345678"
+            radius="xl"
+            maxLength={8}
+            value={payload.dni || ""}
+            onChange={(e) =>
+              handleChange("dni", e.target.value.replace(/\D/g, ""))
+            }
+            classNames={{
+              input:
+                "bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-500 focus:border-zinc-300 transition-all",
+              label: "text-zinc-400 font-medium text-xs",
+            }}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
             label={payload.tipo_entidad === TipoEntidad.Natural ? "Nombre Completo" : "Razón Social"}
             placeholder={payload.tipo_entidad === TipoEntidad.Natural ? "Ej. Juan Perez" : "Ej. Minera Los Andes S.A.C."}

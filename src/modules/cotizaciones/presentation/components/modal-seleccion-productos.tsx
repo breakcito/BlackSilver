@@ -192,6 +192,7 @@ export const ModalSeleccionProductos = ({
       periodo_espera_vencimiento: null,
       dias_espera_vencimiento: p.dias_espera_vencimiento ?? null,
       estado: EstadoBase.Activo,
+      cambios_log: null,
     }));
   }, [catalogoProductos]);
 

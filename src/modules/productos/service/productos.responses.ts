@@ -1,6 +1,7 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Moneda } from "../../../shared/enums/_generic/moneda";
 import type { TipoBien } from "../../../shared/enums/_generic/tipo-bien";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface RES_LogCostoPromedio {
   costo_promedio_anterior: number;
@@ -33,6 +34,8 @@ export interface RES_ProductoResumen {
   tiempo_espera_vencimiento: number | null;
   periodo_espera_vencimiento: string | null;
   dias_espera_vencimiento: number | null;
+  //
+  cambios_log: RES_CambiosLog[] | null;
   //
   estado: EstadoBase;
 }

@@ -1,5 +1,6 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Moneda } from "../../../shared/enums/_generic/moneda";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface ClienteResponse {
   id_cliente: number;
@@ -12,6 +13,7 @@ export interface ClienteResponse {
   correo: string | null;
   estado: EstadoBase;
   created_at: string;
+  cambios_log: RES_CambiosLog[] | null;
   cantidad_cuentas_bancarias: number;
   cuentas_bancarias?: CuentaBancariaResponse[];
 }

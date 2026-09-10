@@ -1,6 +1,12 @@
 import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
-import type { REQ_CrearMaterial, REQ_CrearTarifa, REQ_RegistrarUso } from "./control-uso.requests";
+import type {
+  REQ_CrearMaterial,
+  REQ_CrearTarifa,
+  REQ_RegistrarUso,
+  REQ_RegistrarUsoBulk,
+  REQ_RegistrarUsoBulkVueltas,
+} from "./control-uso.requests";
 import type {
   RES_ControlUsoLog,
   RES_Tarifa,
@@ -49,6 +55,28 @@ export const ControlUsoService = {
    */
   registrarUso: async (payload: REQ_RegistrarUso) => {
     const { data } = await api.post<IRespuesta<RES_ControlUsoLog>>(path, payload);
+    return data;
+  },
+
+  /**
+   * Registrar multiples controles de uso en una sola transaccion (cabecera + items[]).
+   */
+  registrarUsoBulk: async (payload: REQ_RegistrarUsoBulk) => {
+    const { data } = await api.post<IRespuesta<RES_ControlUsoLog[]>>(
+      `${path}/bulk`,
+      payload,
+    );
+    return data;
+  },
+
+  /**
+   * Registrar multiples controles por vueltas en una sola transaccion (cabecera + items[]).
+   */
+  registrarUsoBulkVueltas: async (payload: REQ_RegistrarUsoBulkVueltas) => {
+    const { data } = await api.post<IRespuesta<RES_ControlUsoLog[]>>(
+      `${path}/bulk-vueltas`,
+      payload,
+    );
     return data;
   },
 

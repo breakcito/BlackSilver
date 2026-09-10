@@ -108,60 +108,73 @@ export const useControlUso = () => {
     );
   }, [logs, idActivoFijo, busqueda, en_modo_auditable]);
 
-  const pushNuevoLog = (nuevo: RES_ControlUsoLog & { id?: number }) => {
+  const pushNuevoLog = (
+    nuevo: (RES_ControlUsoLog & { id?: number }) | (RES_ControlUsoLog & { id?: number })[],
+  ) => {
+    const incoming = Array.isArray(nuevo) ? nuevo : [nuevo];
+    if (incoming.length === 0) return;
+
     // Buscar los metadatos del activo fijo seleccionado para poblar los campos JOINed en tiempo real
     const activeAsset = activos.find(
       (a) => String(a.id_activo) === String(idActivoFijo),
     );
 
-    const fullyPopulatedLog: RES_ControlUsoLog = {
-      id_log: nuevo.id || nuevo.id_log, // map database id (or id_log) to id_log
-      id_activo_fijo: nuevo.id_activo_fijo,
-      codigo: null, // no aplica o se deja nulo ya que RES_ActivoFijoDisponible no tiene código de barras directo aquí
-      correlativo: activeAsset?.correlativo || "",
-      producto: activeAsset?.producto || "",
-      categoria: "", // opcional
-      control_por_horometro: activeAsset?.control_por_horometro ? 1 : 0,
-      control_por_odometro: activeAsset?.control_por_odometro ? 1 : 0,
-      fecha_hora_inicio_control: nuevo.fecha_hora_inicio_control,
-      fecha_hora_fin_control: nuevo.fecha_hora_fin_control || null,
-      horometro_inicio: nuevo.horometro_inicio || null,
-      horometro_fin: nuevo.horometro_fin || null,
-      odometro_inicio: nuevo.odometro_inicio || null,
-      odometro_fin: nuevo.odometro_fin || null,
-      cantidad_vueltas: nuevo.cantidad_vueltas || null,
-      total_horas: nuevo.total_horas || null,
-      total_km:
-        nuevo.odometro_fin != null && nuevo.odometro_inicio != null
-          ? Math.max(
-              0,
-              Number(nuevo.odometro_fin) - Number(nuevo.odometro_inicio),
-            )
-          : null,
-      precio_unitario: nuevo.precio_unitario || null,
-      costo_total: nuevo.costo_total || null,
-      es_para_mina: nuevo.es_para_mina || null,
-      id_mina: nuevo.id_mina || null,
-      mina: nuevo.mina || null,
-      id_labor: nuevo.id_labor || null,
-      labor: nuevo.labor || null,
-      id_cliente: nuevo.id_cliente || null,
-      cliente: nuevo.cliente || null,
-      ubicacion_activo: nuevo.ubicacion_activo,
-      tipo_material: nuevo.tipo_material,
-      tarifa_material: nuevo.tarifa_material || nuevo.tipo_material || null,
-      tarifa_distancia_metros: nuevo.tarifa_distancia_metros || null,
-      cantidad_sacos: nuevo.cantidad_sacos || null,
-      tipo_carga: nuevo.tipo_carga || null,
-      id_tarifa: nuevo.id_tarifa || null,
-      tarifa_desc: nuevo.tarifa_desc || null,
-      observacion: nuevo.observacion || null,
-      created_at: nuevo.created_at,
-    };
+    const enriched = incoming.map((n) => {
+      const fullyPopulatedLog: RES_ControlUsoLog = {
+        id_log: n.id || n.id_log,
+        id_activo_fijo: n.id_activo_fijo,
+        codigo: null,
+        correlativo: activeAsset?.correlativo || "",
+        producto: activeAsset?.producto || "",
+        categoria: "",
+        control_por_horometro: activeAsset?.control_por_horometro ? 1 : 0,
+        control_por_odometro: activeAsset?.control_por_odometro ? 1 : 0,
+        fecha_hora_inicio_control: n.fecha_hora_inicio_control,
+        fecha_hora_fin_control: n.fecha_hora_fin_control || null,
+        horometro_inicio: n.horometro_inicio || null,
+        horometro_fin: n.horometro_fin || null,
+        odometro_inicio: n.odometro_inicio || null,
+        odometro_fin: n.odometro_fin || null,
+        cantidad_vueltas: n.cantidad_vueltas || null,
+        total_horas: n.total_horas || null,
+        total_km:
+          n.odometro_fin != null && n.odometro_inicio != null
+            ? Math.max(
+                0,
+                Number(n.odometro_fin) - Number(n.odometro_inicio),
+              )
+            : null,
+        precio_unitario: n.precio_unitario || null,
+        costo_total: n.costo_total || null,
+        es_para_mina: n.es_para_mina || null,
+        id_mina: n.id_mina || null,
+        mina: n.mina || null,
+        id_labor: n.id_labor || null,
+        labor: n.labor || null,
+        id_cliente: n.id_cliente || null,
+        cliente: n.cliente || null,
+        ubicacion_activo: n.ubicacion_activo,
+        tipo_material: n.tipo_material,
+        tarifa_material: n.tarifa_material || n.tipo_material || null,
+        tarifa_distancia_metros: n.tarifa_distancia_metros || null,
+        cantidad_sacos: n.cantidad_sacos || null,
+        tipo_carga: n.tipo_carga || null,
+        id_tarifa: n.id_tarifa || null,
+        tarifa_desc: n.tarifa_desc || null,
+        observacion: n.observacion || null,
+        created_at: n.created_at,
+      };
+      return fullyPopulatedLog;
+    });
 
-    // Agregar el registro completamente poblado al inicio del listado de forma instantánea
-    setLogs((prev) => [fullyPopulatedLog, ...prev]);
-    notifySuccess("Registro de uso guardado correctamente");
+    setLogs((prev) => [...enriched, ...prev]);
+
+    const cantidad = enriched.length;
+    notifySuccess(
+      cantidad === 1
+        ? "Registro de uso guardado correctamente"
+        : `${cantidad} registros de uso guardados correctamente`,
+    );
   };
 
   return {

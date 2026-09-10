@@ -3,6 +3,7 @@ import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
   CrearClienteRequest,
   CrearCuentaBancariaRequest,
+  DTO_ActualizarCliente,
   EditarCuentaBancariaRequest,
 } from "./clientes.requests";
 import type { ClienteResponse, CuentaBancariaResponse } from "./clientes.responses";
@@ -18,6 +19,42 @@ export class ClientesService {
   ): Promise<ClienteResponse> {
     const { data } = await api.post("/clientes", payload);
     return data.data;
+  }
+
+  /**
+   * Actualizar campos administrativos de un cliente.
+   * El backend calcula el diff y lo apendea a cambios_log.
+   * El estado NO se envía: lo gestiona eliminarCliente (soft-delete).
+   */
+  static async actualizarCliente(
+    idCliente: number,
+    dto: DTO_ActualizarCliente
+  ): Promise<IRespuesta<ClienteResponse>> {
+    const response = await api.put<IRespuesta<ClienteResponse>>(
+      `/clientes/${idCliente}`,
+      {
+        tipo_entidad: dto.tipo_entidad ?? null,
+        dni: dto.dni ?? null,
+        ruc: dto.ruc ?? null,
+        razon_social: dto.razon_social,
+        direccion: dto.direccion ?? null,
+        telefono: dto.telefono ?? null,
+        correo: dto.correo ?? null,
+      }
+    );
+    return response.data;
+  }
+
+  /**
+   * Desactivar (soft delete) un cliente. Cambia estado a Inactivo.
+   */
+  static async eliminarCliente(
+    idCliente: number
+  ): Promise<IRespuesta<ClienteResponse>> {
+    const response = await api.delete<IRespuesta<ClienteResponse>>(
+      `/clientes/${idCliente}`
+    );
+    return response.data;
   }
 
   static async getCuentasBancarias(

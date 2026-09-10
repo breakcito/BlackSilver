@@ -122,7 +122,6 @@ export const NuevaTarifaModal = ({ asset, initialTipoControl, onSuccess, onCance
           label="Tipo de Control"
           data={[
             { value: "horometro", label: "Horómetro" },
-            { value: "odometro", label: "Odómetro" },
             { value: "vueltas", label: "Vueltas" },
           ]}
           value={tipoControl}

@@ -1,16 +1,29 @@
 import { useCallback } from "react";
-import { Badge, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Menu, Tooltip } from "@mantine/core";
 import {
   TruckIcon,
   ArrowTrendingUpIcon,
   ClockIcon,
   ArrowPathIcon,
+  EllipsisVerticalIcon,
+  PencilSquareIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { type DataTableColumn } from "mantine-datatable";
 import type { RES_CategoriaResumen } from "../service/categorias.responses";
 import { TipoBien } from "../../../shared/enums/_generic/tipo-bien";
 
-export const useCategoriasColumns = () => {
+interface UseCategoriasColumnsProps {
+  onEditar: (categoria: RES_CategoriaResumen) => void;
+  onEliminar: (categoria: RES_CategoriaResumen) => void;
+  eliminandoId: number | null;
+}
+
+export const useCategoriasColumns = ({
+  onEditar,
+  onEliminar,
+  eliminandoId,
+}: UseCategoriasColumnsProps) => {
   const getColumns =
     useCallback((): DataTableColumn<RES_CategoriaResumen>[] => {
       return [
@@ -193,8 +206,49 @@ export const useCategoriasColumns = () => {
             </Badge>
           ),
         },
+        {
+          accessor: "acciones",
+          title: "",
+          width: 70,
+          textAlign: "right",
+          render: (cat: RES_CategoriaResumen) => {
+            const estaEliminando = eliminandoId === cat.id_categoria;
+            return (
+              <Menu shadow="md" width={170} position="bottom-end" withArrow>
+                <Menu.Target>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    loading={estaEliminando}
+                    aria-label="Abrir acciones de la categoría"
+                  >
+                    <EllipsisVerticalIcon className="w-5 h-5" />
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown className="bg-zinc-900 border-zinc-800">
+                  <Menu.Label className="text-zinc-500">Acciones</Menu.Label>
+                  <Menu.Item
+                    leftSection={<PencilSquareIcon className="w-4 h-4" />}
+                    onClick={() => onEditar(cat)}
+                    className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  >
+                    Editar
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<TrashIcon className="w-4 h-4" />}
+                    color="red"
+                    onClick={() => onEliminar(cat)}
+                    className="hover:bg-red-900/20"
+                  >
+                    Eliminar
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            );
+          },
+        },
       ];
-    }, []);
+    }, [onEditar, onEliminar, eliminandoId]);
 
   return { getColumns };
 };

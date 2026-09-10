@@ -440,7 +440,6 @@ export const ControlUsoPage = () => {
             label="Tipo de control"
             data={[
               { value: "horometro", label: "Horómetro" },
-              { value: "odometro", label: "Odómetro" },
               { value: "vueltas", label: "Vueltas" },
             ]}
             value={tipoControl}
@@ -680,8 +679,8 @@ export const ControlUsoPage = () => {
           <RegistroUso
             asset={selectedAssetObj}
             tipoControl={tipoControl}
-            onSuccess={(nuevoLog) => {
-              pushNuevoLog(nuevoLog);
+            onSuccess={(nuevosLogs) => {
+              pushNuevoLog(nuevosLogs);
               close();
             }}
             onCancel={close}

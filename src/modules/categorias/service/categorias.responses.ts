@@ -1,4 +1,5 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface RES_CategoriaResumen {
   id_categoria: number;
@@ -15,4 +16,5 @@ export interface RES_CategoriaResumen {
   es_auditable: boolean;
   para_cocina: boolean;
   para_mina: boolean;
+  cambios_log?: RES_CambiosLog[] | string | null;
 }

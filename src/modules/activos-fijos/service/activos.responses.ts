@@ -1,5 +1,6 @@
 import type { EstadoActivoFijo } from "../../../shared/enums/activo-fijo";
 import type { IArchivo } from "../../../shared/interfaces/archivo";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface RES_LaborAbastecida {
   id_labor: number;
@@ -59,6 +60,7 @@ export interface RES_ActivoFijoResumen {
   fecha_hora_ingreso: string;
   created_at: string;
   estado: EstadoActivoFijo;
+  cambios_log: RES_CambiosLog[] | null;
   id_empleado_responsable: number | null;
   empleado_responsable: string | null;
   serie_factura_compra: string | null;
