@@ -149,7 +149,7 @@ export const useRegistrarEntregaBatch = ({
               : Promise.resolve({ success: true, data: [] }),
             idsActivoFijo.length > 0
               ? AuxService.get_activos_disponibles({
-                  id_almacen: idAlmacen,
+                  // id_almacen: idAlmacen,
                   ids_productos: idsActivoFijo,
                 })
               : Promise.resolve({ success: true, data: [] }),
