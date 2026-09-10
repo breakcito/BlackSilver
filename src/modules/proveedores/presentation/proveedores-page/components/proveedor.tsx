@@ -67,7 +67,7 @@ export const Proveedor = ({
     {
       accessor: "razon_social",
       title: "Proveedor",
-      width: 280,
+      width: 340,
       render: (r: ProveedorResponse) => (
         <Group gap="sm">
           <ThemeIcon
@@ -335,6 +335,7 @@ export const Proveedor = ({
     {
       accessor: "indicadores",
       title: "Indicadores",
+      width: 130,
       textAlign: "center",
       // En modo carbon la columna no aporta: las flags para_mantenimiento /
       // para_transporte son de logistica y la pagina ya esta filtrada a
