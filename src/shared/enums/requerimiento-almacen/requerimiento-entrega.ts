@@ -7,6 +7,7 @@ export enum Estado_EntregaRequerimiento {
   SinConsumir = "Sin Consumir",
   ConsumoParcial = "Consumo Parcial",
   ConsumoTotal = "Consumo Total",
+  Anulado = "Anulado"
 }
 
 export enum Estado_DetalleEntregaRequerimiento {
