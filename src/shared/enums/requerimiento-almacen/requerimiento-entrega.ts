@@ -14,4 +14,5 @@ export enum Estado_DetalleEntregaRequerimiento {
   SinConsumir = "Sin Consumir",
   ConsumoParcial = "Consumo Parcial",
   ConsumoTotal = "Consumo Total",
+  Anulado = "Anulado",
 }

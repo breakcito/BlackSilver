@@ -8,7 +8,7 @@ import {
 } from "../service/turnos.requests";
 import { useNotify } from "../../../hooks/useNotify";
 import type { RES_TurnoLaboral } from "../service/turnos.responses";
-import { TipoTurno } from "../service/tipo-turno";
+import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 
 /**
  * Calcula la duración en horas entre dos strings "HH:mm".

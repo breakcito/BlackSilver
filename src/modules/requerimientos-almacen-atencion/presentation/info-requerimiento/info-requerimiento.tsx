@@ -2,6 +2,7 @@ import { Loader, Stack } from "@mantine/core";
 import { useMemo, useState } from "react";
 import { useGestionAtencion } from "../../hooks/useGestionAtencion";
 import type { RES_RequerimientoAlmacen } from "../../../../service/responses/requerimientos-almacen/requerimiento-almacen";
+import { Estado_Requerimiento } from "../../../../shared/enums/requerimiento-almacen/requerimiento";
 import { InfoHeader } from "./components/InfoHeader";
 import { InfoStats } from "./components/InfoStats";
 import { InfoProgress } from "./components/InfoProgress";
@@ -67,14 +68,19 @@ export const InfoRequerimiento = ({
     logistica,
     loadData,
     patchDetallesLocales,
+    requerimientoAnulado,
   } = useGestionAtencion({
     idRequerimiento: requerimiento.id_requerimiento,
     onSuccess,
+    requerimientoAnulado:
+      requerimiento.estado === Estado_Requerimiento.Anulado,
   });
 
   const puedeEditar = useMemo(
-    () => detalles.some((d) => Number(d.cantidad_entregada_base ?? 0) === 0),
-    [detalles],
+    () =>
+      !requerimientoAnulado &&
+      detalles.some((d) => Number(d.cantidad_entregada_base ?? 0) === 0),
+    [detalles, requerimientoAnulado],
   );
 
   const [openedEditar, setOpenedEditar] = useState(false);
@@ -122,6 +128,7 @@ export const InfoRequerimiento = ({
         setSelectedItemName={setSelectedItemName}
         openTrace={openTrace}
         isProcessing={isProcessing}
+        deshabilitadoPorAnulacion={requerimientoAnulado}
       />
 
       <InfoActionModals

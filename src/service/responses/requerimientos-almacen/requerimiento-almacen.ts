@@ -1,5 +1,6 @@
 import type { Premura } from "../../../shared/enums/_generic/premura";
 import type { TipoBien } from "../../../shared/enums/_generic/tipo-bien";
+import type { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import type {
   Estado_Requerimiento,
   Estado_RequerimientoDetalle,
@@ -28,6 +29,7 @@ export interface RES_RequerimientoAlmacen {
   observacion: string | null;
   es_auditable: boolean;
   premura: Premura;
+  tipo_turno: TipoTurno | string | null;
   fecha_entrega_requerida: string | null;
   fecha_solicitud: string | null;
   estado: Estado_Requerimiento;

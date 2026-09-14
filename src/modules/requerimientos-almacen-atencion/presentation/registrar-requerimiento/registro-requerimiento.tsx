@@ -30,6 +30,7 @@ import {
 import { useRegistroRequerimiento } from "../../hooks/useRegistroRequerimiento";
 import type { ModoRequerimiento } from "../../hooks/useRegistroRequerimiento";
 import { Premura } from "../../../../shared/enums/_generic/premura";
+import { TipoTurno } from "../../../../shared/enums/_generic/tipo-turno";
 import { TipoBien } from "../../../../shared/enums/_generic/tipo-bien";
 import { CustomDatePicker } from "../../../../presentation/utils/date-picker-input";
 import { enPlural } from "../../../../shared/functions/en-plural";
@@ -101,6 +102,8 @@ export const RegistroRequerimiento = ({
       setFechaEntregaRequerida,
       premura,
       setPremura,
+      tipoTurno,
+      setTipoTurno,
       observacion,
       setObservacion,
       evidencias,
@@ -295,6 +298,23 @@ export const RegistroRequerimiento = ({
             value={fechaSolicitud}
             onChange={(val) => setFechaSolicitud(val as Date | null)}
             radius="lg"
+          />
+
+          <Select
+            label="Turno"
+            placeholder="Seleccione turno"
+            data={[
+              { value: TipoTurno.Dia, label: "Día" },
+              { value: TipoTurno.Noche, label: "Noche" },
+            ]}
+            value={tipoTurno}
+            onChange={(val) =>
+              setTipoTurno((val as TipoTurno | null) ?? null)
+            }
+            classNames={inputClasses}
+            radius="lg"
+            size="sm"
+            clearable
           />
 
           <CustomDatePicker

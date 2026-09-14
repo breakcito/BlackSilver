@@ -19,7 +19,7 @@ import {
 import dayjs from "dayjs";
 import { useRegistroTurno } from "../hooks/useRegistroTurno";
 import type { RES_TurnoLaboral } from "../service/turnos.responses";
-import { TipoTurno } from "../service/tipo-turno";
+import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 
 interface ModalRegistroTurnoProps {

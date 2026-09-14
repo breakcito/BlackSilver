@@ -2,6 +2,7 @@ import { Estado_RequerimientoDetalle } from "../../../shared/enums/requerimiento
 
 import { z } from "zod";
 import { Premura } from "../../../shared/enums/_generic/premura";
+import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 
 export interface DTO_CrearRequerimiento {
   id_empleado_solicitante?: number | null;
@@ -9,6 +10,7 @@ export interface DTO_CrearRequerimiento {
   id_labor?: number | null;
   id_almacen_destino: number;
   premura: Premura;
+  tipo_turno?: TipoTurno | null;
   fecha_entrega_requerida?: string | null;
   fecha_solicitud?: string | null;
   observacion?: string | null;
@@ -55,6 +57,7 @@ export const Schema_CrearRequerimiento = z.object({
   id_labor: z.number().nullable().optional(),
   id_almacen_destino: z.number().min(1, "Seleccione un almacén de destino"),
   premura: z.nativeEnum(Premura),
+  tipo_turno: z.nativeEnum(TipoTurno).nullable().optional(),
   es_auditable: z.boolean(),
   fecha_entrega_requerida: z.string().nullable().optional(),
   detalles: z
@@ -88,6 +91,7 @@ export interface DTO_EditarRequerimiento {
   id_contratista_solicitante?: number | null;
   id_labor?: number | null;
   premura?: string;
+  tipo_turno?: TipoTurno | null;
   fecha_entrega_requerida?: string;
   fecha_solicitud?: string;
   observacion?: string;

@@ -43,6 +43,11 @@ interface InfoItemsTableProps {
   setSelectedItemName: (name: string) => void;
   openTrace: () => void;
   isProcessing: number | null;
+  /**
+   * True cuando el requerimiento padre esta anulado.
+   * Deshabilita toda interaccion de seleccion / despacho.
+   */
+  deshabilitadoPorAnulacion?: boolean;
 }
 
 export const InfoItemsTable = ({
@@ -66,6 +71,7 @@ export const InfoItemsTable = ({
   setSelectedItemName,
   openTrace,
   isProcessing,
+  deshabilitadoPorAnulacion = false,
 }: InfoItemsTableProps) => {
   return (
     <div className="space-y-4">
@@ -95,7 +101,7 @@ export const InfoItemsTable = ({
             color="indigo"
             size="xs"
             leftSection={<TruckIcon className="size-4" />}
-            disabled={selectedItemsIds.length === 0}
+            disabled={selectedItemsIds.length === 0 || deshabilitadoPorAnulacion}
             onClick={openEntregaBatch}
           >
             Nueva Entrega
@@ -176,7 +182,12 @@ export const InfoItemsTable = ({
                       onChange={toggleSelectAllEligible}
                       color="indigo"
                       size="xs"
-                      className="cursor-pointer translate-y-px"
+                      disabled={deshabilitadoPorAnulacion}
+                      className={
+                        deshabilitadoPorAnulacion
+                          ? "cursor-not-allowed translate-y-px"
+                          : "cursor-pointer translate-y-px"
+                      }
                     />
                   </div>
                 )}
@@ -202,6 +213,7 @@ export const InfoItemsTable = ({
                         color="indigo"
                         checked={isAllPendingSelected}
                         onChange={seleccionarTodoLoPendiente}
+                        disabled={deshabilitadoPorAnulacion}
                       />
                     </Tooltip>
                   )}
@@ -235,7 +247,12 @@ export const InfoItemsTable = ({
                         }
                         color="indigo"
                         size="sm"
-                        className="cursor-pointer"
+                        disabled={deshabilitadoPorAnulacion}
+                        className={
+                          deshabilitadoPorAnulacion
+                            ? "cursor-not-allowed"
+                            : "cursor-pointer"
+                        }
                       />
                     ) : (
                       <div

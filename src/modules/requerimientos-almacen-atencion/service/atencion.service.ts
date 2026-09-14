@@ -37,6 +37,9 @@ export const AtencionService = {
     }
     formData.append("id_almacen_destino", String(dto.id_almacen_destino));
     formData.append("premura", dto.premura);
+    if (dto.tipo_turno) {
+      formData.append("tipo_turno", dto.tipo_turno);
+    }
     formData.append("es_auditable", dto.es_auditable ? "1" : "0");
     if (dto.fecha_entrega_requerida) {
       formData.append("fecha_entrega_requerida", dto.fecha_entrega_requerida);
@@ -267,6 +270,12 @@ export const AtencionService = {
     if (dto.premura !== undefined) {
       formData.append("premura", dto.premura);
     }
+    if (dto.tipo_turno !== undefined) {
+      formData.append(
+        "tipo_turno",
+        dto.tipo_turno === null ? "" : dto.tipo_turno,
+      );
+    }
     if (dto.fecha_entrega_requerida !== undefined) {
       formData.append("fecha_entrega_requerida", dto.fecha_entrega_requerida);
     }
@@ -415,6 +424,17 @@ export const AtencionService = {
       {
         headers: { "Content-Type": "multipart/form-data" },
       },
+    );
+    return res.data;
+  },
+
+  /**
+   * Anula un requerimiento (cambia su estado a "Anulado").
+   * El backend rechaza si el requerimiento ya tiene entregas iniciadas.
+   */
+  anularRequerimiento: async (idRequerimiento: number) => {
+    const res = await api.post<IRespuesta<null>>(
+      `${path}/${idRequerimiento}/anular`,
     );
     return res.data;
   },

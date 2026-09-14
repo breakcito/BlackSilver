@@ -1,5 +1,5 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
-import type { TipoTurno } from "./tipo-turno";
+import type { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 
 export interface RES_ProgramacionHorario {
   id: number;

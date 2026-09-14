@@ -1,4 +1,4 @@
-import type { TipoTurno } from "./tipo-turno";
+import type { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 
 export interface RES_TurnoLaboral {

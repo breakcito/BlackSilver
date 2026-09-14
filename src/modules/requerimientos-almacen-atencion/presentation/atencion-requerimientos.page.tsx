@@ -10,6 +10,7 @@ import {
   Select,
   Loader,
   Button,
+  Alert,
 } from "@mantine/core";
 import {
   MagnifyingGlassIcon,
@@ -22,6 +23,8 @@ import {
   PaperClipIcon,
   PrinterIcon,
   DocumentArrowDownIcon,
+  NoSymbolIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { type DataTableColumn } from "mantine-datatable";
@@ -67,6 +70,13 @@ export const RequerimientosAlmacenAtencionPage = () => {
   const { notifySuccess, notifyError } = useNotify();
   const [nuevasEvidencias, setNuevasEvidencias] = useState<File[]>([]);
   const [subiendoEvidencias, setSubiendoEvidencias] = useState(false);
+
+  // Modal de confirmacion de anulacion de requerimiento.
+  const [openedAnular, { open: openAnular, close: closeAnular }] =
+    useDisclosure(false);
+  const [anularId, setAnularId] = useState<number | null>(null);
+  const [anularCorrelativo, setAnularCorrelativo] = useState<string>("");
+  const [anulando, setAnulando] = useState(false);
 
   const {
     idAlmacen,
@@ -252,7 +262,7 @@ export const RequerimientosAlmacenAtencionPage = () => {
         accessor: "acciones",
         title: "Acciones",
         textAlign: "center",
-        width: 140,
+        width: 175,
         render: (item) => (
           <Group gap="xs" justify="center">
             {item.evidencias && item.evidencias.length > 0 && (
@@ -302,6 +312,23 @@ export const RequerimientosAlmacenAtencionPage = () => {
                 <PlayCircleIcon className="w-5 h-5 text-white" />
               </ActionIcon>
             </Tooltip>
+            {item.estado !== Estado_Requerimiento.Anulado && (
+              <Tooltip label="Anular Requerimiento" position="top" withArrow>
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  radius="md"
+                  onClick={() => {
+                    setAnularId(item.id_requerimiento);
+                    setAnularCorrelativo(item.correlativo);
+                    openAnular();
+                  }}
+                  className="shadow-sm hover:scale-105 transition-transform"
+                >
+                  <NoSymbolIcon className="w-5 h-5" />
+                </ActionIcon>
+              </Tooltip>
+            )}
           </Group>
         ),
       },
@@ -588,6 +615,94 @@ export const RequerimientosAlmacenAtencionPage = () => {
             }}
           />
         )}
+      </ModalEstandar>
+
+      <ModalEstandar
+        opened={openedAnular}
+        close={() => {
+          if (anulando) return;
+          closeAnular();
+          setAnularId(null);
+          setAnularCorrelativo("");
+        }}
+        title="Anular Requerimiento"
+        size="md"
+      >
+        <Stack gap="md">
+          <Alert
+            variant="light"
+            color="red"
+            radius="lg"
+            icon={<ExclamationTriangleIcon className="w-5 h-5 text-red-400" />}
+            className="bg-red-500/10 border border-red-500/30"
+            classNames={{ message: "text-zinc-200 text-sm leading-relaxed" }}
+          >
+            Esta accion cambiara el estado del requerimiento a{" "}
+            <strong>Anulado</strong>. Si ya tiene entregas iniciadas, el stock de
+            lotes sera reingresado, los activos fijos seran devueltos al almacen
+            de origen y los consumos asociados seran eliminados.
+          </Alert>
+          <Text size="sm" className="text-zinc-300">
+            Requerimiento a anular:{" "}
+            <Badge color="indigo" variant="light" radius="sm">
+              {anularCorrelativo}
+            </Badge>
+          </Text>
+          <Group justify="flex-end" mt="sm" gap="md">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                if (anulando) return;
+                closeAnular();
+                setAnularId(null);
+                setAnularCorrelativo("");
+              }}
+              disabled={anulando}
+              radius="lg"
+              size="sm"
+              className="text-zinc-400 hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="red"
+              loading={anulando}
+              onClick={async () => {
+                if (!anularId) return;
+                setAnulando(true);
+                try {
+                  const res = await AtencionService.anularRequerimiento(anularId);
+                  if (res.success) {
+                    notifySuccess(
+                      res.message ?? "Requerimiento anulado correctamente",
+                    );
+                    updateRequirementLocal(anularId, {
+                      estado: Estado_Requerimiento.Anulado,
+                    });
+                    closeAnular();
+                    setAnularId(null);
+                    setAnularCorrelativo("");
+                  } else {
+                    notifyError(
+                      res.message ?? "No se pudo anular el requerimiento",
+                    );
+                  }
+                } catch (err) {
+                  console.error(err);
+                  notifyError("Error inesperado al anular el requerimiento");
+                } finally {
+                  setAnulando(false);
+                }
+              }}
+              radius="lg"
+              size="sm"
+              leftSection={<NoSymbolIcon className="w-4 h-4" />}
+              className="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-950/20 px-6"
+            >
+              Anular Requerimiento
+            </Button>
+          </Group>
+        </Stack>
       </ModalEstandar>
 
       {errorLocal && (

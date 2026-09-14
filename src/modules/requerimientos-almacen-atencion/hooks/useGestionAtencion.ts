@@ -12,11 +12,19 @@ import {
 interface UseGestionAtencionProps {
   idRequerimiento: number;
   onSuccess: (ids?: number[]) => void;
+  /**
+   * Si es true, el requerimiento esta anulado y la UI debe impedir
+   * seleccionar items / abrir el modal de entrega. El backend igual
+   * rechaza entregas sobre un requerimiento anulado, pero bloqueamos
+   * aca para evitar malas experiencias y botones habilitados en vano.
+   */
+  requerimientoAnulado?: boolean;
 }
 
 export const useGestionAtencion = ({
   idRequerimiento,
   onSuccess,
+  requerimientoAnulado = false,
 }: UseGestionAtencionProps) => {
   const [loading, setLoading] = useState(true);
   const [detalles, setDetalles] = useState<DetalleRequerimientoExtendido[]>([]);
@@ -54,16 +62,18 @@ export const useGestionAtencion = ({
   const [idsParaAccionMasiva, setIdsParaAccionMasiva] = useState<number[]>([]);
 
   const toggleItemSelection = useCallback((id: number) => {
+    if (requerimientoAnulado) return;
     setSelectedItemsIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
-  }, []);
+  }, [requerimientoAnulado]);
 
   const toggleSeleccionMasiva = useCallback((id: number) => {
+    if (requerimientoAnulado) return;
     setIdsParaAccionMasiva((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
-  }, []);
+  }, [requerimientoAnulado]);
 
   const deseleccionarMasivos = useCallback(() => {
     setIdsParaAccionMasiva([]);
@@ -416,56 +426,58 @@ export const useGestionAtencion = ({
     return Math.round(sumaProgreso / itemsAtendibles.length);
   }, [detalles]);
 
-  return {
-    loading,
-    detalles: detalles,
-    error,
-    eventos,
-    loadingTrazabilidad,
-    openedTrace,
-    openTrace,
-    closeTrace,
-    openedRechazo,
-    openRechazo,
-    closeRechazo,
-    openedAprobar,
-    openAprobar,
-    closeAprobar,
-    openedEntregaBatch,
-    openEntregaBatch,
-    closeEntregaBatch,
-    openedHistorialGlobal,
-    openHistorialGlobal,
-    closeHistorialGlobal,
-    selectedItemId,
-    setSelectedItemId,
-    selectedItemName,
-    setSelectedItemName,
-    selectedItemsIds,
-    toggleItemSelection,
-    deselectAllItems,
-    isAllEligibleSelected,
-    hasPartialEligibleSelection,
-    toggleSelectAllEligible,
-    idsParaAccionMasiva,
-    toggleSeleccionMasiva,
-    isAllPendingSelected,
-    seleccionarTodoLoPendiente,
-    comentarioAccion,
-    setComentarioAccion,
-    isProcessing,
-    progresoGeneral,
-    handleAprobar,
-    handleRechazar,
-    handleDecisionMasiva,
-    getStatusColor,
-    loadData,
-    logistica: {
-      isOpen: isLogisticaModalOpen,
-      open: onConsultarLogisticaClick,
-      close: handleCloseLogisticaModal,
-      onSuccess: onSuccessLogistica,
-    },
-    patchDetallesLocales,
+    return {
+      loading,
+      detalles: detalles,
+      error,
+      eventos,
+      loadingTrazabilidad,
+      openedTrace,
+      openTrace,
+      closeTrace,
+      openedRechazo,
+      openRechazo,
+      closeRechazo,
+      openedAprobar,
+      openAprobar,
+      closeAprobar,
+      openedEntregaBatch,
+      openEntregaBatch,
+      closeEntregaBatch,
+      openedHistorialGlobal,
+      openHistorialGlobal,
+      closeHistorialGlobal,
+      selectedItemId,
+      setSelectedItemId,
+      selectedItemName,
+      setSelectedItemName,
+      selectedItemsIds,
+      toggleItemSelection,
+      deselectAllItems,
+      isAllEligibleSelected,
+      hasPartialEligibleSelection,
+      toggleSelectAllEligible,
+      idsParaAccionMasiva,
+      toggleSeleccionMasiva,
+      isAllPendingSelected,
+      seleccionarTodoLoPendiente,
+      comentarioAccion,
+      setComentarioAccion,
+      isProcessing,
+      progresoGeneral,
+      handleAprobar,
+      handleRechazar,
+      handleDecisionMasiva,
+      getStatusColor,
+      loadData,
+      logistica: {
+        isOpen: isLogisticaModalOpen,
+        open: onConsultarLogisticaClick,
+        close: handleCloseLogisticaModal,
+        onSuccess: onSuccessLogistica,
+      },
+      patchDetallesLocales,
+      /** True cuando el requerimiento padre esta anulado. */
+      requerimientoAnulado,
+    };
   };
-};

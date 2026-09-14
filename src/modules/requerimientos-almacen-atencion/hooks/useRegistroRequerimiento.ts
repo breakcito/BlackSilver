@@ -8,6 +8,7 @@ import type {
   DTO_CrearRequerimientoDetalle,
 } from "../service/atencion.requests";
 import { Premura } from "../../../shared/enums/_generic/premura";
+import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import type { RES_UnidadMedida } from "../../../service/responses/unidad-medida";
 import { AtencionService } from "../service/atencion.service";
 import type {
@@ -82,6 +83,7 @@ export const useRegistroRequerimiento = ({
   const [idLabor, setIdLabor] = useState<number>(0);
   const [idEmpleadoSolicitante, setIdEmpleadoSolicitante] = useState<number>(0);
   const [premura, setPremura] = useState<Premura>(Premura.Normal);
+  const [tipoTurno, setTipoTurno] = useState<TipoTurno | null>(null);
   const [fechaSolicitud, setFechaSolicitud] = useState<Date | null>(new Date());
   const [fechaEntregaRequerida, setFechaEntregaRequerida] =
     useState<Date | null>(null);
@@ -147,6 +149,11 @@ export const useRegistroRequerimiento = ({
       Boolean(requerimientoInicial.id_contratista_solicitante),
     );
     setPremura((requerimientoInicial.premura as Premura) ?? Premura.Normal);
+    setTipoTurno(
+      requerimientoInicial.tipo_turno
+        ? (requerimientoInicial.tipo_turno as TipoTurno)
+        : null,
+    );
     setFechaSolicitud(
       requerimientoInicial.fecha_solicitud
         ? dayjs(requerimientoInicial.fecha_solicitud).toDate()
@@ -842,6 +849,7 @@ export const useRegistroRequerimiento = ({
                 : null,
             id_labor: idLabor > 0 ? idLabor : null,
             premura,
+            tipo_turno: tipoTurno,
             fecha_solicitud: fechaSolicitud
               ? dayjs(fechaSolicitud).format("YYYY-MM-DD")
               : undefined,
@@ -887,6 +895,7 @@ export const useRegistroRequerimiento = ({
       id_labor: idLabor > 0 ? idLabor : null,
       id_almacen_destino: idAlmacenDestino,
       premura,
+      tipo_turno: tipoTurno,
       es_auditable: esAuditable,
       fecha_solicitud: fechaSolicitud
         ? dayjs(fechaSolicitud).format("YYYY-MM-DD")
@@ -946,6 +955,7 @@ export const useRegistroRequerimiento = ({
     idEmpleadoSolicitante,
     idLabor,
     premura,
+    tipoTurno,
     fechaSolicitud,
     fechaEntregaRequerida,
     observacion,
@@ -977,6 +987,8 @@ export const useRegistroRequerimiento = ({
       setVerContratistas,
       premura,
       setPremura,
+      tipoTurno,
+      setTipoTurno,
       fechaSolicitud,
       setFechaSolicitud,
       fechaEntregaRequerida,

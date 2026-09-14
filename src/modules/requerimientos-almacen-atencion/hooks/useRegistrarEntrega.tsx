@@ -785,9 +785,13 @@ export const useRegistrarEntregaBatch = ({
         const d = lotesMineral.find(
           (l) => l.id_lote_mineral === dest.id_lote_mineral,
         );
-        return d
-          ? d.descripcion || d.codigo || `Lote #${dest.id_lote_mineral}`
-          : `Lote #${dest.id_lote_mineral}`;
+        if (!d) return `Lote #${dest.id_lote_mineral}`;
+        const nombreCorto = d.contratista
+          ? d.contratista.split(" ")[0]
+          : null;
+        return nombreCorto
+          ? `${nombreCorto} - ${d.codigo}`
+          : d.codigo || `Lote #${dest.id_lote_mineral}`;
       }
       return null;
     };

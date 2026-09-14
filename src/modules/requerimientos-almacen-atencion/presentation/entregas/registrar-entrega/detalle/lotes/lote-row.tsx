@@ -223,7 +223,7 @@ export const LoteRow = ({
               data={lotesMineral.map((lm) => ({
                 value: String(lm.id_lote_mineral),
                 label: lm.contratista
-                  ? `${lm.codigo} - ${lm.contratista}`
+                  ? `${lm.contratista.split(" ")[0]} - ${lm.codigo}`
                   : lm.codigo,
               }))}
               value={dest.id_lote_mineral ? String(dest.id_lote_mineral) : null}
