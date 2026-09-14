@@ -5,6 +5,8 @@ export enum Kardex_OrigenMovimiento {
   Reposicion = "Reposición",
   AjusteStock = "Ajuste de Stock",
   MovimientoInterno = "Movimiento Interno",
+  Reingreso = "Reingreso",
+  Consumo = "Consumo"
 }
 export enum Kardex_TipoMovimiento {
   Ingreso = "Ingreso",
