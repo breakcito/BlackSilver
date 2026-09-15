@@ -50,6 +50,7 @@ import type { RES_RequerimientoAlmacen } from "../../../service/responses/requer
 import { BotonRecargar } from "../../../presentation/utils/boton-recargar.tsx";
 import { useExcel } from "../../../hooks/useExcel.ts";
 import { useRequerimientosExcel } from "./excel-requerimientos.ts";
+import { useAuditoriaStore } from "../../../stores/auditoria.store.ts";
 
 export const RequerimientosAlmacenAtencionPage = () => {
   useTitlePage("Atención de Requerimientos");
@@ -101,13 +102,18 @@ export const RequerimientosAlmacenAtencionPage = () => {
 
   const { generateExcel: enqueueExcel, isGeneratingExcel } = useExcel();
   const excelBuilder = useRequerimientosExcel();
+  const { en_modo_auditable } = useAuditoriaStore();
 
   const handleExportExcel = () => {
     if (filteredRecords.length === 0) return;
+    const almacenNombre =
+      almacenes.find((a) => String(a.id_almacen) === idAlmacen)?.nombre || "—";
     const config = excelBuilder.generate({
       requerimientos: filteredRecords,
       mes,
       yearcito,
+      almacenNombre,
+      en_modo_auditable,
     });
     enqueueExcel(config);
   };
