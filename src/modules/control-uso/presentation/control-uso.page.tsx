@@ -1,10 +1,12 @@
 import { useDisclosure } from "@mantine/hooks";
 import { useTitlePage } from "../../../hooks/useTitlePage";
 import { useControlUso } from "../hooks/useControlUso";
+import { useState } from "react";
 import dayjs from "dayjs";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { RegistroUso } from "./registro-uso";
+import { EdicionControlUsoModal } from "./EdicionControlUsoModal";
 import { useExcel } from "../../../hooks/useExcel";
 import { useNotify } from "../../../hooks/useNotify";
 import { ControlUsoService } from "../service/control-uso.service";
@@ -22,6 +24,8 @@ import {
   Select,
   Tooltip,
   Loader,
+  ActionIcon,
+  Menu,
 } from "@mantine/core";
 import {
   PlusIcon,
@@ -31,11 +35,16 @@ import {
   TruckIcon,
   CalendarDaysIcon,
   BanknotesIcon,
+  NoSymbolIcon,
+  EllipsisVerticalIcon,
+  PencilSquareIcon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 import { type DataTableColumn } from "mantine-datatable";
 import type { RES_ControlUsoLog } from "../service/control-uso.responses";
 import { MESES } from "../../../shared/variables/meses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
+import { Estado_ControlUso } from "../../../shared/enums/control-uso/estadoControlUso";
 
 export const ControlUsoPage = () => {
   useTitlePage("Control de Uso");
@@ -62,8 +71,62 @@ export const ControlUsoPage = () => {
 
   const [opened, { open, close }] = useDisclosure(false);
 
+  // Estado del modal de anulacion de control de uso
+  const [anularOpened, { open: openAnular, close: closeAnular }] =
+    useDisclosure(false);
+  const [anularTarget, setAnularTarget] = useState<RES_ControlUsoLog | null>(
+    null,
+  );
+  const [anulando, setAnulando] = useState(false);
+
+  // Estado del modal de edicion de control de uso
+  const [editarOpened, { open: openEditar, close: closeEditar }] =
+    useDisclosure(false);
+  const [editarTarget, setEditarTarget] = useState<RES_ControlUsoLog | null>(
+    null,
+  );
+
+  const abrirModalAnular = (log: RES_ControlUsoLog) => {
+    setAnularTarget(log);
+    openAnular();
+  };
+
+  const abrirModalEditar = (log: RES_ControlUsoLog) => {
+    setEditarTarget(log);
+    openEditar();
+  };
+
+  const confirmarAnular = async () => {
+    if (!anularTarget) return;
+    setAnulando(true);
+    try {
+      const resp = await ControlUsoService.anularControlUso(
+        Number(anularTarget.id_log),
+      );
+      if (resp.success) {
+        // El backend decide si reingresa stock o no segun cuantos items
+        // del mismo `uuid_grupo` quedan activos. Mostramos el mensaje tal
+        // cual lo devuelve el service para no mentir sobre el reingreso.
+        const msg =
+          resp.message ||
+          "Control de uso anulado.";
+        notifySuccess?.(msg);
+        closeAnular();
+        setAnularTarget(null);
+        await recargar();
+      } else {
+        notifyError(resp.message || "No se pudo anular el control de uso");
+      }
+    } catch (err) {
+      console.error(err);
+      notifyError("Error inesperado al anular el control de uso");
+    } finally {
+      setAnulando(false);
+    }
+  };
+
   const { generateExcel, isGeneratingExcel } = useExcel();
-  const { notifyError } = useNotify();
+  const { notifyError, notifySuccess } = useNotify();
 
   const handleExportExcel = () => {
     const mesNombre = MESES.find((m) => m.value === String(mes))?.label || String(mes);
@@ -77,7 +140,13 @@ export const ControlUsoPage = () => {
           const resp = await ControlUsoService.getReporteMensual(Number(mes), Number(anio));
           if (resp.success) {
             if (tipoControl === "horometro") {
-              await buildControlHorasExcel(workbook, resp.data.logs, Number(mes), Number(anio));
+              await buildControlHorasExcel(
+                workbook,
+                resp.data.logs,
+                Number(mes),
+                Number(anio),
+                resp.data.consumos_combustible_por_uuid ?? {},
+              );
             } else {
               await buildControlVueltasExcel(workbook, resp.data.logs, Number(mes), Number(anio));
             }
@@ -112,6 +181,27 @@ export const ControlUsoPage = () => {
   )
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([group, items]) => ({ group, items }));
+
+  // Agrupa registros por `uuid_grupo` conservando el orden de llegada
+  // (que ya viene ordenado por fecha DESC desde el backend). Los registros
+  // sin uuid (null/undefined) caen en un solo grupo "Sin grupo" al final.
+  const agruparPorUuidGrupo = (
+    items: RES_ControlUsoLog[],
+  ): { uuid: string | null; registros: RES_ControlUsoLog[] }[] => {
+    const map = new Map<string | null, RES_ControlUsoLog[]>();
+    for (const it of items) {
+      const key = it.uuid_grupo ?? null;
+      const arr = map.get(key) ?? [];
+      arr.push(it);
+      map.set(key, arr);
+    }
+    // Map conserva orden de insercion, asi que los grupos quedan en el
+    // mismo orden en que aparecieron en `logs` (DESC por fecha).
+    return Array.from(map.entries()).map(([uuid, registros]) => ({
+      uuid,
+      registros,
+    }));
+  };
 
   // Table columns definition (inspired by Lotes layout and styling patterns)
   const columns: DataTableColumn<RES_ControlUsoLog>[] = [
@@ -430,6 +520,72 @@ export const ControlUsoPage = () => {
           </Text>
         ),
     },
+    {
+      accessor: "estado",
+      title: "Estado",
+      width: 130,
+      render: (r) => {
+        // Mismo patron visual que Requerimientos (variant="light", color
+        // segun estado): Activo en verde (green), Anulado en rojo (red).
+        const estado = (r.estado ?? Estado_ControlUso.Activo).toString();
+        const esAnulado =
+          estado.toLowerCase() === Estado_ControlUso.Anulado.toLowerCase();
+        const color = esAnulado ? "red" : "green";
+        return (
+          <Group gap={6} wrap="nowrap" justify="space-between">
+            <Badge
+              color={color}
+              variant="light"
+              radius="sm"
+              size="sm"
+              className="font-semibold uppercase tracking-wider"
+            >
+              {estado}
+            </Badge>
+            <Menu position="bottom-end" withinPortal shadow="md" radius="md">
+              <Menu.Target>
+                <ActionIcon
+                  size="sm"
+                  radius="md"
+                  variant="subtle"
+                  color="zinc.4"
+                  aria-label="Acciones"
+                >
+                  <EllipsisVerticalIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {!esAnulado && (
+                  <Menu.Item
+                    leftSection={
+                      <PencilSquareIcon className="w-4 h-4 text-indigo-400" />
+                    }
+                    onClick={() => abrirModalEditar(r)}
+                  >
+                    Editar Control de Uso
+                  </Menu.Item>
+                )}
+                {!esAnulado ? (
+                  <Menu.Item
+                    leftSection={
+                      <NoSymbolIcon className="w-4 h-4 text-red-400" />
+                    }
+                    color="red"
+                    onClick={() => abrirModalAnular(r)}
+                  >
+                    Anular Control de Uso
+                  </Menu.Item>
+                ) : (
+                  <Menu.Item disabled color="zinc.5">
+                    Sin acciones disponibles
+                  </Menu.Item>
+                )}
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+        );
+      },
+    },
   ];
 
   const fieldClasses = {
@@ -639,7 +795,7 @@ export const ControlUsoPage = () => {
           </div>
         )}
 
-        {/* Table inside the shadow card */}
+        {/* Table area: grupos UUID */}
         <div className="relative shadow-inner">
           {loading ? (
             <Stack align="center" gap="md" py={100}>
@@ -670,13 +826,76 @@ export const ControlUsoPage = () => {
               </Text>
             </div>
           ) : (
-            <DataTableEstandar
-              idAccessor="id_log"
-              columns={columns}
-              records={logs}
-              loading={loading}
-              minHeight={0}
-            />
+            <Stack gap="md" p="md">
+              {agruparPorUuidGrupo(logs).map((grupo) => {
+                const uuid = grupo.uuid;
+                const registros = grupo.registros;
+                return (
+                  <div
+                    key={uuid ?? "sin-grupo"}
+                    className="rounded-2xl border border-zinc-800/80 bg-zinc-950/30 overflow-hidden"
+                  >
+                    {/* Cabecera del grupo: UUID + conteo */}
+                    <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-zinc-900/40 border-b border-zinc-800/80">
+                      <Group gap="xs" wrap="nowrap">
+                        <TagIcon className="w-4 h-4 text-grape-400 shrink-0" />
+                        <Text
+                          size="10px"
+                          fw={900}
+                          className="uppercase tracking-widest text-zinc-500"
+                        >
+                          Grupo UUID
+                        </Text>
+                        {uuid ? (
+                          <Badge
+                            variant="light"
+                            color="grape"
+                            radius="sm"
+                            size="md"
+                            className="font-mono font-bold tracking-tight"
+                          >
+                            {uuid}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="light"
+                            color="zinc"
+                            radius="sm"
+                            size="sm"
+                            className="font-bold uppercase tracking-wider"
+                          >
+                            Sin grupo
+                          </Badge>
+                        )}
+                      </Group>
+                      <Badge
+                        size="sm"
+                        variant="light"
+                        color="zinc"
+                        radius="sm"
+                        className="font-bold uppercase tracking-wider"
+                      >
+                        {registros.length}{" "}
+                        {registros.length === 1 ? "registro" : "registros"}
+                      </Badge>
+                    </div>
+
+                    {/* Mini-tabla del grupo */}
+                    <DataTableEstandar
+                      idAccessor="id_log"
+                      columns={columns}
+                      records={registros}
+                      loading={loading}
+                      minHeight={0}
+                      // Bordes mas sutiles para que se vea como sub-tabla.
+                      rowClassName={() =>
+                        "bg-zinc-950/20 hover:bg-zinc-900/40"
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </Stack>
           )}
         </div>
       </div>
@@ -700,6 +919,103 @@ export const ControlUsoPage = () => {
           />
         )}
       </ModalEstandar>
+
+      {/* Anular Control de Uso Modal */}
+      <ModalEstandar
+        opened={anularOpened}
+        close={() => {
+          if (!anulando) {
+            closeAnular();
+            setAnularTarget(null);
+          }
+        }}
+        title="Anular Control de Uso"
+        size="md"
+      >
+        {anularTarget && (
+          <Stack gap="sm">
+            <div className="rounded-lg border border-red-500/30 bg-red-950/10 p-3">
+              <Group gap={8} align="center">
+                <NoSymbolIcon className="w-5 h-5 text-red-400" />
+                <Text size="sm" fw={800} className="text-red-300 uppercase tracking-wider">
+                  Esta accion no se puede deshacer
+                </Text>
+              </Group>
+              <Text size="xs" c="zinc.300" mt={6}>
+                Al anular este control de uso:
+              </Text>
+              <Stack gap={3} mt={4} className="text-xs text-zinc-400">
+                <Text size="xs">
+                  - El registro de uso cambiara a estado{" "}
+                  <span className="text-red-400 font-bold">Anulado</span> y no se
+                  contara en calculos, listados principales ni en el Excel.
+                </Text>
+                <Text size="xs">
+                  - <span className="text-amber-300 font-bold">Stock y consumo:</span>{" "}
+                  los consumos se asocian al GRUPO UUID, no a este item
+                  puntual. El stock se reingresa al lote y el consumo se
+                  elimina fisicamente SOLO cuando este sea el ULTIMO item
+                  activo del grupo (los demas bloques horometrados ya
+                  esten anulados). Si quedan mas bloques activos del
+                  mismo grupo, no se toca stock ni Kardex.
+                </Text>
+                <Text size="xs">
+                  - Se registra un movimiento en Kardex (Ingreso / Reingreso)
+                  solo cuando se cierra el grupo completo.
+                </Text>
+              </Stack>
+            </div>
+
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-lg p-3">
+              <Text size="10px" c="zinc.500" fw={900} tt="uppercase" lts="0.08em" mb={4}>
+                Registro a anular
+              </Text>
+              <Text size="sm" fw={700} className="text-zinc-100">
+                {anularTarget.producto} - {anularTarget.correlativo}
+              </Text>
+              <Text size="xs" c="zinc.400" mt={2}>
+                {anularTarget.fecha_hora_inicio_control} -{" "}
+                {anularTarget.fecha_hora_fin_control || "(sin fin)"}
+              </Text>
+            </div>
+
+            <Group justify="flex-end" gap="sm" mt="sm">
+              <Button
+                variant="default"
+                size="xs"
+                radius="lg"
+                disabled={anulando}
+                onClick={() => {
+                  closeAnular();
+                  setAnularTarget(null);
+                }}
+                className="bg-zinc-800! text-zinc-300! border-zinc-700!"
+              >
+                Cancelar
+              </Button>
+              <Button
+                color="red.6"
+                size="xs"
+                radius="lg"
+                loading={anulando}
+                onClick={confirmarAnular}
+                leftSection={<NoSymbolIcon className="w-4 h-4" />}
+                className="bg-red-600! hover:bg-red-700! text-white! font-bold"
+              >
+                Anular Control de Uso
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </ModalEstandar>
+
+      {/* Editar Control de Uso Modal */}
+      <EdicionControlUsoModal
+        opened={editarOpened}
+        close={closeEditar}
+        target={editarTarget}
+        onSuccess={recargar}
+      />
     </Stack>
   );
 };

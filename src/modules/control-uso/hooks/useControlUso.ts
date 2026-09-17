@@ -85,7 +85,11 @@ export const useControlUso = () => {
   const filtrados = useMemo(() => {
     if (!idActivoFijo) return [];
 
-    // Filter by currently selected active asset first
+    // Filtrar solo por el activo fijo seleccionado. Los registros
+    // anulados TAMBIEN se muestran (con su badge rojo, sin acciones),
+    // para que el usuario pueda ver el historial completo y saber
+    // que fueron anulados. La exclusion de anulados solo aplica al
+    // reporte mensual / Excel (ver `excel-control-horas.ts`).
     const assetFiltered = logs.filter(
       (log) => log.id_activo_fijo === Number(idActivoFijo),
     );

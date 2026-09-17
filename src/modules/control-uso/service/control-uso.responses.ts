@@ -40,6 +40,12 @@ export interface RES_ControlUsoLog {
   tipo_turno: string | null;
   uuid_grupo: string | null;
   created_at: string;
+  /**
+   * Estado del control de uso: 'Activo' | 'Anulado'.
+   * Si el item esta anulado, ya no debe contarse en calculos, listados
+   * principales, ni en el Excel (filtrar `WHERE estado != 'Anulado'`).
+   */
+  estado?: string | null;
 }
 
 export interface RES_UltimoHorometro {
@@ -82,4 +88,15 @@ export interface RES_ReporteMensual {
   logs: RES_ControlUsoLog[];
   mantenimientos: RES_MantenimientoReporte[];
   empresa_logo?: string | null;
+  /**
+   * Mapa uuid_grupo => datos de combustible consumido por el grupo en el mes.
+   * Cada entrada resume todos los consumos_directo de `id_producto = 12`
+   * (producto combustible hardcoded) que pertenecen al mismo `uuid_grupo`.
+   * El Excel lo consume para pintar la columna "Combustible/GL" una sola
+   * vez por grupo.
+   */
+  consumos_combustible_por_uuid?: Record<
+    string,
+    { cantidad: number; unidad: string; producto: string }
+  >;
 }

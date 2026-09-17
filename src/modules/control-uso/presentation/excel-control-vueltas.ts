@@ -2,6 +2,7 @@ import type ExcelJS from "exceljs";
 import dayjs from "dayjs";
 import type { RES_ControlUsoLog } from "../service/control-uso.responses";
 import { MESES } from "../../../shared/variables/meses";
+import { Estado_ControlUso } from "../../../shared/enums/control-uso/estadoControlUso";
 
 // Paleta rotativa de cabeceras laterales de ÁREA (LABOR)
 // cicla: verde → amarillo → rosa → verde → amarillo → rosa → ...
@@ -52,10 +53,17 @@ export const buildControlVueltasExcel = async (
   const daysInMonth = dayjs(`${anio}-${mes}-01`).daysInMonth();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Solo logs con vueltas
-  const vueltasLogs = logs.filter(
-    (l) => l.cantidad_vueltas !== null && l.cantidad_vueltas !== undefined
-  );
+  // Solo logs con vueltas y NO anulados (los anulados se excluyen del
+  // Excel principal).
+  const vueltasLogs = logs.filter((l) => {
+    if (
+      (l.estado ?? Estado_ControlUso.Activo).toString().toLowerCase() ===
+      Estado_ControlUso.Anulado.toLowerCase()
+    ) {
+      return false;
+    }
+    return l.cantidad_vueltas !== null && l.cantidad_vueltas !== undefined;
+  });
 
   if (vueltasLogs.length === 0) {
     const sheet = workbook.addWorksheet("Sin Registros", { views: [{ showGridLines: true }] });
@@ -98,7 +106,9 @@ export const buildControlVueltasExcel = async (
     // ----------------------------------------------------------------
     // Columnas (orden de la imagen)
     //   item | area | detalle | centro_costo | saldos_iniciales |
-    //   d1..dN | total_vueltas | p_unit | total_s
+    //   d1..dN | total_vueltas | p_unit | total_s | total_s_acum
+    // `total_s_acum` es el acumulado de `total_s` por labor (area):
+    // cada fila suma su costo al running total del area actual.
     // ----------------------------------------------------------------
     const columns: Partial<ExcelJS.Column>[] = [
       { header: "", key: "item", width: 6 },
@@ -113,6 +123,7 @@ export const buildControlVueltasExcel = async (
     columns.push({ header: "", key: "total_vueltas", width: 14 });
     columns.push({ header: "", key: "p_unit", width: 12 });
     columns.push({ header: "", key: "total_s", width: 14 });
+    columns.push({ header: "", key: "total_s_acum", width: 14 });
     sheet.columns = columns;
 
     const lastColLetter = colLetter(columns.length);
@@ -141,7 +152,9 @@ export const buildControlVueltasExcel = async (
     // ----------------------------------------------------------------
     // Header de la tabla
     //   ITEM | ÁREA | DETALLE | CENTRO DE COSTO | SALDOS INICIALES |
-    //   d1..dN | TOTAL DE VUELTAS | P.UNIT | TOTAL S/.
+    //   d1..dN | TOTAL DE VUELTAS | P.UNIT | TOTAL S/. | ACUM.
+    // (ACUM. = acumulado del `TOTAL S/.` por labor/area; se resetea al
+    // cambiar de area.)
     // ----------------------------------------------------------------
     const headerValues: Record<string, string | number> = {
       item: "ITEM",
@@ -152,6 +165,7 @@ export const buildControlVueltasExcel = async (
       total_vueltas: "TOTAL DE VUELTAS",
       p_unit: "P.UNIT",
       total_s: "TOTAL S/.",
+      total_s_acum: "ACUM.",
     };
     daysArray.forEach((d) => {
       headerValues[`d${d}`] = String(d);
@@ -195,9 +209,21 @@ export const buildControlVueltasExcel = async (
     let grandTotalCosto = 0;
     const preciosUnitarios: number[] = [];
 
+    // Helper: el material del grupo se considera SACOS si su nombre
+    // contiene "saco" (case-insensitive). En ese caso las celdas diarias
+    // deben mostrar `cantidad_sacos` (no `cantidad_vueltas`) y el
+    // `TOTAL DE VUELTAS` queda vacio (los sacos no son vueltas).
+    const esMaterialSacos = (material: string): boolean => {
+      return material.trim().toLowerCase().includes("saco");
+    };
+
     for (const [areaName, areaLogs] of areaMap.entries()) {
       const areaColor = COLOR_AREA_BG[areaColorIdx % COLOR_AREA_BG.length];
       areaColorIdx++;
+
+      // Acumulado del TOTAL S/. dentro de esta area. Se resetea a 0 al
+      // entrar en cada nueva labor.
+      let acumAreaS = 0;
 
       // Agrupación dentro del ÁREA por (DETALLE, P_UNIT).
       // - material efectivo: tarifa_material ?? tipo_material ?? ""  (fallback)
@@ -328,34 +354,61 @@ export const buildControlVueltasExcel = async (
             saldos_iniciales: "",
           };
 
+          // Si el material del grupo es "sacos", las celdas diarias muestran
+          // `cantidad_sacos` (no vueltas) y el TOTAL DE VUELTAS queda vacio.
+          const grupoEsSacos = esMaterialSacos(detalleText);
+
           let totalVueltas = 0;
           daysArray.forEach((d) => {
             const logsDay = dayMap.get(d);
             if (logsDay && logsDay.length > 0) {
-              // Suma de vueltas del día (mismo material, mismo p_unit)
-              const sumV = logsDay.reduce(
-                (s, l) => s + Number(l.cantidad_vueltas || 0),
-                0
-              );
-              data[`d${d}`] = sumV;
-              totalVueltas += sumV;
+              if (grupoEsSacos) {
+                // En el reporte de vueltas los sacos NO cuentan como
+                // vueltas: pintamos la cantidad de sacos en su celda.
+                const sumSacos = logsDay.reduce(
+                  (s, l) => s + Number(l.cantidad_sacos || 0),
+                  0
+                );
+                data[`d${d}`] = sumSacos;
+              } else {
+                // Caso normal: suma de vueltas del dia.
+                const sumV = logsDay.reduce(
+                  (s, l) => s + Number(l.cantidad_vueltas || 0),
+                  0
+                );
+                data[`d${d}`] = sumV;
+                totalVueltas += sumV;
+              }
             } else {
               data[`d${d}`] = "";
             }
           });
 
-            data.total_vueltas = totalVueltas;
-            data.p_unit = pUnit;
-            data.total_s = totalVueltas * pUnit;
-            grandTotalVueltas += totalVueltas;
-            grandTotalCosto += totalVueltas * pUnit;
-            if (pUnit > 0) preciosUnitarios.push(pUnit);
+          // Si el grupo es sacos, el TOTAL DE VUELTAS queda vacio (los
+          // sacos no son vueltas). Si no, mostramos el total acumulado.
+          data.total_vueltas = grupoEsSacos ? "" : totalVueltas;
+          data.p_unit = pUnit;
+          const costoFila = totalVueltas * pUnit;
+          data.total_s = costoFila;
+          // Acumulado por area: solo aplica a filas con costo (pUnit > 0).
+          // Si no hay vueltas/costo, no acumula (mantiene el ultimo valor
+          // util? No, mejor lo dejamos en blanco para no sumar basura).
+          if (costoFila > 0) {
+            acumAreaS += costoFila;
+            data.total_s_acum = acumAreaS;
+          } else {
+            data.total_s_acum = "";
+          }
+          grandTotalVueltas += totalVueltas;
+          grandTotalCosto += costoFila;
+          if (pUnit > 0) preciosUnitarios.push(pUnit);
 
           row.values = data;
           styleDataRow(row, BORDER);
           row.getCell("total_vueltas").numFmt = "0";
           row.getCell("p_unit").numFmt = '"S/."#,##0.00';
           row.getCell("total_s").numFmt = '"S/."#,##0.00';
+          row.getCell("total_s_acum").numFmt = '"S/."#,##0.00';
           for (let d = 1; d <= daysInMonth; d++) {
             row.getCell(`d${d}`).numFmt = "0";
           }
@@ -476,11 +529,13 @@ export const buildControlVueltasExcel = async (
         ? preciosUnitarios.reduce((sum, precio) => sum + precio, 0) / preciosUnitarios.length
         : "",
       total_s: grandTotalCosto,
+      total_s_acum: grandTotalCosto, // Al final, el acumulado del grupo = total general.
     };
     styleDataRow(totalRow, BORDER);
     totalRow.font = { bold: true, size: 10, name: "Arial" };
     totalRow.getCell("total_vueltas").numFmt = "0.00";
     totalRow.getCell("p_unit").numFmt = '"S/."#,##0.00';
     totalRow.getCell("total_s").numFmt = '"S/."#,##0.00';
+    totalRow.getCell("total_s_acum").numFmt = '"S/."#,##0.00';
   }
 };

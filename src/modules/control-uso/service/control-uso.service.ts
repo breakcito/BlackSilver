@@ -93,6 +93,42 @@ export const ControlUsoService = {
     return data;
   },
 
+  /**
+   * Anula un control de uso (soft-delete).
+   * El backend:
+   * 1. Marca `control_uso_activo.estado = 'Anulado'`.
+   * 2. Para cada consumo asociado (es_consumo_directo = true), reingresa
+   *    stock al `lote_producto` y registra el movimiento en kardex.
+   * 3. Elimina fisicamente los consumos asociados.
+   *
+   * Devuelve el control_uso_activo actualizado o un error.
+   */
+  anularControlUso: async (idControlUso: number) => {
+    const { data } = await api.post<IRespuesta<RES_ControlUsoLog>>(
+      `${path}/anular/${idControlUso}`,
+    );
+    return data;
+  },
+
+  /**
+   * Actualiza un control de uso individual (no masivo). El backend recalcula
+   * `total_horas` y `costo_total` segun los campos modificados. Los consumos
+   * no se ven afectados por esta operacion; si necesitas ajustar consumos,
+   * primero anula este control y registra uno nuevo.
+   *
+   * Solo se puede editar si `estado != 'Anulado'`.
+   */
+  actualizarControlUso: async (
+    idControlUso: number,
+    payload: Record<string, unknown>,
+  ) => {
+    const { data } = await api.put<IRespuesta<RES_ControlUsoLog>>(
+      `${path}/actualizar/${idControlUso}`,
+      payload,
+    );
+    return data;
+  },
+
   // Materiales
   getMateriales: async () => {
     const { data } = await api.get<IRespuesta<RES_TipoMaterial[]>>(`${path}/materiales`);

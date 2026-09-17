@@ -1,6 +1,7 @@
 import {
   Button,
   Group,
+  Grid,
   NumberInput,
   Stack,
   Textarea,
@@ -90,7 +91,12 @@ interface ItemForm {
   lecturaFin: number | "";
   tipoTurno: TipoTurno | "";
   observacion: string;
-  consumos: ItemConsumoForm[];
+  /**
+   * Antes cada Bloque tenia su propio `consumos[]`. Ahora los consumos
+   * son COMPARTIDOS por todo el "Registrar Control por Horometro"
+   * (representan salidas de stock del activo en general, no asociadas
+   * a un tramo horario puntual). Ver `consumos` en el form raiz.
+   */
 }
 
 interface ItemVueltasForm {
@@ -101,6 +107,12 @@ interface ItemVueltasForm {
   horometroInicio: number | "";
   horometroFin: number | "";
   tipoTurno: TipoTurno | "";
+  /**
+   * Fecha del trabajo por bloque (cada viaje puede caer en dia
+   * distinto). Si esta vacio, el submit no envia el campo y el backend
+   * devuelve error para ese item.
+   */
+  fechaTrabajo: string;
   observacion: string;
 }
 
@@ -172,10 +184,15 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
 
   // Modal para agregar/editar consumos directos por bloque.
   const [consumoModalOpen, setConsumoModalOpen] = useState(false);
-  const [consumoModalItemId, setConsumoModalItemId] = useState<string | null>(
-    null,
-  );
   const [consumoEditId, setConsumoEditId] = useState<string | null>(null);
+  /**
+   * Consumos COMPARTIDOS por todo el "Registrar Control por Horometro".
+   * Antes cada `ItemForm.consumos[]` cargaba su propia lista (asociada
+   * al bloque); ahora la lista vive a nivel del formulario completo, ya
+   * que un mismo consumo (p. ej. 50 galones de combustible) cubre a
+   * todos los bloques horometrados del grupo UUID.
+   */
+  const [consumos, setConsumos] = useState<ItemConsumoForm[]>([]);
   const [consumoForm, setConsumoForm] = useState<{
     idProducto: string | null;
     idAlmacen: string | null;
@@ -222,7 +239,6 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           lecturaFin: "",
           tipoTurno: "",
           observacion: "",
-          consumos: [],
         },
       ];
     }
@@ -230,6 +246,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   });
   const [itemsVueltas, setItemsVueltas] = useState<ItemVueltasForm[]>(() => {
     if (tipoControl === "vueltas") {
+      const hoy = dayjs().format("YYYY-MM-DD");
       return [
         {
           id: generarIdItem(),
@@ -239,6 +256,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           horometroInicio: "",
           horometroFin: "",
           tipoTurno: "",
+          fechaTrabajo: hoy,
           observacion: "",
         },
       ];
@@ -681,7 +699,8 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   /**
    * Recarga los almacenes para el select de consumos cuando cambia la mina.
    * Si solo hay un almacen asociado a la mina, lo autoselecciona (el usuario
-   * puede cambiarlo manualmente).
+   * puede cambiarlo manualmente). Como los consumos ahora son compartidos,
+   * actualizamos la lista `consumos` raiz (no por bloque).
    */
   useEffect(() => {
     if (tipoControl !== "horometro") return;
@@ -701,13 +720,10 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         // Autoselecciona si solo hay un almacen y el front no tiene uno ya.
         // No pisamos la seleccion manual del usuario.
         if (opts.length === 1) {
-          setItems((prev) =>
-            prev.map((it) => {
-              const consumosLimpios = it.consumos.map((cs) =>
-                cs.idAlmacen ? cs : { ...cs, idAlmacen: opts[0].value },
-              );
-              return { ...it, consumos: consumosLimpios };
-            }),
+          setConsumos((prev) =>
+            prev.map((cs) =>
+              cs.idAlmacen ? cs : { ...cs, idAlmacen: opts[0].value },
+            ),
           );
         }
       })
@@ -848,13 +864,11 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         lecturaFin: "",
         tipoTurno: "",
         observacion: "",
-        consumos: [],
       },
     ]);
   };
 
-  const openConsumoModal = (itemId: string, consumo?: ItemConsumoForm) => {
-    setConsumoModalItemId(itemId);
+  const openConsumoModal = (consumo?: ItemConsumoForm) => {
     if (consumo) {
       setConsumoEditId(consumo.id);
       setConsumoForm({
@@ -889,7 +903,6 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   };
 
   const guardarConsumoModal = () => {
-    if (!consumoModalItemId) return;
     if (!consumoForm.idProducto) {
       notifyError("Seleccione un producto.");
       return;
@@ -920,53 +933,34 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
       notifyError("El contenido por presentacion debe ser mayor a 0.");
       return;
     }
-    setItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== consumoModalItemId) return it;
-        const idConsumo = consumoEditId ?? generarIdItem();
-        const nuevoConsumo: ItemConsumoForm = {
-          id: idConsumo,
-          idProducto: consumoForm.idProducto,
-          idAlmacen: consumoForm.idAlmacen,
-          idLoteProducto: consumoForm.idLoteProducto,
-          idUnidadMedida: consumoForm.idUnidadMedida,
-          cantidadConsumo: consumoForm.cantidadConsumo,
-          contenidoPorPresentacion: consumoForm.contenidoPorPresentacion,
-          idLoteMineral: null,
-          idLaborDestino: null,
-          paraProduccion: false,
-          paraMantenimiento: false,
-          comentario: consumoForm.comentario,
-          estado: "Consumo Total",
-        };
-        if (consumoEditId) {
-          return {
-            ...it,
-            consumos: it.consumos.map((c) =>
-              c.id === consumoEditId ? nuevoConsumo : c,
-            ),
-          };
-        }
-        return {
-          ...it,
-          consumos: [...it.consumos, nuevoConsumo],
-        };
-      }),
-    );
+    const idConsumo = consumoEditId ?? generarIdItem();
+    const nuevoConsumo: ItemConsumoForm = {
+      id: idConsumo,
+      idProducto: consumoForm.idProducto,
+      idAlmacen: consumoForm.idAlmacen,
+      idLoteProducto: consumoForm.idLoteProducto,
+      idUnidadMedida: consumoForm.idUnidadMedida,
+      cantidadConsumo: consumoForm.cantidadConsumo,
+      contenidoPorPresentacion: consumoForm.contenidoPorPresentacion,
+      idLoteMineral: null,
+      idLaborDestino: null,
+      paraProduccion: false,
+      paraMantenimiento: false,
+      comentario: consumoForm.comentario,
+      estado: "Consumo Total",
+    };
+    if (consumoEditId) {
+      setConsumos((prev) =>
+        prev.map((c) => (c.id === consumoEditId ? nuevoConsumo : c)),
+      );
+    } else {
+      setConsumos((prev) => [...prev, nuevoConsumo]);
+    }
     setConsumoModalOpen(false);
   };
 
-  const quitarConsumo = (itemId: string, consumoId: string) => {
-    setItems((prev) =>
-      prev.map((it) =>
-        it.id === itemId
-          ? {
-              ...it,
-              consumos: it.consumos.filter((c) => c.id !== consumoId),
-            }
-          : it,
-      ),
-    );
+  const quitarConsumo = (consumoId: string) => {
+    setConsumos((prev) => prev.filter((c) => c.id !== consumoId));
   };
 
   const quitarItem = (id: string) => {
@@ -1005,6 +999,10 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   };
 
   const agregarItemVueltas = () => {
+    // Heredamos la fecha del ultimo item para no obligar al usuario a
+    // re-tipearla cuando registra varios viajes el mismo dia.
+    const ultimo = itemsVueltas[itemsVueltas.length - 1];
+    const fechaHeredada = ultimo?.fechaTrabajo || dayjs().format("YYYY-MM-DD");
     setItemsVueltas((prev) => [
       ...prev,
       {
@@ -1015,6 +1013,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         horometroInicio: "",
         horometroFin: "",
         tipoTurno: "",
+        fechaTrabajo: fechaHeredada,
         observacion: "",
       },
     ]);
@@ -1071,10 +1070,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
       notifyError("La labor es obligatoria para registrar un control por vueltas.");
       return;
     }
-    if (tipoControl === "vueltas" && !fechaDia) {
-      notifyError("Por favor seleccione la fecha del trabajo.");
-      return;
-    }
+    // Lote de mineral: OPCIONAL. Ya no se valida aca.
 
     if (tipoControl === "horometro") {
       if (!fechaDia) {
@@ -1150,6 +1146,10 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           notifyError(`Bloque #${idx}: la cantidad de vueltas debe ser mayor a cero.`);
           return;
         }
+        if (!it.fechaTrabajo) {
+          notifyError(`Bloque #${idx}: la fecha del trabajo es obligatoria.`);
+          return;
+        }
         const tarifaItem = tarifas.find(
           (t) => t.id.toString() === it.idTarifa,
         );
@@ -1216,27 +1216,30 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 : Number(it.lecturaFin),
             tipo_turno: it.tipoTurno === "" ? null : it.tipoTurno,
             observacion: it.observacion.trim() ? it.observacion.trim() : null,
-            consumos: it.consumos.map((cs) => ({
-              id_producto: Number(cs.idProducto),
-              id_almacen: Number(cs.idAlmacen),
-              id_lote_producto: Number(cs.idLoteProducto),
-              id_unidad_medida: Number(cs.idUnidadMedida),
-              cantidad_consumo: cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo),
-              contenido_por_presentacion:
-                cs.contenidoPorPresentacion === "" ? 0 : Number(cs.contenidoPorPresentacion),
-              // Activo fijo consumidor: la maquina que se esta controlando
-              // (siempre la misma para todos los consumos de este modal).
-              id_activo_fijo_consumidor: idActivoFijo,
-              // Un mismo UUID para todos los consumos de este "Registrar
-              // Control por Horometro" -> facilita el agrupado en Listar.
-              uuid_control_uso_activo: uuidGrupoControlUso,
-              id_lote_mineral: cs.idLoteMineral ? Number(cs.idLoteMineral) : null,
-              id_labor_destino: cs.idLaborDestino ? Number(cs.idLaborDestino) : null,
-              para_produccion: cs.paraProduccion,
-              para_mantenimiento: cs.paraMantenimiento,
-              comentario: cs.comentario.trim() ? cs.comentario.trim() : null,
-              estado: cs.estado,
-            })),
+          })),
+          // Consumos compartidos por TODO el grupo UUID: ya no van por
+          // item. El backend los aplica una sola vez (kardex SALIDA).
+          consumos: consumos.map((cs) => ({
+            id_producto: Number(cs.idProducto),
+            id_almacen: Number(cs.idAlmacen),
+            id_lote_producto: Number(cs.idLoteProducto),
+            id_unidad_medida: Number(cs.idUnidadMedida),
+            cantidad_consumo: cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo),
+            contenido_por_presentacion:
+              cs.contenidoPorPresentacion === "" ? 0 : Number(cs.contenidoPorPresentacion),
+            // Activo fijo consumidor: la maquina que se esta controlando
+            // (siempre la misma para todos los consumos de este modal).
+            id_activo_fijo_consumidor: idActivoFijo,
+            // Un mismo UUID para todos los consumos de este "Registrar
+            // Control por Horometro" -> el backend los asocia al GRUPO
+            // uuid_grupo (no a un item puntual).
+            uuid_control_uso_activo: uuidGrupoControlUso,
+            id_lote_mineral: cs.idLoteMineral ? Number(cs.idLoteMineral) : null,
+            id_labor_destino: cs.idLaborDestino ? Number(cs.idLaborDestino) : null,
+            para_produccion: cs.paraProduccion,
+            para_mantenimiento: cs.paraMantenimiento,
+            comentario: cs.comentario.trim() ? cs.comentario.trim() : null,
+            estado: cs.estado,
           })),
         };
 
@@ -1254,11 +1257,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
       if (tipoControl === "vueltas") {
         const payload = {
           id_activo_fijo: idActivoFijo,
-          fecha_trabajo: fechaDia
-            ? dayjs(fechaDia).format("YYYY-MM-DD")
-            : "",
           id_mina: Number(idMina),
           id_labor: Number(idLabor),
+          // Lote de mineral ahora es OPCIONAL.
           id_lote_mineral: idLoteMineral ? Number(idLoteMineral) : null,
           items: itemsVueltas.map((it) => {
             const tarifaItem = tarifas.find(
@@ -1290,6 +1291,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   ? null
                   : Number(it.horometroFin),
               tipo_turno: it.tipoTurno === "" ? null : it.tipoTurno,
+              // Fecha del trabajo: por bloque (cada viaje puede caer en
+              // dia distinto). El submit ya valida que `fechaTrabajo`
+              // no este vacio, asi que el fallback solo aplica si por
+              // algun motivo llega vacio.
+              fecha_trabajo:
+                it.fechaTrabajo || dayjs().format("YYYY-MM-DD"),
               observacion: it.observacion.trim()
                 ? it.observacion.trim()
                 : null,
@@ -1482,8 +1489,10 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         </SimpleGrid>
       )}
 
-      {/* Cabecera ESPECIFICA de vueltas: Lote de Mineral filtrado por labor (arriba),
-          luego Mina y Labor. */}
+      {/* Cabecera ESPECIFICA de vueltas: Mina, Labor y Lote de Mineral
+          (OPCIONAL). La Fecha del Trabajo pasa a vivir dentro de cada
+          Bloque #N, no aqui, porque cada viaje puede caer en dia
+          distinto. */}
       {tipoControl === "vueltas" &&
         (() => {
           const lotesFiltrados = idLabor
@@ -1522,37 +1531,27 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   size="xs"
                 />
               </SimpleGrid>
-              <SimpleGrid cols={2} spacing="md" mt="md">
-                <Select
-                  label="Lote de Mineral"
-                  placeholder={
-                    idLabor
-                      ? "Seleccione lote de la labor..."
-                      : "Seleccione primero una labor"
-                  }
-                  data={lotesFiltrados.map((lm) => ({
-                    value: String(lm.id_lote_mineral),
-                    label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-                  }))}
-                  value={idLoteMineral}
-                  onChange={setIdLoteMineral}
-                  searchable
-                  clearable
-                  disabled={!idLabor}
-                  required
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                />
-                <CustomDatePicker
-                  label="Fecha del Trabajo"
-                  placeholder="Seleccione fecha"
-                  value={fechaDia}
-                  onChange={(val) => setFechaDia(val as Date | null)}
-                  radius="lg"
-                  size="xs"
-                />
-              </SimpleGrid>
+              <Select
+                mt="md"
+                label="Lote de Mineral (Opcional)"
+                placeholder={
+                  idLabor
+                    ? "Seleccione lote de la labor (opcional)..."
+                    : "Seleccione primero una labor"
+                }
+                data={lotesFiltrados.map((lm) => ({
+                  value: String(lm.id_lote_mineral),
+                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
+                }))}
+                value={idLoteMineral}
+                onChange={setIdLoteMineral}
+                searchable
+                clearable
+                disabled={!idLabor}
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+              />
             </Card>
           );
         })()}
@@ -1677,6 +1676,219 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 />
               )}
             </SimpleGrid>
+          </Card>
+
+          {/* Consumos asociados (compartidos por todo el grupo UUID).
+              Antes vivia DENTRO de cada Bloque #1; ahora va aqui, debajo
+              de los selects de mina/labor. Un mismo consumo (p. ej. 50
+              galones de combustible) cubre a todos los bloques horometrados
+              del grupo, no a uno puntual. */}
+          <Card withBorder padding="md" radius="lg" className="bg-amber-950/10 border-amber-500/30">
+            <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap">
+                <BeakerIcon className="w-4 h-4 text-amber-400" />
+                <Text size="xs" fw={800} className="text-amber-200 uppercase tracking-wider">
+                  Consumos asociados
+                </Text>
+                {consumos.length > 0 && (
+                  <Badge size="xs" color="amber" variant="filled" radius="sm">
+                    {consumos.length} consumo{consumos.length === 1 ? "" : "s"}
+                  </Badge>
+                )}
+              </Group>
+              <Button
+                variant="light"
+                color="amber.5"
+                size="xs"
+                radius="md"
+                leftSection={<PlusCircleIcon className="w-4 h-4" />}
+                onClick={() => openConsumoModal()}
+                className="font-bold"
+              >
+                Agregar Consumo
+              </Button>
+            </Group>
+
+            {consumos.length === 0 ? (
+              <Text size="11px" c="dimmed" fs="italic">
+                Sin consumos asociados. Si este control representa salida directa de
+                stock (p. ej. combustible gastado por el activo), agrega un consumo.
+              </Text>
+            ) : (
+              <Stack gap={6} mt={4}>
+                {consumos.map((cs) => {
+                  const prodSel =
+                    productos.find(
+                      (p) =>
+                        String(p.id_producto) === String(cs.idProducto),
+                    ) ?? null;
+                  const prodLabel = prodSel?.nombre ?? "Producto";
+                  const almLabel =
+                    almacenesConsumo.find((a) => a.value === cs.idAlmacen)?.label ??
+                    "Almacen";
+                  const cantNum = cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo);
+                  const cppNum =
+                    cs.contenidoPorPresentacion === ""
+                      ? 1
+                      : Number(cs.contenidoPorPresentacion);
+                  const baseNum = cantNum * cppNum;
+                  const baseAbbr =
+                    prodSel?.unidad_medida_base_abv ||
+                    unidadesMedida.find(
+                      (u) =>
+                        String(u.id_unidad_medida) ===
+                        String(prodSel?.id_unidad_medida_base ?? ""),
+                    )?.abreviatura ||
+                    "--";
+                  const baseNombre =
+                    prodSel?.unidad_medida_base ||
+                    unidadesMedida.find(
+                      (u) =>
+                        String(u.id_unidad_medida) ===
+                        String(prodSel?.id_unidad_medida_base ?? ""),
+                    )?.nombre ||
+                    "--";
+                  const unidadSelObj = unidadesMedida.find(
+                    (u) =>
+                      String(u.id_unidad_medida) ===
+                      String(cs.idUnidadMedida ?? ""),
+                  );
+                  const selAbbr = unidadSelObj?.abreviatura || "--";
+                  const selNombre = unidadSelObj?.nombre || "--";
+                  const tieneCantidad = cantNum > 0 && cppNum > 0;
+                  return (
+                    <Card
+                      key={cs.id}
+                      withBorder
+                      padding="sm"
+                      radius="lg"
+                      className="bg-zinc-950/40 border-amber-500/20"
+                    >
+                      <Group
+                        justify="space-between"
+                        align="center"
+                        wrap="nowrap"
+                        mb={6}
+                      >
+                        <Group gap={6} wrap="nowrap" className="min-w-0">
+                          <Badge
+                            size="xs"
+                            color="amber"
+                            variant="filled"
+                            radius="sm"
+                          >
+                            #{cs.id.slice(0, 4)}
+                          </Badge>
+                          <Text
+                            size="11px"
+                            c="amber.3"
+                            fw={700}
+                            className="truncate"
+                          >
+                            {prodLabel} - {almLabel}
+                          </Text>
+                        </Group>
+                        <Group gap={4} wrap="nowrap">
+                          <Tooltip label="Editar">
+                            <ActionIcon
+                              onClick={() => openConsumoModal(cs)}
+                              variant="subtle"
+                              color="indigo.4"
+                              size="sm"
+                              radius="xl"
+                            >
+                              <PencilSquareIcon className="w-4 h-4" />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Quitar">
+                            <ActionIcon
+                              onClick={() => quitarConsumo(cs.id)}
+                              variant="subtle"
+                              color="red"
+                              size="sm"
+                              radius="xl"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
+                      </Group>
+                      <Group gap="lg" wrap="nowrap">
+                        <Stack gap={2}>
+                          <Text
+                            size="9px"
+                            c="amber.4"
+                            fw={700}
+                            className="uppercase"
+                          >
+                            {`En ${selNombre !== "--" ? enPlural(selNombre) : "---"}`}
+                          </Text>
+                          <Group gap={4} align="baseline" wrap="nowrap">
+                            <Text
+                              fw={800}
+                              size="md"
+                              className={
+                                tieneCantidad ? "text-white" : "text-zinc-700"
+                              }
+                            >
+                              {formatNumber(cantNum)}
+                            </Text>
+                            <Text
+                              size="xs"
+                              fw={700}
+                              c="amber.4"
+                              className="uppercase tracking-wider"
+                            >
+                              {selAbbr}
+                            </Text>
+                          </Group>
+                        </Stack>
+                        <div className="h-8 w-px bg-amber-500/30" />
+                        <Stack gap={2}>
+                          <Text
+                            size="9px"
+                            c="amber.4"
+                            fw={700}
+                            className="uppercase"
+                          >
+                            {`En ${baseNombre !== "--" ? enPlural(baseNombre) : "---"}`}
+                          </Text>
+                          <Group gap={4} align="baseline" wrap="nowrap">
+                            <Text
+                              fw={800}
+                              size="md"
+                              className={
+                                tieneCantidad ? "text-emerald-400" : "text-zinc-700"
+                              }
+                            >
+                              {formatNumber(baseNum)}
+                            </Text>
+                            <Text
+                              size="xs"
+                              fw={700}
+                              c="emerald.4"
+                              className="uppercase tracking-wider"
+                            >
+                              {baseAbbr}
+                            </Text>
+                          </Group>
+                        </Stack>
+                      </Group>
+                      <Text
+                        size="10px"
+                        c="dimmed"
+                        ta="center"
+                        mt={6}
+                      >
+                        {tieneCantidad
+                          ? `${formatNumber(cantNum)} ${selAbbr} × ${cppNum} = ${formatNumber(baseNum)} ${baseAbbr}`
+                          : "Complete los datos para ver la equivalencia."}
+                      </Text>
+                    </Card>
+                  );
+                })}
+              </Stack>
+            )}
           </Card>
 
           {/* Items: N bloques de horario */}
@@ -1874,213 +2086,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   mt="sm"
                 />
 
-                {/* Resumen de Consumos asociados al bloque */}
-                <Group justify="space-between" align="center" mt="sm">
-                  <Group gap="xs">
-                    <BeakerIcon className="w-4 h-4 text-amber-400" />
-                    <Text size="xs" fw={800} className="text-amber-200 uppercase tracking-wider">
-                      Consumos asociados
-                    </Text>
-                    {it.consumos.length > 0 && (
-                      <Badge size="xs" color="amber" variant="filled" radius="sm">
-                        {it.consumos.length} consumo
-                        {it.consumos.length === 1 ? "" : "s"}
-                      </Badge>
-                    )}
-                  </Group>
-                  <Button
-                    variant="light"
-                    color="amber.5"
-                    size="xs"
-                    radius="md"
-                    leftSection={<PlusCircleIcon className="w-4 h-4" />}
-                    onClick={() => openConsumoModal(it.id)}
-                    className="font-bold"
-                  >
-                    Agregar Consumo
-                  </Button>
-                </Group>
-
-                {it.consumos.length === 0 ? (
-                  <Text size="11px" c="dimmed" fs="italic">
-                    Sin consumos asociados. Si este bloque representa salida directa de
-                    stock (p. ej. combustible gastado por el activo), agrega un consumo.
-                  </Text>
-                ) : (
-                  <Stack gap={6} mt={4}>
-                    {it.consumos.map((cs) => {
-                      const prodSel =
-                        productos.find(
-                          (p) =>
-                            String(p.id_producto) === String(cs.idProducto),
-                        ) ?? null;
-                      const prodLabel = prodSel?.nombre ?? "Producto";
-                      const almLabel =
-                        almacenesConsumo.find((a) => a.value === cs.idAlmacen)?.label ??
-                        "Almacen";
-                      const cantNum = cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo);
-                      const cppNum =
-                        cs.contenidoPorPresentacion === ""
-                          ? 1
-                          : Number(cs.contenidoPorPresentacion);
-                      const baseNum = cantNum * cppNum;
-                      const baseAbbr =
-                        prodSel?.unidad_medida_base_abv ||
-                        unidadesMedida.find(
-                          (u) =>
-                            String(u.id_unidad_medida) ===
-                            String(prodSel?.id_unidad_medida_base ?? ""),
-                        )?.abreviatura ||
-                        "--";
-                      const baseNombre =
-                        prodSel?.unidad_medida_base ||
-                        unidadesMedida.find(
-                          (u) =>
-                            String(u.id_unidad_medida) ===
-                            String(prodSel?.id_unidad_medida_base ?? ""),
-                        )?.nombre ||
-                        "--";
-                      const unidadSelObj = unidadesMedida.find(
-                        (u) =>
-                          String(u.id_unidad_medida) ===
-                          String(cs.idUnidadMedida ?? ""),
-                      );
-                      const selAbbr = unidadSelObj?.abreviatura || "--";
-                      const selNombre = unidadSelObj?.nombre || "--";
-                      const tieneCantidad = cantNum > 0 && cppNum > 0;
-                      return (
-                        <Card
-                          key={cs.id}
-                          withBorder
-                          padding="sm"
-                          radius="lg"
-                          className="bg-amber-950/10 border-amber-500/30"
-                        >
-                          <Group
-                            justify="space-between"
-                            align="center"
-                            wrap="nowrap"
-                            mb={6}
-                          >
-                            <Group gap={6} wrap="nowrap" className="min-w-0">
-                              <Badge
-                                size="xs"
-                                color="amber"
-                                variant="filled"
-                                radius="sm"
-                              >
-                                #{cs.id.slice(0, 4)}
-                              </Badge>
-                              <Text
-                                size="11px"
-                                c="amber.3"
-                                fw={700}
-                                className="truncate"
-                              >
-                                {prodLabel} - {almLabel}
-                              </Text>
-                            </Group>
-                            <Group gap={4} wrap="nowrap">
-                              <Tooltip label="Editar">
-                                <ActionIcon
-                                  onClick={() => openConsumoModal(it.id, cs)}
-                                  variant="subtle"
-                                  color="indigo.4"
-                                  size="sm"
-                                  radius="xl"
-                                >
-                                  <PencilSquareIcon className="w-4 h-4" />
-                                </ActionIcon>
-                              </Tooltip>
-                              <Tooltip label="Quitar">
-                                <ActionIcon
-                                  onClick={() => quitarConsumo(it.id, cs.id)}
-                                  variant="subtle"
-                                  color="red"
-                                  size="sm"
-                                  radius="xl"
-                                >
-                                  <TrashIcon className="w-4 h-4" />
-                                </ActionIcon>
-                              </Tooltip>
-                            </Group>
-                          </Group>
-                          <Group gap="lg" wrap="nowrap">
-                            <Stack gap={2}>
-                              <Text
-                                size="9px"
-                                c="amber.4"
-                                fw={700}
-                                className="uppercase"
-                              >
-                                {`En ${selNombre !== "--" ? enPlural(selNombre) : "---"}`}
-                              </Text>
-                              <Group gap={4} align="baseline" wrap="nowrap">
-                                <Text
-                                  fw={800}
-                                  size="md"
-                                  className={
-                                    tieneCantidad ? "text-white" : "text-zinc-700"
-                                  }
-                                >
-                                  {formatNumber(cantNum)}
-                                </Text>
-                                <Text
-                                  size="xs"
-                                  fw={700}
-                                  c="amber.4"
-                                  className="uppercase tracking-wider"
-                                >
-                                  {selAbbr}
-                                </Text>
-                              </Group>
-                            </Stack>
-                            <div className="h-8 w-px bg-amber-500/30" />
-                            <Stack gap={2}>
-                              <Text
-                                size="9px"
-                                c="amber.4"
-                                fw={700}
-                                className="uppercase"
-                              >
-                                {`En ${baseNombre !== "--" ? enPlural(baseNombre) : "---"}`}
-                              </Text>
-                              <Group gap={4} align="baseline" wrap="nowrap">
-                                <Text
-                                  fw={800}
-                                  size="md"
-                                  className={
-                                    tieneCantidad ? "text-emerald-400" : "text-zinc-700"
-                                  }
-                                >
-                                  {formatNumber(baseNum)}
-                                </Text>
-                                <Text
-                                  size="xs"
-                                  fw={700}
-                                  c="emerald.4"
-                                  className="uppercase tracking-wider"
-                                >
-                                  {baseAbbr}
-                                </Text>
-                              </Group>
-                            </Stack>
-                          </Group>
-                          <Text
-                            size="10px"
-                            c="dimmed"
-                            ta="center"
-                            mt={6}
-                          >
-                            {tieneCantidad
-                              ? `${formatNumber(cantNum)} ${selAbbr} × ${cppNum} = ${formatNumber(baseNum)} ${baseAbbr}`
-                              : "Complete los datos para ver la equivalencia."}
-                          </Text>
-                        </Card>
-                      );
-                    })}
-                  </Stack>
-                )}
+                {/* NOTA: los consumos ya NO son por bloque. La seccion
+                    "Consumos asociados" se movio abajo de los selects de
+                    mina/labor (compartida por todo el grupo UUID). */}
 
                 <SimpleGrid cols={2} spacing="md" mt="md">
                   <Group gap={6} align="center" wrap="nowrap">
@@ -2242,148 +2250,210 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   )}
                 </Group>
 
-                {/* Fila 1: Tarifa | Cantidad de Sacos (si la tarifa es Saco) | Cantidad de Vueltas */}
-                <SimpleGrid cols={esSacoItem ? 3 : 2} spacing="md">
-                  <Group gap={6} align="flex-end" wrap="nowrap">
-                    <Select
-                      label="Tarifa de Uso"
-                      placeholder="Seleccione tarifa..."
-                      data={tarifas
-                        .filter((t) => t.tipo_control === "vueltas")
-                        .map((t) => {
-                          const esSaco = (t.tipo_material || "")
-                            .toLowerCase()
-                            .includes("saco");
-                          const parts = [
-                            esSaco
-                              ? "Sin precio"
-                              : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
-                            t.distancia_metros ? `x ${t.distancia_metros}m` : null,
-                            t.tipo_material ? `x ${t.tipo_material}` : null,
-                          ].filter(Boolean);
-                          return { value: t.id.toString(), label: parts.join(" ") };
-                        })}
-                      value={it.idTarifa}
-                      onChange={(val) =>
-                        actualizarItemVueltas(it.id, "idTarifa", val ?? null)
-                      }
-                      searchable
-                      clearable
-                      required
-                      className="flex-1"
-                      classNames={fieldClasses}
-                      radius="lg"
-                      size="xs"
-                    />
-                    <Tooltip label="Historial de Tarifas">
-                      <ActionIcon
-                        onClick={() => setModalHistorialOpened(true)}
-                        variant="light"
-                        color="zinc.4"
-                        size={32}
+                {/* Fila 1: Tarifa de Uso | Cantidad de Vueltas | Fecha del Trabajo.
+                    Los tres al mismo ancho (Cantidad y Fecha ambos span=3)
+                    para que se vean cuadrados. Turno y Cantidad de Sacos
+                    viven en la Fila 2 con los horometros. */}
+                <Grid align="flex-end" gutter="md">
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
+                    <Group gap={6} align="flex-end" wrap="nowrap">
+                      <Select
+                        label="Tarifa de Uso"
+                        placeholder="Seleccione tarifa..."
+                        data={tarifas
+                          .filter((t) => t.tipo_control === "vueltas")
+                          .map((t) => {
+                            const esSaco = (t.tipo_material || "")
+                              .toLowerCase()
+                              .includes("saco");
+                            const parts = [
+                              esSaco
+                                ? "Sin precio"
+                                : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                              t.distancia_metros ? `x ${t.distancia_metros}m` : null,
+                              t.tipo_material ? `x ${t.tipo_material}` : null,
+                            ].filter(Boolean);
+                            return { value: t.id.toString(), label: parts.join(" ") };
+                          })}
+                        value={it.idTarifa}
+                        onChange={(val) =>
+                          actualizarItemVueltas(it.id, "idTarifa", val ?? null)
+                        }
+                        searchable
+                        clearable
+                        required
+                        className="flex-1"
+                        classNames={fieldClasses}
                         radius="lg"
-                        className="mb-[3px] border border-zinc-700/50"
-                      >
-                        <QueueListIcon className="w-4 h-4" />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Nueva Tarifa">
-                      <ActionIcon
-                        onClick={() => setModalTarifaOpened(true)}
-                        variant="filled"
-                        color="indigo.6"
-                        size={32}
-                        radius="lg"
-                        className="mb-[3px]"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                  {esSacoItem && (
+                        size="xs"
+                      />
+                      <Tooltip label="Historial de Tarifas">
+                        <ActionIcon
+                          onClick={() => setModalHistorialOpened(true)}
+                          variant="light"
+                          color="zinc.4"
+                          size={32}
+                          radius="lg"
+                          className="mb-[3px] border border-zinc-700/50"
+                        >
+                          <QueueListIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Nueva Tarifa">
+                        <ActionIcon
+                          onClick={() => setModalTarifaOpened(true)}
+                          variant="filled"
+                          color="indigo.6"
+                          size={32}
+                          radius="lg"
+                          className="mb-[3px]"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Grid.Col>
+
+                  {/* Cantidad de Vueltas: mismo ancho que Fecha del Trabajo
+                      (span=3) para que se vean cuadrados en la fila. */}
+                  <Grid.Col span={{ base: 6, sm: 3 }}>
                     <NumberInput
-                      label="Cantidad de Sacos"
-                      placeholder="Ej: 30"
-                      value={it.cantidadSacos}
+                      label="Cantidad de Vueltas"
+                      placeholder="Ej: 3"
+                      value={it.cantidadVueltas}
                       onChange={(val) =>
-                        actualizarItemVueltas(it.id, "cantidadSacos", val as number | "")
+                        actualizarItemVueltas(
+                          it.id,
+                          "cantidadVueltas",
+                          val as number | "",
+                        )
                       }
                       min={0}
-                      allowDecimal={false}
+                      decimalScale={0}
+                      fixedDecimalScale
                       required
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
                     />
-                  )}
-                  <NumberInput
-                    label="Cantidad de Vueltas"
-                    placeholder="Ej: 3"
-                    value={it.cantidadVueltas}
-                    onChange={(val) =>
-                      actualizarItemVueltas(it.id, "cantidadVueltas", val as number | "")
-                    }
-                    min={0}
-                    decimalScale={0}
-                    fixedDecimalScale
-                    required
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                  />
-                </SimpleGrid>
+                  </Grid.Col>
 
-                {/* Fila 2: Turno | Horometro Inicial | Horometro Final */}
-                <SimpleGrid cols={3} spacing="md" mt="sm">
-                  <Select
-                    label="Turno (opcional)"
-                    placeholder="Seleccione turno..."
-                    data={[
-                      { value: TipoTurno.Dia, label: "Día" },
-                      { value: TipoTurno.Noche, label: "Noche" },
-                    ]}
-                    value={it.tipoTurno === "" ? null : it.tipoTurno}
-                    onChange={(val) =>
-                      actualizarItemVueltas(
-                        it.id,
-                        "tipoTurno",
-                        (val ?? "") as TipoTurno | "",
-                      )
-                    }
-                    clearable
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                  />
-                  <NumberInput
-                    label="Horometro Inicial (Opc.)"
-                    placeholder="Ej: 1250.00"
-                    value={it.horometroInicio}
-                    onChange={(val) =>
-                      actualizarItemVueltas(it.id, "horometroInicio", val as number | "")
-                    }
-                    min={0}
-                    decimalScale={2}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                  />
-                  <NumberInput
-                    label="Horometro Final (Opc.)"
-                    placeholder="Ej: 1252.00"
-                    value={it.horometroFin}
-                    onChange={(val) =>
-                      actualizarItemVueltas(it.id, "horometroFin", val as number | "")
-                    }
-                    min={0}
-                    decimalScale={2}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                  />
-                </SimpleGrid>
+                  {/* Fecha del Trabajo: al final del row, span=3 (igual que
+                      Cantidad de Vueltas). */}
+                  <Grid.Col span={{ base: 6, sm: 3 }}>
+                    <CustomDatePicker
+                      label="Fecha del Trabajo"
+                      placeholder="Seleccione fecha"
+                      value={
+                        it.fechaTrabajo
+                          ? dayjs(it.fechaTrabajo).toDate()
+                          : null
+                      }
+                      onChange={(val) =>
+                        actualizarItemVueltas(
+                          it.id,
+                          "fechaTrabajo",
+                          val ? dayjs(val as Date).format("YYYY-MM-DD") : "",
+                        )
+                      }
+                      radius="lg"
+                      size="xs"
+                      required
+                    />
+                  </Grid.Col>
+                </Grid>
+
+                {/* Fila 2: Turno (opcional) | Horometro Inicial (Opc.) |
+                    Horometro Final (Opc.) | Cantidad de Sacos (solo si
+                    la tarifa es Saco, al lado de Horometro Final).
+                    Sin sacos: 3 cols de span=4 cada una.
+                    Con sacos: 4 cols de span=3 cada una (mismo tamano). */}
+                <Grid align="flex-end" gutter="md" mt="sm">
+                  <Grid.Col span={esSacoItem ? 3 : 4}>
+                    <Select
+                      label="Turno (opcional)"
+                      placeholder="Seleccione turno..."
+                      data={[
+                        { value: TipoTurno.Dia, label: "Día" },
+                        { value: TipoTurno.Noche, label: "Noche" },
+                      ]}
+                      value={it.tipoTurno === "" ? null : it.tipoTurno}
+                      onChange={(val) =>
+                        actualizarItemVueltas(
+                          it.id,
+                          "tipoTurno",
+                          (val ?? "") as TipoTurno | "",
+                        )
+                      }
+                      clearable
+                      classNames={fieldClasses}
+                      radius="lg"
+                      size="xs"
+                    />
+                  </Grid.Col>
+                  <Grid.Col span={esSacoItem ? 3 : 4}>
+                    <NumberInput
+                      label="Horometro Inicial (Opc.)"
+                      placeholder="Ej: 1250.00"
+                      value={it.horometroInicio}
+                      onChange={(val) =>
+                        actualizarItemVueltas(
+                          it.id,
+                          "horometroInicio",
+                          val as number | "",
+                        )
+                      }
+                      min={0}
+                      decimalScale={2}
+                      fixedDecimalScale
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                    />
+                  </Grid.Col>
+                  <Grid.Col span={esSacoItem ? 3 : 4}>
+                    <NumberInput
+                      label="Horometro Final (Opc.)"
+                      placeholder="Ej: 1252.00"
+                      value={it.horometroFin}
+                      onChange={(val) =>
+                        actualizarItemVueltas(
+                          it.id,
+                          "horometroFin",
+                          val as number | "",
+                        )
+                      }
+                      min={0}
+                      decimalScale={2}
+                      fixedDecimalScale
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                    />
+                  </Grid.Col>
+                  {esSacoItem && (
+                    <Grid.Col span={3}>
+                      <NumberInput
+                        label="Cantidad de Sacos"
+                        placeholder="Ej: 30"
+                        value={it.cantidadSacos}
+                        onChange={(val) =>
+                          actualizarItemVueltas(
+                            it.id,
+                            "cantidadSacos",
+                            val as number | "",
+                          )
+                        }
+                        min={0}
+                        allowDecimal={false}
+                        required
+                        classNames={fieldClasses}
+                        size="xs"
+                        radius="lg"
+                      />
+                    </Grid.Col>
+                  )}
+                </Grid>
 
                 <Textarea
                   label="Observacion"

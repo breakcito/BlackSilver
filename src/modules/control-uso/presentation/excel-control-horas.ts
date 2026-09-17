@@ -2,12 +2,49 @@ import type ExcelJS from "exceljs";
 import dayjs from "dayjs";
 import type { RES_ControlUsoLog } from "../service/control-uso.responses";
 import { MESES } from "../../../shared/variables/meses";
+import { Estado_ControlUso } from "../../../shared/enums/control-uso/estadoControlUso";
+
+/**
+ * Mapea `tipo_turno` (Dia / Noche / null) al label que se muestra en el
+ * Excel. Si no hay turno seleccionado, devuelve "-" para que la celda
+ * no quede visualmente vacia.
+ */
+const turnoLabel = (raw: string | number | null | undefined): string => {
+  const v = (raw ?? "").toString().trim().toLowerCase();
+  if (v === "noche") return "NOCHE";
+  if (v === "dia" || v === "día") return "DÍA";
+  return "-";
+};
+
+/**
+ * Da formato a un registro de combustible para mostrarlo en una celda:
+ * "50 gal" / "20 lt" / etc. Si no hay dato, devuelve "-" (igual que
+ * turno) para que la celda no quede visualmente vacia.
+ */
+const formatCombustible = (
+  info: { cantidad: number; unidad: string; producto: string } | undefined,
+): string => {
+  if (!info) return "-";
+  const cant = Number(info.cantidad);
+  if (!Number.isFinite(cant) || cant <= 0) return "-";
+  // Truncamos a 2 decimales solo para display. El backend hace el
+  // acumulado en double y conserva precision; en el Excel basta con
+  // 2 decimales.
+  const cantRedondeada = Math.round(cant * 100) / 100;
+  const cantStr = cantRedondeada.toString().replace(/\.?0+$/, "");
+  const unidad = (info.unidad ?? "").trim();
+  return unidad ? `${cantStr} ${unidad}` : cantStr;
+};
 
 export const buildControlHorasExcel = async (
   workbook: ExcelJS.Workbook,
   logs: RES_ControlUsoLog[],
   mes: number,
-  anio: number
+  anio: number,
+  consumosCombustiblePorUuid: Record<
+    string,
+    { cantidad: number; unidad: string; producto: string }
+  > = {}
 ) => {
   const mesNombre = (MESES.find((m) => m.value === String(mes))?.label || String(mes)).toUpperCase();
 
@@ -16,9 +53,19 @@ export const buildControlHorasExcel = async (
   const COLOR_BORDER = "FFCBD5E1";
   const COLOR_ROW_ALT = "FFF8FAFC";
 
-  const horometroLogs = logs.filter(
-    (l) => l.cantidad_vueltas === null || l.cantidad_vueltas === undefined
-  );
+  // Filtrar los registros anulados: NO aparecen en el Excel principal
+  // (solo_activos para reportes).
+  const horometroLogs = logs.filter((l) => {
+    if (
+      (l.estado ?? Estado_ControlUso.Activo).toString().toLowerCase() ===
+      Estado_ControlUso.Anulado.toLowerCase()
+    ) {
+      return false;
+    }
+    return (
+      l.cantidad_vueltas === null || l.cantidad_vueltas === undefined
+    );
+  });
 
   if (horometroLogs.length === 0) {
     const sheet = workbook.addWorksheet("Sin Registros", { views: [{ showGridLines: true }] });
@@ -65,7 +112,9 @@ export const buildControlHorasExcel = async (
 
     const sheet = workbook.addWorksheet(sheetTitle, { views: [{ showGridLines: true }] });
 
-    // Columnas del formato de Horómetro
+    // Columnas del formato de Horómetro. La columna COMBUSTIBLE va
+    // antes de OBSERVACIONES y muestra la cantidad asignada al grupo
+    // UUID una sola vez (en la primera fila de cada grupo).
     sheet.columns = [
       { key: "item", width: 7 },
       { key: "fecha", width: 14 },
@@ -81,14 +130,16 @@ export const buildControlHorasExcel = async (
       { key: "total_horas", width: 12 },
       { key: "precio_unitario", width: 14 },
       { key: "costo_total", width: 16 },
+      { key: "combustible", width: 16 },
       { key: "observaciones", width: 30 },
     ];
 
     // Cabecera superior de la Hoja
     let rowIdx = 1;
 
-    // Fila 1-2: Título Principal
-    sheet.mergeCells(`A${rowIdx}:O${rowIdx + 1}`);
+    // Fila 1-2: Título Principal (ahora hasta columna P por la nueva
+    // columna COMBUSTIBLE).
+    sheet.mergeCells(`A${rowIdx}:P${rowIdx + 1}`);
     const titleCell = sheet.getCell(`A${rowIdx}`);
     titleCell.value = `CONTROL DE HORAS DE TRABAJO - ${nombreActivo} ${codigoActivo ? `(${codigoActivo})` : ""}`;
     titleCell.font = { bold: true, size: 14, color: { argb: "FF0F172A" }, name: "Arial" };
@@ -123,7 +174,9 @@ export const buildControlHorasExcel = async (
     metaRow2.getCell("cod_lote").font = { bold: true, size: 9 };
     rowIdx += 2;
 
-    // Encabezados de Tabla (Fila Doble)
+    // Encabezados de Tabla (Fila Doble). Ponemos TODOS los valores en el
+    // `values` object para evitar inconsistencias entre `getCell(key)` y
+    // `row.values`. Las sub-cabeceras viven en headerRow2.
     const headerRow1 = sheet.getRow(rowIdx);
     headerRow1.values = {
       item: "ITEM",
@@ -136,6 +189,10 @@ export const buildControlHorasExcel = async (
       hora_inicio: "HORAS",
       horometro_inicio: "HORÓMETRO",
       total_horas: "TOTALES",
+      // COMBUSTIBLE: celda simple (columna O). Aparece una sola vez por
+      // grupo UUID en las filas de datos; el texto del header lo da el
+      // values object aqui.
+      combustible: "COMBUSTIBLE/GL",
       observaciones: "OBSERVACIONES",
     };
 
@@ -155,8 +212,9 @@ export const buildControlHorasExcel = async (
       costo_total: "TOTAL S/.",
     };
 
-    // Merge vertical para columnas fijas
-    ["A", "B", "C", "D", "E", "F", "G", "O"].forEach((col) => {
+    // Merge vertical para columnas fijas. Ahora COMBUSTIBLE (O) y
+    // OBSERVACIONES (P) son columnas simples (una sola fila de cabecera).
+    ["A", "B", "C", "D", "E", "F", "G", "O", "P"].forEach((col) => {
       sheet.mergeCells(`${col}${rowIdx - 1}:${col}${rowIdx}`);
     });
 
@@ -182,6 +240,10 @@ export const buildControlHorasExcel = async (
     // Filas de Datos
     let sumHoras = 0;
     let sumCosto = 0;
+    // UUID del grupo ya pintado en la columna COMBUSTIBLE. Lo usamos
+    // para mostrar la cantidad UNA sola vez por grupo UUID (en la
+    // primera fila de cada grupo).
+    let lastUuidPintado: string | null | undefined = "__UNSET__";
 
     activoLogs.forEach((log, idx) => {
       const row = sheet.getRow(rowIdx);
@@ -201,13 +263,31 @@ export const buildControlHorasExcel = async (
       sumHoras += horasVal;
       sumCosto += costoVal;
 
+      // TURNO: leemos el valor real de la API (Dia / Noche / null) y lo
+      // mapeamos a DÍA / NOCHE / "" via el helper. Antes estaba
+      // hardcodeado a "DÍA" (bug fix).
+      const turnoTxt = turnoLabel(log.tipo_turno);
+
+      // COMBUSTIBLE: solo pintamos la celda en la primera fila de cada
+      // grupo UUID; las filas siguientes del mismo grupo quedan vacias
+      // (asi no aparece "50 gal 50 gal 50 gal" en cada fila).
+      const uuidActual = log.uuid_grupo ?? null;
+      let combustibleTxt = "";
+      if (lastUuidPintado !== uuidActual) {
+        const info = uuidActual
+          ? consumosCombustiblePorUuid[uuidActual]
+          : undefined;
+        combustibleTxt = formatCombustible(info);
+        lastUuidPintado = uuidActual;
+      }
+
       row.values = {
         item: idx + 1,
         fecha: inicioDt.format("DD/MM/YYYY"),
         mes: mesNombre,
         cod_lote: log.lote_mineral || "-",
         equipo: log.codigo || codigoActivo || nombreActivo,
-        turno: "DÍA",
+        turno: turnoTxt,
         cliente: clienteNombre,
         hora_inicio: inicioDt.format("hh:mm a"),
         hora_fin: finDt ? finDt.format("hh:mm a") : "-",
@@ -216,12 +296,13 @@ export const buildControlHorasExcel = async (
         total_horas: horasVal,
         precio_unitario: precioVal,
         costo_total: costoVal,
+        combustible: combustibleTxt,
         observaciones: log.observacion || "-",
       };
 
       row.eachCell({ includeEmpty: true }, (cell, colNum) => {
         cell.font = { size: 9, name: "Arial" };
-        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
         cell.border = {
           top: { style: "thin", color: { argb: COLOR_BORDER } },
           bottom: { style: "thin", color: { argb: COLOR_BORDER } },

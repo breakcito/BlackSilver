@@ -81,14 +81,23 @@ export interface REQ_ItemUsoBulkVueltas {
   horometro_inicio?: number | null;
   horometro_fin?: number | null;
   tipo_turno?: string | null;
+  /**
+   * Fecha del trabajo POR BLOQUE (cada viaje puede caer en dia
+   * distinto). Antes vivia como cabecera-wide; ahora cada item la
+   * trae propia.
+   */
+  fecha_trabajo: string;
   observacion?: string | null;
 }
 
 export interface REQ_RegistrarUsoBulkVueltas {
   id_activo_fijo: number;
-  fecha_trabajo: string;
   id_mina: number;
   id_labor: number;
+  /**
+   * Lote de mineral ahora es OPCIONAL: hay vueltas (servicios,
+   * carguios iniciales) donde aun no se asigna lote.
+   */
   id_lote_mineral?: number | null;
   items: REQ_ItemUsoBulkVueltas[];
 }
