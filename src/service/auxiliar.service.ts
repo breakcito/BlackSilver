@@ -51,6 +51,7 @@ export const AuxService = {
     id_empleado_responsable?: number;
     es_principal?: boolean;
     para_carbon?: boolean;
+    id_mina?: number;
   }): Promise<IRespuesta<RES_Almacen[]>> => {
     // Transformamos el booleano a 1 o 0 antes de enviarlo
     const params = filters

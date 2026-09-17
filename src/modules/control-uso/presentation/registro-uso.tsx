@@ -14,15 +14,23 @@ import {
   Box,
   ActionIcon,
   Tooltip,
+  Checkbox,
+  Alert,
+  Loader,
 } from "@mantine/core";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNotify } from "../../../hooks/useNotify";
 import { ControlUsoService } from "../service/control-uso.service";
 import { AuxService } from "../../../service/auxiliar.service";
+import type { RES_LoteMineral } from "../../../service/responses/lote-mineral";
 import { MinasService } from "../../../modules/minas-labores/service/minas.service";
 import { ClientesService } from "../../../modules/clientes/service/clientes.service";
 import type { RES_ControlUsoLog, RES_Tarifa } from "../service/control-uso.responses";
 import type { RES_ActivoFijoDisponible } from "../../../service/responses/activo-fijo";
+import type { RES_LoteDisponible } from "../../../service/responses/lote-producto";
+import type { RES_Producto } from "../../../service/responses/producto";
+import type { RES_UnidadMedida } from "../../../service/responses/unidad-medida";
 import {
   Cog8ToothIcon,
   TruckIcon,
@@ -33,8 +41,10 @@ import {
   QueueListIcon,
   PlusCircleIcon,
   TrashIcon,
-  ClockIcon,
-  BanknotesIcon,
+   ClockIcon,
+   BanknotesIcon,
+   PencilSquareIcon,
+   BeakerIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { TimeInput } from "@mantine/dates";
@@ -43,6 +53,9 @@ import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { NuevaTarifaModal } from "./nueva-tarifa-modal";
 import { CustomDatePicker } from "../../../presentation/utils/date-picker-input";
+import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
+import { enPlural } from "../../../shared/functions/en-plural";
+import { formatNumber } from "../../../shared/functions/formatNumber";
 
 interface Props {
   asset: RES_ActivoFijoDisponible;
@@ -51,21 +64,43 @@ interface Props {
   onCancel: () => void;
 }
 
+interface ItemConsumoForm {
+  id: string;
+  idProducto: string | null;
+  idAlmacen: string | null;
+  idLoteProducto: string | null;
+  idUnidadMedida: string | null;
+  cantidadConsumo: number | "";
+  contenidoPorPresentacion: number | "";
+  idLoteMineral: string | null;
+  idLaborDestino: string | null;
+  paraProduccion: boolean;
+  paraMantenimiento: boolean;
+  comentario: string;
+  estado: "Consumo Parcial" | "Consumo Total";
+}
+
 interface ItemForm {
   id: string;
+  usarHoras: boolean;
+  usarHorometro: boolean;
   horaInicioStr: string;
   horaFinStr: string;
   lecturaInicio: number | "";
   lecturaFin: number | "";
+  tipoTurno: TipoTurno | "";
   observacion: string;
+  consumos: ItemConsumoForm[];
 }
 
 interface ItemVueltasForm {
   id: string;
+  idTarifa: string | null;
   cantidadVueltas: number | "";
   cantidadSacos: number | "";
   horometroInicio: number | "";
   horometroFin: number | "";
+  tipoTurno: TipoTurno | "";
   observacion: string;
 }
 
@@ -94,10 +129,23 @@ export const RegistroUso = ({
   const [saving, setSaving] = useState(false);
 
   const [tarifas, setTarifas] = useState<RES_Tarifa[]>([]);
-  const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
+const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   const [labores, setLabores] = useState<{ value: string; label: string }[]>([]);
-  const [lotesMineral, setLotesMineral] = useState<{ value: string; label: string }[]>([]);
+  const [lotesMineral, setLotesMineral] = useState<RES_LoteMineral[]>([]);
   const [clientes, setClientes] = useState<{ value: string; label: string }[]>([]);
+  // Catálogos para consumos directos (solo horometro).
+  // Guardamos el RES_Producto completo para tener acceso a
+  // `id_unidad_medida_base`, `unidad_medida_base_abv`, etc.
+  const [productos, setProductos] = useState<RES_Producto[]>([]);
+  const [almacenesConsumo, setAlmacenesConsumo] = useState<
+    { value: string; label: string }[]
+  >([]);
+  const [unidadesMedida, setUnidadesMedida] = useState<RES_UnidadMedida[]>([]);
+  // Lotes que ve el modal actual (segun idAlmacen + idProducto del form).
+  const [lotesModal, setLotesModal] = useState<RES_LoteDisponible[]>([]);
+  const [loadingLotesModal, setLoadingLotesModal] = useState(false);
+
+  const [loadingLabores, setLoadingLabores] = useState(false);
 
   const [esParaMina, setEsParaMina] = useState<boolean>(true);
   const [idMina, setIdMina] = useState<string | null>(null);
@@ -109,17 +157,94 @@ export const RegistroUso = ({
 
   const [modalTarifaOpened, setModalTarifaOpened] = useState(false);
   const [modalHistorialOpened, setModalHistorialOpened] = useState(false);
+  const [erroresItems, setErroresItems] = useState<string[]>([]);
+
+  /**
+   * UUID unico por invocacion de "Registrar Control por Horometro".
+   * Agrupa TODOS los items + consumos que nacen en este llamado y se
+   * envia como `uuid_control_uso_activo` en cada consumo del payload
+   * bulk. Asi el modulo de Listar Consumo puede agruparlos por la
+   * sesion completa (un "Registrar Control" = un grupo). Se genera
+   * una sola vez al montar el componente y se mantiene estable durante
+   * toda la sesion de edicion.
+   */
+  const [uuidGrupoControlUso] = useState<string>(() => generarIdItem());
+
+  // Modal para agregar/editar consumos directos por bloque.
+  const [consumoModalOpen, setConsumoModalOpen] = useState(false);
+  const [consumoModalItemId, setConsumoModalItemId] = useState<string | null>(
+    null,
+  );
+  const [consumoEditId, setConsumoEditId] = useState<string | null>(null);
+  const [consumoForm, setConsumoForm] = useState<{
+    idProducto: string | null;
+    idAlmacen: string | null;
+    idLoteProducto: string | null;
+    idUnidadMedida: string | null;
+    cantidadConsumo: number | "";
+    contenidoPorPresentacion: number | "";
+    comentario: string;
+  }>({
+    idProducto: "12",
+    idAlmacen: null,
+    idLoteProducto: null,
+    idUnidadMedida: null,
+    cantidadConsumo: "",
+    contenidoPorPresentacion: 1,
+    comentario: "",
+  });
 
   // ===== Estados single (odometro) =====
   const [fechaDia, setFechaDia] = useState<Date | null>(new Date());
 
-  const [lecturaInicio, setLecturaInicio] = useState<number | "">("");
-  const [lecturaFin, setLecturaFin] = useState<number | "">("");
+  const [lecturaInicio, setLecturaInicio] = useState<number | "">(() =>
+    tipoControl === "odometro" ? 0 : "",
+  );
+  const [lecturaFin, setLecturaFin] = useState<number | "">(() =>
+    tipoControl === "odometro" ? 0 : "",
+  );
   const [observacion, setObservacion] = useState("");
 
   // ===== Estados bulk (horometro, vueltas) =====
-  const [items, setItems] = useState<ItemForm[]>([]);
-  const [itemsVueltas, setItemsVueltas] = useState<ItemVueltasForm[]>([]);
+// Inicializamos con el primer bloque ya creado SEGÚN el tipoControl,
+// para que el modal renderice inmediato sin esperar a la API de catalogos.
+// Los catalogos y el pre-fill de ultima lectura se cargan en background.
+  const [items, setItems] = useState<ItemForm[]>(() => {
+    if (tipoControl === "horometro") {
+      return [
+        {
+          id: generarIdItem(),
+          usarHoras: false,
+          usarHorometro: false,
+          horaInicioStr: "",
+          horaFinStr: "",
+          lecturaInicio: "",
+          lecturaFin: "",
+          tipoTurno: "",
+          observacion: "",
+          consumos: [],
+        },
+      ];
+    }
+    return [];
+  });
+  const [itemsVueltas, setItemsVueltas] = useState<ItemVueltasForm[]>(() => {
+    if (tipoControl === "vueltas") {
+      return [
+        {
+          id: generarIdItem(),
+          idTarifa: null,
+          cantidadVueltas: 0,
+          cantidadSacos: "",
+          horometroInicio: "",
+          horometroFin: "",
+          tipoTurno: "",
+          observacion: "",
+        },
+      ];
+    }
+    return [];
+  });
   const refInicioRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const refFinRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -184,49 +309,67 @@ export const RegistroUso = ({
         // Lotes Mineral
         const respLotes = await AuxService.get_lotes_mineral();
         if (respLotes.success) {
-          setLotesMineral(
-            respLotes.data.map((lm: { id_lote_mineral: string | number; codigo: string }) => ({
-              value: lm.id_lote_mineral.toString(),
-              label: lm.codigo,
-            })),
-          );
+          setLotesMineral(respLotes.data);
         }
 
-        // Lecturas/Items iniciales segun tipo
+        // Catálogos para consumos directos (solo se usan si tipoControl = horometro)
         if (tipoControl === "horometro") {
-          // Bulk: poblar el primer item con el ultimo horometro
-          const resp = await ControlUsoService.getUltimoHorometro(idActivoFijo);
-          const horometroSugerido: number | "" = resp.success
-            ? resp.data.ultimo_horometro || ""
-            : "";
-          setItems([
-            {
-              id: generarIdItem(),
-              horaInicioStr: "08:00",
-              horaFinStr: "10:00",
-              lecturaInicio: horometroSugerido,
-              lecturaFin: "",
-              observacion: "",
-            },
-          ]);
-        } else if (tipoControl === "vueltas") {
-          // Bulk: primer item con 0 vueltas / sacos opcionales
-          setItemsVueltas([
-            {
-              id: generarIdItem(),
-              cantidadVueltas: 0,
-              cantidadSacos: "",
-              horometroInicio: "",
-              horometroFin: "",
-              observacion: "",
-            },
-          ]);
-        } else if (tipoControl === "odometro") {
-          const resp = await ControlUsoService.getUltimoOdometro(idActivoFijo);
-          if (resp.success) {
-            setLecturaInicio(resp.data.ultimo_odometro);
-            setLecturaFin(0);
+          const [respProductos, respAlmacenes, respUnidades] =
+            await Promise.all([
+              AuxService.get_productos(),
+              AuxService.get_almacenes(),
+              // `incluir_conversiones: true` para que cada unidad_medida
+              // traiga su array `conversiones` y podamos autocompletar
+              // `contenido_por_presentacion` cuando la unidad solicitada
+              // difiera de la base del producto.
+              AuxService.get_unidades_medida({ incluir_conversiones: true }),
+            ]);
+          if (respProductos.success) {
+            setProductos(respProductos.data);
           }
+          if (respAlmacenes.success) {
+            setAlmacenesConsumo(
+              respAlmacenes.data.map((a) => ({
+                value: String(a.id_almacen),
+                label: a.nombre,
+              })),
+            );
+          }
+          if (respUnidades.success) {
+            setUnidadesMedida(respUnidades.data);
+          }
+        }
+
+        // Pre-fill no bloqueante de la última lectura (horometro / odometro).
+        // El primer bloque ya está creado por useState initializer, así que la
+        // llegada de la API solo rellenará el campo si el usuario no ha escrito
+        // nada en él (no pisa edición manual).
+        if (tipoControl === "horometro") {
+          ControlUsoService.getUltimoHorometro(idActivoFijo)
+            .then((resp) => {
+              if (!resp.success) return;
+              const raw = resp.data.ultimo_horometro;
+              const sugerido = typeof raw === "number" ? raw : null;
+              if (sugerido === null || sugerido === 0) return;
+              setItems((prev) => {
+                if (prev.length === 0) return prev;
+                if (prev[0].lecturaInicio !== "") return prev;
+                return [
+                  { ...prev[0], lecturaInicio: sugerido },
+                  ...prev.slice(1),
+                ];
+              });
+            })
+            .catch(() => undefined);
+        } else if (tipoControl === "odometro") {
+          ControlUsoService.getUltimoOdometro(idActivoFijo)
+            .then((resp) => {
+              if (!resp.success) return;
+              const v = resp.data.ultimo_odometro;
+              setLecturaInicio((curr) => (curr === 0 ? v : curr));
+              setLecturaFin((curr) => (curr === 0 ? 0 : curr));
+            })
+            .catch(() => undefined);
         }
       } catch (err) {
         console.error(err);
@@ -239,35 +382,363 @@ export const RegistroUso = ({
     fetchData();
   }, [idActivoFijo, tipoControl, notifyError]);
 
-  // Cuando cambia la mina, cargar labores
+  // Cuando cambia la mina, cargar labores (con lock "cargando..." hasta que llegue la respuesta).
+  // Usa cancelacion para evitar race conditions si el usuario cambia de mina rapido.
   useEffect(() => {
-    if (idMina) {
-      const fetchLab = async () => {
-        try {
-          const resp = await MinasService.getLabores(Number(idMina));
-          if (resp.success) {
-            setLabores(
-              resp.data.map((l: { id_labor: string | number; nombre: string | null }) => ({
-                value: l.id_labor.toString(),
-                label: l.nombre || "Sin nombre",
-              })),
-            );
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      };
-      fetchLab();
-    } else {
+    if (!idMina) {
       setLabores([]);
       setIdLabor(null);
+      setLoadingLabores(false);
+      return;
     }
+    let cancelado = false;
+    setLoadingLabores(true);
+    setLabores([]);
+    MinasService.getLabores(Number(idMina))
+      .then((resp) => {
+        if (cancelado) return;
+        if (resp.success) {
+          setLabores(
+            resp.data.map(
+              (l: { id_labor: string | number; nombre: string | null }) => ({
+                value: l.id_labor.toString(),
+                label: l.nombre || "Sin nombre",
+              }),
+            ),
+          );
+        }
+      })
+      .catch((e) => {
+        if (!cancelado) console.error(e);
+      })
+      .finally(() => {
+        if (!cancelado) setLoadingLabores(false);
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [idMina]);
+
+  /**
+   * Carga los lotes del modal segun (idAlmacen, idProducto) actuales del form.
+   * Si solo hay una combinacion valida, autoselecciona el primer lote con
+   * mayor stock_actual_base para que el usuario no tenga que adivinar.
+   * Si NO hay lotes para el producto en ese almacen, deja `lotesModal` vacio
+   * para que el modal muestre el mensaje "No disponible en almacen".
+   */
+  useEffect(() => {
+    if (!consumoModalOpen) {
+      setLotesModal([]);
+      return;
+    }
+    const idAlm = consumoForm.idAlmacen ? Number(consumoForm.idAlmacen) : null;
+    const idProd = consumoForm.idProducto
+      ? Number(consumoForm.idProducto)
+      : null;
+    if (!idAlm || !idProd) {
+      setLotesModal([]);
+      setLoadingLotesModal(false);
+      return;
+    }
+    let cancelado = false;
+    setLoadingLotesModal(true);
+    AuxService.get_lotes_disponibles(idAlm, [idProd])
+      .then((resp) => {
+        if (cancelado || !resp.success) return;
+        const ordenados = [...resp.data].sort(
+          (a, b) =>
+            Number(b.stock_actual_base ?? 0) - Number(a.stock_actual_base ?? 0),
+        );
+        setLotesModal(ordenados);
+        // Autoselecciona el primer lote (mayor stock) si el form aun no
+        // tiene un idLoteProducto o si el actual ya no esta disponible.
+        setConsumoForm((prev) => {
+          const sigueValido =
+            prev.idLoteProducto !== null &&
+            ordenados.some(
+              (l) => String(l.id_lote) === prev.idLoteProducto,
+            );
+          if (sigueValido) return prev;
+          if (ordenados.length > 0) {
+            return {
+              ...prev,
+              idLoteProducto: String(ordenados[0].id_lote),
+            };
+          }
+          return { ...prev, idLoteProducto: null };
+        });
+      })
+      .catch(() => {
+        if (!cancelado) setLotesModal([]);
+      })
+      .finally(() => {
+        if (!cancelado) setLoadingLotesModal(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    consumoForm.idAlmacen,
+    consumoForm.idProducto,
+    consumoModalOpen,
+  ]);
+
+  /**
+* Auto-completar `contenidoPorPresentacion` cuando cambia el producto
+    * o la unidad de medida en el modal del consumo directo.
+    *
+    * Reglas:
+    * - Si la unidad seleccionada es la misma que la base del producto
+    *   -> contenidoPorPresentacion = 1.
+    * - Si difieren y existe la conversion en la lista de conversiones
+    *   de la unidad SELECCIONADA (donde id_unidad_destino = base),
+    *   entonces contenidoPorPresentacion = 1 / factor (porque el
+    *   factor que devuelve la API esta en direccion "origens por
+    *   destino", y nosotros necesitamos "base por detalle").
+    * - Si difieren y NO existe la conversion -> queda en blanco y el
+    *   usuario debe tipear el factor manualmente.
+    *
+    * MISMO lookup que `useRegistroRequerimiento.ts` ("Nuevo Requerimiento").
+    * La convencion del backend es:
+    * - "1 destino = factor origens"  =>  "1 origen = 1/factor destinos".
+    * - En la respuesta de `get_unidades_medida({incluir_conversiones})`,
+    *   la unidad consultada aparece como `id_unidad_origen` y la
+    *   relacionada como `id_unidad_destino`.
+    *
+    * Solo aplica cuando el modal esta abierto. Ademas solo "tocamos"
+    * el campo si su valor previo es "" o 1 (defaults), para no pisar
+    * lo que el usuario haya tipeado a mano.
+    */
+  useEffect(() => {
+    if (!consumoModalOpen) return;
+    if (!consumoForm.idProducto || !consumoForm.idUnidadMedida) return;
+    const prod = productos.find(
+      (p) => String(p.id_producto) === String(consumoForm.idProducto),
+    );
+    if (!prod) return;
+    const baseId = String(prod.id_unidad_medida_base);
+    const selId = String(consumoForm.idUnidadMedida);
+    // Unidades identicas -> contenido = 1 (siempre)
+    if (baseId === selId) {
+      setConsumoForm((prev) =>
+        prev.contenidoPorPresentacion === 1
+          ? prev
+          : { ...prev, contenidoPorPresentacion: 1 },
+      );
+      return;
+    }
+    // Buscar conversion en la lista de conversiones de la unidad
+    // SELECCIONADA (la consultada por la API). Match cuando el
+    // id_unidad_destino coincide con la base. Luego se invierte el
+    // factor con 1/x para obtener "base por detalle".
+    const unidadSel = unidadesMedida.find(
+      (u) => String(u.id_unidad_medida) === selId,
+    );
+    const conv =
+      unidadSel?.conversiones?.find(
+        (c) => String(c.id_unidad_destino) === baseId,
+      ) ?? null;
+    setConsumoForm((prev) => {
+      // Solo autocompletamos si el usuario no toco el campo manualmente
+      // (no pisamos un valor distinto a "" o 1 que el usuario haya tipeado).
+      const tocar =
+        prev.contenidoPorPresentacion === "" ||
+        prev.contenidoPorPresentacion === 1;
+      if (!tocar) return prev;
+      if (conv) {
+        const factor = Number(conv.factor_conversion);
+        if (!Number.isFinite(factor) || factor <= 0) {
+          // Sin conversion util -> no se debe forzar el campo
+          if (prev.contenidoPorPresentacion === "") return prev;
+          return { ...prev, contenidoPorPresentacion: "" };
+        }
+        const cpp = 1 / factor;
+        if (cpp === prev.contenidoPorPresentacion) return prev;
+        return { ...prev, contenidoPorPresentacion: cpp };
+      }
+      // Sin conversion automatica: dejar en blanco para que el
+      // usuario tipee el factor a mano (solo si venia de 1).
+      if (prev.contenidoPorPresentacion === "") return prev;
+      return { ...prev, contenidoPorPresentacion: "" };
+    });
+  }, [
+    consumoForm.idProducto,
+    consumoForm.idUnidadMedida,
+    consumoModalOpen,
+    productos,
+    unidadesMedida,
+  ]);
+
+  /**
+   * Al cambiar de producto en el modal, autocompletar la unidad base del
+   * producto seleccionado (el usuario la puede cambiar despues). Solo aplica
+   * cuando el modal esta abierto.
+   */
+  useEffect(() => {
+    if (!consumoModalOpen) return;
+    if (!consumoForm.idProducto) return;
+    const prod = productos.find(
+      (p) => String(p.id_producto) === String(consumoForm.idProducto),
+    );
+    if (!prod) return;
+    const baseStr = String(prod.id_unidad_medida_base);
+    // Solo si la unidad actual no es la base ni una conversion valida,
+    // forzamos la base. Esto evita pisar la seleccion manual del usuario.
+    if (
+      consumoForm.idUnidadMedida === null ||
+      consumoForm.idUnidadMedida === baseStr
+    ) {
+      setConsumoForm((prev) =>
+        prev.idUnidadMedida === baseStr
+          ? prev
+          : { ...prev, idUnidadMedida: baseStr },
+      );
+    }
+  }, [
+    consumoForm.idProducto,
+    consumoForm.idUnidadMedida,
+    consumoModalOpen,
+    productos,
+  ]);
+
+  /**
+   * Sincroniza el `idAlmacen` del modal con `almacenesConsumo` (que
+   * refleja la mina actualmente seleccionada en el form padre). Reglas:
+   * - Si el idAlmacen actualmente seleccionado ya NO esta en la lista
+   *   (la mina cambio y ese almacen pertenece a otra mina), se limpia
+   *   para forzar al usuario a re-seleccionar uno valido.
+   * - Si el idAlmacen es null y solo hay UN almacen disponible para la
+   *   mina actual, se auto-selecciona para mantener la consistencia
+   *   mina -> almacen (igual que `openConsumoModal` al abrir el modal).
+   * - Si hay varios almacenes, el usuario elige manualmente.
+   */
+  useEffect(() => {
+    if (!consumoModalOpen) return;
+
+    // Caso 1: el seleccionado quedo invalido por un cambio de mina ->
+    // limpiar para forzar al usuario a re-seleccionar.
+    if (
+      consumoForm.idAlmacen !== null &&
+      !almacenesConsumo.some((a) => a.value === consumoForm.idAlmacen)
+    ) {
+      setConsumoForm((prev) => ({ ...prev, idAlmacen: null }));
+      return;
+    }
+
+    // Caso 2: no hay seleccionado y solo hay un almacen -> auto-seleccionar
+    // para mantener la consistencia con la mina elegida.
+    if (consumoForm.idAlmacen === null && almacenesConsumo.length === 1) {
+      const unico = almacenesConsumo[0].value;
+      setConsumoForm((prev) =>
+        prev.idAlmacen === unico ? prev : { ...prev, idAlmacen: unico },
+      );
+    }
+  }, [almacenesConsumo, consumoModalOpen, consumoForm.idAlmacen]);
+
+  /**
+   * Defaults de los checks segun la mina (solo horometro).
+   * - Algamarca → autocompletar Usar Horas
+   * - Sayapullo → autocompletar Usar Horometro
+   * - Otra mina → ninguno autocompletado
+   * Comparacion case-insensitive sobre el nombre de la mina.
+   * El usuario puede togglear manualmente, los defaults se reaplican
+   * si cambia la mina.
+   */
+  const getDefaultsForMina = (
+    nombreMina: string | null | undefined,
+  ): { usarHoras: boolean; usarHorometro: boolean } => {
+    if (!nombreMina) return { usarHoras: false, usarHorometro: false };
+    const n = nombreMina.trim().toLowerCase();
+    if (n === "algamarca") return { usarHoras: true, usarHorometro: false };
+    if (n === "sayapullo") return { usarHoras: false, usarHorometro: true };
+    return { usarHoras: false, usarHorometro: false };
+  };
+
+  // Aplica los defaults segun la mina seleccionada a TODOS los bloques existentes.
+  // Solo aplica a horometro y solo cuando hay bloques ya creados (no en init vacio).
+  useEffect(() => {
+    if (tipoControl !== "horometro") return;
+    if (!idMina) return;
+    if (items.length === 0) return;
+    const nombre = minas.find((m) => m.value === idMina)?.label ?? null;
+    const defaults = getDefaultsForMina(nombre);
+    setItems((prev) =>
+      prev.map((it) => ({
+        ...it,
+        usarHoras: defaults.usarHoras,
+        usarHorometro: defaults.usarHorometro,
+        // Si el default apaga un check, limpia sus valores para no enviar basura.
+        horaInicioStr: defaults.usarHoras ? it.horaInicioStr : "",
+        horaFinStr: defaults.usarHoras ? it.horaFinStr : "",
+        lecturaInicio: defaults.usarHorometro ? it.lecturaInicio : "",
+        lecturaFin: defaults.usarHorometro ? it.lecturaFin : "",
+      })),
+    );
+    setErroresItems([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idMina, tipoControl]);
+
+  /**
+   * Recarga los almacenes para el select de consumos cuando cambia la mina.
+   * Si solo hay un almacen asociado a la mina, lo autoselecciona (el usuario
+   * puede cambiarlo manualmente).
+   */
+  useEffect(() => {
+    if (tipoControl !== "horometro") return;
+    if (!idMina) {
+      setAlmacenesConsumo([]);
+      return;
+    }
+    let cancelado = false;
+    AuxService.get_almacenes({ id_mina: Number(idMina) })
+      .then((resp) => {
+        if (cancelado || !resp.success) return;
+        const opts = resp.data.map((a) => ({
+          value: String(a.id_almacen),
+          label: a.nombre,
+        }));
+        setAlmacenesConsumo(opts);
+        // Autoselecciona si solo hay un almacen y el front no tiene uno ya.
+        // No pisamos la seleccion manual del usuario.
+        if (opts.length === 1) {
+          setItems((prev) =>
+            prev.map((it) => {
+              const consumosLimpios = it.consumos.map((cs) =>
+                cs.idAlmacen ? cs : { ...cs, idAlmacen: opts[0].value },
+              );
+              return { ...it, consumos: consumosLimpios };
+            }),
+          );
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [idMina, tipoControl]);
 
   // Dynamic naming segun tipo (single)
   const labelLectura = tipoControl === "horometro" ? "Horometro" : tipoControl === "odometro" ? "Odometro" : "Vueltas";
   const labelDiferencia = tipoControl === "vueltas" ? "Vueltas" : tipoControl === "horometro" ? "Horas" : "Km";
   const unitMeasure = tipoControl === "vueltas" ? "vuelta(s)" : tipoControl === "horometro" ? "hrs" : "Km";
+
+  /**
+   * Formatea horas totales para el display:
+   * - Trunca a 2 decimales (no redondea), de modo que el valor mostrado
+   *   refleja el piso real, no un redondeo al alza.
+   * - Si el valor crudo tiene precision mas alla del 2do decimal, agrega
+   *   "…" para avisar al usuario que hay mas detalle sin saturar la pantalla.
+   * - Si el valor cabe exacto en 2 decimales, lo muestra limpio.
+   */
+  const formatHorasDisplay = (v: number): string => {
+    if (!Number.isFinite(v) || v === 0) return "0.00";
+    const trunc = Math.trunc(v * 100) / 100;
+    const remainder = Math.abs(v - trunc);
+    const hayMas = remainder > 1e-9;
+    let s = trunc.toFixed(2);
+    if (hayMas) s += "\u2026";
+    return s;
+  };
 
   // Calculo totalUso single (solo se usa para odometro; las ramas bulk calculan por item)
   const totalUso = useMemo(() => {
@@ -286,27 +757,50 @@ export const RegistroUso = ({
   }, [totalUso, precioUnitario]);
 
   // Calculos por item (bulk horometro)
+  // Prioridad: si usarHoras está activo y los campos están completos, usa Horas.
+  // Si no, si usarHorometro está activo y los campos están completos, usa Horometro.
+  // Si ninguno aplica, totalHoras = 0.
   const calculosPorItem = useMemo(() => {
     return items.map((it) => {
-      if (!fechaDia || !it.horaInicioStr || !it.horaFinStr) {
-        return { totalHoras: 0, costoTotal: 0 };
+      const usarHoras =
+        it.usarHoras && !!it.horaInicioStr && !!it.horaFinStr;
+      const usarHorometro =
+        it.usarHorometro &&
+        it.lecturaInicio !== "" &&
+        it.lecturaFin !== "";
+
+      if (usarHoras && fechaDia) {
+        const baseDate = dayjs(fechaDia).format("YYYY-MM-DD");
+        const dtInicio = dayjs(`${baseDate} ${it.horaInicioStr}`);
+        let dtFin = dayjs(`${baseDate} ${it.horaFinStr}`);
+        if (!dtInicio.isValid() || !dtFin.isValid()) {
+          return { totalHoras: 0, costoTotal: 0 };
+        }
+        if (dtFin.isBefore(dtInicio) || dtFin.isSame(dtInicio)) {
+          dtFin = dtFin.add(1, "day");
+        }
+        const diffSecs = dtFin.diff(dtInicio, "second");
+        if (diffSecs <= 0) {
+          return { totalHoras: 0, costoTotal: 0 };
+        }
+        // Sin redondeo prematuro: el float crudo viaja al backend (precision
+        // DECIMAL(13,6)) y el display redondea via toLocaleString. Asi el costo
+        // se calcula exacto (1 min a 60 -> S/ 1.00, no S/ 1.20).
+        const totalHoras = diffSecs / 3600;
+        const costoTotalCalc = totalHoras * (precioUnitario || 0);
+        return { totalHoras, costoTotal: costoTotalCalc };
       }
-      const baseDate = dayjs(fechaDia).format("YYYY-MM-DD");
-      const dtInicio = dayjs(`${baseDate} ${it.horaInicioStr}`);
-      let dtFin = dayjs(`${baseDate} ${it.horaFinStr}`);
-      if (!dtInicio.isValid() || !dtFin.isValid()) {
-        return { totalHoras: 0, costoTotal: 0 };
+
+      if (usarHorometro) {
+        const totalHoras = Math.max(
+          0,
+          Number(it.lecturaFin) - Number(it.lecturaInicio),
+        );
+        const costoTotalCalc = totalHoras * (precioUnitario || 0);
+        return { totalHoras, costoTotal: costoTotalCalc };
       }
-      if (dtFin.isBefore(dtInicio) || dtFin.isSame(dtInicio)) {
-        dtFin = dtFin.add(1, "day");
-      }
-      const diffSecs = dtFin.diff(dtInicio, "second");
-      if (diffSecs <= 0) {
-        return { totalHoras: 0, costoTotal: 0 };
-      }
-      const totalHoras = Math.round((diffSecs / 3600) * 100) / 100;
-      const costoTotalCalc = Math.round(totalHoras * (precioUnitario || 0) * 100) / 100;
-      return { totalHoras, costoTotal: costoTotalCalc };
+
+      return { totalHoras: 0, costoTotal: 0 };
     });
   }, [items, fechaDia, precioUnitario]);
 
@@ -329,7 +823,7 @@ export const RegistroUso = ({
   const actualizarItem = (
     id: string,
     campo: keyof Omit<ItemForm, "id">,
-    valor: string | number | "",
+    valor: string | number | "" | boolean,
   ) => {
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, [campo]: valor } : it)),
@@ -340,17 +834,139 @@ export const RegistroUso = ({
     const ultimo = items[items.length - 1];
     const horometroSugerido: number | "" =
       ultimo && ultimo.lecturaFin !== "" ? Number(ultimo.lecturaFin) : "";
+    const nombreMina = minas.find((m) => m.value === idMina)?.label ?? null;
+    const defaults = getDefaultsForMina(nombreMina);
     setItems((prev) => [
       ...prev,
       {
         id: generarIdItem(),
-        horaInicioStr: "08:00",
-        horaFinStr: "10:00",
-        lecturaInicio: horometroSugerido,
+        usarHoras: defaults.usarHoras,
+        usarHorometro: defaults.usarHorometro,
+        horaInicioStr: defaults.usarHoras ? "" : "",
+        horaFinStr: defaults.usarHoras ? "" : "",
+        lecturaInicio: defaults.usarHorometro ? horometroSugerido : "",
         lecturaFin: "",
+        tipoTurno: "",
         observacion: "",
+        consumos: [],
       },
     ]);
+  };
+
+  const openConsumoModal = (itemId: string, consumo?: ItemConsumoForm) => {
+    setConsumoModalItemId(itemId);
+    if (consumo) {
+      setConsumoEditId(consumo.id);
+      setConsumoForm({
+        idProducto: consumo.idProducto,
+        idAlmacen: consumo.idAlmacen,
+        idLoteProducto: consumo.idLoteProducto,
+        idUnidadMedida: consumo.idUnidadMedida,
+        cantidadConsumo: consumo.cantidadConsumo,
+        contenidoPorPresentacion: consumo.contenidoPorPresentacion,
+        comentario: consumo.comentario,
+      });
+    } else {
+      setConsumoEditId(null);
+      // Auto-selecciona el unico almacen disponible para la mina actual,
+      // para evitar inconsistencias (mina y almacen desalineados). Si
+      // hay varios, el usuario elige. Si no hay ninguno todavia
+      // (catalogos cargando), queda en null y se actualiza reactivamente
+      // via el useEffect de sincronizacion de abajo.
+      const idAlmacenAuto =
+        almacenesConsumo.length === 1 ? almacenesConsumo[0].value : null;
+      setConsumoForm({
+        idProducto: "12",
+        idAlmacen: idAlmacenAuto,
+        idLoteProducto: null,
+        idUnidadMedida: null,
+        cantidadConsumo: "",
+        contenidoPorPresentacion: 1,
+        comentario: "",
+      });
+    }
+    setConsumoModalOpen(true);
+  };
+
+  const guardarConsumoModal = () => {
+    if (!consumoModalItemId) return;
+    if (!consumoForm.idProducto) {
+      notifyError("Seleccione un producto.");
+      return;
+    }
+    if (!consumoForm.idAlmacen) {
+      notifyError("Seleccione un almacen.");
+      return;
+    }
+    if (!consumoForm.idLoteProducto) {
+      notifyError("Seleccione un lote.");
+      return;
+    }
+    if (!consumoForm.idUnidadMedida) {
+      notifyError("Seleccione una unidad de medida.");
+      return;
+    }
+    if (
+      consumoForm.cantidadConsumo === "" ||
+      Number(consumoForm.cantidadConsumo) <= 0
+    ) {
+      notifyError("Ingrese una cantidad valida.");
+      return;
+    }
+    if (
+      consumoForm.contenidoPorPresentacion === "" ||
+      Number(consumoForm.contenidoPorPresentacion) <= 0
+    ) {
+      notifyError("El contenido por presentacion debe ser mayor a 0.");
+      return;
+    }
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== consumoModalItemId) return it;
+        const idConsumo = consumoEditId ?? generarIdItem();
+        const nuevoConsumo: ItemConsumoForm = {
+          id: idConsumo,
+          idProducto: consumoForm.idProducto,
+          idAlmacen: consumoForm.idAlmacen,
+          idLoteProducto: consumoForm.idLoteProducto,
+          idUnidadMedida: consumoForm.idUnidadMedida,
+          cantidadConsumo: consumoForm.cantidadConsumo,
+          contenidoPorPresentacion: consumoForm.contenidoPorPresentacion,
+          idLoteMineral: null,
+          idLaborDestino: null,
+          paraProduccion: false,
+          paraMantenimiento: false,
+          comentario: consumoForm.comentario,
+          estado: "Consumo Total",
+        };
+        if (consumoEditId) {
+          return {
+            ...it,
+            consumos: it.consumos.map((c) =>
+              c.id === consumoEditId ? nuevoConsumo : c,
+            ),
+          };
+        }
+        return {
+          ...it,
+          consumos: [...it.consumos, nuevoConsumo],
+        };
+      }),
+    );
+    setConsumoModalOpen(false);
+  };
+
+  const quitarConsumo = (itemId: string, consumoId: string) => {
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              consumos: it.consumos.filter((c) => c.id !== consumoId),
+            }
+          : it,
+      ),
+    );
   };
 
   const quitarItem = (id: string) => {
@@ -381,7 +997,7 @@ export const RegistroUso = ({
   const actualizarItemVueltas = (
     id: string,
     campo: keyof Omit<ItemVueltasForm, "id">,
-    valor: number | "" | string,
+    valor: number | "" | string | boolean | null,
   ) => {
     setItemsVueltas((prev) =>
       prev.map((it) => (it.id === id ? { ...it, [campo]: valor } : it)),
@@ -393,10 +1009,12 @@ export const RegistroUso = ({
       ...prev,
       {
         id: generarIdItem(),
+        idTarifa: null,
         cantidadVueltas: 0,
-        cantidadSacos: esTarifaSaco ? 0 : "",
+        cantidadSacos: "",
         horometroInicio: "",
         horometroFin: "",
+        tipoTurno: "",
         observacion: "",
       },
     ]);
@@ -415,7 +1033,7 @@ export const RegistroUso = ({
     if (idLabor) e.labor = labores.find((l) => l.value === String(idLabor))?.label || null;
     if (idLoteMineral)
       e.lote_mineral =
-        lotesMineral.find((lm) => lm.value === String(idLoteMineral))?.label || null;
+        lotesMineral.find((lm) => String(lm.id_lote_mineral) === String(idLoteMineral))?.codigo || null;
     if (idCliente)
       e.cliente = clientes.find((c) => c.value === String(idCliente))?.label || null;
     return e;
@@ -438,6 +1056,7 @@ export const RegistroUso = ({
 
   // Submit: ramifica segun tipoControl
   const handleSubmit = async () => {
+    setErroresItems([]);
     if (!idActivoFijo) {
       notifyError("Por favor seleccione un activo fijo.");
       return;
@@ -452,37 +1071,55 @@ export const RegistroUso = ({
       notifyError("La labor es obligatoria para registrar un control por vueltas.");
       return;
     }
+    if (tipoControl === "vueltas" && !fechaDia) {
+      notifyError("Por favor seleccione la fecha del trabajo.");
+      return;
+    }
 
     if (tipoControl === "horometro") {
       if (!fechaDia) {
         notifyError("Por favor seleccione la fecha del trabajo.");
         return;
       }
-      // Validacion de cada item
+      // Validacion de cada item. Acumula errores para mostrar todos en un Alert arriba.
+      const errores: string[] = [];
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
         const idx = i + 1;
-        if (!it.horaInicioStr || !it.horaFinStr) {
-          notifyError(`Bloque #${idx}: complete las horas de inicio y fin.`);
-          return;
-        }
-        if (calculosPorItem[i].totalHoras <= 0) {
-          notifyError(
-            `Bloque #${idx}: la hora de fin debe ser posterior a la hora de inicio.`,
+        if (!it.usarHoras && !it.usarHorometro) {
+          errores.push(
+            `Bloque #${idx}: active "Usar Horas" o "Usar Horometro" (al menos uno).`,
           );
-          return;
         }
-        if (
-          it.lecturaInicio !== "" &&
-          it.lecturaFin !== "" &&
-          Number(it.lecturaFin) <= Number(it.lecturaInicio)
-        ) {
-          notifyError(
-            `Bloque #${idx}: el horometro final no puede ser menor o igual al inicial.`,
-          );
-          return;
+        if (it.usarHoras) {
+          if (!it.horaInicioStr || !it.horaFinStr) {
+            errores.push(
+              `Bloque #${idx}: complete las horas de inicio y fin.`,
+            );
+          } else if (calculosPorItem[i].totalHoras <= 0) {
+            errores.push(
+              `Bloque #${idx}: la hora de fin debe ser posterior a la hora de inicio.`,
+            );
+          }
+        }
+        if (it.usarHorometro) {
+          if (it.lecturaInicio === "" || it.lecturaFin === "") {
+            errores.push(
+              `Bloque #${idx}: complete el horometro inicial y final.`,
+            );
+          } else if (Number(it.lecturaFin) <= Number(it.lecturaInicio)) {
+            errores.push(
+              `Bloque #${idx}: el horometro final no puede ser menor o igual al inicial.`,
+            );
+          }
         }
       }
+      if (errores.length > 0) {
+        setErroresItems(errores);
+        notifyError(`Hay ${errores.length} error(es) en los bloques.`);
+        return;
+      }
+      setErroresItems([]);
     }
 
     if (tipoControl === "vueltas") {
@@ -495,16 +1132,34 @@ export const RegistroUso = ({
         notifyError("La labor es obligatoria para registrar un control por vueltas.");
         return;
       }
+      if (!idLoteMineral) {
+        notifyError(
+          "El lote de mineral en producción es obligatorio para registrar un control por vueltas.",
+        );
+        return;
+      }
       // Validacion por item
       for (let i = 0; i < itemsVueltas.length; i++) {
         const it = itemsVueltas[i];
         const idx = i + 1;
+        if (!it.idTarifa) {
+          notifyError(`Bloque #${idx}: debe seleccionar una Tarifa de Uso.`);
+          return;
+        }
         if (Number(it.cantidadVueltas) <= 0) {
           notifyError(`Bloque #${idx}: la cantidad de vueltas debe ser mayor a cero.`);
           return;
         }
+        const tarifaItem = tarifas.find(
+          (t) => t.id.toString() === it.idTarifa,
+        );
+        const esSacoItem = tarifaItem
+          ? (tarifaItem.tipo_material || "")
+              .toLowerCase()
+              .includes("saco")
+          : false;
         if (
-          esTarifaSaco &&
+          esSacoItem &&
           (it.cantidadSacos === "" || Number(it.cantidadSacos) <= 0)
         ) {
           notifyError(`Bloque #${idx}: la cantidad de sacos es obligatoria.`);
@@ -549,8 +1204,8 @@ export const RegistroUso = ({
           id_lote_mineral: idLoteMineral ? Number(idLoteMineral) : null,
           tipo_carga: tipoCarga || null,
           items: items.map((it) => ({
-            hora_inicio: it.horaInicioStr,
-            hora_fin: it.horaFinStr,
+            hora_inicio: it.horaInicioStr === "" ? null : it.horaInicioStr,
+            hora_fin: it.horaFinStr === "" ? null : it.horaFinStr,
             horometro_inicio:
               it.lecturaInicio === "" || it.lecturaInicio === null
                 ? null
@@ -559,7 +1214,29 @@ export const RegistroUso = ({
               it.lecturaFin === "" || it.lecturaFin === null
                 ? null
                 : Number(it.lecturaFin),
+            tipo_turno: it.tipoTurno === "" ? null : it.tipoTurno,
             observacion: it.observacion.trim() ? it.observacion.trim() : null,
+            consumos: it.consumos.map((cs) => ({
+              id_producto: Number(cs.idProducto),
+              id_almacen: Number(cs.idAlmacen),
+              id_lote_producto: Number(cs.idLoteProducto),
+              id_unidad_medida: Number(cs.idUnidadMedida),
+              cantidad_consumo: cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo),
+              contenido_por_presentacion:
+                cs.contenidoPorPresentacion === "" ? 0 : Number(cs.contenidoPorPresentacion),
+              // Activo fijo consumidor: la maquina que se esta controlando
+              // (siempre la misma para todos los consumos de este modal).
+              id_activo_fijo_consumidor: idActivoFijo,
+              // Un mismo UUID para todos los consumos de este "Registrar
+              // Control por Horometro" -> facilita el agrupado en Listar.
+              uuid_control_uso_activo: uuidGrupoControlUso,
+              id_lote_mineral: cs.idLoteMineral ? Number(cs.idLoteMineral) : null,
+              id_labor_destino: cs.idLaborDestino ? Number(cs.idLaborDestino) : null,
+              para_produccion: cs.paraProduccion,
+              para_mantenimiento: cs.paraMantenimiento,
+              comentario: cs.comentario.trim() ? cs.comentario.trim() : null,
+              estado: cs.estado,
+            })),
           })),
         };
 
@@ -577,26 +1254,47 @@ export const RegistroUso = ({
       if (tipoControl === "vueltas") {
         const payload = {
           id_activo_fijo: idActivoFijo,
-          id_tarifa: idTarifa ? Number(idTarifa) : null,
-          precio_unitario: precioUnitario,
+          fecha_trabajo: fechaDia
+            ? dayjs(fechaDia).format("YYYY-MM-DD")
+            : "",
           id_mina: Number(idMina),
           id_labor: Number(idLabor),
-          items: itemsVueltas.map((it) => ({
-            cantidad_vueltas: Number(it.cantidadVueltas),
-            cantidad_sacos:
-              esTarifaSaco && it.cantidadSacos !== "" && it.cantidadSacos !== null
-                ? Number(it.cantidadSacos)
+          id_lote_mineral: idLoteMineral ? Number(idLoteMineral) : null,
+          items: itemsVueltas.map((it) => {
+            const tarifaItem = tarifas.find(
+              (t) => t.id.toString() === it.idTarifa,
+            );
+            const esSacoItem = tarifaItem
+              ? (tarifaItem.tipo_material || "")
+                  .toLowerCase()
+                  .includes("saco")
+              : false;
+            return {
+              id_tarifa: it.idTarifa ? Number(it.idTarifa) : null,
+              precio_unitario: tarifaItem
+                ? Number(tarifaItem.precio_unitario)
+                : 0,
+              cantidad_vueltas: Number(it.cantidadVueltas),
+              cantidad_sacos:
+                esSacoItem &&
+                it.cantidadSacos !== "" &&
+                it.cantidadSacos !== null
+                  ? Number(it.cantidadSacos)
+                  : null,
+              horometro_inicio:
+                it.horometroInicio === "" || it.horometroInicio === null
+                  ? null
+                  : Number(it.horometroInicio),
+              horometro_fin:
+                it.horometroFin === "" || it.horometroFin === null
+                  ? null
+                  : Number(it.horometroFin),
+              tipo_turno: it.tipoTurno === "" ? null : it.tipoTurno,
+              observacion: it.observacion.trim()
+                ? it.observacion.trim()
                 : null,
-            horometro_inicio:
-              it.horometroInicio === "" || it.horometroInicio === null
-                ? null
-                : Number(it.horometroInicio),
-            horometro_fin:
-              it.horometroFin === "" || it.horometroFin === null
-                ? null
-                : Number(it.horometroFin),
-            observacion: it.observacion.trim() ? it.observacion.trim() : null,
-          })),
+            };
+          }),
         };
 
         const resp = await ControlUsoService.registrarUsoBulkVueltas(payload);
@@ -655,6 +1353,25 @@ export const RegistroUso = ({
 
   return (
     <Stack gap="md" className="p-1">
+      {tipoControl === "horometro" && erroresItems.length > 0 && (
+        <Alert
+          variant="light"
+          color="red"
+          radius="lg"
+          icon={<ExclamationTriangleIcon className="w-5 h-5 text-red-400" />}
+          className="bg-red-500/10 border border-red-500/30"
+          classNames={{ message: "text-zinc-200 text-sm leading-relaxed" }}
+          title="Revisa los bloques antes de guardar"
+        >
+          <Stack gap={4}>
+            {erroresItems.map((msg, i) => (
+              <Text key={i} size="sm" className="text-zinc-200">
+                {msg}
+              </Text>
+            ))}
+          </Stack>
+        </Alert>
+      )}
       {/* Asset card (cabecera) */}
       <div className="relative overflow-hidden bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 flex gap-3.5 transition-all">
         <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
@@ -691,93 +1408,187 @@ export const RegistroUso = ({
         </div>
       </div>
 
-      {/* Tarifa de Uso (cabecera) */}
-      <SimpleGrid cols={1} spacing="md">
-        <Group gap={6} align="flex-end" wrap="nowrap">
-          <Select
-            className="flex-1"
-            label="Tarifa de Uso"
-            placeholder="Seleccione tarifa..."
-            data={tarifas
-              .filter((t) => t.tipo_control === tipoControl)
-              .map((t) => {
-                const esSaco = (t.tipo_material || "").toLowerCase().includes("saco");
-                if (tipoControl === "vueltas") {
-                  const parts = [
-                    esSaco ? "Sin precio" : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
-                    t.distancia_metros ? `x ${t.distancia_metros}m` : null,
-                    t.tipo_material ? `x ${t.tipo_material}` : null,
-                  ].filter(Boolean);
-                  return { value: t.id.toString(), label: parts.join(" ") };
-                }
-                return {
-                  value: t.id.toString(),
-                  label: [
-                    `S/. ${Number(t.precio_unitario).toFixed(2)}`,
-                    t.tipo_material ? `x ${t.tipo_material}` : null,
-                    t.descripcion ? `- ${t.descripcion}` : null,
-                  ].filter(Boolean).join(" "),
-                };
-              })}
-            classNames={fieldClasses}
-            value={idTarifa}
-            onChange={setIdTarifa}
-            searchable
-            clearable
-            radius="lg"
-            size="xs"
-          />
-          <Tooltip label="Historial de Tarifas">
-            <ActionIcon
-              onClick={() => setModalHistorialOpened(true)}
-              variant="light"
-              color="zinc.4"
-              size={32}
+      {/* Cabecera por modo:
+          - horometro: Tarifa + Fecha (cols=2).
+          - odometro: Tarifa sola (cols=1).
+          - vueltas: NO se muestra Tarifa aqui (cada item tiene su Tarifa propia). */}
+      {tipoControl !== "vueltas" && (
+        <SimpleGrid cols={tipoControl === "horometro" ? 2 : 1} spacing="md">
+          <Group gap={6} align="flex-end" wrap="nowrap">
+            <Select
+              className="flex-1"
+              label="Tarifa de Uso"
+              placeholder="Seleccione tarifa..."
+              data={tarifas
+                .filter((t) => t.tipo_control === tipoControl)
+                .map((t) => {
+                  // NOTA: para vueltas este Select NO se renderiza
+                  // (cada item tiene su Tarifa propia). Este bloque queda
+                  // solo para horometro / odometro.
+                  return {
+                    value: t.id.toString(),
+                    label: [
+                      `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                      t.tipo_material ? `x ${t.tipo_material}` : null,
+                      t.descripcion ? `- ${t.descripcion}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                  };
+                })}
+              classNames={fieldClasses}
+              value={idTarifa}
+              onChange={setIdTarifa}
+              searchable
+              clearable
               radius="lg"
-              className="mb-[3px] border border-zinc-700/50"
-            >
-              <QueueListIcon className="w-4 h-4" />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Nueva Tarifa">
-            <ActionIcon
-              onClick={() => setModalTarifaOpened(true)}
-              variant="filled"
-              color="indigo.6"
-              size={32}
+              size="xs"
+            />
+            <Tooltip label="Historial de Tarifas">
+              <ActionIcon
+                onClick={() => setModalHistorialOpened(true)}
+                variant="light"
+                color="zinc.4"
+                size={32}
+                radius="lg"
+                className="mb-[3px] border border-zinc-700/50"
+              >
+                <QueueListIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Nueva Tarifa">
+              <ActionIcon
+                onClick={() => setModalTarifaOpened(true)}
+                variant="filled"
+                color="indigo.6"
+                size={32}
+                radius="lg"
+                className="mb-[3px]"
+              >
+                <PlusIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+          {tipoControl === "horometro" && (
+            <CustomDatePicker
+              label="Fecha del Trabajo"
+              placeholder="Seleccione fecha"
+              value={fechaDia}
+              onChange={(val) => setFechaDia(val as Date | null)}
               radius="lg"
-              className="mb-[3px]"
+              size="xs"
+            />
+          )}
+        </SimpleGrid>
+      )}
+
+      {/* Cabecera ESPECIFICA de vueltas: Lote de Mineral filtrado por labor (arriba),
+          luego Mina y Labor. */}
+      {tipoControl === "vueltas" &&
+        (() => {
+          const lotesFiltrados = idLabor
+            ? lotesMineral.filter((lm) => lm.id_labor === Number(idLabor))
+            : [];
+          return (
+            <Card
+              withBorder
+              padding="md"
+              radius="lg"
+              className="bg-zinc-950/20 border-zinc-800/60"
             >
-              <PlusIcon className="w-4 h-4" />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </SimpleGrid>
+              <SimpleGrid cols={2} spacing="md">
+                <Select
+                  label="Mina"
+                  placeholder="Seleccione mina"
+                  data={minas}
+                  value={idMina}
+                  onChange={setIdMina}
+                  searchable
+                  required
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="xs"
+                />
+                <Select
+                  label="Labor"
+                  placeholder="Seleccione labor"
+                  data={labores}
+                  value={idLabor}
+                  onChange={setIdLabor}
+                  searchable
+                  disabled={!idMina}
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="xs"
+                />
+              </SimpleGrid>
+              <SimpleGrid cols={2} spacing="md" mt="md">
+                <Select
+                  label="Lote de Mineral"
+                  placeholder={
+                    idLabor
+                      ? "Seleccione lote de la labor..."
+                      : "Seleccione primero una labor"
+                  }
+                  data={lotesFiltrados.map((lm) => ({
+                    value: String(lm.id_lote_mineral),
+                    label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
+                  }))}
+                  value={idLoteMineral}
+                  onChange={setIdLoteMineral}
+                  searchable
+                  clearable
+                  disabled={!idLabor}
+                  required
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="xs"
+                />
+                <CustomDatePicker
+                  label="Fecha del Trabajo"
+                  placeholder="Seleccione fecha"
+                  value={fechaDia}
+                  onChange={(val) => setFechaDia(val as Date | null)}
+                  radius="lg"
+                  size="xs"
+                />
+              </SimpleGrid>
+            </Card>
+          );
+        })()}
 
       {/* Bloque Horometro: Bulk (N items) */}
       {tipoControl === "horometro" ? (
         <Stack gap="sm">
-          <CustomDatePicker
-            label="Fecha del Trabajo"
-            placeholder="Seleccione fecha"
-            value={fechaDia}
-            onChange={(val) => setFechaDia(val as Date | null)}
-            radius="lg"
-            size="xs"
-          />
-
-          <Select
-            label="Lote Mineral (Opc.)"
-            placeholder="Seleccione lote de mineral..."
-            data={lotesMineral}
-            value={idLoteMineral}
-            onChange={setIdLoteMineral}
-            searchable
-            clearable
-            classNames={fieldClasses}
-            radius="lg"
-            size="xs"
-          />
+          {/* Lote Mineral + Tipo de Carga (Opc.) en la misma fila */}
+          <SimpleGrid cols={2} spacing="md">
+              <Select
+                label="Lote Mineral (Opc.)"
+                placeholder="Seleccione lote de mineral..."
+                data={lotesMineral.map((lm) => ({
+                  value: String(lm.id_lote_mineral),
+                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
+                }))}
+                value={idLoteMineral}
+                onChange={setIdLoteMineral}
+                searchable
+                clearable
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+              />
+            <Select
+              label="Tipo de Carga (Opc.)"
+              placeholder="Seleccione..."
+              data={["Arrumaje de Mineral", "Carguio de Mineral"]}
+              value={tipoCarga}
+              onChange={setTipoCarga}
+              clearable
+              classNames={fieldClasses}
+              radius="lg"
+              size="xs"
+            />
+          </SimpleGrid>
 
           {/* Destino del Trabajo (cabecera del bulk) */}
           <Card withBorder padding="md" radius="lg" className="bg-zinc-950/20 border-zinc-800/60">
@@ -836,13 +1647,16 @@ export const RegistroUso = ({
                   />
                   <Select
                     label="Labor (Opcional)"
-                    placeholder="Seleccione labor"
+                    placeholder={
+                      loadingLabores ? "Cargando labores..." : "Seleccione labor"
+                    }
                     data={labores}
                     value={idLabor}
                     onChange={setIdLabor}
                     searchable
                     clearable
-                    disabled={!idMina}
+                    disabled={!idMina || loadingLabores}
+                    rightSection={loadingLabores ? <Loader size={12} color="indigo" /> : undefined}
                     classNames={fieldClasses}
                     radius="lg"
                     size="xs"
@@ -865,18 +1679,6 @@ export const RegistroUso = ({
             </SimpleGrid>
           </Card>
 
-          <Select
-            label="Tipo de Carga"
-            placeholder="Seleccione..."
-            data={["Arrumaje de Mineral", "Carguio de Mineral"]}
-            value={tipoCarga}
-            onChange={setTipoCarga}
-            clearable
-            classNames={fieldClasses}
-            radius="lg"
-            size="xs"
-          />
-
           {/* Items: N bloques de horario */}
           <Stack gap="sm">
             {items.map((it, idx) => (
@@ -896,20 +1698,52 @@ export const RegistroUso = ({
                       Horario independiente
                     </Text>
                   </Group>
-                  {items.length > 1 && (
-                    <Tooltip label="Quitar bloque">
-                      <ActionIcon
-                        onClick={() => quitarItem(it.id)}
-                        variant="subtle"
-                        color="red"
-                        size="sm"
-                        radius="xl"
-                        aria-label={`Quitar bloque ${idx + 1}`}
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
+                  <Group gap="md" align="center" wrap="nowrap">
+                    <Checkbox
+                      label="Usar Horas"
+                      checked={it.usarHoras}
+                      onChange={(event) => {
+                        const value = event.currentTarget.checked;
+                        actualizarItem(it.id, "usarHoras", value);
+                        if (!value) {
+                          actualizarItem(it.id, "horaInicioStr", "");
+                          actualizarItem(it.id, "horaFinStr", "");
+                        }
+                      }}
+                      radius="sm"
+                      size="xs"
+                      color="indigo"
+                    />
+                    <Checkbox
+                      label="Usar Horometro"
+                      checked={it.usarHorometro}
+                      onChange={(event) => {
+                        const value = event.currentTarget.checked;
+                        actualizarItem(it.id, "usarHorometro", value);
+                        if (!value) {
+                          actualizarItem(it.id, "lecturaInicio", "");
+                          actualizarItem(it.id, "lecturaFin", "");
+                        }
+                      }}
+                      radius="sm"
+                      size="xs"
+                      color="indigo"
+                    />
+                    {items.length > 1 && (
+                      <Tooltip label="Quitar bloque">
+                        <ActionIcon
+                          onClick={() => quitarItem(it.id)}
+                          variant="subtle"
+                          color="red"
+                          size="sm"
+                          radius="xl"
+                          aria-label={`Quitar bloque ${idx + 1}`}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Group>
 
                 <SimpleGrid cols={2} spacing="md">
@@ -918,19 +1752,20 @@ export const RegistroUso = ({
                       ref={(el) => {
                         refInicioRefs.current[it.id] = el;
                       }}
-                      label="Hora Inicio"
+                      label={it.usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"}
                       placeholder="08:00"
                       value={it.horaInicioStr}
                       onChange={(event) => {
                         actualizarItem(it.id, "horaInicioStr", formatHora(event.currentTarget.value));
                       }}
-                      onClick={() => refInicioRefs.current[it.id]?.showPicker?.()}
+                      onClick={() => it.usarHoras && refInicioRefs.current[it.id]?.showPicker?.()}
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
-                      required
+                      required={it.usarHoras}
+                      disabled={!it.usarHoras}
                     />
-                    {it.horaInicioStr && (
+                    {it.horaInicioStr && it.usarHoras && (
                       <Text size="10px" c="blue.4" fw={700} mt={3} className="ml-1">
                         ({dayjs(`2000-01-01 ${it.horaInicioStr}`).format("hh:mm A")})
                       </Text>
@@ -942,19 +1777,20 @@ export const RegistroUso = ({
                       ref={(el) => {
                         refFinRefs.current[it.id] = el;
                       }}
-                      label="Hora Fin"
+                      label={it.usarHoras ? "Hora Fin" : "Hora Fin (no aplica)"}
                       placeholder="10:00"
                       value={it.horaFinStr}
                       onChange={(event) => {
                         actualizarItem(it.id, "horaFinStr", formatHora(event.currentTarget.value));
                       }}
-                      onClick={() => refFinRefs.current[it.id]?.showPicker?.()}
+                      onClick={() => it.usarHoras && refFinRefs.current[it.id]?.showPicker?.()}
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
-                      required
+                      required={it.usarHoras}
+                      disabled={!it.usarHoras}
                     />
-                    {it.horaFinStr && (
+                    {it.horaFinStr && it.usarHoras && (
                       <Text size="10px" c="blue.4" fw={700} mt={3} className="ml-1">
                         ({dayjs(`2000-01-01 ${it.horaFinStr}`).format("hh:mm A")})
                         {it.horaInicioStr &&
@@ -969,9 +1805,31 @@ export const RegistroUso = ({
                   </div>
                 </SimpleGrid>
 
+                <Select
+                  label="Turno (opcional)"
+                  placeholder="Seleccione turno..."
+                  data={[
+                    { value: TipoTurno.Dia, label: "Día" },
+                    { value: TipoTurno.Noche, label: "Noche" },
+                  ]}
+                  value={it.tipoTurno === "" ? null : it.tipoTurno}
+                  onChange={(val) =>
+                    actualizarItem(it.id, "tipoTurno", (val ?? "") as TipoTurno | "")
+                  }
+                  clearable
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="xs"
+                  mt="sm"
+                />
+
                 <SimpleGrid cols={2} spacing="md" mt="sm" className="opacity-85">
                   <NumberInput
-                    label="Horometro Inicial (Opc.)"
+                    label={
+                      it.usarHorometro
+                        ? "Horometro Inicial"
+                        : "Horometro Inicial (no aplica)"
+                    }
                     placeholder="Ej: 1250.00"
                     value={it.lecturaInicio}
                     onChange={(val) => actualizarItem(it.id, "lecturaInicio", val as number | "")}
@@ -981,10 +1839,15 @@ export const RegistroUso = ({
                     classNames={fieldClasses}
                     size="xs"
                     radius="lg"
-                    disabled={loadingData}
+                    required={it.usarHorometro}
+                    disabled={!it.usarHorometro || loadingData}
                   />
                   <NumberInput
-                    label="Horometro Final (Opc.)"
+                    label={
+                      it.usarHorometro
+                        ? "Horometro Final"
+                        : "Horometro Final (no aplica)"
+                    }
                     placeholder="Ej: 1252.00"
                     value={it.lecturaFin}
                     onChange={(val) => actualizarItem(it.id, "lecturaFin", val as number | "")}
@@ -994,7 +1857,8 @@ export const RegistroUso = ({
                     classNames={fieldClasses}
                     size="xs"
                     radius="lg"
-                    disabled={loadingData}
+                    required={it.usarHorometro}
+                    disabled={!it.usarHorometro || loadingData}
                   />
                 </SimpleGrid>
 
@@ -1010,6 +1874,214 @@ export const RegistroUso = ({
                   mt="sm"
                 />
 
+                {/* Resumen de Consumos asociados al bloque */}
+                <Group justify="space-between" align="center" mt="sm">
+                  <Group gap="xs">
+                    <BeakerIcon className="w-4 h-4 text-amber-400" />
+                    <Text size="xs" fw={800} className="text-amber-200 uppercase tracking-wider">
+                      Consumos asociados
+                    </Text>
+                    {it.consumos.length > 0 && (
+                      <Badge size="xs" color="amber" variant="filled" radius="sm">
+                        {it.consumos.length} consumo
+                        {it.consumos.length === 1 ? "" : "s"}
+                      </Badge>
+                    )}
+                  </Group>
+                  <Button
+                    variant="light"
+                    color="amber.5"
+                    size="xs"
+                    radius="md"
+                    leftSection={<PlusCircleIcon className="w-4 h-4" />}
+                    onClick={() => openConsumoModal(it.id)}
+                    className="font-bold"
+                  >
+                    Agregar Consumo
+                  </Button>
+                </Group>
+
+                {it.consumos.length === 0 ? (
+                  <Text size="11px" c="dimmed" fs="italic">
+                    Sin consumos asociados. Si este bloque representa salida directa de
+                    stock (p. ej. combustible gastado por el activo), agrega un consumo.
+                  </Text>
+                ) : (
+                  <Stack gap={6} mt={4}>
+                    {it.consumos.map((cs) => {
+                      const prodSel =
+                        productos.find(
+                          (p) =>
+                            String(p.id_producto) === String(cs.idProducto),
+                        ) ?? null;
+                      const prodLabel = prodSel?.nombre ?? "Producto";
+                      const almLabel =
+                        almacenesConsumo.find((a) => a.value === cs.idAlmacen)?.label ??
+                        "Almacen";
+                      const cantNum = cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo);
+                      const cppNum =
+                        cs.contenidoPorPresentacion === ""
+                          ? 1
+                          : Number(cs.contenidoPorPresentacion);
+                      const baseNum = cantNum * cppNum;
+                      const baseAbbr =
+                        prodSel?.unidad_medida_base_abv ||
+                        unidadesMedida.find(
+                          (u) =>
+                            String(u.id_unidad_medida) ===
+                            String(prodSel?.id_unidad_medida_base ?? ""),
+                        )?.abreviatura ||
+                        "--";
+                      const baseNombre =
+                        prodSel?.unidad_medida_base ||
+                        unidadesMedida.find(
+                          (u) =>
+                            String(u.id_unidad_medida) ===
+                            String(prodSel?.id_unidad_medida_base ?? ""),
+                        )?.nombre ||
+                        "--";
+                      const unidadSelObj = unidadesMedida.find(
+                        (u) =>
+                          String(u.id_unidad_medida) ===
+                          String(cs.idUnidadMedida ?? ""),
+                      );
+                      const selAbbr = unidadSelObj?.abreviatura || "--";
+                      const selNombre = unidadSelObj?.nombre || "--";
+                      const tieneCantidad = cantNum > 0 && cppNum > 0;
+                      return (
+                        <Card
+                          key={cs.id}
+                          withBorder
+                          padding="sm"
+                          radius="lg"
+                          className="bg-amber-950/10 border-amber-500/30"
+                        >
+                          <Group
+                            justify="space-between"
+                            align="center"
+                            wrap="nowrap"
+                            mb={6}
+                          >
+                            <Group gap={6} wrap="nowrap" className="min-w-0">
+                              <Badge
+                                size="xs"
+                                color="amber"
+                                variant="filled"
+                                radius="sm"
+                              >
+                                #{cs.id.slice(0, 4)}
+                              </Badge>
+                              <Text
+                                size="11px"
+                                c="amber.3"
+                                fw={700}
+                                className="truncate"
+                              >
+                                {prodLabel} - {almLabel}
+                              </Text>
+                            </Group>
+                            <Group gap={4} wrap="nowrap">
+                              <Tooltip label="Editar">
+                                <ActionIcon
+                                  onClick={() => openConsumoModal(it.id, cs)}
+                                  variant="subtle"
+                                  color="indigo.4"
+                                  size="sm"
+                                  radius="xl"
+                                >
+                                  <PencilSquareIcon className="w-4 h-4" />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Quitar">
+                                <ActionIcon
+                                  onClick={() => quitarConsumo(it.id, cs.id)}
+                                  variant="subtle"
+                                  color="red"
+                                  size="sm"
+                                  radius="xl"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          </Group>
+                          <Group gap="lg" wrap="nowrap">
+                            <Stack gap={2}>
+                              <Text
+                                size="9px"
+                                c="amber.4"
+                                fw={700}
+                                className="uppercase"
+                              >
+                                {`En ${selNombre !== "--" ? enPlural(selNombre) : "---"}`}
+                              </Text>
+                              <Group gap={4} align="baseline" wrap="nowrap">
+                                <Text
+                                  fw={800}
+                                  size="md"
+                                  className={
+                                    tieneCantidad ? "text-white" : "text-zinc-700"
+                                  }
+                                >
+                                  {formatNumber(cantNum)}
+                                </Text>
+                                <Text
+                                  size="xs"
+                                  fw={700}
+                                  c="amber.4"
+                                  className="uppercase tracking-wider"
+                                >
+                                  {selAbbr}
+                                </Text>
+                              </Group>
+                            </Stack>
+                            <div className="h-8 w-px bg-amber-500/30" />
+                            <Stack gap={2}>
+                              <Text
+                                size="9px"
+                                c="amber.4"
+                                fw={700}
+                                className="uppercase"
+                              >
+                                {`En ${baseNombre !== "--" ? enPlural(baseNombre) : "---"}`}
+                              </Text>
+                              <Group gap={4} align="baseline" wrap="nowrap">
+                                <Text
+                                  fw={800}
+                                  size="md"
+                                  className={
+                                    tieneCantidad ? "text-emerald-400" : "text-zinc-700"
+                                  }
+                                >
+                                  {formatNumber(baseNum)}
+                                </Text>
+                                <Text
+                                  size="xs"
+                                  fw={700}
+                                  c="emerald.4"
+                                  className="uppercase tracking-wider"
+                                >
+                                  {baseAbbr}
+                                </Text>
+                              </Group>
+                            </Stack>
+                          </Group>
+                          <Text
+                            size="10px"
+                            c="dimmed"
+                            ta="center"
+                            mt={6}
+                          >
+                            {tieneCantidad
+                              ? `${formatNumber(cantNum)} ${selAbbr} × ${cppNum} = ${formatNumber(baseNum)} ${baseAbbr}`
+                              : "Complete los datos para ver la equivalencia."}
+                          </Text>
+                        </Card>
+                      );
+                    })}
+                  </Stack>
+                )}
+
                 <SimpleGrid cols={2} spacing="md" mt="md">
                   <Group gap={6} align="center" wrap="nowrap">
                     <ClockIcon className="w-4 h-4 text-indigo-400 shrink-0" />
@@ -1018,10 +2090,7 @@ export const RegistroUso = ({
                         Total Horas
                       </Text>
                       <Text size="md" fw={800} className="text-indigo-300">
-                        {calculosPorItem[idx]?.totalHoras?.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }) ?? "0.00"}{" "}
+                        {formatHorasDisplay(calculosPorItem[idx]?.totalHoras ?? 0)}{" "}
                         <span className="text-[10px] text-zinc-500 italic font-medium">hrs</span>
                       </Text>
                     </div>
@@ -1076,10 +2145,7 @@ export const RegistroUso = ({
                       Horas
                     </Text>
                     <Text size="sm" fw={800} className="text-indigo-300">
-                      {totalGeneral.horas.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
+                      {formatHorasDisplay(totalGeneral.horas)}{" "}
                       <span className="text-[10px] text-zinc-500 italic">hrs</span>
                     </Text>
                   </Group>
@@ -1129,41 +2195,21 @@ export const RegistroUso = ({
           />
         </SimpleGrid>
       ) : (
-        // ===== Bulk: Vueltas (cabecera + N items, mismo patron que horometro) =====
+        // ===== Bulk: Vueltas (N items; cada uno con su Tarifa) =====
         <Stack gap="sm">
-          {/* Cabecera de bloque: Mina* y Labor (compartidos por todos los items) */}
-          <Card withBorder padding="md" radius="lg" className="bg-zinc-950/20 border-zinc-800/60">
-            <SimpleGrid cols={2} spacing="md">
-              <Select
-                label="Mina"
-                placeholder="Seleccione mina"
-                data={minas}
-                value={idMina}
-                onChange={setIdMina}
-                searchable
-                required
-                classNames={fieldClasses}
-                radius="lg"
-                size="xs"
-              />
-              <Select
-                label="Labor"
-                placeholder="Seleccione labor"
-                data={labores}
-                value={idLabor}
-                onChange={setIdLabor}
-                searchable
-                disabled={!idMina}
-                classNames={fieldClasses}
-                radius="lg"
-                size="xs"
-              />
-            </SimpleGrid>
-          </Card>
-
           {/* Items: N bloques de vueltas */}
           <Stack gap="sm">
-            {itemsVueltas.map((it, idx) => (
+            {itemsVueltas.map((it, idx) => {
+              // Tarifa del item (cada bloque puede ser independiente)
+              const tarifaItem = tarifas.find(
+                (t) => t.id.toString() === it.idTarifa,
+              );
+              const esSacoItem = tarifaItem
+                ? (tarifaItem.tipo_material || "")
+                    .toLowerCase()
+                    .includes("saco")
+                : false;
+              return (
               <Card
                 key={it.id}
                 withBorder
@@ -1196,26 +2242,72 @@ export const RegistroUso = ({
                   )}
                 </Group>
 
-                <SimpleGrid cols={esTarifaSaco ? 2 : 1} spacing="md">
-                  <NumberInput
-                    label="Cantidad de Vueltas"
-                    placeholder="Ej: 3"
-                    value={it.cantidadVueltas}
-                    onChange={(val) => actualizarItemVueltas(it.id, "cantidadVueltas", val as number | "")}
-                    min={0}
-                    decimalScale={0}
-                    fixedDecimalScale
-                    required
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                  />
-                  {esTarifaSaco && (
+                {/* Fila 1: Tarifa | Cantidad de Sacos (si la tarifa es Saco) | Cantidad de Vueltas */}
+                <SimpleGrid cols={esSacoItem ? 3 : 2} spacing="md">
+                  <Group gap={6} align="flex-end" wrap="nowrap">
+                    <Select
+                      label="Tarifa de Uso"
+                      placeholder="Seleccione tarifa..."
+                      data={tarifas
+                        .filter((t) => t.tipo_control === "vueltas")
+                        .map((t) => {
+                          const esSaco = (t.tipo_material || "")
+                            .toLowerCase()
+                            .includes("saco");
+                          const parts = [
+                            esSaco
+                              ? "Sin precio"
+                              : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                            t.distancia_metros ? `x ${t.distancia_metros}m` : null,
+                            t.tipo_material ? `x ${t.tipo_material}` : null,
+                          ].filter(Boolean);
+                          return { value: t.id.toString(), label: parts.join(" ") };
+                        })}
+                      value={it.idTarifa}
+                      onChange={(val) =>
+                        actualizarItemVueltas(it.id, "idTarifa", val ?? null)
+                      }
+                      searchable
+                      clearable
+                      required
+                      className="flex-1"
+                      classNames={fieldClasses}
+                      radius="lg"
+                      size="xs"
+                    />
+                    <Tooltip label="Historial de Tarifas">
+                      <ActionIcon
+                        onClick={() => setModalHistorialOpened(true)}
+                        variant="light"
+                        color="zinc.4"
+                        size={32}
+                        radius="lg"
+                        className="mb-[3px] border border-zinc-700/50"
+                      >
+                        <QueueListIcon className="w-4 h-4" />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Nueva Tarifa">
+                      <ActionIcon
+                        onClick={() => setModalTarifaOpened(true)}
+                        variant="filled"
+                        color="indigo.6"
+                        size={32}
+                        radius="lg"
+                        className="mb-[3px]"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                  {esSacoItem && (
                     <NumberInput
                       label="Cantidad de Sacos"
                       placeholder="Ej: 30"
                       value={it.cantidadSacos}
-                      onChange={(val) => actualizarItemVueltas(it.id, "cantidadSacos", val as number | "")}
+                      onChange={(val) =>
+                        actualizarItemVueltas(it.id, "cantidadSacos", val as number | "")
+                      }
                       min={0}
                       allowDecimal={false}
                       required
@@ -1224,14 +2316,52 @@ export const RegistroUso = ({
                       radius="lg"
                     />
                   )}
+                  <NumberInput
+                    label="Cantidad de Vueltas"
+                    placeholder="Ej: 3"
+                    value={it.cantidadVueltas}
+                    onChange={(val) =>
+                      actualizarItemVueltas(it.id, "cantidadVueltas", val as number | "")
+                    }
+                    min={0}
+                    decimalScale={0}
+                    fixedDecimalScale
+                    required
+                    classNames={fieldClasses}
+                    size="xs"
+                    radius="lg"
+                  />
                 </SimpleGrid>
 
-                <SimpleGrid cols={2} spacing="md" mt="sm" className="opacity-85">
+                {/* Fila 2: Turno | Horometro Inicial | Horometro Final */}
+                <SimpleGrid cols={3} spacing="md" mt="sm">
+                  <Select
+                    label="Turno (opcional)"
+                    placeholder="Seleccione turno..."
+                    data={[
+                      { value: TipoTurno.Dia, label: "Día" },
+                      { value: TipoTurno.Noche, label: "Noche" },
+                    ]}
+                    value={it.tipoTurno === "" ? null : it.tipoTurno}
+                    onChange={(val) =>
+                      actualizarItemVueltas(
+                        it.id,
+                        "tipoTurno",
+                        (val ?? "") as TipoTurno | "",
+                      )
+                    }
+                    clearable
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                  />
                   <NumberInput
                     label="Horometro Inicial (Opc.)"
                     placeholder="Ej: 1250.00"
                     value={it.horometroInicio}
-                    onChange={(val) => actualizarItemVueltas(it.id, "horometroInicio", val as number | "")}
+                    onChange={(val) =>
+                      actualizarItemVueltas(it.id, "horometroInicio", val as number | "")
+                    }
                     min={0}
                     decimalScale={2}
                     fixedDecimalScale
@@ -1243,7 +2373,9 @@ export const RegistroUso = ({
                     label="Horometro Final (Opc.)"
                     placeholder="Ej: 1252.00"
                     value={it.horometroFin}
-                    onChange={(val) => actualizarItemVueltas(it.id, "horometroFin", val as number | "")}
+                    onChange={(val) =>
+                      actualizarItemVueltas(it.id, "horometroFin", val as number | "")
+                    }
                     min={0}
                     decimalScale={2}
                     fixedDecimalScale
@@ -1295,7 +2427,7 @@ export const RegistroUso = ({
                   </Group>
                 </SimpleGrid>
               </Card>
-            ))}
+            );})}
 
             <Button
               variant="light"
@@ -1560,6 +2692,449 @@ export const RegistroUso = ({
             ]}
           />
         </div>
+      </ModalEstandar>
+
+{/* Modal de Consumo directo (se abre desde el boton "Agregar Consumo" del bloque) */}
+      <ModalEstandar
+        opened={consumoModalOpen}
+        close={() => setConsumoModalOpen(false)}
+        title={consumoEditId ? "Editar Consumo" : "Registrar Consumo"}
+        size="xl"
+      >
+        <Stack gap="md">
+          {/* Fila 1: Almacén | Producto | Cantidad */}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
+            <Select
+              label="Almacén"
+              placeholder="Seleccione almacen"
+              data={almacenesConsumo}
+              value={consumoForm.idAlmacen}
+              onChange={(val) =>
+                setConsumoForm((prev) => ({
+                  ...prev,
+                  idAlmacen: val ?? null,
+                  idLoteProducto: null,
+                }))
+              }
+              searchable
+              required
+              classNames={fieldClasses}
+              radius="lg"
+              size="sm"
+              comboboxProps={{
+                withinPortal: true,
+                zIndex: 9999,
+                transitionProps: { transition: "pop", duration: 200 },
+              }}
+            />
+
+            <Select
+              label="Producto"
+              placeholder="Seleccione producto"
+              data={productos.map((p) => ({
+                value: String(p.id_producto),
+                label: p.nombre,
+              }))}
+              value={consumoForm.idProducto}
+              onChange={(val) =>
+                setConsumoForm((prev) => ({
+                  ...prev,
+                  idProducto: val ?? null,
+                  idLoteProducto: null,
+                }))
+              }
+              searchable
+              required
+              classNames={fieldClasses}
+              radius="lg"
+              size="sm"
+              comboboxProps={{
+                withinPortal: true,
+                zIndex: 9999,
+                transitionProps: { transition: "pop", duration: 200 },
+              }}
+            />
+
+            <NumberInput
+              label="Cantidad"
+              placeholder="Ej: 5.5"
+              value={consumoForm.cantidadConsumo}
+              onChange={(val) =>
+                setConsumoForm((prev) => ({
+                  ...prev,
+                  cantidadConsumo: val as number | "",
+                }))
+              }
+              min={0}
+              decimalScale={6}
+              required
+              classNames={fieldClasses}
+              radius="lg"
+              size="sm"
+            />
+          </SimpleGrid>
+
+          {/* Fila 2: (UND x UND) | Unidad de Medida */}
+          {/* El primer input muestra solo las abreviaturas de las unidades
+              (base x seleccionada) y se bloquea segun la conversion:
+              - Si la unidad seleccionada es la base => factor = 1.
+              - Si difiere y EXISTE conversion automatica => factor.
+              - Si difiere y NO hay conversion => queda editable. */}
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
+            {(() => {
+              const prodSel = productos.find(
+                (p) =>
+                  String(p.id_producto) === String(consumoForm.idProducto),
+              );
+              const baseAbbr =
+                prodSel?.unidad_medida_base_abv ||
+                unidadesMedida.find(
+                  (u) =>
+                    String(u.id_unidad_medida) ===
+                    String(prodSel?.id_unidad_medida_base ?? ""),
+                )?.abreviatura ||
+                "--";
+              const selAbbr =
+                unidadesMedida.find(
+                  (u) =>
+                    String(u.id_unidad_medida) ===
+                    String(consumoForm.idUnidadMedida ?? ""),
+                )?.abreviatura || "--";
+              const unidadesIdenticas =
+                baseAbbr !== "--" &&
+                selAbbr !== "--" &&
+                baseAbbr === selAbbr;
+              // Misma logica que `useRegistroRequerimiento.ts`:
+              // buscar en `selected.conversiones` el entry donde
+              // `id_unidad_destino === baseId`, y devolver 1/factor.
+              let conversionAutomatica: number | null = null;
+              if (
+                !unidadesIdenticas &&
+                prodSel &&
+                consumoForm.idUnidadMedida
+              ) {
+                const baseId = String(prodSel.id_unidad_medida_base);
+                const selId = String(consumoForm.idUnidadMedida);
+                const unidadSel = unidadesMedida.find(
+                  (u) => String(u.id_unidad_medida) === selId,
+                );
+                const conv =
+                  unidadSel?.conversiones?.find(
+                    (c) => String(c.id_unidad_destino) === baseId,
+                  ) ?? null;
+                if (conv) {
+                  const factor = Number(conv.factor_conversion);
+                  if (Number.isFinite(factor) && factor > 0) {
+                    conversionAutomatica = 1 / factor;
+                  }
+                }
+              }
+              const inputBloqueado =
+                unidadesIdenticas || conversionAutomatica !== null;
+              return (
+                <NumberInput
+                  label={`(${baseAbbr} x ${selAbbr})`}
+                  placeholder={
+                    unidadesIdenticas
+                      ? "1"
+                      : !consumoForm.idUnidadMedida
+                        ? "--x--"
+                        : conversionAutomatica !== null
+                          ? ""
+                          : "Sin conversion automatica - ingrese factor"
+                  }
+                  value={consumoForm.contenidoPorPresentacion}
+                  onChange={(val) =>
+                    setConsumoForm((prev) => ({
+                      ...prev,
+                      contenidoPorPresentacion: val as number | "",
+                    }))
+                  }
+                  min={0}
+                  decimalScale={6}
+                  required
+                  disabled={inputBloqueado}
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="sm"
+                />
+              );
+            })()}
+
+            <Select
+              label="Unidad de Medida"
+              placeholder="Seleccione unidad"
+              data={unidadesMedida.map((u) => ({
+                value: String(u.id_unidad_medida),
+                label: `${u.nombre} (${u.abreviatura})`,
+              }))}
+              value={consumoForm.idUnidadMedida}
+              onChange={(val) =>
+                setConsumoForm((prev) => ({
+                  ...prev,
+                  idUnidadMedida: val ?? null,
+                }))
+              }
+              searchable
+              required
+              classNames={fieldClasses}
+              radius="lg"
+              size="sm"
+              comboboxProps={{
+                withinPortal: true,
+                zIndex: 9999,
+                transitionProps: { transition: "pop", duration: 200 },
+              }}
+            />
+          </SimpleGrid>
+
+          {/* Fila 3: Lote (izquierda) | Resumen del consumo (derecha) */}
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
+            {/* Lote */}
+            {(() => {
+              const hayLotes = lotesModal.length > 0;
+              const placeholderLote = !consumoForm.idAlmacen
+                ? "Seleccione almacen"
+                : !consumoForm.idProducto
+                  ? "Seleccione producto"
+                  : loadingLotesModal
+                    ? "Cargando lotes..."
+                    : hayLotes
+                      ? "Seleccione lote"
+                      : "No disponible en almacen";
+              return (
+                <Stack gap={4}>
+                  <Select
+                    label="Lote (Producto)"
+                    placeholder={placeholderLote}
+                    data={lotesModal.map((l) => ({
+                      value: String(l.id_lote),
+                      label: `${l.correlativo} - stock: ${l.stock_actual_base}`,
+                    }))}
+                    value={consumoForm.idLoteProducto}
+                    onChange={(val) =>
+                      setConsumoForm((prev) => ({
+                        ...prev,
+                        idLoteProducto: val ?? null,
+                      }))
+                    }
+                    searchable
+                    disabled={
+                      !consumoForm.idAlmacen ||
+                      !consumoForm.idProducto ||
+                      !consumoForm.idUnidadMedida ||
+                      !hayLotes ||
+                      loadingLotesModal
+                    }
+                    required
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="sm"
+                    comboboxProps={{
+                      withinPortal: true,
+                      zIndex: 9999,
+                      transitionProps: { transition: "pop", duration: 200 },
+                    }}
+                  />
+                  {!hayLotes &&
+                    consumoForm.idAlmacen &&
+                    consumoForm.idProducto &&
+                    !loadingLotesModal && (
+                      <Text
+                        size="11px"
+                        c="amber.4"
+                        fw={700}
+                        className="uppercase tracking-wider"
+                      >
+                        No hay lotes disponibles para este producto en el
+                        almacén seleccionado.
+                      </Text>
+                    )}
+                </Stack>
+              );
+            })()}
+
+            {/* Resumen del consumo */}
+            {(() => {
+              const prodSelResumen = productos.find(
+                (p) =>
+                  String(p.id_producto) === String(consumoForm.idProducto),
+              );
+              const baseNombre =
+                prodSelResumen?.unidad_medida_base ||
+                unidadesMedida.find(
+                  (u) =>
+                    String(u.id_unidad_medida) ===
+                    String(prodSelResumen?.id_unidad_medida_base ?? ""),
+                )?.nombre ||
+                "--";
+              const baseAbbrResumen =
+                prodSelResumen?.unidad_medida_base_abv ||
+                unidadesMedida.find(
+                  (u) =>
+                    String(u.id_unidad_medida) ===
+                    String(prodSelResumen?.id_unidad_medida_base ?? ""),
+                )?.abreviatura ||
+                "--";
+              const unidadSel = unidadesMedida.find(
+                (u) =>
+                  String(u.id_unidad_medida) ===
+                  String(consumoForm.idUnidadMedida ?? ""),
+              );
+              const selNombre = unidadSel?.nombre || "--";
+              const selAbbrResumen = unidadSel?.abreviatura || "--";
+
+              const cantConsumoNum =
+                consumoForm.cantidadConsumo === ""
+                  ? 0
+                  : Number(consumoForm.cantidadConsumo);
+              const cppNum =
+                consumoForm.contenidoPorPresentacion === ""
+                  ? 0
+                  : Number(consumoForm.contenidoPorPresentacion);
+              const cantBaseNum = cantConsumoNum * cppNum;
+              const tieneCantidad = cantConsumoNum > 0 && cppNum > 0;
+
+              return (
+                <Card
+                  withBorder
+                  padding="sm"
+                  radius="lg"
+                  className="bg-indigo-950/10 border-indigo-500/20"
+                >
+                  <Group justify="space-between" align="center" mb={6}>
+                    <Text
+                      size="9px"
+                      c="indigo.3"
+                      fw={900}
+                      tt="uppercase"
+                      lts="0.08em"
+                    >
+                      Resumen del consumo
+                    </Text>
+                    {prodSelResumen?.nombre ? (
+                      <Badge
+                        size="xs"
+                        color="indigo"
+                        variant="light"
+                        radius="sm"
+                      >
+                        {prodSelResumen.nombre}
+                      </Badge>
+                    ) : null}
+                  </Group>
+                  <Group gap="lg" wrap="nowrap">
+                    <Stack gap={2}>
+                      <Text
+                        size="10px"
+                        c="zinc.5"
+                        fw={700}
+                        className="uppercase"
+                      >
+                        {`En ${selNombre !== "--" ? enPlural(selNombre) : "---"}`}
+                      </Text>
+                      <Group gap={6} align="baseline" wrap="nowrap">
+                        <Text
+                          fw={800}
+                          size="xl"
+                          className={
+                            tieneCantidad ? "text-white" : "text-zinc-700"
+                          }
+                        >
+                          {formatNumber(cantConsumoNum)}
+                        </Text>
+                        <Text
+                          size="xs"
+                          fw={700}
+                          c="zinc.5"
+                          className="uppercase tracking-wider"
+                        >
+                          {selAbbrResumen}
+                        </Text>
+                      </Group>
+                    </Stack>
+                    <div className="h-10 w-px bg-indigo-500/20" />
+                    <Stack gap={2}>
+                      <Text
+                        size="10px"
+                        c="zinc.5"
+                        fw={700}
+                        className="uppercase"
+                      >
+                        {`En ${baseNombre !== "--" ? enPlural(baseNombre) : "---"}`}
+                      </Text>
+                      <Group gap={6} align="baseline" wrap="nowrap">
+                        <Text
+                          fw={800}
+                          size="xl"
+                          className={
+                            tieneCantidad
+                              ? "text-emerald-400"
+                              : "text-zinc-700"
+                          }
+                        >
+                          {formatNumber(cantBaseNum)}
+                        </Text>
+                        <Text
+                          size="xs"
+                          fw={700}
+                          c="zinc.5"
+                          className="uppercase tracking-wider"
+                        >
+                          {baseAbbrResumen}
+                        </Text>
+                      </Group>
+                    </Stack>
+                  </Group>
+                  <Text size="9px" c="dimmed" mt={6} ta="center">
+                    {tieneCantidad
+                      ? `${formatNumber(cantConsumoNum)} ${selAbbrResumen} × ${cppNum} = ${formatNumber(cantBaseNum)} ${baseAbbrResumen}`
+                      : "Complete cantidad y contenido para ver la equivalencia."}
+                  </Text>
+                </Card>
+              );
+            })()}
+          </SimpleGrid>
+
+          {/* Fila 4: Comentario (full width) */}
+          <Textarea
+            label="Comentario (opcional)"
+            placeholder="Notas del consumo..."
+            value={consumoForm.comentario}
+            onChange={(e) =>
+              setConsumoForm((prev) => ({
+                ...prev,
+                comentario: e.currentTarget.value,
+              }))
+            }
+            classNames={fieldClasses}
+            radius="lg"
+            size="sm"
+            minRows={2}
+          />
+
+          <Group justify="flex-end" gap="sm" mt="sm">
+            <Button
+              variant="default"
+              size="xs"
+              radius="lg"
+              onClick={() => setConsumoModalOpen(false)}
+              className="bg-zinc-800! text-zinc-300! border-zinc-700!"
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="amber.6"
+              size="xs"
+              radius="lg"
+              onClick={guardarConsumoModal}
+              leftSection={<BeakerIcon className="w-4 h-4" />}
+              className="bg-amber-600! hover:bg-amber-700! text-white! font-bold"
+            >
+              {consumoEditId ? "Guardar Cambios" : "Anadir Consumo"}
+            </Button>
+          </Group>
+        </Stack>
       </ModalEstandar>
     </Stack>
   );

@@ -41,4 +41,33 @@ export const ControlConsumoService = {
     );
     return data;
   },
+
+  /**
+   * Registrar un consumo DIRECTO (sin requerimiento previo). Usado por:
+   * - el modal "Registrar Uso de Combustible" desde la pagina de Consumo.
+   * - el modal de Registro de Control por Horometro (por item.consumos[]).
+   */
+  registrarConsumoDirecto: async (payload: {
+    id_activo_fijo_consumidor: number;
+    id_producto: number;
+    id_almacen: number;
+    id_lote_producto: number;
+    id_unidad_medida: number;
+    cantidad_consumo: number;
+    contenido_por_presentacion: number;
+    cantidad_base: number;
+    uuid_control_uso_activo: string;
+    id_lote_mineral?: number | null;
+    id_labor_destino?: number | null;
+    para_mantenimiento?: boolean;
+    para_produccion?: boolean;
+    comentario?: string | null;
+    estado?: "Consumo Parcial" | "Consumo Total";
+  }) => {
+    const { data } = await api.post<IRespuesta<RES_Consumo>>(
+      `${path}/consumo-directo`,
+      payload,
+    );
+    return data;
+  },
 };

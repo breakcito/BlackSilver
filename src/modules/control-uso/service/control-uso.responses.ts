@@ -37,6 +37,8 @@ export interface RES_ControlUsoLog {
   tarifa_material: string | null;
   observacion: string | null;
   tipo_material: string | null;
+  tipo_turno: string | null;
+  uuid_grupo: string | null;
   created_at: string;
 }
 

@@ -205,6 +205,7 @@ export const ControlConsumoPage = () => {
           />
         )}
       </ModalEstandar>
+
     </Stack>
   );
 };

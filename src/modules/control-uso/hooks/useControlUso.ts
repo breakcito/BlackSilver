@@ -162,6 +162,8 @@ export const useControlUso = () => {
         id_tarifa: n.id_tarifa || null,
         tarifa_desc: n.tarifa_desc || null,
         observacion: n.observacion || null,
+        tipo_turno: n.tipo_turno || null,
+        uuid_grupo: n.uuid_grupo || null,
         created_at: n.created_at,
       };
       return fullyPopulatedLog;

@@ -28,6 +28,10 @@ export interface RES_Consumo {
   id_activo_fijo_consumidor: number | null;
   /** Correlativo del activo fijo consumidor */
   correlativo_activo_fijo_consumidor?: string | null;
+  /** Nombre del producto del activo fijo consumidor (JOIN con la tabla
+      de activos). Es lo que el front debe mostrar como nombre legible
+      en lugar del correlativo (ej: "electrobomba sumergible"). */
+  producto_activo_fijo_consumidor?: string | null;
   /** Modelo del activo fijo consumidor */
   modelo_activo_fijo_consumidor?: string | null;
   /** Costo de compra del activo fijo consumidor */

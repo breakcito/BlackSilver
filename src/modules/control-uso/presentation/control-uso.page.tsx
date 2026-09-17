@@ -125,7 +125,7 @@ export const ControlUsoPage = () => {
       accessor: "periodo",
       title: "Periodo de Uso",
       textAlign: "center",
-      width: 230,
+      width: 280,
       render: (r) => {
         const inicioDate = dayjs(r.fecha_hora_inicio_control);
 
@@ -144,6 +144,19 @@ export const ControlUsoPage = () => {
             <div className="p-1.5 bg-zinc-850/60 rounded-xl border border-zinc-800/80 shrink-0 shadow-sm flex items-center justify-center">
               <CalendarDaysIcon className="w-4 h-4 text-zinc-400" />
             </div>
+
+            {/* Turno (opcional) — al costadito del icono, verticalmente centrado */}
+            {r.tipo_turno && (
+              <Badge
+                size="sm"
+                color={r.tipo_turno === "Noche" ? "violet" : "yellow"}
+                variant="light"
+                radius="sm"
+                className="font-bold uppercase shrink-0 border border-zinc-700/40 px-1.5"
+              >
+                {r.tipo_turno}
+              </Badge>
+            )}
 
             {/* Inner Content holding Inicio & Fin */}
             <Group gap="xs" wrap="nowrap" className="shrink-0">
@@ -673,7 +686,7 @@ export const ControlUsoPage = () => {
         opened={opened}
         close={close}
         title={`Registrar Control por ${tipoControl === "horometro" ? "Horómetro" : tipoControl === "odometro" ? "Odómetro" : "Vueltas"}`}
-        size="md"
+        size="xl"
       >
         {selectedAssetObj && (
           <RegistroUso
