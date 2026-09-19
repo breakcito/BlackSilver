@@ -15,6 +15,9 @@ import {
   Checkbox,
   Loader,
   SimpleGrid,
+  Grid,
+  ActionIcon,
+  Tooltip,
 } from "@mantine/core";
 import {
   Cog8ToothIcon,
@@ -24,9 +27,11 @@ import {
   BriefcaseIcon,
   BanknotesIcon,
   ClockIcon,
+  PlusIcon,
+  QueueListIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
-import { TimeInput, DateInput } from "@mantine/dates";
+import { TimeInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
 import { useNotify } from "../../../hooks/useNotify";
 import { AuxService } from "../../../service/auxiliar.service";
@@ -34,8 +39,12 @@ import { ClientesService } from "../../clientes/service/clientes.service";
 import { ControlUsoService } from "../service/control-uso.service";
 import { MinasService } from "../../minas-labores/service/minas.service";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
-import type { RES_ControlUsoLog } from "../service/control-uso.responses";
+import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
+import { CustomDatePicker } from "../../../presentation/utils/date-picker-input";
+import { NuevaTarifaModal } from "./nueva-tarifa-modal";
+import type { RES_ControlUsoLog, RES_Tarifa } from "../service/control-uso.responses";
 import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
+import { formatNumber } from "../../../shared/functions/formatNumber";
 
 interface Props {
   opened: boolean;
@@ -95,7 +104,7 @@ export const EdicionControlUsoModal = ({
   const [clientes, setClientes] = useState<
     { value: string; label: string }[]
   >([]);
-  const [tarifas, setTarifas] = useState<RES_TarifaLite[]>([]);
+  const [tarifas, setTarifas] = useState<RES_Tarifa[]>([]);
   const [labores, setLabores] = useState<{ value: string; label: string }[]>(
     [],
   );
@@ -128,12 +137,50 @@ export const EdicionControlUsoModal = ({
 
   const [saving, setSaving] = useState(false);
 
+  // Modales auxiliares (Historial / Nueva Tarifa) — igual que el registro.
+  const [modalTarifaOpened, setModalTarifaOpened] = useState(false);
+  const [modalHistorialOpened, setModalHistorialOpened] = useState(false);
+
   // Tipo de control del registro.
   const esVueltas =
     target?.cantidad_vueltas !== null && target?.cantidad_vueltas !== undefined;
   const esOdometro =
     target?.odometro_inicio !== null && target?.odometro_inicio !== undefined;
   const esHorometro = !esVueltas && !esOdometro;
+
+  // Tipo de control normalizado (string) para pasar a NuevaTarifaModal
+  // y para filtrar el select.
+  const tipoControlStr: "horometro" | "odometro" | "vueltas" = esHorometro
+    ? "horometro"
+    : esOdometro
+      ? "odometro"
+      : "vueltas";
+
+  // Helper: construye un RES_ActivoFijoDisponible minimo desde el target
+  // para pasarselo a NuevaTarifaModal (que solo usa `id_activo`).
+  const targetAsAsset = target
+    ? ({
+        id_activo: target.id_activo_fijo,
+        correlativo: target.correlativo ?? "",
+        id_almacen: null,
+        almacen: target.ubicacion_activo ?? null,
+        en_almacen_principal: null,
+        id_mina: target.id_mina ?? null,
+        mina: target.mina ?? null,
+        id_producto: 0,
+        producto: target.producto ?? "",
+        es_auditable: false,
+        id_categoria: 0,
+        categoria: target.categoria ?? "",
+        para_transporte: false,
+        control_por_odometro: target.control_por_odometro === 1,
+        control_por_horometro: target.control_por_horometro === 1,
+        control_por_vueltas: !esHorometro && !esOdometro,
+        id_unidad_medida_base: 0,
+        unidad_medida_base: "",
+        unidad_medida_base_abv: "",
+      } as const)
+    : null;
 
   const fieldClasses = {
     input:
@@ -190,16 +237,24 @@ export const EdicionControlUsoModal = ({
     if (!opened || !target) return;
     ControlUsoService.getTarifas(Number(target.id_activo_fijo)).then((r) => {
       if (r.success) {
-        setTarifas(
-          r.data.map((t) => ({
+        // El response ya trae todos los campos; los declarados por
+        // RES_Tarifa que la API puede omitir los rellenamos con defaults.
+        // `created_at` se preserva tal cual para que el historial no
+        // muestre "Invalid Date".
+        const completas = r.data.map(
+          (t): RES_Tarifa => ({
             id: t.id,
+            id_activo_fijo: Number(target.id_activo_fijo),
             tipo_control: t.tipo_control,
             precio_unitario: t.precio_unitario,
             descripcion: t.descripcion,
+            id_tipo_material: null,
             tipo_material: t.tipo_material,
             distancia_metros: t.distancia_metros,
-          })),
+            created_at: t.created_at ?? "",
+          }),
         );
+        setTarifas(completas);
       }
     });
   }, [opened, target]);
@@ -507,60 +562,94 @@ export const EdicionControlUsoModal = ({
           </div>
         </div>
 
-        {/* Cabecera con Tarifa + Fecha del Trabajo (mismo diseno que el
-            registro para horometro). Sin historial/nueva tarifa (es
-            edicion, no creacion). */}
-        <SimpleGrid cols={esHorometro ? 2 : 1} spacing="md">
-          <Group gap={6} align="flex-end" wrap="nowrap">
-            <Select
-              className="flex-1"
-              label="Tarifa de Uso"
-              placeholder="Seleccione tarifa..."
-              data={tarifas
-                .filter(
-                  (t) =>
-                    t.tipo_control === (esHorometro
-                      ? "horometro"
-                      : esOdometro
-                        ? "odometro"
-                        : "vueltas"),
-                )
-                .map((t) => {
-                  const parts = [
-                    `S/. ${Number(t.precio_unitario).toFixed(2)}`,
-                    t.tipo_material ? `x ${t.tipo_material}` : null,
-                    t.descripcion ? `- ${t.descripcion}` : null,
-                  ].filter(Boolean);
-                  return { value: String(t.id), label: parts.join(" ") };
-                })}
-              value={idTarifa}
-              onChange={setIdTarifa}
-              searchable
-              clearable
-              classNames={fieldClasses}
-              radius="lg"
-              size="xs"
-            />
-          </Group>
-          {esHorometro && (
-            <DateInput
-              label="Fecha del Trabajo"
-              placeholder="Seleccione fecha"
-              value={fechaTrabajo}
-              onChange={(val) =>
-                setFechaTrabajo(val ? new Date(val as string) : null)
-              }
-              valueFormat="YYYY-MM-DD"
-              classNames={fieldClasses}
-              radius="lg"
-              size="xs"
-              required
-            />
-          )}
-        </SimpleGrid>
+        {/* Cabecera. El layout varia por tipo:
+              - horometro: Tarifa + Fecha del Trabajo (SimpleGrid cols=2)
+              - odometro:  Tarifa sola          (SimpleGrid cols=1)
+              - vueltas:   Tarifa + Cantidad Vueltas + Fecha (Grid 3 cols)
+            El Select de Tarifa incluye los botones Historial / Nueva
+            Tarifa (igual que en el registro) para que el usuario pueda
+            revisar el historial o agregar una tarifa rapido desde la
+            edicion sin tener que salir. */}
+        {esVueltas ? (
+          // En vueltas la cabecera (Tarifa + Cantidad + Fecha) vive
+          // DENTRO del Bloque Vueltas mas abajo, igual que en el
+          // registro. Aqui no renderizamos nada.
+          <></>
+        ) : (
+          // Cabecera horometro / odometro: SimpleGrid simple (Tarifa +
+          // opcional Fecha del Trabajo si es horometro).
+          <SimpleGrid cols={esHorometro ? 2 : 1} spacing="md">
+            <Group gap={6} align="flex-end" wrap="nowrap">
+              <Select
+                className="flex-1"
+                label="Tarifa de Uso"
+                placeholder="Seleccione tarifa..."
+                data={tarifas
+                  .filter(
+                    (t) =>
+                      t.tipo_control === (esHorometro
+                        ? "horometro"
+                        : "odometro"),
+                  )
+                  .map((t) => {
+                    const parts = [
+                      `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                      t.tipo_material ? `x ${t.tipo_material}` : null,
+                      t.descripcion ? `- ${t.descripcion}` : null,
+                    ].filter(Boolean);
+                    return { value: String(t.id), label: parts.join(" ") };
+                  })}
+                value={idTarifa}
+                onChange={setIdTarifa}
+                searchable
+                clearable
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+              />
+              <Tooltip label="Historial de Tarifas">
+                <ActionIcon
+                  onClick={() => setModalHistorialOpened(true)}
+                  variant="light"
+                  color="zinc.4"
+                  size={32}
+                  radius="lg"
+                  className="mb-[3px] border border-zinc-700/50"
+                >
+                  <QueueListIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Nueva Tarifa">
+                <ActionIcon
+                  onClick={() => setModalTarifaOpened(true)}
+                  variant="filled"
+                  color="indigo.6"
+                  size={32}
+                  radius="lg"
+                  className="mb-[3px]"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            {esHorometro && (
+              <CustomDatePicker
+                label="Fecha del Trabajo"
+                placeholder="Seleccione fecha"
+                value={fechaTrabajo}
+                onChange={(val) => setFechaTrabajo(val)}
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+                required
+              />
+            )}
+          </SimpleGrid>
+        )}
 
         {/* Lote Mineral + Tipo de Carga (solo horometro / odometro, mismo
-            diseno que el registro). */}
+            diseno que el registro). En vueltas NO se muestran (el
+            registro de vueltas tiene su propio card Mina/Labor/Lote). */}
         {(esHorometro || esOdometro) && (
           <SimpleGrid cols={2} spacing="md">
             <Select
@@ -592,103 +681,172 @@ export const EdicionControlUsoModal = ({
           </SimpleGrid>
         )}
 
-        {/* Destino del Trabajo (mismo diseno que el registro). */}
-        <Card
-          withBorder
-          padding="md"
-          radius="lg"
-          className="bg-zinc-950/20 border-zinc-800/60"
-        >
-          <Group justify="flex-start" align="center" mb="sm" gap="xs">
-            <Text size="xs" fw={600} className="text-zinc-300">
-              Destino del Trabajo:
-            </Text>
-            <SegmentedControl
-              value={esParaMina ? "mina" : "terceros"}
-              onChange={(value) => setEsParaMina(value === "mina")}
-              data={[
-                {
-                  value: "mina",
-                  label: (
-                    <Center style={{ gap: 6 }}>
-                      <MapPinIcon className="w-4 h-4" />
-                      <Box>En Mina</Box>
-                    </Center>
-                  ),
-                },
-                {
-                  value: "terceros",
-                  label: (
-                    <Center style={{ gap: 6 }}>
-                      <BriefcaseIcon className="w-4 h-4" />
-                      <Box>Para Terceros</Box>
-                    </Center>
-                  ),
-                },
-              ]}
-              radius="md"
-              size="xs"
-              classNames={{
-                root: "bg-zinc-900/50 border border-zinc-800",
-                control: "border-none",
-                indicator: "bg-indigo-600",
-                label: "text-zinc-400 data-[active]:text-white font-bold",
-              }}
-            />
-          </Group>
-
-          <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="md">
-            {esParaMina ? (
-              <>
-                <Select
-                  label="Mina"
-                  placeholder="Seleccione mina"
-                  data={minas}
-                  value={idMina}
-                  onChange={setIdMina}
-                  searchable
-                  required
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                />
-                <Select
-                  label="Labor (Opcional)"
-                  placeholder={
-                    loadingLabores ? "Cargando labores..." : "Seleccione labor"
-                  }
-                  data={labores}
-                  value={idLabor}
-                  onChange={setIdLabor}
-                  searchable
-                  clearable
-                  disabled={!idMina || loadingLabores}
-                  rightSection={
-                    loadingLabores ? (
-                      <Loader size={12} color="indigo" />
-                    ) : undefined
-                  }
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                />
-              </>
-            ) : (
+        {/* Cabecera ESPECIFICA de vueltas: Mina (required) + Labor +
+            Lote Mineral (opcional, filtrado por labor). Reemplaza al
+            "Destino del Trabajo" generico porque vueltas SIEMPRE va a
+            mina (es_para_mina=true en el service). */}
+        {esVueltas && (
+          <Card
+            withBorder
+            padding="md"
+            radius="lg"
+            className="bg-zinc-950/20 border-zinc-800/60"
+          >
+            <SimpleGrid cols={2} spacing="md">
               <Select
-                label="Cliente"
-                placeholder="Seleccione cliente"
-                data={clientes}
-                value={idCliente}
-                onChange={setIdCliente}
+                label="Mina"
+                placeholder="Seleccione mina"
+                data={minas}
+                value={idMina}
+                onChange={setIdMina}
                 searchable
                 required
                 classNames={fieldClasses}
                 radius="lg"
                 size="xs"
               />
-            )}
-          </SimpleGrid>
-        </Card>
+              <Select
+                label="Labor"
+                placeholder="Seleccione labor"
+                data={labores}
+                value={idLabor}
+                onChange={setIdLabor}
+                searchable
+                disabled={!idMina}
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+              />
+            </SimpleGrid>
+            <Select
+              mt="md"
+              label="Lote de Mineral (Opcional)"
+              placeholder={
+                idLabor
+                  ? "Seleccione lote de la labor (opcional)..."
+                  : "Seleccione primero una labor"
+              }
+              data={lotesMineral
+                .filter(() => Boolean(idLabor))
+                .map((lm) => ({
+                  value: String(lm.id_lote_mineral),
+                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
+                }))}
+              value={idLoteMineral}
+              onChange={setIdLoteMineral}
+              searchable
+              clearable
+              disabled={!idLabor}
+              classNames={fieldClasses}
+              radius="lg"
+              size="xs"
+            />
+          </Card>
+        )}
+
+        {/* Destino del Trabajo (solo horometro / odometro, mismo
+            diseno que el registro). En vueltas se omite porque arriba
+            va el card Mina/Labor/Lote y vueltas SIEMPRE es para mina. */}
+        {!esVueltas && (
+          <Card
+            withBorder
+            padding="md"
+            radius="lg"
+            className="bg-zinc-950/20 border-zinc-800/60"
+          >
+            <Group justify="flex-start" align="center" mb="sm" gap="xs">
+              <Text size="xs" fw={600} className="text-zinc-300">
+                Destino del Trabajo:
+              </Text>
+              <SegmentedControl
+                value={esParaMina ? "mina" : "terceros"}
+                onChange={(value) => setEsParaMina(value === "mina")}
+                data={[
+                  {
+                    value: "mina",
+                    label: (
+                      <Center style={{ gap: 6 }}>
+                        <MapPinIcon className="w-4 h-4" />
+                        <Box>En Mina</Box>
+                      </Center>
+                    ),
+                  },
+                  {
+                    value: "terceros",
+                    label: (
+                      <Center style={{ gap: 6 }}>
+                        <BriefcaseIcon className="w-4 h-4" />
+                        <Box>Para Terceros</Box>
+                      </Center>
+                    ),
+                  },
+                ]}
+                radius="md"
+                size="xs"
+                classNames={{
+                  root: "bg-zinc-900/50 border border-zinc-800",
+                  control: "border-none",
+                  indicator: "bg-indigo-600",
+                  label: "text-zinc-400 data-[active]:text-white font-bold",
+                }}
+              />
+            </Group>
+
+            <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="md">
+              {esParaMina ? (
+                <>
+                  <Select
+                    label="Mina"
+                    placeholder="Seleccione mina"
+                    data={minas}
+                    value={idMina}
+                    onChange={setIdMina}
+                    searchable
+                    required
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                  />
+                  <Select
+                    label="Labor (Opcional)"
+                    placeholder={
+                      loadingLabores
+                        ? "Cargando labores..."
+                        : "Seleccione labor"
+                    }
+                    data={labores}
+                    value={idLabor}
+                    onChange={setIdLabor}
+                    searchable
+                    clearable
+                    disabled={!idMina || loadingLabores}
+                    rightSection={
+                      loadingLabores ? (
+                        <Loader size={12} color="indigo" />
+                      ) : undefined
+                    }
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                  />
+                </>
+              ) : (
+                <Select
+                  label="Cliente"
+                  placeholder="Seleccione cliente"
+                  data={clientes}
+                  value={idCliente}
+                  onChange={setIdCliente}
+                  searchable
+                  required
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="xs"
+                />
+              )}
+            </SimpleGrid>
+          </Card>
+        )}
 
         {/* Bloque Horometro (single, no agregar/quitar) - mismo diseno
             que el registro. */}
@@ -981,60 +1139,278 @@ export const EdicionControlUsoModal = ({
           </Card>
         )}
 
-        {/* Bloque Vueltas (single, no agregar/quitar) - placeholder para
-            cuando el usuario pida el diseno de vueltas. */}
-        {esVueltas && (
-          <Card
-            withBorder
-            padding="md"
-            radius="lg"
-            className="bg-zinc-950/40 border-zinc-800"
-          >
-            <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap">
-                <Badge color="indigo" variant="light" size="sm" radius="sm">
-                  Bloque #1
-                </Badge>
-                <Text size="xs" c="zinc.500" fw={600}>
-                  Viaje independiente
-                </Text>
-              </Group>
-            </Group>
-            <SimpleGrid cols={2} spacing="md">
-              <NumberInput
-                label="Cantidad de Vueltas"
-                value={cantidadVueltas}
-                onChange={(val) => setCantidadVueltas(val as number | "")}
-                min={0}
-                decimalScale={0}
-                fixedDecimalScale
-                classNames={fieldClasses}
-                size="xs"
-                radius="lg"
-              />
-              <NumberInput
-                label="Cantidad de Sacos"
-                value={cantidadSacos}
-                onChange={(val) => setCantidadSacos(val as number | "")}
-                min={0}
-                decimalScale={0}
-                classNames={fieldClasses}
-                size="xs"
-                radius="lg"
-              />
-            </SimpleGrid>
-            <Textarea
-              label="Observacion"
-              value={observacion}
-              onChange={(e) => setObservacion(e.currentTarget.value)}
-              classNames={fieldClasses}
-              size="xs"
+        {/* Bloque Vueltas (single, no agregar/quitar) - mismo diseno que
+            el registro: Cabecera (Tarifa + Cantidad + Fecha), Fila 2 con
+            Turno + Horometros + Cantidad de Sacos (si aplica), Observacion
+            y Resumen Total Vueltas/Costo. */}
+        {esVueltas && (() => {
+          const tarifaItem = tarifas.find(
+            (t) => String(t.id) === idTarifa,
+          );
+          const esSacoItem = tarifaItem
+            ? (tarifaItem.tipo_material || "")
+                .toLowerCase()
+                .includes("saco")
+            : false;
+          return (
+            <Card
+              withBorder
+              padding="md"
               radius="lg"
-              minRows={2}
-              mt="sm"
-            />
-          </Card>
-        )}
+              className="bg-zinc-950/40 border-zinc-800"
+            >
+              <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
+                <Group gap="xs" wrap="nowrap">
+                  <Badge color="indigo" variant="light" size="sm" radius="sm">
+                    Bloque #1
+                  </Badge>
+                  <Text size="xs" c="zinc.500" fw={600}>
+                    Viaje independiente
+                  </Text>
+                </Group>
+              </Group>
+
+              {/* Fila 1: Tarifa de Uso | Cantidad de Vueltas | Fecha del Trabajo.
+                  Los tres al mismo ancho (Cantidad y Fecha ambos span=3)
+                  para que se vean cuadrados. */}
+              <Grid align="flex-end" gutter="md">
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Group gap={6} align="flex-end" wrap="nowrap">
+                    <Select
+                      className="flex-1"
+                      label="Tarifa de Uso"
+                      placeholder="Seleccione tarifa..."
+                      data={tarifas
+                        .filter((t) => t.tipo_control === "vueltas")
+                        .map((t) => {
+                          const esSaco = (t.tipo_material || "")
+                            .toLowerCase()
+                            .includes("saco");
+                          const parts = [
+                            esSaco
+                              ? "Sin precio"
+                              : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                            t.distancia_metros ? `x ${t.distancia_metros}m` : null,
+                            t.tipo_material ? `x ${t.tipo_material}` : null,
+                          ].filter(Boolean);
+                          return { value: String(t.id), label: parts.join(" ") };
+                        })}
+                      value={idTarifa}
+                      onChange={setIdTarifa}
+                      searchable
+                      clearable
+                      classNames={fieldClasses}
+                      radius="lg"
+                      size="xs"
+                    />
+                    <Tooltip label="Historial de Tarifas">
+                      <ActionIcon
+                        onClick={() => setModalHistorialOpened(true)}
+                        variant="light"
+                        color="zinc.4"
+                        size={32}
+                        radius="lg"
+                        className="mb-[3px] border border-zinc-700/50"
+                      >
+                        <QueueListIcon className="w-4 h-4" />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Nueva Tarifa">
+                      <ActionIcon
+                        onClick={() => setModalTarifaOpened(true)}
+                        variant="filled"
+                        color="indigo.6"
+                        size={32}
+                        radius="lg"
+                        className="mb-[3px]"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                </Grid.Col>
+
+                {/* Cantidad de Vueltas: mismo ancho que Fecha del Trabajo
+                    (span=3) para que se vean cuadrados en la fila. */}
+                <Grid.Col span={{ base: 6, sm: 3 }}>
+                  <NumberInput
+                    label="Cantidad de Vueltas"
+                    placeholder="Ej: 3"
+                    value={cantidadVueltas}
+                    onChange={(val) =>
+                      setCantidadVueltas(val as number | "")
+                    }
+                    min={0}
+                    decimalScale={0}
+                    fixedDecimalScale
+                    classNames={fieldClasses}
+                    size="xs"
+                    radius="lg"
+                    required
+                  />
+                </Grid.Col>
+
+                {/* Fecha del Trabajo: al final del row, span=3. */}
+                <Grid.Col span={{ base: 6, sm: 3 }}>
+                  <CustomDatePicker
+                    label="Fecha del Trabajo"
+                    placeholder="Seleccione fecha"
+                    value={fechaTrabajo}
+                    onChange={(val) => setFechaTrabajo(val)}
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                    required
+                  />
+                </Grid.Col>
+              </Grid>
+
+              {/* Fila 2: Turno (opcional) | Horometro Inicial (Opc.) |
+                  Horometro Final (Opc.) | Cantidad de Sacos (solo si la
+                  tarifa es Saco, al lado de Horometro Final). */}
+              <Grid align="flex-end" gutter="md" mt="sm">
+                <Grid.Col span={esSacoItem ? 3 : 4}>
+                  <Select
+                    label="Turno (opcional)"
+                    placeholder="Seleccione turno..."
+                    data={[
+                      { value: TipoTurno.Dia, label: "Día" },
+                      { value: TipoTurno.Noche, label: "Noche" },
+                    ]}
+                    value={tipoTurno === "" ? null : tipoTurno}
+                    onChange={(val) =>
+                      setTipoTurno((val ?? "") as TipoTurno | "")
+                    }
+                    clearable
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                  />
+                </Grid.Col>
+                <Grid.Col span={esSacoItem ? 3 : 4}>
+                  <NumberInput
+                    label="Horometro Inicial (Opc.)"
+                    placeholder="Ej: 1250.00"
+                    value={horometroInicio}
+                    onChange={(val) =>
+                      setHorometroInicio(val as number | "")
+                    }
+                    min={0}
+                    decimalScale={2}
+                    fixedDecimalScale
+                    classNames={fieldClasses}
+                    size="xs"
+                    radius="lg"
+                  />
+                </Grid.Col>
+                <Grid.Col span={esSacoItem ? 3 : 4}>
+                  <NumberInput
+                    label="Horometro Final (Opc.)"
+                    placeholder="Ej: 1252.00"
+                    value={horometroFin}
+                    onChange={(val) =>
+                      setHorometroFin(val as number | "")
+                    }
+                    min={0}
+                    decimalScale={2}
+                    fixedDecimalScale
+                    classNames={fieldClasses}
+                    size="xs"
+                    radius="lg"
+                  />
+                </Grid.Col>
+                {esSacoItem && (
+                  <Grid.Col span={3}>
+                    <NumberInput
+                      label="Cantidad de Sacos"
+                      placeholder="Ej: 30"
+                      value={cantidadSacos}
+                      onChange={(val) =>
+                        setCantidadSacos(val as number | "")
+                      }
+                      min={0}
+                      decimalScale={0}
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                    />
+                  </Grid.Col>
+                )}
+              </Grid>
+
+              <Textarea
+                label="Observacion"
+                placeholder="Notas u observaciones de este bloque (opcional)..."
+                value={observacion}
+                onChange={(e) => setObservacion(e.currentTarget.value)}
+                classNames={fieldClasses}
+                size="xs"
+                radius="lg"
+                minRows={2}
+                mt="sm"
+              />
+
+              {/* Resumen Total Vueltas + Costo (mismo patron que el
+                  registro). Si la tarifa es Saco, el Total Vueltas queda
+                  en "-" (los sacos no son vueltas). */}
+              <SimpleGrid cols={2} spacing="md" mt="md">
+                <Group gap={6} align="center" wrap="nowrap">
+                  <ArrowPathRoundedSquareIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <div className="min-w-0">
+                    <Text
+                      size="9px"
+                      c="zinc.500"
+                      fw={900}
+                      tt="uppercase"
+                      lts="0.08em"
+                    >
+                      Total Vueltas
+                    </Text>
+                    <Text size="md" fw={800} className="text-indigo-300">
+                      {esSacoItem
+                        ? "-"
+                        : `${formatNumber(Number(cantidadVueltas) || 0)} `}
+                      {!esSacoItem && (
+                        <span className="text-[10px] text-zinc-500 italic font-medium">
+                          vuelta(s)
+                        </span>
+                      )}
+                    </Text>
+                  </div>
+                </Group>
+                <Group
+                  gap={6}
+                  align="center"
+                  wrap="nowrap"
+                  justify="flex-end"
+                >
+                  <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0 text-right">
+                    <Text
+                      size="9px"
+                      c="zinc.500"
+                      fw={900}
+                      tt="uppercase"
+                      lts="0.08em"
+                    >
+                      Costo Operativo
+                    </Text>
+                    <Text size="md" fw={800} className="text-emerald-300">
+                      S/.{" "}
+                      {(
+                        (Number(cantidadVueltas) || 0) *
+                        (precioUnitario || 0)
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </Text>
+                  </div>
+                </Group>
+              </SimpleGrid>
+            </Card>
+          );
+        })()}
 
         <Group justify="flex-end" gap="sm" mt="sm">
           <Button
@@ -1058,21 +1434,161 @@ export const EdicionControlUsoModal = ({
             Guardar Cambios
           </Button>
         </Group>
+
+        {/* Modal "Nueva Tarifa" — igual que en el registro. Permite
+            agregar una tarifa nueva para este activo sin salir del modal
+            de edicion. */}
+        {targetAsAsset && (
+          <ModalEstandar
+            opened={modalTarifaOpened}
+            close={() => setModalTarifaOpened(false)}
+            title={`Tarifas por uso - ${
+              tipoControlStr.charAt(0).toUpperCase() + tipoControlStr.slice(1)
+            }`}
+            size="sm"
+          >
+            <NuevaTarifaModal
+              asset={targetAsAsset}
+              initialTipoControl={tipoControlStr}
+              onCancel={() => setModalTarifaOpened(false)}
+              onSuccess={async (nuevaTarifa) => {
+                // Refrescamos la lista de tarifas para que el select
+                // muestre la nueva.
+                try {
+                  const respTarifas = await ControlUsoService.getTarifas(
+                    Number(target.id_activo_fijo),
+                  );
+                  if (respTarifas.success) {
+                    setTarifas(respTarifas.data);
+                  } else {
+                    setTarifas((prev) => [...prev, nuevaTarifa]);
+                  }
+                } catch {
+                  setTarifas((prev) => [...prev, nuevaTarifa]);
+                }
+                // Si la tarifa nueva es del tipo de control actual, la
+                // seleccionamos automaticamente.
+                if (nuevaTarifa.tipo_control === tipoControlStr) {
+                  setIdTarifa(nuevaTarifa.id.toString());
+                }
+                setModalTarifaOpened(false);
+              }}
+            />
+          </ModalEstandar>
+        )}
+
+        {/* Modal "Historial de Tarifas" — igual que en el registro. */}
+        <ModalEstandar
+          opened={modalHistorialOpened}
+          close={() => setModalHistorialOpened(false)}
+          title={`Historial de Tarifas - ${
+            tipoControlStr.charAt(0).toUpperCase() + tipoControlStr.slice(1)
+          }`}
+          size="xl"
+        >
+          <div className="mt-2 h-[350px]">
+            <DataTableEstandar
+              idAccessor="id"
+              loading={false}
+              records={tarifas
+                .filter((t) => t.tipo_control === tipoControlStr)
+                .sort((a, b) => b.id - a.id)}
+              columns={[
+                {
+                  accessor: "id",
+                  title: "#",
+                  width: 50,
+                  render: (_record, index) => (
+                    <span className="text-zinc-500 text-xs font-mono">
+                      {(index ?? 0) + 1}
+                    </span>
+                  ),
+                },
+                {
+                  accessor: "precio_unitario",
+                  title: "Precio Unit.",
+                  render: (record) => {
+                    if (Number(record.precio_unitario) === 0) {
+                      return (
+                        <span className="text-zinc-600 text-xs italic">
+                          Sin precio
+                        </span>
+                      );
+                    }
+                    return (
+                      <Badge color="violet" variant="filled" size="sm" radius="sm">
+                        S/. {Number(record.precio_unitario).toFixed(2)}
+                      </Badge>
+                    );
+                  },
+                },
+                // Columna Distancia: solo en Vueltas
+                ...(tipoControlStr === "vueltas"
+                  ? [
+                      {
+                        accessor: "distancia_metros",
+                        title: "Distancia hasta",
+                        render: (record: RES_Tarifa) =>
+                          record.distancia_metros ? (
+                            <Badge size="xs" color="teal" variant="filled">
+                              {record.distancia_metros} m.
+                            </Badge>
+                          ) : (
+                            <span className="text-zinc-600 text-xs italic">-</span>
+                          ),
+                      },
+                    ]
+                  : []),
+                // Columna Material: solo en Vueltas
+                ...(tipoControlStr === "vueltas"
+                  ? [
+                      {
+                        accessor: "tipo_material",
+                        title: "Material",
+                        render: (record: RES_Tarifa) =>
+                          record.tipo_material ? (
+                            <Badge size="xs" color="pink" variant="filled">
+                              {record.tipo_material}
+                            </Badge>
+                          ) : (
+                            <span className="text-zinc-600 text-xs italic">-</span>
+                          ),
+                      },
+                    ]
+                  : []),
+                {
+                  accessor: "descripcion",
+                  title: "Descripcion",
+                  render: (record) =>
+                    record.descripcion ? (
+                      <span className="text-zinc-400 text-xs">
+                        {record.descripcion}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-600 text-xs italic">
+                        Sin descripcion
+                      </span>
+                    ),
+                },
+                {
+                  accessor: "created_at",
+                  title: "Fecha Creacion",
+                  render: (record) => (
+                    <span className="text-zinc-400 text-xs">
+                      {dayjs(record.created_at).format("DD MMM YYYY, HH:mm")}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
+        </ModalEstandar>
       </Stack>
     </ModalEstandar>
   );
 };
 
 // ============================================================================
-// Tipos auxiliares (subset de RES_Tarifa para no importar todo el modulo
-// innecesario).
+// Tipos auxiliares
 // ============================================================================
-
-interface RES_TarifaLite {
-  id: number;
-  tipo_control: string;
-  precio_unitario: string | number;
-  descripcion: string;
-  tipo_material: string | null;
-  distancia_metros: number | null;
-}
+// (Eliminado: usamos RES_Tarifa directamente desde el service.)

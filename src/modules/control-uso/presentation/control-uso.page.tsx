@@ -835,7 +835,11 @@ export const ControlUsoPage = () => {
                     key={uuid ?? "sin-grupo"}
                     className="rounded-2xl border border-zinc-800/80 bg-zinc-950/30 overflow-hidden"
                   >
-                    {/* Cabecera del grupo: UUID + conteo */}
+                    {/* Cabecera del grupo: Fecha de registro + UUID + conteo.
+                        La fecha que se muestra es la del `created_at` del
+                        PRIMER registro del grupo (todos los items del
+                        mismo UUID se crearon en el mismo submit, asi
+                        que todos comparten el mismo timestamp de alta). */}
                     <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-zinc-900/40 border-b border-zinc-800/80">
                       <Group gap="xs" wrap="nowrap">
                         <TagIcon className="w-4 h-4 text-grape-400 shrink-0" />
@@ -844,8 +848,33 @@ export const ControlUsoPage = () => {
                           fw={900}
                           className="uppercase tracking-widest text-zinc-500"
                         >
-                          Grupo UUID
+                          Registrado el:
                         </Text>
+                        {/* Fecha de registro (created_at del primer item
+                            del grupo, formateada DD/MM/YYYY HH:mm). */}
+                        {(() => {
+                          const firstCreated = registros.find(
+                            (r) => r.created_at,
+                          )?.created_at;
+                          if (!firstCreated) return null;
+                          const d = dayjs(firstCreated);
+                          if (!d.isValid()) return null;
+                          return (
+                            <Badge
+                              variant="light"
+                              color="blue"
+                              radius="sm"
+                              size="md"
+                              className="font-bold tracking-tight"
+                              leftSection={
+                                <CalendarDaysIcon className="w-3.5 h-3.5" />
+                              }
+                              title={`Registrado el ${d.format("DD/MM/YYYY HH:mm:ss")}`}
+                            >
+                              {d.format("DD/MM/YYYY HH:mm")}
+                            </Badge>
+                          );
+                        })()}
                         {uuid ? (
                           <Badge
                             variant="light"
