@@ -5,15 +5,28 @@ import { TipoEntidad } from "../../../../shared/enums/_generic/tipo-entidad";
 import type { ClienteResponse } from "../../service/clientes.responses";
 
 interface Props {
+  /**
+   * Define `para_carbon` automaticamente al crear: false para clientes
+   * logisticos, true para clientes de carbon. La pagina lo pasa segun la
+   * tab activa (patron proveedores).
+   */
+  modoCarbon?: boolean;
   onCancel: () => void;
   onSuccess: (p: ClienteResponse) => void;
 }
 
-export const RegistroCliente = ({ onCancel, onSuccess }: Props) => {
+export const RegistroCliente = ({
+  modoCarbon = false,
+  onCancel,
+  onSuccess,
+}: Props) => {
   const { payload, handleChange, handleSelectChange, submit, loading, error } =
-    useRegistroCliente((p) => {
-      onSuccess(p);
-    });
+    useRegistroCliente(
+      (p) => {
+        onSuccess(p);
+      },
+      modoCarbon,
+    );
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">

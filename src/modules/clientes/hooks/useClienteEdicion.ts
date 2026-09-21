@@ -61,6 +61,9 @@ export const useClienteEdicion = ({
     setSubmitting(true);
     setError(null);
 
+    // `para_carbon` NO se incluye: define la pestaña donde vive el cliente
+    // (logística vs carbón) y se congela al crear — mismo patrón que
+    // proveedores. Se preserva en backend al no estar en el payload.
     const values: DTO_ActualizarCliente = {
       tipo_entidad: tipoEntidad,
       dni: dni.trim() ? dni.trim() : null,

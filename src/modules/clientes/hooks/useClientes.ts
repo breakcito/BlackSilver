@@ -3,7 +3,16 @@ import { ClientesService } from "../service/clientes.service";
 import type { ClienteResponse } from "../service/clientes.responses";
 import { useNotify } from "../../../hooks/useNotify";
 
-export const useClientes = () => {
+/**
+ * Hook del modulo Clientes.
+ *
+ * Se parametriza por `modoCarbon`:
+ * - modoCarbon=false (logistica): lista clientes logisticos (para_carbon=0).
+ * - modoCarbon=true (carbon): lista clientes de carbon (para_carbon=1).
+ * La pagina controla esta flag con las Tabs Logistica / Carbon y se
+ * recarga el listado al cambiar.
+ */
+export const useClientes = (modoCarbon: boolean = false) => {
   const [clientes, setClientes] = useState<ClienteResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -13,7 +22,9 @@ export const useClientes = () => {
   const fetchClientes = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await ClientesService.getClientes();
+      const res = await ClientesService.getClientes({
+        para_carbon: modoCarbon,
+      });
       setClientes(res);
     } catch (error) {
       console.error(error);
@@ -21,7 +32,7 @@ export const useClientes = () => {
     } finally {
       setLoading(false);
     }
-  }, [notifyError]);
+  }, [notifyError, modoCarbon]);
 
   useEffect(() => {
     fetchClientes();

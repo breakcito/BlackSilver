@@ -9,15 +9,27 @@ import type {
 import type { ClienteResponse, CuentaBancariaResponse } from "./clientes.responses";
 
 export class ClientesService {
-  static async getClientes(): Promise<ClienteResponse[]> {
-    const { data } = await api.get("/clientes");
+  static async getClientes(filters?: {
+    para_carbon?: boolean;
+  }): Promise<ClienteResponse[]> {
+    const params = filters
+      ? {
+          ...(filters.para_carbon !== undefined && {
+            para_carbon: filters.para_carbon ? 1 : 0,
+          }),
+        }
+      : undefined;
+    const { data } = await api.get("/clientes", { params });
     return data.data;
   }
 
   static async crearCliente(
     payload: CrearClienteRequest
   ): Promise<ClienteResponse> {
-    const { data } = await api.post("/clientes", payload);
+    const { data } = await api.post("/clientes", {
+      ...payload,
+      paraCarbon: payload.para_carbon ?? false,
+    });
     return data.data;
   }
 
@@ -25,6 +37,8 @@ export class ClientesService {
    * Actualizar campos administrativos de un cliente.
    * El backend calcula el diff y lo apendea a cambios_log.
    * El estado NO se envía: lo gestiona eliminarCliente (soft-delete).
+   * `para_carbon` NO se envía: define la pestaña donde vive el cliente
+   * y se congela al crear — mismo patrón que proveedores.
    */
   static async actualizarCliente(
     idCliente: number,

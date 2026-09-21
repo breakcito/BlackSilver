@@ -12,6 +12,13 @@ export interface ClienteResponse {
   telefono: string | null;
   correo: string | null;
   estado: EstadoBase;
+  /**
+   * `true` si el cliente vive en el flujo de compra de carbón (define
+   * en qué pestaña/agrupación se lista). `false` para clientes de
+   * logística. Backend lo persiste como tinyint (0/1); normalizamos
+   * a boolean en frontend.
+   */
+  para_carbon: boolean;
   created_at: string;
   cambios_log: RES_CambiosLog[] | null;
   cantidad_cuentas_bancarias: number;

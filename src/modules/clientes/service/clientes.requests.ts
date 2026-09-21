@@ -6,6 +6,9 @@ import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
  * Registro de cliente.
  * Patron Proveedores: RUC obligatorio (11 digitos, prefijo 10/20 segun
  * tipo_entidad); DNI opcional (8 digitos si llega). Razon social obligatoria.
+ *
+ * `para_carbon` opcional: true para clientes del flujo de compra de
+ * carbón, false (default) para clientes de logística.
  */
 export const Schema_CrearCliente = z
   .object({
@@ -26,6 +29,7 @@ export const Schema_CrearCliente = z
       .refine((val) => !val || z.string().email().safeParse(val).success, {
         message: "Debe ser un correo electrónico válido",
       }),
+    para_carbon: z.boolean().optional().default(false),
   })
   .superRefine((data, ctx) => {
     if (!/^\d{11}$/.test(data.ruc)) {
@@ -64,6 +68,8 @@ export type CrearClienteRequest = z.infer<typeof Schema_CrearCliente>;
  *
  * NO incluye:
  *  - estado: lo gestiona eliminar_cliente (soft-delete).
+ *  - para_carbon: define la pestaña donde vive el cliente (logística vs
+ *    carbón) y se congela al crear — mismo patrón que proveedores.
  */
 export const Schema_ActualizarCliente = z
   .object({

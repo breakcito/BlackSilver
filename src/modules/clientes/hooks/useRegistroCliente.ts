@@ -8,8 +8,18 @@ import {
 import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 import type { ClienteResponse } from "../service/clientes.responses";
 
+/**
+ * Hook para registrar un cliente.
+ *
+ * `modoCarbon` define el flag `para_carbon` automaticamente:
+ * - false (default): cliente de logistica.
+ * - true: cliente de carbon (queda listado en la pestaña Carbon).
+ *
+ * La pagina pasa esta flag segun la tab activa (patron proveedores).
+ */
 export const useRegistroCliente = (
   onSuccess: (p: ClienteResponse) => void,
+  modoCarbon: boolean = false,
 ) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +33,7 @@ export const useRegistroCliente = (
     direccion: "",
     telefono: "",
     correo: "",
+    para_carbon: modoCarbon,
   });
 
   const handleChange = (field: keyof CrearClienteRequest, value: string) => {
@@ -62,6 +73,7 @@ export const useRegistroCliente = (
         direccion: "",
         telefono: "",
         correo: "",
+        para_carbon: modoCarbon,
       });
       onSuccess(created);
     } catch (e) {
