@@ -29,9 +29,12 @@ const formatCombustible = (
   if (!Number.isFinite(cant) || cant <= 0) return "-";
   // Truncamos a 2 decimales solo para display. El backend hace el
   // acumulado en double y conserva precision; en el Excel basta con
-  // 2 decimales.
-  const cantRedondeada = Math.round(cant * 100) / 100;
-  const cantStr = cantRedondeada.toString().replace(/\.?0+$/, "");
+  // 2 decimales. Usamos `parseFloat(...).toString()` para que
+  // `"50.00"` -> `"50"`, `"50.10"` -> `"50.1"`, `"50"` -> `"50"`
+  // sin depender de un regex fragil (antes usabamos `/\.?0+$/`, que
+  // matcheaba y borraba el `0` final de `"50"`, dejandolo en `"5"`).
+  const cantRedondeada = parseFloat((Math.round(cant * 100) / 100).toFixed(2));
+  const cantStr = cantRedondeada.toString();
   const unidad = (info.unidad ?? "").trim();
   return unidad ? `${cantStr} ${unidad}` : cantStr;
 };
