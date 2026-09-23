@@ -241,10 +241,14 @@ export const ProveedoresPage = () => {
     // Solo cuentan para el badge los NO anulados: el backend ya filtra
     // `esta_anulado = 0` en el subquery de `get_proveedores`.
     const activos = anticipos.filter((a) => !a.esta_anulado);
+    // `Number(...)` es obligatorio: el backend devuelve DECIMAL como
+    // string ("25", "30", "21") por PDO; sin la coercion JS concatena
+    // y aparecen numeros raros en el badge (ej. "25" + "30" + "21" =
+    // "253021" en vez de 76). Mismo motivo que `formatMontoPEN`.
     updateProveedor(proveedor.id_proveedor, {
       cantidad_anticipos: activos.length,
       suma_saldo_anticipos: activos.reduce(
-        (acc, a) => acc + a.saldo_actual,
+        (acc, a) => acc + Number(a.saldo_actual ?? 0),
         0,
       ),
       anticipos,

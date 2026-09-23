@@ -28,6 +28,7 @@ import { DataTableEstandar } from "../../../../../presentation/utils/datatable-e
 import type { DataTableColumn } from "mantine-datatable";
 import type { ProveedorResponse } from "../../../service/proveedores.responses";
 import { TipoEntidad } from "../../../../../shared/enums/_generic/tipo-entidad";
+import { formatMontoPEN } from "../../../../../shared/functions/format-monto-pen";
 
 type Col = DataTableColumn<ProveedorResponse> & { id?: string };
 
@@ -377,42 +378,40 @@ export const Proveedor = ({
             render: (r: ProveedorResponse) => {
               const n = r.cantidad_anticipos ?? 0;
               const total = r.suma_saldo_anticipos ?? 0;
-              const totalLabel = `S/${total.toLocaleString("es-PE", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}`;
               return (
                 <Group gap="xs" justify="center" wrap="nowrap">
-                  {n > 0 ? (
+                  <Stack gap={4} align="center">
+                    {n > 0 ? (
+                      <Badge
+                        color="indigo"
+                        variant="light"
+                        size="sm"
+                        radius="xl"
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        {n} anticipo{n === 1 ? "" : "s"}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        color="gray"
+                        variant="light"
+                        size="sm"
+                        radius="xl"
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        Sin anticipos
+                      </Badge>
+                    )}
                     <Badge
-                      color="indigo"
+                      color={n > 0 ? "teal" : "gray"}
                       variant="light"
                       size="sm"
                       radius="xl"
                       style={{ whiteSpace: "nowrap" }}
                     >
-                      {n} anticipo{n === 1 ? "" : "s"}
+                      {formatMontoPEN(total)}
                     </Badge>
-                  ) : (
-                    <Badge
-                      color="gray"
-                      variant="light"
-                      size="sm"
-                      radius="xl"
-                      style={{ whiteSpace: "nowrap" }}
-                    >
-                      Sin anticipos
-                    </Badge>
-                  )}
-                  <Badge
-                    color={n > 0 ? "teal" : "gray"}
-                    variant="light"
-                    size="sm"
-                    radius="xl"
-                    style={{ whiteSpace: "nowrap" }}
-                  >
-                    {totalLabel}
-                  </Badge>
+                  </Stack>
                   {onOpenAnticipos && (
                     <Tooltip
                       label="Gestionar anticipos"

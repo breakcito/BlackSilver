@@ -15,8 +15,8 @@ import {
   IconBuildingBank,
   IconCash,
   IconCircleX,
-  IconHash,
   IconNotes,
+  IconPaperclip,
   IconPlus,
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
@@ -35,10 +35,12 @@ import type { RES_CuentaEmpresa } from "../../../../service/responses/cuenta-emp
 import { EstadoBase } from "../../../../shared/enums/_generic/estado-base";
 import { useNotify } from "../../../../hooks/useNotify";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { ArchivoCard } from "../../../../presentation/utils/archivo/archivo-card";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
 import { CustomDatePicker } from "../../../../presentation/utils/date-picker-input";
 import { subirAnticipos } from "../../service/upload-anticipos";
 import { ThemeIcon } from "@mantine/core";
+import { formatMontoPEN } from "../../../../shared/functions/format-monto-pen";
 
 dayjs.locale("es");
 
@@ -74,10 +76,14 @@ export const AnticiposProveedor = ({
   const [empresas, setEmpresas] = useState<RES_Empresa[]>([]);
   const [cuentas, setCuentas] = useState<RES_CuentaEmpresa[]>([]);
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+  const [loadingCuentas, setLoadingCuentas] = useState(false);
 
   // Form. Medio de pago preseleccionado al primero (Transferencia) para
   // que el operador no tenga que elegir si la operacion tipica es esa.
-  // Si elige Efectivo, los campos condicionales se ocultan.
+  // Fecha y hora arrancan VACIAS para que el operador pueda borrarlas
+  // libremente sin que el sistema las rellene automaticamente. Si elige
+  // Efectivo, los campos opcionales (fecha/hora/operacion) siguen
+  // visibles: si el usuario los llena, se envian al backend.
   const [idEmpresa, setIdEmpresa] = useState<string | null>(
     String(DEFAULT_CUPPER_ID),
   );
@@ -85,13 +91,8 @@ export const AnticiposProveedor = ({
   const [medioPago, setMedioPago] = useState<string | null>(
     MedioPago.Transferencia,
   );
-  // Default: fecha de hoy + hora actual local en HH:mm (mismo patron que
-  // control-uso `fechaDia = useState<Date | null>(new Date())`). Reduce
-  // clicks del operador y garantiza consistencia con el momento del pago.
-  const [fechaPago, setFechaPago] = useState<Date | null>(new Date());
-  const [horaPagoStr, setHoraPagoStr] = useState<string>(
-    dayjs().format("HH:mm"),
-  );
+  const [fechaPago, setFechaPago] = useState<Date | null>(null);
+  const [horaPagoStr, setHoraPagoStr] = useState<string>("");
   const [numeroOperacion, setNumeroOperacion] = useState("");
   const [saldo, setSaldo] = useState<string>("");
   const [evidenciasFiles, setEvidenciasFiles] = useState<File[]>([]);
@@ -172,6 +173,7 @@ export const AnticiposProveedor = ({
       return;
     }
     let cancel = false;
+    setLoadingCuentas(true);
     (async () => {
       try {
         const empId = Number(idEmpresa);
@@ -194,6 +196,8 @@ export const AnticiposProveedor = ({
         }
       } catch (e) {
         console.error("No se pudieron cargar las cuentas de empresa", e);
+      } finally {
+        if (!cancel) setLoadingCuentas(false);
       }
     })();
     return () => {
@@ -219,13 +223,17 @@ export const AnticiposProveedor = ({
       return;
     }
 
-    // Componer fecha_hora_pago a partir de fechaPago + horaPagoStr.
-    // Si el usuario solo escribe la fecha pero no la hora, usamos 00:00:00
-    // para mantener el formato Y-m-d H:i:s del backend (sin requerir hora).
-    let fechaHoraPago: string | null = null;
+    // Si medio_pago es Transferencia o Deposito, los tres campos
+    // (cuenta, fecha/hora y nro de operacion) son obligatorios. Si es
+    // Efectivo, son opcionales: si el operador los lleno, se envian;
+    // si los dejo vacios, llegan como null.
     if (requiereBanco) {
       if (!idCuenta) {
-        setError("Para " + medioPago + " debes seleccionar la cuenta bancaria");
+        setError(
+          "Para " +
+            medioPago +
+            " debes seleccionar la cuenta bancaria de la empresa",
+        );
         return;
       }
       if (!fechaPago) {
@@ -233,9 +241,19 @@ export const AnticiposProveedor = ({
         return;
       }
       if (!numeroOperacion.trim()) {
-        setError("Para " + medioPago + " debes indicar el numero de operacion");
+        setError(
+          "Para " + medioPago + " debes indicar el numero de operacion",
+        );
         return;
       }
+    }
+
+    // Componer fecha_hora_pago a partir de fechaPago + horaPagoStr.
+    // Solo se envia si el operador escribio al menos la fecha. Si
+    // completo la fecha pero dejo la hora vacia, usamos 00:00 para
+    // mantener el formato Y-m-d H:i:s del backend.
+    let fechaHoraPago: string | null = null;
+    if (fechaPago) {
       const fechaBase = dayjs(fechaPago).format("YYYY-MM-DD");
       const hora = horaPagoStr.trim() === "" ? "00:00" : horaPagoStr;
       const candidato = dayjs(`${fechaBase} ${hora}`);
@@ -269,7 +287,8 @@ export const AnticiposProveedor = ({
 
       const payload: RegistrarAnticipoRequest = {
         id_empresa: Number(idEmpresa),
-        id_cuenta_bancaria_empresa: idCuenta ? Number(idCuenta) : null,
+        id_cuenta_bancaria_empresa:
+          !requiereBanco && !idCuenta ? null : idCuenta ? Number(idCuenta) : null,
         medio_pago: medioPago as MedioPago | null,
         fecha_hora_pago: fechaHoraPago,
         numero_operacion: numeroOperacion.trim() || null,
@@ -287,11 +306,11 @@ export const AnticiposProveedor = ({
         // Limpiar solo los campos del detalle. NO tocamos idEmpresa ni
         // medioPago: ya estan bien elegidos. idCuenta se vuelve a
         // preseleccionar sola cuando termine el re-render por `cuentas`.
-        // Fecha y hora vuelven al "ahora" (mismo patron que control-uso
-        // -> el modal siempre arranca con la fecha/hora del momento).
+        // Fecha y hora vuelven a quedar vacias para que el operador
+        // pueda borrarlas o rellenarlas a voluntad.
         setIdCuenta(null);
-        setFechaPago(new Date());
-        setHoraPagoStr(dayjs().format("HH:mm"));
+        setFechaPago(null);
+        setHoraPagoStr("");
         setNumeroOperacion("");
         setSaldo("");
         setEvidenciasFiles([]);
@@ -328,9 +347,6 @@ export const AnticiposProveedor = ({
       setAnulandoId(null);
     }
   };
-
-  const formatSaldo = (n: number) =>
-    `S/${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const dataEmpresas = useMemo(
     () =>
@@ -384,11 +400,6 @@ export const AnticiposProveedor = ({
           </Alert>
         )}
 
-        <form
-          autoComplete="off"
-          onSubmit={(event) => event.preventDefault()}
-          className="contents"
-        >
         <Stack gap="md">
         <Group grow align="flex-start">
           <Select
@@ -397,6 +408,7 @@ export const AnticiposProveedor = ({
             radius="lg"
             size="xs"
             searchable
+            placeholder={loadingCatalogos ? "Cargando..." : "Seleccione"}
             comboboxProps={{ withinPortal: true }}
             data={dataEmpresas}
             value={idEmpresa}
@@ -409,6 +421,7 @@ export const AnticiposProveedor = ({
             radius="lg"
             size="xs"
             clearable
+            placeholder="Seleccione"
             autoComplete="off"
             comboboxProps={{ withinPortal: true }}
             data={medioPagoData}
@@ -417,8 +430,8 @@ export const AnticiposProveedor = ({
               setMedioPago(v);
               if (v === null) {
                 setIdCuenta(null);
-                setFechaPago(new Date());
-                setHoraPagoStr(dayjs().format("HH:mm"));
+                setFechaPago(null);
+                setHoraPagoStr("");
                 setNumeroOperacion("");
               }
             }}
@@ -437,6 +450,13 @@ export const AnticiposProveedor = ({
             size="xs"
             searchable
             clearable
+            placeholder={
+              !idEmpresa
+                ? "Seleccione una empresa"
+                : loadingCuentas
+                  ? "Cargando..."
+                  : "Seleccione"
+            }
             comboboxProps={{ withinPortal: true }}
             data={dataCuentas}
             value={idCuenta}
@@ -444,32 +464,30 @@ export const AnticiposProveedor = ({
             disabled={!idEmpresa}
             classNames={fieldClasses}
           />
-<TextInput
+          <TextInput
             label={
-              <Group gap={6} wrap="nowrap">
-                <IconHash size={14} />
-                <span>
-                  Numero de operacion{" "}
-                  {requiereBanco && (
-                    <span style={{ color: "var(--mantine-color-red-6)" }}>
-                      *
-                    </span>
-                  )}
-                </span>
-              </Group>
+              <span>
+                Numero de operacion{" "}
+                {requiereBanco && (
+                  <span style={{ color: "var(--mantine-color-red-6)" }}>
+                    *
+                  </span>
+                )}
+              </span>
             }
-            placeholder="Ej. 1234567890"
+            placeholder="Ingrese el numero de operacion"
             radius="lg"
             size="xs"
             type="text"
-            inputMode="numeric"
             value={numeroOperacion}
             onChange={(event) => {
-              // Igual que Saldo: quedarnos solo con los digitos (sin
-              // decimales: un nro de operacion no acepta punto). Evita
-              // que se pegue texto y mantiene el teclado numerico en
-              // mobile. No usamos <input type="number"> para no disparar
-              // el aviso de Chrome de metodos de pago.
+              // Quedarnos solo con los digitos (sin punto). No usamos
+              // inputMode="numeric" porque Chrome interpreta
+              // inputMode numerico + un form en HTTP como un campo de
+              // tarjeta y muestra el aviso "La opcion de
+              // autocompletado de los metodos de pago esta
+              // inhabilitada...". El resto de modales del proyecto
+              // tampoco usan inputMode por la misma razon.
               const cleaned = (event.currentTarget.value ?? "")
                 .replace(/\D/g, "")
                 .slice(0, 12);
@@ -477,7 +495,7 @@ export const AnticiposProveedor = ({
             }}
             classNames={fieldClasses}
             name="anticipo_numero_operacion"
-            autoComplete="new-password"
+            autoComplete="off"
             data-form-type="other"
             data-lpignore="true"
           />
@@ -498,7 +516,7 @@ export const AnticiposProveedor = ({
             <TimeInput
               ref={horaPagoRef}
               label="Hora del pago"
-              placeholder="08:00"
+              placeholder="HH:MM"
               value={horaPagoStr}
               onChange={(event) =>
                 setHoraPagoStr(formatHora(event.currentTarget.value))
@@ -538,8 +556,7 @@ export const AnticiposProveedor = ({
             radius="lg"
             size="xs"
             type="text"
-            inputMode="decimal"
-            placeholder="0.00"
+            placeholder="Ingrese el saldo"
             value={saldo}
             onChange={(event) => {
               const raw = event.currentTarget.value ?? "";
@@ -565,7 +582,7 @@ export const AnticiposProveedor = ({
 
         <Group justify="flex-end">
           <Button
-            type="submit"
+            type="button"
             leftSection={<IconPlus size={14} />}
             radius="xl"
             loading={guardando}
@@ -576,7 +593,6 @@ export const AnticiposProveedor = ({
           </Button>
         </Group>
         </Stack>
-        </form>
       </div>
 
       {/* === LISTADO DE ANTICIPOS REGISTRADOS === */}
@@ -709,7 +725,7 @@ export const AnticiposProveedor = ({
                       radius="xl"
                       leftSection={<IconCash size={12} />}
                     >
-                      Saldo actual: {formatSaldo(a.saldo_actual)}
+                      Saldo actual: {formatMontoPEN(a.saldo_actual)}
                     </Badge>
                   )}
                 </Group>
@@ -750,6 +766,30 @@ export const AnticiposProveedor = ({
                     </Group>
                   )}
                 </Stack>
+
+                {/* Fila 3.5: Archivos de evidencia adjuntos al registro */}
+                {Array.isArray(a.evidencias) && a.evidencias.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-zinc-800/60">
+                    <Group gap={6} mb="xs">
+                      <IconPaperclip size={12} className="text-zinc-500" />
+                      <Text
+                        size="10px"
+                        fw={700}
+                        className="text-zinc-500 uppercase tracking-widest"
+                      >
+                        Archivos de evidencia ({a.evidencias.length})
+                      </Text>
+                    </Group>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {a.evidencias.map((ev) => (
+                        <ArchivoCard
+                          key={ev.path_relativo}
+                          archivo={ev}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Fila 4: Anulado por (solo si aplica) */}
                 {anulado && a.empleado_anulacion_nombre && (
@@ -796,7 +836,7 @@ export const AnticiposProveedor = ({
               variant="filled"
             >
               Vas a anular el anticipo de{" "}
-              <strong>{formatSaldo(confirmarAnular.saldo_actual)}</strong>{" "}
+              <strong>{formatMontoPEN(confirmarAnular.saldo_actual)}</strong>{" "}
               del {dayjs(confirmarAnular.created_at).format("DD MMM YYYY")}.
             </Alert>
             <Group justify="flex-end" gap="sm">
