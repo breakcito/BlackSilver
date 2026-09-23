@@ -10,10 +10,18 @@ interface Props {
 }
 
 export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
-  const { payload, handleChange, handleSelectChange, submit, loading, error } =
-    useRegistroProveedor((p) => {
-      onSuccess(p);
-    });
+  const {
+    payload,
+    documento,
+    setDocumento,
+    handleChange,
+    handleSelectChange,
+    submit,
+    loading,
+    error,
+  } = useRegistroProveedor((p) => {
+    onSuccess(p);
+  });
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
@@ -48,37 +56,16 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            label="RUC (opc)"
+            label="RUC o DNI (opc)"
             placeholder={
               payload.tipo_entidad === TipoEntidad.Natural
-                ? "10xxxxxxxxx (persona natural)"
-                : "20xxxxxxxxx (persona jurídica)"
+                ? "RUC 10xxxxxxxxx o DNI 8 dígitos"
+                : "RUC 20xxxxxxxxx o DNI 8 dígitos"
             }
             radius="xl"
             maxLength={11}
-            value={payload.ruc || ""}
-            onChange={(e) => {
-              const val = e.currentTarget.value.replace(/\D/g, "");
-              handleChange("ruc", val);
-            }}
-            classNames={{
-              input:
-                "bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-500 focus:border-zinc-300 transition-all",
-              label: "text-zinc-400 font-medium text-xs",
-            }}
-          />
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <TextInput
-            label="DNI (opc)"
-            placeholder="12345678"
-            radius="xl"
-            maxLength={8}
-            value={payload.dni || ""}
-            onChange={(e) => {
-              const val = e.currentTarget.value.replace(/\D/g, "");
-              handleChange("dni", val);
-            }}
+            value={documento}
+            onChange={(e) => setDocumento(e.currentTarget.value)}
             classNames={{
               input:
                 "bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-500 focus:border-zinc-300 transition-all",

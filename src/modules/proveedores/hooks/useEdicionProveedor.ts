@@ -112,6 +112,22 @@ export const useEdicionProveedor = (
     if (error) setError(null);
   };
 
+  /**
+   * Documento unificado (RUC o DNI) para el input unico en el formulario.
+   * Mapeo por largo: 8 digitos -> DNI; cualquier otro -> RUC.
+   * La hidratacion desde el proveedor prefiere dni (si existe) y cae al ruc.
+   */
+  const documento = payload.dni || payload.ruc || "";
+  const setDocumento = (value: string) => {
+    const limpio = value.replace(/\D/g, "");
+    if (limpio.length === 8) {
+      setPayload((prev) => ({ ...prev, dni: limpio, ruc: "" }));
+    } else {
+      setPayload((prev) => ({ ...prev, dni: "", ruc: limpio }));
+    }
+    if (error) setError(null);
+  };
+
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -177,6 +193,8 @@ export const useEdicionProveedor = (
 
   return {
     payload,
+    documento,
+    setDocumento,
     handleChange,
     handleSelectChange,
     submit,

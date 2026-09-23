@@ -67,6 +67,8 @@ const selectClasses = {
 export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
   const {
     payload,
+    documento,
+    setDocumento,
     personal,
     tiposCarbon,
     lugaresExtraccion,
@@ -309,33 +311,16 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            label="RUC (opc)"
+            label="RUC o DNI (opc)"
             placeholder={
               payload.tipo_entidad === TipoEntidad.Natural
-                ? "10xxxxxxxxx (persona natural)"
-                : "20xxxxxxxxx (persona jurídica)"
+                ? "RUC 10xxxxxxxxx o DNI 8 dígitos"
+                : "RUC 20xxxxxxxxx o DNI 8 dígitos"
             }
             radius="xl"
             maxLength={11}
-            value={payload.ruc || ""}
-            onChange={(e) => {
-              const val = e.currentTarget.value.replace(/\D/g, "");
-              handleChange("ruc", val);
-            }}
-            classNames={fieldClasses}
-          />
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <TextInput
-            label="DNI (opc)"
-            placeholder="12345678"
-            radius="xl"
-            maxLength={8}
-            value={payload.dni || ""}
-            onChange={(e) => {
-              const val = e.currentTarget.value.replace(/\D/g, "");
-              handleChange("dni", val);
-            }}
+            value={documento}
+            onChange={(e) => setDocumento(e.currentTarget.value)}
             classNames={fieldClasses}
           />
         </Grid.Col>
