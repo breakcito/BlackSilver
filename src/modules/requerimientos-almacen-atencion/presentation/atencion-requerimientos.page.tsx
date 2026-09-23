@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   Badge,
+  Checkbox,
   Group,
   Stack,
   Text,
@@ -31,6 +32,7 @@ import { type DataTableColumn } from "mantine-datatable";
 import { useEntregas } from "../hooks/useEntregas.ts";
 import type { IArchivo } from "../../../shared/interfaces/archivo.ts";
 import { Estado_Requerimiento } from "../../../shared/enums/requerimiento-almacen/requerimiento.ts";
+import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import { Premura } from "../../../shared/enums/_generic/premura.ts";
 import { useTitlePage } from "../../../hooks/useTitlePage.ts";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar.tsx";
@@ -104,19 +106,59 @@ export const RequerimientosAlmacenAtencionPage = () => {
   const excelBuilder = useRequerimientosExcel();
   const { en_modo_auditable } = useAuditoriaStore();
 
-  const handleExportExcel = () => {
+  // --- Modal de filtro de Turno para Exportacion a Excel ---
+  // El usuario elige que turnos incluir (Dia, Noche, sin turno) antes
+  // de generar el archivo. Default: Dia + Noche marcados.
+  const [openedFiltroTurno, { open: openFiltroTurno, close: closeFiltroTurno }] =
+    useDisclosure(false);
+  const [incluirDia, setIncluirDia] = useState(true);
+  const [incluirNoche, setIncluirNoche] = useState(true);
+  const [incluirSinTurno, setIncluirSinTurno] = useState(false);
+
+  const handleOpenExcel = () => {
     if (filteredRecords.length === 0) return;
+    openFiltroTurno();
+  };
+
+  const handleConfirmExportExcel = () => {
+    if (incluirDia === false && incluirNoche === false && incluirSinTurno === false) {
+      return; // guard: no hay nada que exportar
+    }
+    const filtrados = filteredRecords.filter((r) => {
+      if (r.tipo_turno === TipoTurno.Dia) return incluirDia;
+      if (r.tipo_turno === TipoTurno.Noche) return incluirNoche;
+      // Sin turno (null o cualquier valor fuera del enum)
+      return incluirSinTurno;
+    });
+
+    if (filtrados.length === 0) {
+      notifyError(
+        "Ningun requerimiento coincide con el filtro de turno seleccionado.",
+      );
+      return;
+    }
+
     const almacenNombre =
       almacenes.find((a) => String(a.id_almacen) === idAlmacen)?.nombre || "—";
     const config = excelBuilder.generate({
-      requerimientos: filteredRecords,
+      requerimientos: filtrados,
       mes,
       yearcito,
       almacenNombre,
       en_modo_auditable,
     });
     enqueueExcel(config);
+    closeFiltroTurno();
   };
+
+  // Cantidad filtrada en tiempo real para mostrar al usuario en el modal.
+  const previewFiltrados = filteredRecords.filter((r) => {
+    if (r.tipo_turno === TipoTurno.Dia) return incluirDia;
+    if (r.tipo_turno === TipoTurno.Noche) return incluirNoche;
+    return incluirSinTurno;
+  }).length;
+  const hayAlgunFiltroActivo =
+    incluirDia || incluirNoche || incluirSinTurno;
 
   // Ya no manejamos 'page' localmente ni disclosures
 
@@ -174,7 +216,7 @@ export const RequerimientosAlmacenAtencionPage = () => {
       {
         accessor: "fechas",
         title: "Programación",
-        width: 180,
+        width: 200,
         render: (item) => {
           const fechaReq =
             item.fecha_entrega_requerida &&
@@ -186,6 +228,36 @@ export const RequerimientosAlmacenAtencionPage = () => {
             item.fecha_solicitud && dayjs(item.fecha_solicitud).isValid()
               ? dayjs(item.fecha_solicitud).format("DD/MM/YYYY")
               : null;
+
+          // Badge de Turno: solo si el requerimiento tiene tipo_turno.
+          // "Dia" -> badge amber (amanecer/atardecer); "Noche" -> indigo
+          // (luna). Sin turno -> no se muestra nada (el campo es opcional).
+          const turnoBadge =
+            item.tipo_turno === "Dia" ? (
+              <Badge
+                color="orange"
+                variant="light"
+                size="sm"
+                radius="xl"
+                leftSection={
+                  <span style={{ fontSize: 11, lineHeight: 1 }}>☀</span>
+                }
+              >
+                Día
+              </Badge>
+            ) : item.tipo_turno === "Noche" ? (
+              <Badge
+                color="indigo"
+                variant="light"
+                size="sm"
+                radius="xl"
+                leftSection={
+                  <span style={{ fontSize: 11, lineHeight: 1 }}>☾</span>
+                }
+              >
+                Noche
+              </Badge>
+            ) : null;
 
           return (
             <Stack gap={2}>
@@ -203,6 +275,11 @@ export const RequerimientosAlmacenAtencionPage = () => {
               <Text size="xs" c="dimmed" ml={22}>
                 Creado: {dayjs(item.created_at).format("DD/MM/YYYY HH:mm")}
               </Text>
+              {turnoBadge && (
+                <Group ml={22} mt={2} gap={4}>
+                  {turnoBadge}
+                </Group>
+              )}
             </Stack>
           );
         },
@@ -463,7 +540,7 @@ export const RequerimientosAlmacenAtencionPage = () => {
             >
               <Button
                 leftSection={<DocumentArrowDownIcon className="w-5 h-5" />}
-                onClick={handleExportExcel}
+                onClick={handleOpenExcel}
                 radius="lg"
                 size="sm"
                 variant="light"
@@ -706,6 +783,78 @@ export const RequerimientosAlmacenAtencionPage = () => {
               className="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-950/20 px-6"
             >
               Anular Requerimiento
+            </Button>
+          </Group>
+        </Stack>
+      </ModalEstandar>
+
+      {/* Modal: Filtro de Turno para Exportacion a Excel */}
+      <ModalEstandar
+        opened={openedFiltroTurno}
+        close={closeFiltroTurno}
+        title="Filtro de Turno para Exportacion"
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Elige que turnos incluir en el reporte de Excel. Por defecto se
+            incluyen Dia y Noche (los requerimientos sin turno quedan fuera).
+            Marca "Incluir sin turno" si tambien quieres exportarlos.
+          </Text>
+
+          <Stack gap="xs">
+            <Checkbox
+              label="Dia"
+              checked={incluirDia}
+              onChange={(e) => setIncluirDia(e.currentTarget.checked)}
+              color="orange"
+            />
+            <Checkbox
+              label="Noche"
+              checked={incluirNoche}
+              onChange={(e) => setIncluirNoche(e.currentTarget.checked)}
+              color="indigo"
+            />
+            <Checkbox
+              label="Incluir requerimientos sin turno asignado"
+              checked={incluirSinTurno}
+              onChange={(e) => setIncluirSinTurno(e.currentTarget.checked)}
+            />
+          </Stack>
+
+          <Text
+            size="xs"
+            c="zinc.4"
+            className="bg-zinc-900/40 border border-zinc-800 rounded-lg px-3 py-2"
+          >
+            Se exportaran{" "}
+            <Text component="span" fw={700} c="zinc.100">
+              {previewFiltrados}
+            </Text>{" "}
+            de {filteredRecords.length} requerimientos con el filtro actual.
+          </Text>
+
+          <Group justify="flex-end" mt="sm" gap="md">
+            <Button
+              variant="subtle"
+              onClick={closeFiltroTurno}
+              radius="lg"
+              size="sm"
+              className="text-zinc-400 hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="teal"
+              onClick={handleConfirmExportExcel}
+              disabled={!hayAlgunFiltroActivo || previewFiltrados === 0}
+              loading={isGeneratingExcel}
+              radius="lg"
+              size="sm"
+              leftSection={<DocumentArrowDownIcon className="w-4 h-4" />}
+              className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-950/20 px-6"
+            >
+              Exportar Excel
             </Button>
           </Group>
         </Stack>

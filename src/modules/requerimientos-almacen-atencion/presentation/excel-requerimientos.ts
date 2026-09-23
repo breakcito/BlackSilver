@@ -29,6 +29,7 @@ const HEADERS = [
   "Labor",
   "F. Solicitud",
   "F. Entrega Est.",
+  "Turno",
   "Estado",
   "Producto",
   "U.M.",
@@ -36,7 +37,7 @@ const HEADERS = [
   "Comentario",
 ];
 
-const COL_WIDTHS = [5, 16, 28, 22, 13, 13, 18, 28, 10, 14, 38];
+const COL_WIDTHS = [5, 16, 28, 22, 13, 13, 10, 18, 28, 10, 14, 38];
 
 /**
  * Color de fondo según el estado del requerimiento.
@@ -86,7 +87,7 @@ export const buildRequerimientosExcel = async (
   sheet.columns = COL_WIDTHS.map((w) => ({ width: w }));
 
   // Banda superior: título del reporte
-  sheet.mergeCells("A1:K2");
+  sheet.mergeCells("A1:L2");
   const titleCell = sheet.getCell("A1");
   titleCell.value = `REPORTE DE REQUERIMIENTOS DE ALMACÉN - ${options.almacenNombre} - ${options.yearcito}`;
   titleCell.font = {
@@ -143,7 +144,7 @@ export const buildRequerimientosExcel = async (
 
   if (filtered.length === 0) {
     const emptyRow = sheet.getRow(5);
-    sheet.mergeCells("A5:K5");
+    sheet.mergeCells("A5:L5");
     emptyRow.getCell(1).value =
       "No hay requerimientos para los filtros seleccionados (modo auditoría / mes / año / búsqueda).";
     emptyRow.getCell(1).font = {
@@ -249,11 +250,16 @@ const writeRow = (
   row.getCell(4).value = req.labor || "—";
   row.getCell(5).value = fechaSol;
   row.getCell(6).value = fechaEnt;
-  row.getCell(7).value = req.estado;
-  row.getCell(8).value = det ? det.producto : "—";
-  row.getCell(9).value = det ? det.unidad_medida_req_abv : "—";
-  row.getCell(10).value = det ? Number(det.cantidad_solicitada || 0) : "—";
-  row.getCell(11).value = det?.comentario || "";
+  // Columna 7 = Turno: "Dia" | "Noche" | "—" (sin turno)
+  row.getCell(7).value =
+    req.tipo_turno === "Dia" || req.tipo_turno === "Noche"
+      ? req.tipo_turno
+      : "—";
+  row.getCell(8).value = req.estado;
+  row.getCell(9).value = det ? det.producto : "—";
+  row.getCell(10).value = det ? det.unidad_medida_req_abv : "—";
+  row.getCell(11).value = det ? Number(det.cantidad_solicitada || 0) : "—";
+  row.getCell(12).value = det?.comentario || "";
 
   // Alineación
   row.getCell(1).alignment = { horizontal: "center" };
@@ -263,10 +269,11 @@ const writeRow = (
   row.getCell(5).alignment = { horizontal: "center" };
   row.getCell(6).alignment = { horizontal: "center" };
   row.getCell(7).alignment = { horizontal: "center" };
-  row.getCell(8).alignment = { horizontal: "left" };
-  row.getCell(9).alignment = { horizontal: "center" };
-  row.getCell(10).alignment = { horizontal: "right" };
-  row.getCell(11).alignment = { horizontal: "left", wrapText: true };
+  row.getCell(8).alignment = { horizontal: "center" };
+  row.getCell(9).alignment = { horizontal: "left" };
+  row.getCell(10).alignment = { horizontal: "center" };
+  row.getCell(11).alignment = { horizontal: "right" };
+  row.getCell(12).alignment = { horizontal: "left", wrapText: true };
 
   // Estilo base (fuente + bordes)
   row.eachCell({ includeEmpty: true }, (cell) => {
@@ -281,12 +288,12 @@ const writeRow = (
 
   // Producto auditable: resaltar celda (solo si hay detalle y es auditable)
   if (hasDetalle && productoAuditable) {
-    row.getCell(8).fill = {
+    row.getCell(9).fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: COLOR_AUDITABLE_BG },
     };
-    row.getCell(8).font = {
+    row.getCell(9).font = {
       name: "Arial",
       size: 10,
       bold: true,
@@ -297,12 +304,12 @@ const writeRow = (
   // Estado coloreado
   const estadoBg = colorForEstado(req.estado);
   if (estadoBg) {
-    row.getCell(7).fill = {
+    row.getCell(8).fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: estadoBg },
     };
-    row.getCell(7).font = {
+    row.getCell(8).font = {
       name: "Arial",
       size: 10,
       bold: true,
