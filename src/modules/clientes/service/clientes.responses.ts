@@ -2,6 +2,19 @@ import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Moneda } from "../../../shared/enums/_generic/moneda";
 import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
+export interface AlmacenCarbonClienteResponse {
+  id_almacen: number;
+  id_cliente: number;
+  id_departamento: number | null;
+  departamento_nombre: string | null;
+  id_provincia: number | null;
+  provincia_nombre: string | null;
+  id_distrito: number | null;
+  distrito_nombre: string | null;
+  direccion: string;
+  estado: EstadoBase;
+}
+
 export interface ClienteResponse {
   id_cliente: number;
   tipo_entidad: string | null;
@@ -23,6 +36,8 @@ export interface ClienteResponse {
   cambios_log: RES_CambiosLog[] | null;
   cantidad_cuentas_bancarias: number;
   cuentas_bancarias?: CuentaBancariaResponse[];
+  cantidad_almacenes_carbon: number;
+  almacenes_carbon?: AlmacenCarbonClienteResponse[];
 }
 
 export interface CuentaBancariaResponse {

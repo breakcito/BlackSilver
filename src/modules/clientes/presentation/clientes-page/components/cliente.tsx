@@ -11,6 +11,7 @@ import {
   IconBuilding,
   IconUser,
   IconBuildingBank,
+  IconBuildingWarehouse,
   IconDotsVertical,
   IconPencil,
   IconHistory,
@@ -22,7 +23,9 @@ import type { ClienteResponse } from "../../../service/clientes.responses";
 interface Props {
   clientes: ClienteResponse[];
   loading: boolean;
+  modoCarbon?: boolean;
   onOpenCuentas: (cliente: ClienteResponse) => void;
+  onOpenAlmacenesCarbon?: (cliente: ClienteResponse) => void;
   onEdit: (cliente: ClienteResponse) => void;
   onHistory: (cliente: ClienteResponse) => void;
   onDelete: (cliente: ClienteResponse) => void;
@@ -32,7 +35,9 @@ interface Props {
 export const Cliente = ({
   clientes,
   loading,
+  modoCarbon = false,
   onOpenCuentas,
+  onOpenAlmacenesCarbon,
   onEdit,
   onHistory,
   onDelete,
@@ -113,6 +118,48 @@ export const Cliente = ({
             </Group>
           ),
         },
+        ...(modoCarbon
+          ? [
+              {
+                accessor: "cantidad_almacenes_carbon" as const,
+                title: "Almacenes",
+                width: 160,
+                textAlign: "center" as const,
+                render: (r: ClienteResponse) => (
+                  <Group gap="xs" justify="center" wrap="nowrap">
+                    <Badge
+                      color={r.cantidad_almacenes_carbon > 0 ? "teal" : "gray"}
+                      variant="light"
+                      size="sm"
+                      radius="xl"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {r.cantidad_almacenes_carbon === 1
+                        ? "1 almacen"
+                        : `${r.cantidad_almacenes_carbon} almacenes`}
+                    </Badge>
+                    {onOpenAlmacenesCarbon && (
+                      <Tooltip
+                        label="Asignar almacenes de carbon"
+                        withArrow
+                        position="left"
+                      >
+                        <ActionIcon
+                          variant="subtle"
+                          color="teal"
+                          radius="xl"
+                          size="sm"
+                          onClick={() => onOpenAlmacenesCarbon(r)}
+                        >
+                          <IconBuildingWarehouse size={16} stroke={1.5} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
+                ),
+              },
+            ]
+          : []),
         {
           accessor: "direccion",
           title: "Dirección",

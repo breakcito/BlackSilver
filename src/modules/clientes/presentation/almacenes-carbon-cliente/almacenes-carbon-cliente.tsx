@@ -14,59 +14,62 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 
-import { ProveedoresService } from "../../service/proveedores.service";
+import { ClientesService } from "../../service/clientes.service";
 import type {
-  AlmacenCarbonResponse,
-  ProveedorResponse,
-} from "../../service/proveedores.responses";
+  AlmacenCarbonClienteResponse,
+  ClienteResponse,
+} from "../../service/clientes.responses";
 import {
-  Schema_AlmacenCarbon,
-  type CrearAlmacenCarbonRequest,
-} from "../../service/proveedores.requests";
+  Schema_AlmacenCarbonCliente,
+  type CrearAlmacenCarbonClienteRequest,
+} from "../../service/clientes.requests";
 import { useNotify } from "../../../../hooks/useNotify";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { FormAlmacenCarbon } from "../../../../presentation/utils/form-almacen-carbon";
 
 interface Props {
-  proveedor: ProveedorResponse;
+  cliente: ClienteResponse;
   /**
    * Se dispara despues de cualquier cambio (crear/editar/eliminar) para
-   * que el padre actualice la fila del proveedor en su estado global con
+   * que el padre actualice la fila del cliente en su estado global con
    * la lista + count refrescados.
    */
-  onAlmacenGuardado?: (almacenes: AlmacenCarbonResponse[]) => void;
+  onAlmacenGuardado?: (almacenes: AlmacenCarbonClienteResponse[]) => void;
 }
 
 /**
- * Gestion de almacenes de carbon de un proveedor (modulo carbon).
+ * Gestion de almacenes de carbon de un cliente (modulo carbon).
  *
  * Carga inicial via GET, CRUD via service. A diferencia de LugaresExtraccion
  * (que reemplaza el set completo via PUT), aca cada almacen es una fila
- * independiente en `almacen_carbon_proveedor`, asi que se hace create /
+ * independiente en `almacen_carbon_cliente`, asi que se hace create /
  * update / delete granulares.
  *
- * Reusa el mismo `FormAlmacenCarbon` que el form inline de registro.
+ * Reusa el mismo `FormAlmacenCarbon` (generico parametrizado con
+ * `Schema_AlmacenCarbonCliente`) que el form del modulo gemelo de
+ * proveedores.
  */
-export const AlmacenesCarbonProveedor = ({
-  proveedor,
+export const AlmacenesCarbonCliente = ({
+  cliente,
   onAlmacenGuardado,
 }: Props) => {
   const { notifySuccess, notifyError } = useNotify();
 
-  const [almacenes, setAlmacenes] = useState<AlmacenCarbonResponse[]>([]);
+  const [almacenes, setAlmacenes] = useState<AlmacenCarbonClienteResponse[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [enEdicion, setEnEdicion] = useState<AlmacenCarbonResponse | null>(
-    null,
-  );
+  const [enEdicion, setEnEdicion] =
+    useState<AlmacenCarbonClienteResponse | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [eliminandoId, setEliminandoId] = useState<number | null>(null);
 
   const cargar = async () => {
     setLoading(true);
     try {
-      const resp = await ProveedoresService.getAlmacenesCarbonPorProveedor(
-        proveedor.id_proveedor,
+      const resp = await ClientesService.getAlmacenesCarbonPorCliente(
+        cliente.id_cliente,
       );
       if (resp.success && Array.isArray(resp.data)) {
         setAlmacenes(resp.data);
@@ -85,14 +88,14 @@ export const AlmacenesCarbonProveedor = ({
   useEffect(() => {
     void cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proveedor.id_proveedor]);
+  }, [cliente.id_cliente]);
 
   const abrirNuevo = () => {
     setEnEdicion(null);
     setModalAbierto(true);
   };
 
-  const abrirEditar = (a: AlmacenCarbonResponse) => {
+  const abrirEditar = (a: AlmacenCarbonClienteResponse) => {
     setEnEdicion(a);
     setModalAbierto(true);
   };
@@ -103,18 +106,18 @@ export const AlmacenesCarbonProveedor = ({
   };
 
   const handleGuardar = async (
-    payload: CrearAlmacenCarbonRequest,
+    payload: CrearAlmacenCarbonClienteRequest,
   ) => {
     setGuardando(true);
     try {
       const resp = enEdicion
-        ? await ProveedoresService.actualizarAlmacenCarbonPorProveedor(
-            proveedor.id_proveedor,
+        ? await ClientesService.actualizarAlmacenCarbonPorCliente(
+            cliente.id_cliente,
             enEdicion.id_almacen,
             payload,
           )
-        : await ProveedoresService.crearAlmacenCarbonPorProveedor(
-            proveedor.id_proveedor,
+        : await ClientesService.crearAlmacenCarbonPorCliente(
+            cliente.id_cliente,
             payload,
           );
 
@@ -137,11 +140,11 @@ export const AlmacenesCarbonProveedor = ({
     }
   };
 
-  const handleEliminar = async (a: AlmacenCarbonResponse) => {
+  const handleEliminar = async (a: AlmacenCarbonClienteResponse) => {
     setEliminandoId(a.id_almacen);
     try {
-      const resp = await ProveedoresService.eliminarAlmacenCarbonPorProveedor(
-        proveedor.id_proveedor,
+      const resp = await ClientesService.eliminarAlmacenCarbonPorCliente(
+        cliente.id_cliente,
         a.id_almacen,
       );
       if (resp.success) {
@@ -175,11 +178,11 @@ export const AlmacenesCarbonProveedor = ({
     <Stack gap="md">
       <div>
         <Text size="sm" fw={600} className="text-zinc-200">
-          {proveedor.razon_social}
+          {cliente.razon_social}
         </Text>
         <Text size="xs" className="text-zinc-400">
-          Almacenes propios donde este proveedor guarda carbon. Cada
-          registro vive bajo este proveedor.
+          Almacenes propios donde este cliente guarda carbon. Cada registro
+          vive bajo este cliente.
         </Text>
       </div>
 
@@ -204,7 +207,7 @@ export const AlmacenesCarbonProveedor = ({
         </div>
       ) : almacenes.length === 0 ? (
         <div className="text-zinc-500 text-xs italic px-3 py-2 border border-dashed border-zinc-800 rounded-lg">
-          Este proveedor no tiene almacenes registrados.
+          Este cliente no tiene almacenes registrados.
         </div>
       ) : (
         <Stack gap="xs">
@@ -289,13 +292,13 @@ export const AlmacenesCarbonProveedor = ({
         title={enEdicion ? "Editar almacén" : "Añadir almacén"}
         size="md"
       >
-        <FormAlmacenCarbon<CrearAlmacenCarbonRequest>
-          schema={Schema_AlmacenCarbon}
+        <FormAlmacenCarbon<CrearAlmacenCarbonClienteRequest>
+          schema={Schema_AlmacenCarbonCliente}
           initialData={initialData}
           onSave={handleGuardar}
           onCancel={cerrarModal}
           loading={guardando}
-          helpText="El almacen se persiste con el mismo `id_proveedor` y se asocia a la lista actual del proveedor."
+          helpText="El almacen se persiste con el mismo `id_cliente` y se asocia a la lista actual del cliente."
         />
       </ModalEstandar>
     </Stack>

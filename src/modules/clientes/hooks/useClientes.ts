@@ -52,10 +52,17 @@ export const useClientes = (modoCarbon: boolean = false) => {
         const cantidadConsistente =
           clienteActualizado.cantidad_cuentas_bancarias ?? cuentas.length;
 
+        const almacenes =
+          clienteActualizado.almacenes_carbon ?? c.almacenes_carbon ?? [];
+        const cantidadAlmacenesConsistente =
+          clienteActualizado.cantidad_almacenes_carbon ?? almacenes.length;
+
         return {
           ...clienteActualizado,
           cuentas_bancarias: cuentas,
           cantidad_cuentas_bancarias: cantidadConsistente,
+          almacenes_carbon: almacenes,
+          cantidad_almacenes_carbon: cantidadAlmacenesConsistente,
         };
       })
     );

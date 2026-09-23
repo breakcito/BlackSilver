@@ -9,10 +9,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { IconDeviceFloppy, IconExclamationCircle } from "@tabler/icons-react";
-import {
-  Schema_AlmacenCarbon,
-  type CrearAlmacenCarbonRequest,
-} from "../../modules/proveedores/service/proveedores.requests";
+import type { z } from "zod";
 import type {
   RES_Departamento,
   RES_Distrito,
@@ -22,7 +19,8 @@ import { AuxService } from "../../service/auxiliar.service";
 
 /**
  * Datos iniciales para modo edicion. Si NO se pasa, el form abre en modo
- * crear. El id_proveedor NO es parte del payload: lo resuelve el caller.
+ * crear. El id del padre (id_proveedor / id_cliente) NO es parte del
+ * payload: lo resuelve el caller.
  */
 export interface FormAlmacenCarbonInitial {
   id_departamento?: number | null;
@@ -31,9 +29,29 @@ export interface FormAlmacenCarbonInitial {
   direccion: string;
 }
 
-export interface FormAlmacenCarbonProps {
+/**
+ * Tipo del payload que el form emite. Garantiza que `direccion` es string
+ * obligatorio y que los ids de ubigeo son `number | null | undefined`.
+ * Cada modulo (proveedores / clientes) pasa su propio schema concreto
+ * con el tipo del payload.
+ */
+export type FormAlmacenCarbonPayload = {
+  id_departamento?: number | null;
+  id_provincia?: number | null;
+  id_distrito?: number | null;
+  direccion: string;
+};
+
+export interface FormAlmacenCarbonProps<T extends FormAlmacenCarbonPayload> {
   initialData?: FormAlmacenCarbonInitial;
-  onSave: (payload: CrearAlmacenCarbonRequest) => void;
+  /**
+   * Schema Zod que valida el payload antes de emitir `onSave`. Cada modulo
+   * pasa su schema concreto (Schema_AlmacenCarbon para proveedores,
+   * Schema_AlmacenCarbonCliente para clientes) — la forma es la misma,
+   * se mantiene separada para preservar la autodocumentacion del modulo.
+   */
+  schema: z.ZodType<T>;
+  onSave: (payload: T) => void;
   onCancel?: () => void;
   /**
    * Bandera externa de "guardando". Mientras es `true`, el boton principal
@@ -43,6 +61,11 @@ export interface FormAlmacenCarbonProps {
    * `false` porque no hay request en curso.
    */
   loading?: boolean;
+  /**
+   * Texto de ayuda debajo del formulario. Personaliza el recordatorio
+   * segun el modulo donde se usa (proveedor / cliente).
+   */
+  helpText?: string;
 }
 
 const inputClasses = {
@@ -52,21 +75,28 @@ const inputClasses = {
 };
 
 /**
- * Form de un almacen de carbon de un proveedor.
+ * Form de un almacen de carbon (modulo carbon).
  *
  * Solo emite el payload validado por `onSave` — no hace la llamada al
  * backend. Eso permite reusarlo en dos contextos:
- *   - Inline en `RegistroProveedorCarbon`: el caller guarda los datos en
- *     estado local (aun no existe id_proveedor).
+ *   - Inline en `RegistroProveedorCarbon` / `RegistroClienteCarbon`: el
+ *     caller guarda los datos en estado local (aun no existe el id del
+ *     padre).
  *   - Standalone en el modal del list view: el caller llama al service
  *     correspondiente.
+ *
+ * Se parametriza con un schema Zod generico para que cada modulo
+ * (proveedores / clientes) aporte su schema concreto y mantenga la
+ * autodocumentacion, sin duplicar 300 lineas de UI.
  */
-export const FormAlmacenCarbon = ({
+export const FormAlmacenCarbon = <T extends FormAlmacenCarbonPayload>({
   initialData,
+  schema,
   onSave,
   onCancel,
   loading = false,
-}: FormAlmacenCarbonProps) => {
+  helpText,
+}: FormAlmacenCarbonProps<T>) => {
   const [departamentos, setDepartamentos] = useState<RES_Departamento[]>([]);
   const [provincias, setProvincias] = useState<RES_Provincia[]>([]);
   const [distritos, setDistritos] = useState<RES_Distrito[]>([]);
@@ -138,20 +168,20 @@ export const FormAlmacenCarbon = ({
 
   const onSubmit = () => {
     setError(null);
-    const payload: CrearAlmacenCarbonRequest = {
+    const payload: FormAlmacenCarbonPayload = {
       id_departamento: idDepartamento ? Number(idDepartamento) : null,
       id_provincia: idProvincia ? Number(idProvincia) : null,
       id_distrito: idDistrito ? Number(idDistrito) : null,
       direccion: direccion.trim(),
     };
 
-    const parsed = Schema_AlmacenCarbon.safeParse(payload);
+    const parsed = schema.safeParse(payload);
     if (!parsed.success) {
       const msg = parsed.error.issues[0]?.message ?? "Datos invalidos";
       setError(msg);
       return;
     }
-    onSave(parsed.data as CrearAlmacenCarbonRequest);
+    onSave(parsed.data as T);
   };
 
   return (
@@ -264,10 +294,9 @@ export const FormAlmacenCarbon = ({
         </Grid.Col>
       </Grid>
 
-      {initialData && (
+      {initialData && helpText && (
         <Text size="xs" c="dimmed">
-          El almacen se persiste con el mismo `id_proveedor` y se asocia a la
-          lista actual del proveedor.
+          {helpText}
         </Text>
       )}
 

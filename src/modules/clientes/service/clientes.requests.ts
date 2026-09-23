@@ -153,3 +153,27 @@ export const Schema_EditarCuentaBancaria = z.object({
 export type EditarCuentaBancariaRequest = z.infer<
   typeof Schema_EditarCuentaBancaria
 >;
+
+/**
+ * Almacen de carbon de un cliente (modulo carbon).
+ *
+ * Misma forma que `Schema_AlmacenCarbon` (proveedores): direccion
+ * obligatoria (VARCHAR(256)), los ids de ubigeo son opcionales. La
+ * duplicacion es intencional: mantiene la autodocumentacion del modulo
+ * y permite divergir en el futuro sin tocar el modulo gemelo.
+ */
+export const Schema_AlmacenCarbonCliente = z.object({
+  id_departamento: z.number().int().positive().nullable().optional(),
+  id_provincia: z.number().int().positive().nullable().optional(),
+  id_distrito: z.number().int().positive().nullable().optional(),
+  direccion: z
+    .string()
+    .min(1, "La dirección es obligatoria")
+    .max(256, "La dirección no puede superar 256 caracteres"),
+});
+export type CrearAlmacenCarbonClienteRequest = z.infer<
+  typeof Schema_AlmacenCarbonCliente
+>;
+export type ActualizarAlmacenCarbonClienteRequest = z.infer<
+  typeof Schema_AlmacenCarbonCliente
+>;

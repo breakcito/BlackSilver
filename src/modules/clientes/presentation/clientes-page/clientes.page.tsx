@@ -9,11 +9,14 @@ import {
 import { useTitlePage } from "../../../../hooks/useTitlePage";
 import { useClientes } from "../../hooks/useClientes";
 import { RegistroCliente } from "../registro-cliente/registro-cliente";
+import { RegistroClienteCarbon } from "../registro-cliente-carbon/registro-cliente-carbon";
 import { CuentasBancarias } from "../cuentas-bancarias/cuentas-bancarias";
+import { AlmacenesCarbonCliente } from "../almacenes-carbon-cliente/almacenes-carbon-cliente";
 import { EditarClienteModal } from "../components/editar-cliente-modal";
 import { HistorialClienteModal } from "../components/historial-cliente-modal";
 import { useState } from "react";
 import type {
+  AlmacenCarbonClienteResponse,
   ClienteResponse,
   CuentaBancariaResponse,
 } from "../../service/clientes.responses";
@@ -90,6 +93,21 @@ export const ClientesPage = () => {
   const handleCloseHistory = () => {
     setClienteParaHistorial(null);
     closeHistorial();
+  };
+
+  // Modal de Almacenes de Carbon (solo tab Carbon)
+  const [clienteAlmacenes, setClienteAlmacenes] =
+    useState<ClienteResponse | null>(null);
+
+  const handleAlmacenesGuardados = (
+    cliente: ClienteResponse,
+    almacenes: AlmacenCarbonClienteResponse[],
+  ) => {
+    updateCliente({
+      ...cliente,
+      cantidad_almacenes_carbon: almacenes.length,
+      almacenes_carbon: almacenes,
+    });
   };
 
   const actualizarCuentas = (
@@ -221,7 +239,9 @@ export const ClientesPage = () => {
           <Cliente
             clientes={clientesFiltrados}
             loading={loading}
+            modoCarbon
             onOpenCuentas={(c) => setSelectedCliente(c)}
+            onOpenAlmacenesCarbon={(c) => setClienteAlmacenes(c)}
             onEdit={handleOpenEdit}
             onHistory={handleOpenHistory}
             onDelete={(c) => void eliminarCliente(c.id_cliente)}
@@ -237,14 +257,24 @@ export const ClientesPage = () => {
         title={modoCarbon ? "Nuevo Cliente de Carbón" : "Nuevo Cliente"}
         size="lg"
       >
-        <RegistroCliente
-          modoCarbon={modoCarbon}
-          onCancel={() => setOpenRegistro(false)}
-          onSuccess={(c) => {
-            insertCliente(c);
-            setOpenRegistro(false);
-          }}
-        />
+        {modoCarbon ? (
+          <RegistroClienteCarbon
+            onCancel={() => setOpenRegistro(false)}
+            onSuccess={(c) => {
+              insertCliente(c);
+              setOpenRegistro(false);
+            }}
+          />
+        ) : (
+          <RegistroCliente
+            modoCarbon={modoCarbon}
+            onCancel={() => setOpenRegistro(false)}
+            onSuccess={(c) => {
+              insertCliente(c);
+              setOpenRegistro(false);
+            }}
+          />
+        )}
       </ModalEstandar>
 
       {/* Modal: Editar Cliente */}
@@ -302,6 +332,27 @@ export const ClientesPage = () => {
             cliente={selectedCliente}
             onCuentaActualizada={handleCuentaActualizada}
             onCuentaAgregada={handleCuentaAgregada}
+          />
+        )}
+      </ModalEstandar>
+
+      {/* Modal: Almacenes de Carbon del Cliente (solo tab Carbon) */}
+      <ModalEstandar
+        opened={!!clienteAlmacenes}
+        close={() => setClienteAlmacenes(null)}
+        title={
+          clienteAlmacenes
+            ? `Almacenes de Carbon: ${clienteAlmacenes.razon_social}`
+            : "Almacenes de Carbon"
+        }
+        size="xl"
+      >
+        {clienteAlmacenes && (
+          <AlmacenesCarbonCliente
+            cliente={clienteAlmacenes}
+            onAlmacenGuardado={(almacenes) =>
+              handleAlmacenesGuardados(clienteAlmacenes, almacenes)
+            }
           />
         )}
       </ModalEstandar>

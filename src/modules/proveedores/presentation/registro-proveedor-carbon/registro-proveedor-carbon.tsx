@@ -34,6 +34,10 @@ import {
 } from "../../../../presentation/utils/modal-personal-externo";
 import { FormLugarExtraccion } from "../../../../presentation/utils/form-lugar-extraccion";
 import { FormAlmacenCarbon } from "../../../../presentation/utils/form-almacen-carbon";
+import {
+  Schema_AlmacenCarbon,
+  type CrearAlmacenCarbonRequest,
+} from "../../service/proveedores.requests";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
 import type { RES_LugarExtraccionCarbon } from "../../../../service/responses/lugar-extraccion-carbon";
@@ -758,7 +762,8 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         title={almacenEnEdicion ? "Editar almacén" : "Añadir almacén"}
         size="md"
       >
-        <FormAlmacenCarbon
+        <FormAlmacenCarbon<CrearAlmacenCarbonRequest>
+          schema={Schema_AlmacenCarbon}
           initialData={almacenEnEdicion ?? undefined}
           onSave={handleAlmacenGuardado}
           onCancel={cerrarModalAlmacen}
