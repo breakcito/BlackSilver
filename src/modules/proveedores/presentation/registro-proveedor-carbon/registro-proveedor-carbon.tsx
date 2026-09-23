@@ -12,15 +12,20 @@ import {
   TextInput,
 } from "@mantine/core";
 import {
+  IconBuildingWarehouse,
   IconDeviceFloppy,
   IconExclamationCircle,
+  IconPencil,
   IconTrash,
   IconUser,
   IconPlus,
 } from "@tabler/icons-react";
 
 import { useRegistroProveedorCarbon } from "../../hooks/useRegistroProveedorCarbon";
-import type { LugarExtraccionTemporal } from "../../hooks/useRegistroProveedorCarbon";
+import type {
+  AlmacenCarbonTemporal,
+  LugarExtraccionTemporal,
+} from "../../hooks/useRegistroProveedorCarbon";
 import { TipoEntidad } from "../../../../shared/enums/_generic/tipo-entidad";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
 import {
@@ -28,6 +33,7 @@ import {
   type PersonalLocal,
 } from "../../../../presentation/utils/modal-personal-externo";
 import { FormLugarExtraccion } from "../../../../presentation/utils/form-lugar-extraccion";
+import { FormAlmacenCarbon } from "../../../../presentation/utils/form-almacen-carbon";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
 import type { RES_LugarExtraccionCarbon } from "../../../../service/responses/lugar-extraccion-carbon";
@@ -35,6 +41,7 @@ import type { ProveedorResponse } from "../../service/proveedores.responses";
 import { AuxService } from "../../../../service/auxiliar.service";
 import { TipoCarbonService } from "../../../tipo-carbon/service/tipo-carbon.service";
 import type { RES_TipoCarbon } from "../../../tipo-carbon/service/tipo-carbon.responses";
+import { useUbicacionCompleta } from "../../../../hooks/useUbicacionCompleta";
 
 interface Props {
   onCancel: () => void;
@@ -60,6 +67,10 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
     tiposCarbon,
     lugaresExtraccion,
     setLugaresExtraccion,
+    almacenesCarbon,
+    addAlmacenCarbon,
+    removeAlmacenCarbon,
+    updateAlmacenCarbon,
     contratosNuevos,
     setContratosFiles,
     loading,
@@ -74,6 +85,10 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
 
   const [openRepresentante, setOpenRepresentante] = useState(false);
   const [modalNuevoLugarAbierto, setModalNuevoLugarAbierto] = useState(false);
+  const [modalAlmacenAbierto, setModalAlmacenAbierto] = useState(false);
+  const [almacenEnEdicionTempId, setAlmacenEnEdicionTempId] = useState<
+    string | null
+  >(null);
 
   const [todosTipos, setTodosTipos] = useState<RES_TipoCarbon[]>([]);
   const [loadingTipos, setLoadingTipos] = useState(false);
@@ -85,6 +100,11 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
   >([]);
   const [loadingLugares, setLoadingLugares] = useState(false);
   const [searchLugar, setSearchLugar] = useState("");
+
+  // Ubigeo completo para resolver nombres de los almacenes que el usuario
+  // agrega antes de guardar el proveedor (aun no tienen id_proveedor ni
+  // hidratacion desde el backend, solo lo que el usuario tipeo).
+  const { departamentos, provincias, distritos } = useUbicacionCompleta();
 
   // Carga unica al montar: tipos de carbon + catalogo global de lugares.
   useEffect(() => {
@@ -205,6 +225,57 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
     );
     setModalNuevoLugarAbierto(false);
   };
+
+  // Helpers de ubigeo: resuelven id -> nombre para mostrar el path geografico
+  // del almacen dentro del card de la lista local.
+  const nombreUbigeo = (
+    idDpto: number | null | undefined,
+    idProv: number | null | undefined,
+    idDist: number | null | undefined,
+  ): string => {
+    const parts: string[] = [];
+    if (idDpto) {
+      parts.push(departamentos.find((d) => d.id === idDpto)?.nombre ?? "");
+    }
+    if (idProv) {
+      parts.push(provincias.find((p) => p.id === idProv)?.nombre ?? "");
+    }
+    if (idDist) {
+      parts.push(distritos.find((d) => d.id === idDist)?.nombre ?? "");
+    }
+    return parts.filter(Boolean).join(" / ");
+  };
+
+  const abrirNuevoAlmacen = () => {
+    setAlmacenEnEdicionTempId(null);
+    setModalAlmacenAbierto(true);
+  };
+
+  const abrirEdicionAlmacen = (tempId: string) => {
+    setAlmacenEnEdicionTempId(tempId);
+    setModalAlmacenAbierto(true);
+  };
+
+  const cerrarModalAlmacen = () => {
+    setModalAlmacenAbierto(false);
+    setAlmacenEnEdicionTempId(null);
+  };
+
+  const handleAlmacenGuardado = (
+    payload: import("../../service/proveedores.requests").CrearAlmacenCarbonRequest,
+  ) => {
+    if (almacenEnEdicionTempId === null) {
+      addAlmacenCarbon(payload);
+    } else {
+      updateAlmacenCarbon(almacenEnEdicionTempId, payload);
+    }
+    cerrarModalAlmacen();
+  };
+
+  const almacenEnEdicion: AlmacenCarbonTemporal | null =
+    almacenEnEdicionTempId === null
+      ? null
+      : almacenesCarbon.find((a) => a.tempId === almacenEnEdicionTempId) ?? null;
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
@@ -394,8 +465,7 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
             Lugares de extracción
           </Text>
           <Text size="xs" className="text-zinc-500">
-            Selecciona los sitios de donde este proveedor extrae carbón. Cada
-            sitio vive en el catálogo global; usa el botón "+" para agregar uno
+            Selecciona los sitios de donde este proveedor extrae carbón. Usa el botón "+" para agregar uno
             nuevo.
           </Text>
         </div>
@@ -473,6 +543,105 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
 
         <Text size="xs" className="text-zinc-500">
           {lugaresExtraccion.length} lugar(es) seleccionado(s).
+        </Text>
+      </div>
+
+      {/* Almacenes de Carbon */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <Text size="sm" fw={600} className="text-zinc-300">
+              Almacenes de Carbón
+            </Text>
+            <Text size="xs" className="text-zinc-500">
+              Añadir almacenes del proveedor
+            </Text>
+          </div>
+          <Button
+            leftSection={<IconPlus size={14} />}
+            radius="xl"
+            size="xs"
+            variant="filled"
+            color="teal"
+            onClick={abrirNuevoAlmacen}
+            className="font-semibold shadow-md shadow-teal-900/30"
+          >
+            Añadir almacén
+          </Button>
+        </div>
+
+        {almacenesCarbon.length === 0 ? (
+          <div className="text-zinc-500 text-xs italic px-3 py-2 border border-dashed border-zinc-800 rounded-lg">
+            Sin almacenes. Si el proveedor no tiene almacenes, puedes dejar
+            esta sección vacía y agregarlos después desde la lista.
+          </div>
+        ) : (
+          <Stack gap="xs">
+            {almacenesCarbon.map((a) => {
+              const geo = nombreUbigeo(
+                a.id_departamento ?? null,
+                a.id_provincia ?? null,
+                a.id_distrito ?? null,
+              );
+              return (
+                <div
+                  key={a.tempId}
+                  className="flex items-center justify-between gap-3 p-3 bg-linear-to-r from-zinc-900/60 to-zinc-900/30 border border-zinc-800 rounded-xl hover:border-teal-700/60 transition-colors"
+                >
+                  <Group gap="sm" wrap="nowrap">
+                    <Badge
+                      variant="filled"
+                      color="teal"
+                      radius="xl"
+                      size="lg"
+                      className="shrink-0"
+                    >
+                      <IconBuildingWarehouse size={14} stroke={1.8} />
+                    </Badge>
+                    <div className="flex flex-col min-w-0">
+                      <Text size="xs" c="dimmed" className="leading-tight">
+                        {geo || "—"}
+                      </Text>
+                      <Text
+                        size="sm"
+                        fw={500}
+                        className="text-zinc-100 leading-tight truncate"
+                      >
+                        {a.direccion}
+                      </Text>
+                    </div>
+                  </Group>
+                  <Group gap={4} className="shrink-0">
+                    <Button
+                      variant="subtle"
+                      color="indigo"
+                      size="xs"
+                      radius="xl"
+                      leftSection={<IconPencil size={14} />}
+                      onClick={() => abrirEdicionAlmacen(a.tempId)}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="subtle"
+                      color="red"
+                      size="xs"
+                      radius="xl"
+                      leftSection={<IconTrash size={14} />}
+                      onClick={() => removeAlmacenCarbon(a.tempId)}
+                    >
+                      Quitar
+                    </Button>
+                  </Group>
+                </div>
+              );
+            })}
+          </Stack>
+        )}
+
+        <Text size="xs" className="text-zinc-500">
+          {almacenesCarbon.length} almacén(es) agregado(s) — se guardarán al
+          confirmar el proveedor.
         </Text>
       </div>
 
@@ -580,6 +749,19 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         <FormLugarExtraccion
           onSuccess={handleNuevoLugarCreado}
           onCancel={() => setModalNuevoLugarAbierto(false)}
+        />
+      </ModalEstandar>
+
+      <ModalEstandar
+        opened={modalAlmacenAbierto}
+        close={cerrarModalAlmacen}
+        title={almacenEnEdicion ? "Editar almacén" : "Añadir almacén"}
+        size="md"
+      >
+        <FormAlmacenCarbon
+          initialData={almacenEnEdicion ?? undefined}
+          onSave={handleAlmacenGuardado}
+          onCancel={cerrarModalAlmacen}
         />
       </ModalEstandar>
     </form>

@@ -3,8 +3,9 @@ import { ProveedoresService } from "../service/proveedores.service";
 import { useNotify } from "../../../hooks/useNotify";
 import {
   Schema_CrearProveedor,
-  type CrearProveedorRequest,
+  type CrearAlmacenCarbonRequest,
   type CrearPersonalRequest,
+  type CrearProveedorRequest,
 } from "../service/proveedores.requests";
 import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 import type { ProveedorResponse } from "../service/proveedores.responses";
@@ -41,6 +42,21 @@ export interface LugarExtraccionTemporal {
   direccion: string;
 }
 
+/**
+ * Almacen de carbon capturado en el formulario de registro antes de
+ * persistir. Cada almacen es propio del proveedor (1:N), asi que el
+ * backend lo crea con el `id_proveedor` devuelto por el POST de crear
+ * proveedor. `tempId` solo es la clave local para React (no viaja al
+ * backend). Tras `crearAlmacenCarbonPorProveedor` la fila queda
+ * refrescada con el `id_almacen` real (ver `submit`).
+ */
+export interface AlmacenCarbonTemporal extends CrearAlmacenCarbonRequest {
+  tempId: string;
+  departamento_nombre?: string | null;
+  provincia_nombre?: string | null;
+  distrito_nombre?: string | null;
+}
+
 export const useRegistroProveedorCarbon = (
   onSuccess: (p: ProveedorResponse) => void,
 ) => {
@@ -75,6 +91,10 @@ export const useRegistroProveedorCarbon = (
 
   const [lugaresExtraccion, setLugaresExtraccion] = useState<
     LugarExtraccionTemporal[]
+  >([]);
+
+  const [almacenesCarbon, setAlmacenesCarbon] = useState<
+    AlmacenCarbonTemporal[]
   >([]);
 
   const handleChange = <K extends keyof CrearProveedorRequest>(
@@ -122,6 +142,50 @@ export const useRegistroProveedorCarbon = (
   }
   setTiposCarbon(next);
 };
+
+  /**
+   * Anade un almacen al array local. Si ya hay uno identico (misma
+   * direccion), se ignora para evitar duplicados visuales antes de
+   * guardar. El backend no impone UNIQUE (es 1:N libre).
+   */
+  const addAlmacenCarbon = (payload: CrearAlmacenCarbonRequest) => {
+    setAlmacenesCarbon((prev) => {
+      const dup = prev.some(
+        (a) =>
+          a.direccion.trim().toLowerCase() ===
+            payload.direccion.trim().toLowerCase() &&
+          (a.id_departamento ?? null) === (payload.id_departamento ?? null) &&
+          (a.id_provincia ?? null) === (payload.id_provincia ?? null) &&
+          (a.id_distrito ?? null) === (payload.id_distrito ?? null),
+      );
+      if (dup) return prev;
+      return [
+        ...prev,
+        {
+          ...payload,
+          tempId:
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+              ? crypto.randomUUID()
+              : `tmp-${Date.now()}-${prev.length}`,
+        },
+      ];
+    });
+  };
+
+  const removeAlmacenCarbon = (tempId: string) => {
+    setAlmacenesCarbon((prev) => prev.filter((a) => a.tempId !== tempId));
+  };
+
+  const updateAlmacenCarbon = (
+    tempId: string,
+    payload: CrearAlmacenCarbonRequest,
+  ) => {
+    setAlmacenesCarbon((prev) =>
+      prev.map((a) =>
+        a.tempId === tempId ? { ...payload, tempId: a.tempId } : a,
+      ),
+    );
+  };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -227,6 +291,32 @@ export const useRegistroProveedorCarbon = (
         }
       }
 
+      // 5) crear los almacenes de carbon del proveedor. Cada uno es una
+      //    fila nueva en `almacen_carbon_proveedor` con su propio
+      //    `direccion`. Un fallo aqui no revierte nada previo; avisamos
+      //    y dejamos pendientes.
+      const almacenesFallados: string[] = [];
+      for (const a of almacenesCarbon) {
+        try {
+          const respAlmacen =
+            await ProveedoresService.crearAlmacenCarbonPorProveedor(
+              created.id_proveedor,
+              {
+                id_departamento: a.id_departamento ?? null,
+                id_provincia: a.id_provincia ?? null,
+                id_distrito: a.id_distrito ?? null,
+                direccion: a.direccion,
+              },
+            );
+          if (!respAlmacen.success) {
+            almacenesFallados.push(a.direccion);
+          }
+        } catch (err) {
+          console.error(err);
+          almacenesFallados.push(a.direccion);
+        }
+      }
+
       const piezas: string[] = [];
       if (fallidos.length > 0) {
         piezas.push(`personal: ${fallidos.join(", ")}`);
@@ -237,6 +327,11 @@ export const useRegistroProveedorCarbon = (
       if (lugaresFallaron) {
         piezas.push("lugares de extraccion (completa desde la lista)");
       }
+      if (almacenesFallados.length > 0) {
+        piezas.push(
+          `almacenes de carbon: ${almacenesFallados.join(", ")}`,
+        );
+      }
 
       if (piezas.length > 0) {
         notifyError(
@@ -244,7 +339,7 @@ export const useRegistroProveedorCarbon = (
         );
       } else {
         notifySuccess(
-          "Proveedor, personal, tipos de carbon y lugares de extraccion registrados correctamente",
+          "Proveedor, personal, tipos de carbon, lugares de extraccion y almacenes de carbon registrados correctamente",
         );
       }
 
@@ -263,6 +358,10 @@ export const useRegistroProveedorCarbon = (
     tiposCarbon,
     lugaresExtraccion,
     setLugaresExtraccion,
+    almacenesCarbon,
+    addAlmacenCarbon,
+    removeAlmacenCarbon,
+    updateAlmacenCarbon,
     contratosNuevos,
     setContratosFiles,
     loading,

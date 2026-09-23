@@ -1,7 +1,9 @@
 import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
+  ActualizarAlmacenCarbonRequest,
   ActualizarProveedorRequest,
+  CrearAlmacenCarbonRequest,
   CrearBancoRequest,
   CrearCuentaBancariaRequest,
   CrearProveedorRequest,
@@ -12,7 +14,9 @@ import type {
 } from "./proveedores.requests";
 
 export type {
+  ActualizarAlmacenCarbonRequest,
   ActualizarProveedorRequest,
+  CrearAlmacenCarbonRequest,
   CrearBancoRequest,
   CrearCuentaBancariaRequest,
   CrearProveedorRequest,
@@ -22,6 +26,7 @@ export type {
   SetTiposCarbonProveedorRequest,
 };
 import type {
+  AlmacenCarbonResponse,
   CuentaBancariaResponse,
   LugarExtraccionResponse,
   ProveedorResponse,
@@ -172,6 +177,51 @@ export const ProveedoresService = {
     const { data } = await api.put<IRespuesta<LugarExtraccionResponse[]>>(
       `/proveedores/${idProveedor}/lugares-extraccion`,
       payload,
+    );
+    return data;
+  },
+
+  /**
+   * Almacenes de carbon de un proveedor (modulo carbon).
+   */
+  getAlmacenesCarbonPorProveedor: async (
+    idProveedor: number,
+  ): Promise<IRespuesta<AlmacenCarbonResponse[]>> => {
+    const { data } = await api.get<IRespuesta<AlmacenCarbonResponse[]>>(
+      `/proveedores/${idProveedor}/almacenes-carbon`,
+    );
+    return data;
+  },
+
+  crearAlmacenCarbonPorProveedor: async (
+    idProveedor: number,
+    payload: CrearAlmacenCarbonRequest,
+  ): Promise<IRespuesta<AlmacenCarbonResponse>> => {
+    const { data } = await api.post<IRespuesta<AlmacenCarbonResponse>>(
+      `/proveedores/${idProveedor}/almacenes-carbon`,
+      payload,
+    );
+    return data;
+  },
+
+  actualizarAlmacenCarbonPorProveedor: async (
+    idProveedor: number,
+    idAlmacen: number,
+    payload: ActualizarAlmacenCarbonRequest,
+  ): Promise<IRespuesta<AlmacenCarbonResponse>> => {
+    const { data } = await api.put<IRespuesta<AlmacenCarbonResponse>>(
+      `/proveedores/${idProveedor}/almacenes-carbon/${idAlmacen}`,
+      payload,
+    );
+    return data;
+  },
+
+  eliminarAlmacenCarbonPorProveedor: async (
+    idProveedor: number,
+    idAlmacen: number,
+  ): Promise<IRespuesta<AlmacenCarbonResponse>> => {
+    const { data } = await api.delete<IRespuesta<AlmacenCarbonResponse>>(
+      `/proveedores/${idProveedor}/almacenes-carbon/${idAlmacen}`,
     );
     return data;
   },

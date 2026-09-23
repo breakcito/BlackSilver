@@ -30,8 +30,10 @@ import { CuentasBancarias } from "../cuentas-bancarias/cuentas-bancarias";
 import { PersonalExternoProveedor } from "../personal-externo-proveedor/personal-externo-proveedor";
 import { TiposCarbonProveedor } from "../tipos-carbon-proveedor/tipos-carbon-proveedor";
 import { LugaresExtraccionProveedor } from "../lugares-extraccion-proveedor/lugares-extraccion-proveedor";
+import { AlmacenesCarbonProveedor } from "../almacenes-carbon-proveedor/almacenes-carbon-proveedor";
 import { ContratoProveedor } from "../contrato-proveedor/contrato-proveedor";
 import type {
+  AlmacenCarbonResponse,
   CuentaBancariaResponse,
   LugarExtraccionResponse,
   ProveedorResponse,
@@ -96,6 +98,8 @@ export const ProveedoresPage = () => {
     useState<ProveedorResponse | null>(null);
   const [proveedorLugares, setProveedorLugares] =
     useState<ProveedorResponse | null>(null);
+  const [proveedorAlmacenes, setProveedorAlmacenes] =
+    useState<ProveedorResponse | null>(null);
   const [proveedorContrato, setProveedorContrato] =
     useState<ProveedorResponse | null>(null);
   const [busqueda, setBusqueda] = useState("");
@@ -125,6 +129,13 @@ export const ProveedoresPage = () => {
       ? (proveedores.find(
           (p) => p.id_proveedor === proveedorLugares.id_proveedor,
         ) ?? proveedorLugares)
+      : null;
+
+  const proveedorAlmacenesEnGestion =
+    proveedorAlmacenes
+      ? (proveedores.find(
+          (p) => p.id_proveedor === proveedorAlmacenes.id_proveedor,
+        ) ?? proveedorAlmacenes)
       : null;
 
   const proveedorContratoEnGestion =
@@ -198,6 +209,16 @@ export const ProveedoresPage = () => {
     updateProveedor(proveedor.id_proveedor, {
       cantidad_lugares_extraccion: lugares.length,
       lugares_extraccion: lugares,
+    });
+  };
+
+  const handleAlmacenesGuardados = (
+    proveedor: ProveedorResponse,
+    almacenes: AlmacenCarbonResponse[],
+  ) => {
+    updateProveedor(proveedor.id_proveedor, {
+      cantidad_almacenes_carbon: almacenes.length,
+      almacenes_carbon: almacenes,
     });
   };
 
@@ -390,6 +411,7 @@ export const ProveedoresPage = () => {
             onOpenPersonal={(p) => setProveedorPersonal(p)}
             onOpenTiposCarbon={(p) => setProveedorTiposCarbon(p)}
             onOpenLugaresExtraccion={(p) => setProveedorLugares(p)}
+            onOpenAlmacenesCarbon={(p) => setProveedorAlmacenes(p)}
             onOpenContrato={(p) => setProveedorContrato(p)}
             onEditar={(p) => setProveedorEnEdicion(p)}
             onEliminar={(p) => {
@@ -557,6 +579,30 @@ export const ProveedoresPage = () => {
             onGuardados={(lugares) => {
               handleLugaresGuardados(proveedorLugaresEnGestion, lugares);
               setProveedorLugares(null);
+            }}
+          />
+        )}
+      </ModalEstandar>
+
+      {/* Modal: Almacenes de carbon del proveedor (solo tab Carbon) */}
+      <ModalEstandar
+        opened={!!proveedorAlmacenes}
+        close={() => setProveedorAlmacenes(null)}
+        title="Almacenes de Carbon"
+        size="lg"
+      >
+        {proveedorAlmacenesEnGestion && (
+          <AlmacenesCarbonProveedor
+            proveedor={proveedorAlmacenesEnGestion}
+            onAlmacenGuardado={(almacenes) => {
+              handleAlmacenesGuardados(
+                proveedorAlmacenesEnGestion,
+                almacenes,
+              );
+              // NO cerramos el modal: el componente refresca su lista
+              // local tras cada accion y emite el array refrescado para
+              // que el padre actualice su estado global. El usuario
+              // cierra manualmente cuando termine.
             }}
           />
         )}

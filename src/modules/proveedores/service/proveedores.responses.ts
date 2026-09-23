@@ -34,6 +34,8 @@ export interface ProveedorResponse {
   tipos_carbon?: TipoCarbonProveedorResponse[];
   cantidad_lugares_extraccion: number;
   lugares_extraccion?: LugarExtraccionResponse[];
+  cantidad_almacenes_carbon: number;
+  almacenes_carbon?: AlmacenCarbonResponse[];
 }
 
 export interface CuentaBancariaResponse {
@@ -64,4 +66,17 @@ export interface LugarExtraccionResponse {
   id_distrito: number | null;
   distrito_nombre: string | null;
   direccion: string;
+}
+
+export interface AlmacenCarbonResponse {
+  id_almacen: number;
+  id_proveedor: number;
+  id_departamento: number | null;
+  departamento_nombre: string | null;
+  id_provincia: number | null;
+  provincia_nombre: string | null;
+  id_distrito: number | null;
+  distrito_nombre: string | null;
+  direccion: string;
+  estado: EstadoBase;
 }

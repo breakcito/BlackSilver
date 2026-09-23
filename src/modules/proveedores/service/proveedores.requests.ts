@@ -219,3 +219,23 @@ export const Schema_SetLugaresExtraccionProveedor = z.object({
 export type SetLugaresExtraccionProveedorRequest = z.infer<
   typeof Schema_SetLugaresExtraccionProveedor
 >;
+
+/**
+ * Almacenes de carbon de un proveedor (modulo carbon).
+ *
+ * Cada almacen es propio del proveedor (1:N): se persiste en
+ * `almacen_carbon_proveedor` con `id_proveedor`. `direccion` es obligatoria;
+ * los ids de ubigeo son opcionales. Se valida la longitud maxima del
+ * VARCHAR(256) declarado en la tabla.
+ */
+export const Schema_AlmacenCarbon = z.object({
+  id_departamento: z.number().int().positive().nullable().optional(),
+  id_provincia: z.number().int().positive().nullable().optional(),
+  id_distrito: z.number().int().positive().nullable().optional(),
+  direccion: z
+    .string()
+    .min(1, "La dirección es obligatoria")
+    .max(256, "La dirección no puede superar 256 caracteres"),
+});
+export type CrearAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon>;
+export type ActualizarAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon>;

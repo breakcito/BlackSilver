@@ -11,6 +11,7 @@ import {
 import {
   IconBuildingBank,
   IconBuilding,
+  IconBuildingWarehouse,
   IconClipboardText,
   IconDotsVertical,
   IconFlame,
@@ -27,7 +28,7 @@ import type { DataTableColumn } from "mantine-datatable";
 import type { ProveedorResponse } from "../../../service/proveedores.responses";
 import { TipoEntidad } from "../../../../../shared/enums/_generic/tipo-entidad";
 
-type Col = DataTableColumn<ProveedorResponse>;
+type Col = DataTableColumn<ProveedorResponse> & { id?: string };
 
 interface Props {
   proveedores: ProveedorResponse[];
@@ -37,6 +38,7 @@ interface Props {
   onOpenPersonal: (proveedor: ProveedorResponse) => void;
   onOpenTiposCarbon?: (proveedor: ProveedorResponse) => void;
   onOpenLugaresExtraccion?: (proveedor: ProveedorResponse) => void;
+  onOpenAlmacenesCarbon?: (proveedor: ProveedorResponse) => void;
   onOpenContrato?: (proveedor: ProveedorResponse) => void;
   onEditar: (proveedor: ProveedorResponse) => void;
   onEliminar: (proveedor: ProveedorResponse) => void;
@@ -51,6 +53,7 @@ export const Proveedor = ({
   onOpenPersonal,
   onOpenTiposCarbon,
   onOpenLugaresExtraccion,
+  onOpenAlmacenesCarbon,
   onOpenContrato,
   onEditar,
   onEliminar,
@@ -84,8 +87,8 @@ export const Proveedor = ({
               <IconBuilding className="w-5 h-5" />
             )}
           </ThemeIcon>
-          <div>
-            <Text size="sm" fw={500} className="text-zinc-200">
+          <div className="min-w-0">
+            <Text size="sm" fw={500} className="text-zinc-200 truncate">
               {r.razon_social}
             </Text>
             <Text size="xs" className="text-zinc-500">
@@ -93,6 +96,23 @@ export const Proveedor = ({
               {r.ruc && ` · RUC: ${r.ruc}`}
               {r.dni && ` · DNI: ${r.dni}`}
             </Text>
+            {modoCarbon && r.codigo_reinfo && (
+              <Group gap={4} wrap="nowrap" mt={2}>
+                <Text size="xs" className="text-zinc-500 shrink-0">
+                  Cod. Reinfo:
+                </Text>
+                <Badge
+                  color="pink"
+                  variant="light"
+                  size="sm"
+                  radius="xl"
+                  className="font-mono tracking-wide truncate"
+                  title={r.codigo_reinfo}
+                >
+                  {r.codigo_reinfo}
+                </Badge>
+              </Group>
+            )}
           </div>
         </Group>
       ),
@@ -150,33 +170,6 @@ export const Proveedor = ({
     ...(modoCarbon
       ? [
           {
-            accessor: "codigo_reinfo" as const,
-            title: "REINFO",
-            width: 160,
-            textAlign: "center" as const,
-            render: (r: ProveedorResponse) =>
-              r.codigo_reinfo ? (
-                <Badge
-                  color="pink"
-                  variant="light"
-                  size="sm"
-                  radius="xl"
-                  className="font-mono tracking-wide truncate max-w-40"
-                  title={r.codigo_reinfo}
-                >
-                  {r.codigo_reinfo}
-                </Badge>
-              ) : (
-                <Text size="xs" className="text-zinc-500">
-                  —
-                </Text>
-              ),
-          },
-        ]
-      : []),
-    ...(modoCarbon
-      ? [
-          {
             accessor: "cantidad_tipos_carbon" as const,
             title: "Tipos Carbon",
             width: 130,
@@ -195,7 +188,7 @@ export const Proveedor = ({
                 </Badge>
                 {onOpenTiposCarbon && (
                   <Tooltip
-                    label="Gestionar tipos de carbon"
+                    label="Asignar tipos de carbon"
                     withArrow
                     position="left"
                   >
@@ -232,7 +225,7 @@ export const Proveedor = ({
                 </Badge>
                 {onOpenLugaresExtraccion && (
                   <Tooltip
-                    label="Gestionar lugares de extraccion"
+                    label="Ver lugares de extraccion"
                     withArrow
                     position="left"
                   >
@@ -244,6 +237,44 @@ export const Proveedor = ({
                       onClick={() => onOpenLugaresExtraccion(r)}
                     >
                       <IconMapPin size={16} stroke={1.5} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </Group>
+            ),
+          },
+          {
+            accessor: "cantidad_almacenes_carbon" as const,
+            title: "Almacenes",
+            width: 160,
+            textAlign: "center" as const,
+            render: (r: ProveedorResponse) => (
+              <Group gap="xs" justify="center" wrap="nowrap">
+                <Badge
+                  color={r.cantidad_almacenes_carbon > 0 ? "teal" : "gray"}
+                  variant="light"
+                  size="sm"
+                  radius="xl"
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  {r.cantidad_almacenes_carbon === 1
+                    ? "1 almacen"
+                    : `${r.cantidad_almacenes_carbon} almacenes`}
+                </Badge>
+                {onOpenAlmacenesCarbon && (
+                  <Tooltip
+                    label="Asignar almacenes de carbon"
+                    withArrow
+                    position="left"
+                  >
+                    <ActionIcon
+                      variant="subtle"
+                      color="teal"
+                      radius="xl"
+                      size="sm"
+                      onClick={() => onOpenAlmacenesCarbon(r)}
+                    >
+                      <IconBuildingWarehouse size={16} stroke={1.5} />
                     </ActionIcon>
                   </Tooltip>
                 )}
@@ -264,6 +295,7 @@ export const Proveedor = ({
                     variant="light"
                     size="sm"
                     radius="xl"
+                    style={{ whiteSpace: "nowrap" }}
                   >
                     {n === 0
                       ? "Sin archivos"
