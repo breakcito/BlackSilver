@@ -4,8 +4,10 @@ import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 
 /**
  * Registro de cliente.
- * Patron Proveedores: RUC obligatorio (11 digitos, prefijo 10/20 segun
- * tipo_entidad); DNI opcional (8 digitos si llega). Razon social obligatoria.
+ * Patron Proveedores (mismo criterio): RUC opcional (11 digitos, prefijo
+ * 10/20 segun tipo_entidad); DNI opcional (8 digitos si llega).
+ * El frontend mapea 8 digitos -> campo dni, 11 digitos -> campo ruc.
+ * Razon social obligatoria.
  *
  * `para_carbon` opcional: true para clientes del flujo de compra de
  * carbón, false (default) para clientes de logística.
@@ -19,7 +21,12 @@ export const Schema_CrearCliente = z
       .refine((val) => !val || /^\d{8}$/.test(val), {
         message: "El DNI debe tener exactamente 8 dígitos",
       }),
-    ruc: z.string().min(1, "El RUC es obligatorio"),
+    ruc: z
+      .string()
+      .nullable()
+      .refine((val) => !val || /^\d{11}$/.test(val), {
+        message: "El RUC debe tener exactamente 11 dígitos",
+      }),
     razon_social: z.string().min(2, "La razón social es obligatoria"),
     direccion: z.string().nullable(),
     telefono: z.string().nullable(),
@@ -32,30 +39,35 @@ export const Schema_CrearCliente = z
     para_carbon: z.boolean().optional().default(false),
   })
   .superRefine((data, ctx) => {
-    if (!/^\d{11}$/.test(data.ruc)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El RUC debe tener exactamente 11 dígitos",
-        path: ["ruc"],
-      });
-    } else if (
-      data.tipo_entidad === TipoEntidad.Juridica &&
-      !data.ruc.startsWith("20")
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El RUC de una persona jurídica debe comenzar con 20",
-        path: ["ruc"],
-      });
-    } else if (
-      data.tipo_entidad === TipoEntidad.Natural &&
-      !data.ruc.startsWith("10")
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El RUC de una persona natural debe comenzar con 10",
-        path: ["ruc"],
-      });
+    // Validacion de prefijo de RUC segun tipo de entidad. Solo se aplica si
+    // llega ruc: cuando es null, el documento viene por dni (8 digitos).
+    const ruc = data.ruc ?? "";
+    if (ruc.length > 0) {
+      if (!/^\d{11}$/.test(ruc)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El RUC debe tener exactamente 11 dígitos",
+          path: ["ruc"],
+        });
+      } else if (
+        data.tipo_entidad === TipoEntidad.Juridica &&
+        !ruc.startsWith("20")
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El RUC de una persona jurídica debe comenzar con 20",
+          path: ["ruc"],
+        });
+      } else if (
+        data.tipo_entidad === TipoEntidad.Natural &&
+        !ruc.startsWith("10")
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El RUC de una persona natural debe comenzar con 10",
+          path: ["ruc"],
+        });
+      }
     }
   });
 
@@ -63,8 +75,9 @@ export type CrearClienteRequest = z.infer<typeof Schema_CrearCliente>;
 
 /**
  * Edicion administrativa de cliente.
- * Mismas reglas que el registro: RUC obligatorio con prefijo segun
- * tipo_entidad; DNI opcional. Solo se exponen los campos modificables.
+ * Mismas reglas que el registro: RUC opcional (11 digitos con prefijo
+ * segun tipo_entidad si llega); DNI opcional. Solo se exponen los campos
+ * modificables.
  *
  * NO incluye:
  *  - estado: lo gestiona eliminar_cliente (soft-delete).
@@ -80,7 +93,12 @@ export const Schema_ActualizarCliente = z
       .refine((val) => !val || /^\d{8}$/.test(val), {
         message: "El DNI debe tener exactamente 8 dígitos",
       }),
-    ruc: z.string().min(1, "El RUC es obligatorio"),
+    ruc: z
+      .string()
+      .nullable()
+      .refine((val) => !val || /^\d{11}$/.test(val), {
+        message: "El RUC debe tener exactamente 11 dígitos",
+      }),
     razon_social: z.string().min(2, "La razón social es obligatoria"),
     direccion: z.string().max(255).nullable(),
     telefono: z.string().max(20).nullable(),
@@ -93,30 +111,33 @@ export const Schema_ActualizarCliente = z
       }),
   })
   .superRefine((data, ctx) => {
-    if (!/^\d{11}$/.test(data.ruc)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El RUC debe tener exactamente 11 dígitos",
-        path: ["ruc"],
-      });
-    } else if (
-      data.tipo_entidad === TipoEntidad.Juridica &&
-      !data.ruc.startsWith("20")
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El RUC de una persona jurídica debe comenzar con 20",
-        path: ["ruc"],
-      });
-    } else if (
-      data.tipo_entidad === TipoEntidad.Natural &&
-      !data.ruc.startsWith("10")
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El RUC de una persona natural debe comenzar con 10",
-        path: ["ruc"],
-      });
+    const ruc = data.ruc ?? "";
+    if (ruc.length > 0) {
+      if (!/^\d{11}$/.test(ruc)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El RUC debe tener exactamente 11 dígitos",
+          path: ["ruc"],
+        });
+      } else if (
+        data.tipo_entidad === TipoEntidad.Juridica &&
+        !ruc.startsWith("20")
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El RUC de una persona jurídica debe comenzar con 20",
+          path: ["ruc"],
+        });
+      } else if (
+        data.tipo_entidad === TipoEntidad.Natural &&
+        !ruc.startsWith("10")
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El RUC de una persona natural debe comenzar con 10",
+          path: ["ruc"],
+        });
+      }
     }
   });
 

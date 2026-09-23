@@ -31,10 +31,8 @@ export const EditarClienteModal = ({
   const {
     tipoEntidad,
     setTipoEntidad,
-    dni,
-    setDni,
-    ruc,
-    setRuc,
+    documento,
+    setDocumento,
     razonSocial,
     setRazonSocial,
     direccion,
@@ -113,28 +111,16 @@ export const EditarClienteModal = ({
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            withAsterisk
-            label="RUC"
+            label="RUC o DNI (opc)"
             placeholder={
               tipoEntidad === TipoEntidad.Natural
-                ? "10xxxxxxxxx (persona natural)"
-                : "20xxxxxxxxx (persona jurídica)"
+                ? "RUC 10xxxxxxxxx o DNI 8 dígitos"
+                : "RUC 20xxxxxxxxx o DNI 8 dígitos"
             }
             radius="xl"
             maxLength={11}
-            value={ruc}
-            onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
-            classNames={inputClasses}
-          />
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <TextInput
-            label="DNI (opcional)"
-            placeholder="12345678"
-            radius="xl"
-            maxLength={8}
-            value={dni}
-            onChange={(e) => setDni(e.target.value.replace(/\D/g, ""))}
+            value={documento}
+            onChange={(e) => setDocumento(e.target.value)}
             classNames={inputClasses}
           />
         </Grid.Col>

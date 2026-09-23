@@ -374,14 +374,6 @@ export const AnticiposProveedor = ({
 
   return (
     <Stack gap="md">
-      {/* === FORMULARIO DE NUEVO ANTICIPO (primero, como Cuentas) ===
-          Se envuelve en un <form autoComplete="off"> para indicarle al
-          navegador que NO es un formulario de metodos de pago: eso silencia
-          el aviso nativo de Chrome "La opcion de autocompletado de los
-          metodos de pago esta inhabilitada...". Ademas, dentro del form
-          no usamos <input type="number"> (Chrome lo cataloga como credit
-          card). En su lugar: TextInput + inputMode="numeric" / "decimal"
-          para mantener el teclado numerico en mobile y el mismo aspecto. */}
       <div className="bg-zinc-900/50 p-5 rounded-xl border border-zinc-800 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-linear-to-b from-indigo-500 to-indigo-700" />
         <h3 className="text-zinc-200 font-semibold text-sm mb-4 flex items-center gap-2 uppercase tracking-wider">
@@ -481,13 +473,6 @@ export const AnticiposProveedor = ({
             type="text"
             value={numeroOperacion}
             onChange={(event) => {
-              // Quedarnos solo con los digitos (sin punto). No usamos
-              // inputMode="numeric" porque Chrome interpreta
-              // inputMode numerico + un form en HTTP como un campo de
-              // tarjeta y muestra el aviso "La opcion de
-              // autocompletado de los metodos de pago esta
-              // inhabilitada...". El resto de modales del proyecto
-              // tampoco usan inputMode por la misma razon.
               const cleaned = (event.currentTarget.value ?? "")
                 .replace(/\D/g, "")
                 .slice(0, 12);

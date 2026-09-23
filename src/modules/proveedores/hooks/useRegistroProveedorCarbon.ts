@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProveedoresService } from "../service/proveedores.service";
 import { useNotify } from "../../../hooks/useNotify";
 import {
@@ -80,6 +80,52 @@ export const useRegistroProveedorCarbon = (
   });
 
   const [personal, setpersonal] = useState<PersonalLocal[]>([]);
+
+  /**
+   * Auto-poblar / sincronizar `personal` cuando el proveedor es Natural:
+   * como no se puede separar nombre / apellido / DNI a partir de la razon
+   * social, se crea una entrada con todo el texto en `nombre` y se deja
+   * `apellido` y `dni` vacios. El usuario puede borrar la entrada o agregar
+   * mas representantes manualmente con el boton "+" si lo necesita.
+   *
+   * Reglas de sincronizacion (en orden):
+   *  - Si cambia el tipo o se vacia la razon social: NO tocamos entradas
+   *    existentes (el usuario decide si las deja o las borra).
+   *  - Si `personal` esta vacio: creamos la entrada auto.
+   *  - Si `personal` tiene UNA sola entrada y su nombre coincide con el
+   *    ultimo valor auto-poblado (lo seguimos con un ref): actualizamos
+   *    esa entrada para que siga al campo. Asi, al tipear letra por letra
+   *    en `razon_social`, el card se mantiene en sync.
+   *  - En cualquier otro caso (>= 2 entradas, o la unica entrada ya no
+   *    coincide con nuestro ref porque el usuario la edito): no tocamos.
+   *
+   * Esto preserva la regla "el effect solo sincroniza entradas que el
+   * effect creo"; una vez que el usuario agrega o edita algo distinto,
+   * dejamos de actuar.
+   */
+  const lastAutoPersonalNombreRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const nombre = payload.razon_social.trim();
+    const esNatural = payload.tipo_entidad === TipoEntidad.Natural;
+
+    if (!esNatural || nombre.length === 0) {
+      // Reset del ref: si el tipo cambia o se vacia el nombre, dejamos de
+      // sincronizar. No removemos entradas (eso lo hace el usuario).
+      lastAutoPersonalNombreRef.current = null;
+      return;
+    }
+
+    const autoActual = lastAutoPersonalNombreRef.current;
+    const unicaCoincideConAuto =
+      personal.length === 1 && autoActual !== null && personal[0].nombre === autoActual;
+
+    if (personal.length === 0 || unicaCoincideConAuto) {
+      lastAutoPersonalNombreRef.current = nombre;
+      setpersonal([{ nombre, apellido: undefined, dni: undefined }]);
+    }
+  }, [payload.tipo_entidad, payload.razon_social, personal.length]);
+
   /**
    * Archivos del contrato seleccionados en el formulario y pendientes de subir
    * al storage. El submit los sube primero, concatena las URLs resultantes
@@ -107,11 +153,12 @@ export const useRegistroProveedorCarbon = (
 
   const handleSelectChange = (value: string | null) => {
     if (value) {
+      // NO se limpian dni/ruc: el usuario puede tipear el documento antes de
+      // elegir el tipo, o cambiar entre Natural/Juridica sin perder lo
+      // tipeado. La validacion Zod se encarga del prefijo al submit.
       setPayload((prev) => ({
         ...prev,
         tipo_entidad: value as TipoEntidad,
-        dni: "",
-        ruc: "",
       }));
       if (error) setError(null);
     }

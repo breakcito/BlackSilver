@@ -47,6 +47,8 @@ const fieldClasses = {
 export const RegistroClienteCarbon = ({ onCancel, onSuccess }: Props) => {
   const {
     payload,
+    documento,
+    setDocumento,
     almacenesCarbon,
     addAlmacenCarbon,
     removeAlmacenCarbon,
@@ -148,36 +150,20 @@ export const RegistroClienteCarbon = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            withAsterisk
-            label="RUC"
+            label="RUC o DNI (opc)"
             placeholder={
               payload.tipo_entidad === TipoEntidad.Natural
-                ? "10xxxxxxxxx (persona natural)"
-                : "20xxxxxxxxx (persona jurídica)"
+                ? "RUC 10xxxxxxxxx o DNI 8 dígitos"
+                : "RUC 20xxxxxxxxx o DNI 8 dígitos"
             }
             radius="xl"
             maxLength={11}
-            value={payload.ruc || ""}
-            onChange={(e) =>
-              handleChange("ruc", e.target.value.replace(/\D/g, ""))
-            }
+            value={documento}
+            onChange={(e) => setDocumento(e.target.value)}
             classNames={fieldClasses}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <TextInput
-            label="DNI (opcional)"
-            placeholder="12345678"
-            radius="xl"
-            maxLength={8}
-            value={payload.dni || ""}
-            onChange={(e) =>
-              handleChange("dni", e.target.value.replace(/\D/g, ""))
-            }
-            classNames={fieldClasses}
-          />
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
+        <Grid.Col span={{ base: 12 }}>
           <TextInput
             label={
               payload.tipo_entidad === TipoEntidad.Natural

@@ -26,8 +26,7 @@ export const useClienteEdicion = ({
   const [tipoEntidad, setTipoEntidad] = useState<TipoEntidad>(
     TipoEntidad.Juridica,
   );
-  const [dni, setDni] = useState("");
-  const [ruc, setRuc] = useState("");
+  const [documento, setDocumento] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
   const [direccion, setDireccion] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -39,8 +38,9 @@ export const useClienteEdicion = ({
     setTipoEntidad(
       (cliente.tipo_entidad as TipoEntidad | null) ?? TipoEntidad.Juridica,
     );
-    setDni(cliente.dni ?? "");
-    setRuc(cliente.ruc ?? "");
+    // Hidratacion del input unificado: preferimos dni (8 digitos) si existe,
+    // si no usamos ruc. Nunca ambos a la vez en el campo visible.
+    setDocumento(cliente.dni ?? cliente.ruc ?? "");
     setRazonSocial(cliente.razon_social ?? "");
     setDireccion(cliente.direccion ?? "");
     setTelefono(cliente.telefono ?? "");
@@ -61,13 +61,20 @@ export const useClienteEdicion = ({
     setSubmitting(true);
     setError(null);
 
+    // Mapeo del input unificado al payload que espera el backend:
+    // 8 digitos -> dni, cualquier otro largo -> ruc, vacio -> ambos null.
+    const limpio = documento.replace(/\D/g, "");
+    const esDni = limpio.length === 8;
+    const dniValue = esDni ? limpio : null;
+    const rucValue = limpio.length === 0 || esDni ? null : limpio;
+
     // `para_carbon` NO se incluye: define la pestaña donde vive el cliente
     // (logística vs carbón) y se congela al crear — mismo patrón que
     // proveedores. Se preserva en backend al no estar en el payload.
     const values: DTO_ActualizarCliente = {
       tipo_entidad: tipoEntidad,
-      dni: dni.trim() ? dni.trim() : null,
-      ruc: ruc.trim(),
+      dni: dniValue,
+      ruc: rucValue,
       razon_social: razonSocial,
       direccion: direccion || null,
       telefono: telefono || null,
@@ -105,10 +112,8 @@ export const useClienteEdicion = ({
   return {
     tipoEntidad,
     setTipoEntidad: handleTipoEntidadChange,
-    dni,
-    setDni,
-    ruc,
-    setRuc,
+    documento,
+    setDocumento,
     razonSocial,
     setRazonSocial,
     direccion,

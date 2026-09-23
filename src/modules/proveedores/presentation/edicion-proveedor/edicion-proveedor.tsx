@@ -105,7 +105,7 @@ export const EdicionProveedor = ({
             classNames={fieldClasses}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
+        <Grid.Col span={{ base: 12 }}>
           <TextInput
             label={esNatural ? "Nombre Completo" : "Razón Social"}
             placeholder={

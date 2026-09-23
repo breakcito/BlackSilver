@@ -98,16 +98,16 @@ export const useEdicionProveedor = (
   };
 
   /**
-   * Al cambiar el tipo de entidad se limpian DNI y RUC porque el prefijo del
-   * RUC depende del tipo (10 natural / 20 juridica) y quedaria invalido.
+   * Al cambiar el tipo de entidad NO se limpian DNI ni RUC: el usuario puede
+   * tipear el documento antes de elegir el tipo, o alternar entre Natural y
+   * Juridica sin perder lo tipeado. La validacion Zod se encarga del prefijo
+   * (10 natural / 20 juridica) al submit.
    */
   const handleSelectChange = (value: string | null) => {
     if (!value) return;
     setPayload((prev) => ({
       ...prev,
       tipo_entidad: value as TipoEntidad,
-      dni: "",
-      ruc: "",
     }));
     if (error) setError(null);
   };

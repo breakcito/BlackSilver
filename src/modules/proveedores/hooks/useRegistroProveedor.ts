@@ -40,11 +40,12 @@ export const useRegistroProveedor = (
 
   const handleSelectChange = (value: string | null) => {
     if (value) {
+      // NO se limpian dni/ruc: el usuario puede tipear el documento antes de
+      // elegir el tipo, o cambiar entre Natural/Juridica sin perder lo
+      // tipeado. La validacion Zod se encarga del prefijo al submit.
       setPayload((prev) => ({
         ...prev,
         tipo_entidad: value as TipoEntidad,
-        dni: "", // Limpiar para evitar basura entre tipos
-        ruc: "",
       }));
       if (error) setError(null);
     }

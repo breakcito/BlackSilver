@@ -155,7 +155,7 @@ export const Proveedor = ({
     {
       accessor: "id_proveedor",
       title: "Personal",
-      width: 110,
+      width: 120,
       textAlign: "center",
       render: (r: ProveedorResponse) => (
         <Tooltip label="Ver personal externo" withArrow position="left">
@@ -176,7 +176,7 @@ export const Proveedor = ({
           {
             accessor: "cantidad_tipos_carbon" as const,
             title: "Tipos Carbon",
-            width: 130,
+            width: 140,
             textAlign: "center" as const,
             render: (r: ProveedorResponse) => (
               <Group gap="xs" justify="center" wrap="nowrap">
@@ -213,7 +213,7 @@ export const Proveedor = ({
           {
             accessor: "cantidad_lugares_extraccion" as const,
             title: "Lugares Extraccion",
-            width: 170,
+            width: 150,
             textAlign: "center" as const,
             render: (r: ProveedorResponse) => (
               <Group gap="xs" justify="center" wrap="nowrap">
@@ -250,7 +250,7 @@ export const Proveedor = ({
           {
             accessor: "cantidad_almacenes_carbon" as const,
             title: "Almacenes",
-            width: 160,
+            width: 140,
             textAlign: "center" as const,
             render: (r: ProveedorResponse) => (
               <Group gap="xs" justify="center" wrap="nowrap">
@@ -288,7 +288,7 @@ export const Proveedor = ({
           {
             accessor: "contratos" as const,
             title: "Contrato",
-            width: 150,
+            width: 140,
             textAlign: "center" as const,
             render: (r: ProveedorResponse) => {
               const n = Array.isArray(r.contratos) ? r.contratos.length : 0;
@@ -333,7 +333,7 @@ export const Proveedor = ({
     {
       accessor: "contacto",
       title: "Contacto",
-      width: 200,
+      width: 180,
       render: (r: ProveedorResponse) => (
         <Stack gap={2}>
           {r.correo && (
