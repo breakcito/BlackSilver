@@ -9,6 +9,7 @@ import type {
   CrearProveedorRequest,
   CrearPersonalRequest,
   EditarCuentaBancariaRequest,
+  RegistrarAnticipoRequest,
   SetLugaresExtraccionProveedorRequest,
   SetTiposCarbonProveedorRequest,
 } from "./proveedores.requests";
@@ -22,11 +23,13 @@ export type {
   CrearProveedorRequest,
   CrearPersonalRequest,
   EditarCuentaBancariaRequest,
+  RegistrarAnticipoRequest,
   SetLugaresExtraccionProveedorRequest,
   SetTiposCarbonProveedorRequest,
 };
 import type {
   AlmacenCarbonResponse,
+  AnticipoProveedorResponse,
   CuentaBancariaResponse,
   LugarExtraccionResponse,
   ProveedorResponse,
@@ -222,6 +225,39 @@ export const ProveedoresService = {
   ): Promise<IRespuesta<AlmacenCarbonResponse>> => {
     const { data } = await api.delete<IRespuesta<AlmacenCarbonResponse>>(
       `/proveedores/${idProveedor}/almacenes-carbon/${idAlmacen}`,
+    );
+    return data;
+  },
+
+  /**
+   * Anticipos de carbon de un proveedor (modulo carbon).
+   */
+  getAnticiposPorProveedor: async (
+    idProveedor: number,
+  ): Promise<IRespuesta<AnticipoProveedorResponse[]>> => {
+    const { data } = await api.get<IRespuesta<AnticipoProveedorResponse[]>>(
+      `/proveedores/${idProveedor}/anticipos`,
+    );
+    return data;
+  },
+
+  registrarAnticipoPorProveedor: async (
+    idProveedor: number,
+    payload: RegistrarAnticipoRequest,
+  ): Promise<IRespuesta<AnticipoProveedorResponse>> => {
+    const { data } = await api.post<IRespuesta<AnticipoProveedorResponse>>(
+      `/proveedores/${idProveedor}/anticipos`,
+      payload,
+    );
+    return data;
+  },
+
+  anularAnticipoPorProveedor: async (
+    idProveedor: number,
+    idAnticipo: number,
+  ): Promise<IRespuesta<AnticipoProveedorResponse>> => {
+    const { data } = await api.post<IRespuesta<AnticipoProveedorResponse>>(
+      `/proveedores/${idProveedor}/anticipos/${idAnticipo}/anular`,
     );
     return data;
   },

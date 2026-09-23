@@ -31,14 +31,17 @@ import { PersonalExternoProveedor } from "../personal-externo-proveedor/personal
 import { TiposCarbonProveedor } from "../tipos-carbon-proveedor/tipos-carbon-proveedor";
 import { LugaresExtraccionProveedor } from "../lugares-extraccion-proveedor/lugares-extraccion-proveedor";
 import { AlmacenesCarbonProveedor } from "../almacenes-carbon-proveedor/almacenes-carbon-proveedor";
+import { AnticiposProveedor } from "../anticipos-proveedor/anticipos-proveedor";
 import { ContratoProveedor } from "../contrato-proveedor/contrato-proveedor";
 import type {
   AlmacenCarbonResponse,
+  AnticipoProveedorResponse,
   CuentaBancariaResponse,
   LugarExtraccionResponse,
   ProveedorResponse,
   TipoCarbonProveedorResponse,
 } from "../../service/proveedores.responses";
+import { ProveedoresService } from "../../service/proveedores.service";
 import { Proveedor } from "./components/proveedor";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { BotonRecargar } from "../../../../presentation/utils/boton-recargar";
@@ -100,6 +103,8 @@ export const ProveedoresPage = () => {
     useState<ProveedorResponse | null>(null);
   const [proveedorAlmacenes, setProveedorAlmacenes] =
     useState<ProveedorResponse | null>(null);
+  const [proveedorAnticipos, setProveedorAnticipos] =
+    useState<ProveedorResponse | null>(null);
   const [proveedorContrato, setProveedorContrato] =
     useState<ProveedorResponse | null>(null);
   const [busqueda, setBusqueda] = useState("");
@@ -136,6 +141,13 @@ export const ProveedoresPage = () => {
       ? (proveedores.find(
           (p) => p.id_proveedor === proveedorAlmacenes.id_proveedor,
         ) ?? proveedorAlmacenes)
+      : null;
+
+  const proveedorAnticiposEnGestion =
+    proveedorAnticipos
+      ? (proveedores.find(
+          (p) => p.id_proveedor === proveedorAnticipos.id_proveedor,
+        ) ?? proveedorAnticipos)
       : null;
 
   const proveedorContratoEnGestion =
@@ -219,6 +231,23 @@ export const ProveedoresPage = () => {
     updateProveedor(proveedor.id_proveedor, {
       cantidad_almacenes_carbon: almacenes.length,
       almacenes_carbon: almacenes,
+    });
+  };
+
+  const handleAnticiposGuardados = (
+    proveedor: ProveedorResponse,
+    anticipos: AnticipoProveedorResponse[],
+  ) => {
+    // Solo cuentan para el badge los NO anulados: el backend ya filtra
+    // `esta_anulado = 0` en el subquery de `get_proveedores`.
+    const activos = anticipos.filter((a) => !a.esta_anulado);
+    updateProveedor(proveedor.id_proveedor, {
+      cantidad_anticipos: activos.length,
+      suma_saldo_anticipos: activos.reduce(
+        (acc, a) => acc + a.saldo_actual,
+        0,
+      ),
+      anticipos,
     });
   };
 
@@ -412,6 +441,7 @@ export const ProveedoresPage = () => {
             onOpenTiposCarbon={(p) => setProveedorTiposCarbon(p)}
             onOpenLugaresExtraccion={(p) => setProveedorLugares(p)}
             onOpenAlmacenesCarbon={(p) => setProveedorAlmacenes(p)}
+            onOpenAnticipos={(p) => setProveedorAnticipos(p)}
             onOpenContrato={(p) => setProveedorContrato(p)}
             onEditar={(p) => setProveedorEnEdicion(p)}
             onEliminar={(p) => {
@@ -603,6 +633,32 @@ export const ProveedoresPage = () => {
               // local tras cada accion y emite el array refrescado para
               // que el padre actualice su estado global. El usuario
               // cierra manualmente cuando termine.
+            }}
+          />
+        )}
+      </ModalEstandar>
+
+      {/* Modal: Anticipos de carbon del proveedor (solo tab Carbon) */}
+      <ModalEstandar
+        opened={!!proveedorAnticipos}
+        close={() => setProveedorAnticipos(null)}
+        title={
+          proveedorAnticiposEnGestion
+            ? `Anticipos: ${proveedorAnticiposEnGestion.razon_social}`
+            : "Anticipos"
+        }
+        size="xl"
+      >
+        {proveedorAnticiposEnGestion && (
+          <AnticiposProveedor
+            idProveedor={proveedorAnticiposEnGestion.id_proveedor}
+            razonSocial={proveedorAnticiposEnGestion.razon_social}
+            service={ProveedoresService}
+            onChanged={(anticipos) => {
+              handleAnticiposGuardados(
+                proveedorAnticiposEnGestion,
+                anticipos,
+              );
             }}
           />
         )}

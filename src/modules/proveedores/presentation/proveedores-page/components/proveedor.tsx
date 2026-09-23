@@ -12,6 +12,7 @@ import {
   IconBuildingBank,
   IconBuilding,
   IconBuildingWarehouse,
+  IconCash,
   IconClipboardText,
   IconDotsVertical,
   IconFlame,
@@ -39,6 +40,7 @@ interface Props {
   onOpenTiposCarbon?: (proveedor: ProveedorResponse) => void;
   onOpenLugaresExtraccion?: (proveedor: ProveedorResponse) => void;
   onOpenAlmacenesCarbon?: (proveedor: ProveedorResponse) => void;
+  onOpenAnticipos?: (proveedor: ProveedorResponse) => void;
   onOpenContrato?: (proveedor: ProveedorResponse) => void;
   onEditar: (proveedor: ProveedorResponse) => void;
   onEliminar: (proveedor: ProveedorResponse) => void;
@@ -54,6 +56,7 @@ export const Proveedor = ({
   onOpenTiposCarbon,
   onOpenLugaresExtraccion,
   onOpenAlmacenesCarbon,
+  onOpenAnticipos,
   onOpenContrato,
   onEditar,
   onEliminar,
@@ -364,6 +367,75 @@ export const Proveedor = ({
         </Stack>
       ),
     },
+    ...(modoCarbon
+      ? [
+          {
+            accessor: "cantidad_anticipos" as const,
+            title: "Anticipos",
+            width: 170,
+            textAlign: "center" as const,
+            render: (r: ProveedorResponse) => {
+              const n = r.cantidad_anticipos ?? 0;
+              const total = r.suma_saldo_anticipos ?? 0;
+              const totalLabel = `S/${total.toLocaleString("es-PE", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`;
+              return (
+                <Group gap="xs" justify="center" wrap="nowrap">
+                  {n > 0 ? (
+                    <Badge
+                      color="indigo"
+                      variant="light"
+                      size="sm"
+                      radius="xl"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {n} anticipo{n === 1 ? "" : "s"}
+                    </Badge>
+                  ) : (
+                    <Badge
+                      color="gray"
+                      variant="light"
+                      size="sm"
+                      radius="xl"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      Sin anticipos
+                    </Badge>
+                  )}
+                  <Badge
+                    color={n > 0 ? "teal" : "gray"}
+                    variant="light"
+                    size="sm"
+                    radius="xl"
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {totalLabel}
+                  </Badge>
+                  {onOpenAnticipos && (
+                    <Tooltip
+                      label="Gestionar anticipos"
+                      withArrow
+                      position="left"
+                    >
+                      <ActionIcon
+                        variant="subtle"
+                        color="indigo"
+                        radius="xl"
+                        size="sm"
+                        onClick={() => onOpenAnticipos(r)}
+                      >
+                        <IconCash size={16} stroke={1.5} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+              );
+            },
+          },
+        ]
+      : []),
     {
       accessor: "indicadores",
       title: "Indicadores",

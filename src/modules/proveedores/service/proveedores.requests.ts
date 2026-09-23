@@ -1,5 +1,6 @@
 import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 import { Moneda } from "../../../shared/enums/_generic/moneda";
+import { MedioPago } from "../../../shared/enums/anticipo-proveedor/medio-pago";
 import { z } from "zod";
 
 /**
@@ -239,3 +240,42 @@ export const Schema_AlmacenCarbon = z.object({
 });
 export type CrearAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon>;
 export type ActualizarAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon>;
+
+/**
+ * Registro de un anticipo a proveedor (modulo carbon).
+ *
+ * El backend exige id_cuenta_bancaria_empresa + fecha_hora_pago +
+ * numero_operacion cuando medio_pago es Transferencia o Deposito;
+ * aqui solo validamos tipos (el server-side rechaza la combinacion
+ * invalida con 422).
+ *
+ * `saldo` es el unico campo numerico visible: el form lo guarda en
+ * `saldo_inicial` y `saldo_actual` (iguales al registrar).
+ *
+ * `evidencias` es la lista de IArchivo (subidos antes via
+ * POST /archivos/upload con carpeta=anticipos-proveedor).
+ */
+export const Schema_RegistrarAnticipo = z.object({
+  id_empresa: z.number().int().positive("La empresa es obligatoria"),
+  id_cuenta_bancaria_empresa: z.number().int().positive().nullable().optional(),
+  medio_pago: z.nativeEnum(MedioPago).nullable().optional(),
+  fecha_hora_pago: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, "Formato de fecha y hora invalido")
+    .nullable()
+    .optional(),
+  numero_operacion: z.string().max(64).nullable().optional(),
+  saldo: z.number().positive("El saldo debe ser mayor a 0"),
+  evidencias: z
+    .array(
+      z.object({
+        url: z.string(),
+        path_relativo: z.string(),
+        nombre_original: z.string().nullable().optional(),
+        extension: z.string().nullable().optional(),
+      }),
+    )
+    .nullable()
+    .optional(),
+});
+export type RegistrarAnticipoRequest = z.infer<typeof Schema_RegistrarAnticipo>;
