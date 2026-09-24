@@ -26,9 +26,13 @@ import {
   IconChevronRight,
   IconCirclePlus,
   IconMapPin,
+  IconTag,
   IconTrash,
   IconTruckDelivery,
 } from "@tabler/icons-react";
+
+import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
+import { FormTarifaCarbon } from "../../../presentation/utils/form-tarifa-carbon";
 
 import { useNotify } from "../../../hooks/useNotify";
 import { AuxService } from "../../../service/auxiliar.service";
@@ -210,6 +214,10 @@ export const ConfirmacionCompraCarbonModal = ({
     DocumentoDuplicadoItem[]
   >([]);
 
+  // Modal para nueva tarifa de carbón desde el detalle
+  const [openNuevaTarifa, setOpenNuevaTarifa] = useState(false);
+  const [targetTarifaIdx, setTargetTarifaIdx] = useState<number | null>(null);
+
   // Cargar catálogos y datos de la compra en paralelo e independiente (rellena cada select inmediatamente)
   useEffect(() => {
     let cancel = false;
@@ -296,7 +304,37 @@ export const ConfirmacionCompraCarbonModal = ({
       .then((res) => {
         if (cancel) return;
         if (res.success && res.data) {
-          setTarifas(Array.isArray(res.data) ? res.data : [res.data]);
+          const tars = Array.isArray(res.data) ? res.data : [res.data];
+          setTarifas(tars);
+          // Si ya hay líneas con tipo y ceniza pero sin tarifa asignada o con precio 0, autoasignar
+          setDetalles((prev) =>
+            prev.map((d) => {
+              if (
+                d.id_tipo_carbon &&
+                d.porcentaje_ceniza > 0 &&
+                !d.id_tarifa_carbon
+              ) {
+                const tarifaCoincide = tars.find(
+                  (t) =>
+                    t.id_tipo_carbon === d.id_tipo_carbon &&
+                    (t.estado ?? "Activo") === "Activo" &&
+                    d.porcentaje_ceniza >= Number(t.inicio_porcentaje_ceniza) &&
+                    d.porcentaje_ceniza <= Number(t.fin_porcentaje_ceniza),
+                );
+                if (tarifaCoincide) {
+                  return {
+                    ...d,
+                    id_tarifa_carbon: tarifaCoincide.id_tarifa_carbon,
+                    precio_unitario:
+                      d.precio_unitario > 0
+                        ? d.precio_unitario
+                        : Number(tarifaCoincide.precio_unitario),
+                  };
+                }
+              }
+              return d;
+            }),
+          );
         }
       })
       .catch((e) => console.error("Error cargando tarifas carbón:", e));
@@ -386,6 +424,23 @@ export const ConfirmacionCompraCarbonModal = ({
     };
   }, [compra.id_compra_carbon, compra.id_proveedor, notifyError]);
 
+  // Obtener la tarifa correspondiente al tipo de carbón y % de ceniza
+  const tarifaPara = (
+    idTipo: number | null,
+    ceniza: number,
+  ): RES_TarifaCarbon | null => {
+    if (!idTipo || !ceniza || ceniza <= 0) return null;
+    return (
+      tarifas.find(
+        (t) =>
+          t.id_tipo_carbon === idTipo &&
+          (t.estado ?? "Activo") === "Activo" &&
+          ceniza >= Number(t.inicio_porcentaje_ceniza) &&
+          ceniza <= Number(t.fin_porcentaje_ceniza),
+      ) ?? null
+    );
+  };
+
   // Actualizar un detalle
   const updateDetalle = (index: number, patch: Partial<LineaDetalleForm>) => {
     setDetalles((prev) => {
@@ -397,17 +452,15 @@ export const ConfirmacionCompraCarbonModal = ({
         const idTipo = actual.id_tipo_carbon;
         const ceniza = actual.porcentaje_ceniza;
         if (idTipo && ceniza > 0) {
-          const tarifaCoincide = tarifas.find(
-            (t) =>
-              t.id_tipo_carbon === idTipo &&
-              (t.estado ?? "Activo") === "Activo" &&
-              ceniza >= Number(t.inicio_porcentaje_ceniza) &&
-              ceniza <= Number(t.fin_porcentaje_ceniza),
-          );
+          const tarifaCoincide = tarifaPara(idTipo, ceniza);
           if (tarifaCoincide) {
             actual.id_tarifa_carbon = tarifaCoincide.id_tarifa_carbon;
             actual.precio_unitario = Number(tarifaCoincide.precio_unitario);
+          } else {
+            actual.id_tarifa_carbon = null;
           }
+        } else {
+          actual.id_tarifa_carbon = null;
         }
       }
 
@@ -542,13 +595,46 @@ export const ConfirmacionCompraCarbonModal = ({
     onProgresoChange?.(progresoInfo);
   }, [progresoInfo, onProgresoChange]);
 
-  // Verificar documentos duplicados en tiempo real (debounced)
+  // Firma única de documentos (tickets y guías) para no ejecutar validación de duplicados
+  // cuando el usuario modifica otros campos (ceniza, humedad, precio, cantidad, etc.)
+  const docsSignature = useMemo(() => {
+    return detalles
+      .map(
+        (d) =>
+          `${(d.codigo_ticket_balanza || "").trim()}::${(d.guia_remitente || "").trim()}::${(d.guia_transportista || "").trim()}`,
+      )
+      .filter((sig) => sig !== "::::")
+      .join("||");
+  }, [detalles]);
+
+  // Verificar documentos duplicados SOLO cuando cambian los documentos (debounced a 800ms)
   useEffect(() => {
-    const tickets = detalles
-      .map((d) => d.codigo_ticket_balanza)
-      .filter(Boolean);
-    const guiasR = detalles.map((d) => d.guia_remitente).filter(Boolean);
-    const guiasT = detalles.map((d) => d.guia_transportista).filter(Boolean);
+    if (!docsSignature) {
+      setDocumentosDuplicados([]);
+      return;
+    }
+
+    const tickets = Array.from(
+      new Set(
+        detalles
+          .map((d) => d.codigo_ticket_balanza.trim())
+          .filter((t) => t.length >= 3),
+      ),
+    );
+    const guiasR = Array.from(
+      new Set(
+        detalles
+          .map((d) => d.guia_remitente.trim())
+          .filter((g) => g.length >= 3),
+      ),
+    );
+    const guiasT = Array.from(
+      new Set(
+        detalles
+          .map((d) => d.guia_transportista.trim())
+          .filter((g) => g.length >= 3),
+      ),
+    );
 
     if (tickets.length === 0 && guiasR.length === 0 && guiasT.length === 0) {
       setDocumentosDuplicados([]);
@@ -566,14 +652,16 @@ export const ConfirmacionCompraCarbonModal = ({
         });
         if (resp.success && resp.data) {
           setDocumentosDuplicados(resp.data);
+        } else {
+          setDocumentosDuplicados([]);
         }
       } catch (e) {
         console.error("Error al verificar documentos duplicados:", e);
       }
-    }, 600);
+    }, 800);
 
     return () => clearTimeout(handler);
-  }, [detalles, compra.id_proveedor, compra.id_compra_carbon]);
+  }, [docsSignature, compra.id_proveedor, compra.id_compra_carbon]);
 
   const handleSubmit = async () => {
     setError(null);
@@ -1253,6 +1341,70 @@ export const ConfirmacionCompraCarbonModal = ({
                       />
                     </div>
 
+                    {/* Indicador de Tarifa aplicada según % de ceniza */}
+                    {item.id_tipo_carbon && item.porcentaje_ceniza > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {(() => {
+                          const tarifa = tarifaPara(
+                            item.id_tipo_carbon,
+                            item.porcentaje_ceniza,
+                          );
+                          if (tarifa) {
+                            return (
+                              <Badge
+                                color="teal"
+                                variant="light"
+                                size="sm"
+                                radius="md"
+                                leftSection={
+                                  <IconTag
+                                    size={12}
+                                    className="text-teal-400"
+                                  />
+                                }
+                              >
+                                {`Tarifa aplicada: ${tarifa.inicio_porcentaje_ceniza}% - ${tarifa.fin_porcentaje_ceniza}% ceniza · S/ ${formatNumber(
+                                  Number(tarifa.precio_unitario),
+                                )}/TM`}
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <>
+                              <Badge
+                                color="yellow"
+                                variant="light"
+                                size="sm"
+                                radius="md"
+                                leftSection={
+                                  <IconAlertTriangle
+                                    size={12}
+                                    className="text-yellow-400"
+                                  />
+                                }
+                              >
+                                {`Sin tarifa para ${formatNumber(item.porcentaje_ceniza)}% ceniza (precio editable)`}
+                              </Badge>
+                              <Button
+                                variant="subtle"
+                                color="indigo"
+                                size="compact-xs"
+                                radius="lg"
+                                leftSection={<IconCirclePlus size={14} />}
+                                onClick={() => {
+                                  setTargetTarifaIdx(index);
+                                  setOpenNuevaTarifa(true);
+                                }}
+                                className="font-semibold text-xs h-6"
+                              >
+                                Crear tarifa
+                              </Button>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     {/* Flete */}
                     <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/60">
                       <Group
@@ -1447,6 +1599,45 @@ export const ConfirmacionCompraCarbonModal = ({
             : "Guardar Modificaciones"}
         </Button>
       </Group>
+
+      {/* Modal: Nueva tarifa de carbón */}
+      <ModalEstandar
+        opened={openNuevaTarifa}
+        close={() => {
+          setOpenNuevaTarifa(false);
+          setTargetTarifaIdx(null);
+        }}
+        title="Nueva Tarifa de Carbón"
+        size="md"
+      >
+        <FormTarifaCarbon
+          idTipoCarbonInicial={
+            targetTarifaIdx !== null
+              ? (detalles[targetTarifaIdx]?.id_tipo_carbon ?? null)
+              : null
+          }
+          cenizaReferenciaInicial={
+            targetTarifaIdx !== null
+              ? (detalles[targetTarifaIdx]?.porcentaje_ceniza ?? 0)
+              : 0
+          }
+          onSuccess={(nueva) => {
+            setTarifas((prev) => [...prev, nueva]);
+            if (targetTarifaIdx !== null) {
+              updateDetalle(targetTarifaIdx, {
+                id_tarifa_carbon: nueva.id_tarifa_carbon,
+                precio_unitario: Number(nueva.precio_unitario),
+              });
+            }
+            setOpenNuevaTarifa(false);
+            setTargetTarifaIdx(null);
+          }}
+          onCancel={() => {
+            setOpenNuevaTarifa(false);
+            setTargetTarifaIdx(null);
+          }}
+        />
+      </ModalEstandar>
     </div>
   );
 };

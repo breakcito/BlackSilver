@@ -14,12 +14,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
-import {
-  IconCheck,
-  IconCirclePlus,
-  IconCoins,
-  IconInfoCircle,
-} from "@tabler/icons-react";
+import { IconCheck, IconCirclePlus, IconCoins } from "@tabler/icons-react";
 
 import { useNotify } from "../../../hooks/useNotify";
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
@@ -76,12 +71,15 @@ export const AprobarLiquidacionModal = ({
 
   // Cuentas de la empresa (para registro rápido de anticipo si falta)
   const [cuentasEmpresa, setCuentasEmpresa] = useState<RES_CuentaEmpresa[]>([]);
-  const [mostrarFormNuevoAnticipo, setMostrarFormNuevoAnticipo] = useState(false);
+  const [mostrarFormNuevoAnticipo, setMostrarFormNuevoAnticipo] =
+    useState(false);
   const [creandoAnticipo, setCreandoAnticipo] = useState(false);
 
   // Form nuevo anticipo
   const [nuevoMonto, setNuevoMonto] = useState<number | string>(0);
-  const [nuevoMedio, setNuevoMedio] = useState<MedioPago>(MedioPago.Transferencia);
+  const [nuevoMedio, setNuevoMedio] = useState<MedioPago>(
+    MedioPago.Transferencia,
+  );
   const [nuevaCuenta, setNuevaCuenta] = useState<string | null>(null);
   const [nuevoNumOp, setNuevoNumOp] = useState<string>("");
   const [nuevaFechaPago, setNuevaFechaPago] = useState<Date | null>(new Date());
@@ -112,14 +110,16 @@ export const AprobarLiquidacionModal = ({
   useEffect(() => {
     cargarAnticipos();
     // Cargar cuentas empresa
-    AuxService.get_cuentas_empresa({ id_empresa: compra.id_empresa }).then((res) => {
-      if (res.success && res.data) {
-        setCuentasEmpresa(res.data);
-        if (res.data.length > 0) {
-          setNuevaCuenta(String(res.data[0].id_cuenta_bancaria));
+    AuxService.get_cuentas_empresa({ id_empresa: compra.id_empresa }).then(
+      (res) => {
+        if (res.success && res.data) {
+          setCuentasEmpresa(res.data);
+          if (res.data.length > 0) {
+            setNuevaCuenta(String(res.data[0].id_cuenta_bancaria));
+          }
         }
-      }
-    });
+      },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compra.id_proveedor, compra.id_empresa]);
 
@@ -146,8 +146,14 @@ export const AprobarLiquidacionModal = ({
     } else {
       // Sugerir monto: lo que quede de saldo pendiente o el saldo total del anticipo
       const maxRetirable = Number(a.saldo_actual);
-      const restantePorCubrir = Math.max(0, totalCompraNeto - totalAnticiposAplicados);
-      const sugerido = Math.min(maxRetirable, restantePorCubrir > 0 ? restantePorCubrir : maxRetirable);
+      const restantePorCubrir = Math.max(
+        0,
+        totalCompraNeto - totalAnticiposAplicados,
+      );
+      const sugerido = Math.min(
+        maxRetirable,
+        restantePorCubrir > 0 ? restantePorCubrir : maxRetirable,
+      );
       setAnticiposSeleccionados((prev) => ({
         ...prev,
         [id]: Math.round(sugerido * 100) / 100,
@@ -243,20 +249,6 @@ export const AprobarLiquidacionModal = ({
 
   return (
     <div className="space-y-5">
-      <Alert
-        icon={<IconInfoCircle className="w-5 h-5 text-indigo-400" />}
-        title="Aprobación de Liquidación de Compra"
-        color="indigo"
-        radius="lg"
-        variant="light"
-      >
-        <Text size="xs" c="indigo.1">
-          Al aprobar la liquidación, se fijan los importes definitivos y se pueden
-          imputar los anticipos previos otorgados a este proveedor para amortizar
-          el pago de la carga.
-        </Text>
-      </Alert>
-
       {error && (
         <Alert color="red" radius="lg" variant="light">
           <Text size="xs">{error}</Text>
@@ -264,11 +256,20 @@ export const AprobarLiquidacionModal = ({
       )}
 
       {/* Resumen de la Orden */}
-      <Paper p="md" radius="lg" className="bg-zinc-900/40 border border-zinc-800">
+      <Paper
+        p="md"
+        radius="lg"
+        className="bg-zinc-900/40 border border-zinc-800"
+      >
         <Group justify="space-between" align="center">
           <div>
             <Group gap="xs">
-              <Text size="xs" fw={700} c="dimmed" className="uppercase tracking-wider">
+              <Text
+                size="xs"
+                fw={700}
+                c="dimmed"
+                className="uppercase tracking-wider"
+              >
                 Orden:
               </Text>
               <Badge color="indigo" variant="filled" size="sm">
@@ -281,10 +282,15 @@ export const AprobarLiquidacionModal = ({
           </div>
 
           <div className="text-right">
-            <Text size="11px" c="dimmed" className="uppercase tracking-wider">
+            <Text
+              size="11px"
+              c="gray.5"
+              fw={600}
+              className="uppercase tracking-wider"
+            >
               Total Neto a Liquidar
             </Text>
-            <Text size="lg" fw={900} c="emerald.4" className="font-mono">
+            <Text size="md" fw={900} c="emerald.4" className="font-mono">
               {formatPEN(totalCompraNeto)}
             </Text>
           </div>
@@ -292,11 +298,20 @@ export const AprobarLiquidacionModal = ({
       </Paper>
 
       {/* Anticipos disponibles */}
-      <Paper p="md" radius="lg" className="bg-zinc-900/40 border border-zinc-800 space-y-3">
+      <Paper
+        p="md"
+        radius="lg"
+        className="bg-zinc-900/40 border border-zinc-800 space-y-3"
+      >
         <Group justify="space-between">
           <Group gap="xs">
             <IconCoins className="w-4 h-4 text-amber-500" />
-            <Text size="xs" fw={700} c="white" className="uppercase tracking-wider">
+            <Text
+              size="xs"
+              fw={700}
+              c="white"
+              className="uppercase tracking-wider"
+            >
               Anticipos del Proveedor Disponibles
             </Text>
           </Group>
@@ -307,19 +322,38 @@ export const AprobarLiquidacionModal = ({
             color="amber"
             size="xs"
             radius="lg"
-            onClick={() => setMostrarFormNuevoAnticipo(!mostrarFormNuevoAnticipo)}
+            onClick={() =>
+              setMostrarFormNuevoAnticipo(!mostrarFormNuevoAnticipo)
+            }
           >
-            {mostrarFormNuevoAnticipo ? "Ocultar formulario" : "Registrar nuevo anticipo"}
+            {mostrarFormNuevoAnticipo
+              ? "Ocultar formulario"
+              : "Registrar nuevo anticipo"}
           </Button>
         </Group>
 
         {/* Formulario rápido para nuevo anticipo si falta saldo */}
         {mostrarFormNuevoAnticipo && (
-          <Paper p="sm" radius="md" className="bg-zinc-950/80 border border-amber-500/30 space-y-3">
-            <Text size="xs" fw={700} c="amber.3">
-              Nuevo Anticipo para {compra.proveedor}
-            </Text>
+          <Paper
+            p="sm"
+            radius="md"
+            className="bg-zinc-950/80 border border-amber-500/30 space-y-3"
+          >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Select
+                label="Medio de Pago"
+                data={["Transferencia", "Depósito", "Efectivo"]}
+                value={nuevoMedio}
+                onChange={(val) =>
+                  setNuevoMedio((val as MedioPago) ?? MedioPago.Transferencia)
+                }
+                size="xs"
+                radius="lg"
+                classNames={inputClasses}
+                required
+                clearable
+              />
+
               <NumberInput
                 label="Monto del anticipo (S/)"
                 placeholder="0.00"
@@ -328,19 +362,6 @@ export const AprobarLiquidacionModal = ({
                 min={0.01}
                 decimalScale={2}
                 fixedDecimalScale
-                size="xs"
-                radius="lg"
-                classNames={inputClasses}
-                required
-              />
-
-              <Select
-                label="Medio de Pago"
-                data={["Transferencia", "Depósito", "Efectivo"]}
-                value={nuevoMedio}
-                onChange={(val) =>
-                  setNuevoMedio((val as MedioPago) ?? MedioPago.Transferencia)
-                }
                 size="xs"
                 radius="lg"
                 classNames={inputClasses}
@@ -360,6 +381,7 @@ export const AprobarLiquidacionModal = ({
                 radius="lg"
                 classNames={inputClasses}
                 searchable
+                clearable
               />
             </div>
 
@@ -379,7 +401,8 @@ export const AprobarLiquidacionModal = ({
                 value={nuevaFechaPago}
                 onChange={(v) => {
                   if (!v) setNuevaFechaPago(null);
-                  else if (typeof v === "string") setNuevaFechaPago(new Date(v));
+                  else if (typeof v === "string")
+                    setNuevaFechaPago(new Date(v));
                   else setNuevaFechaPago(v);
                 }}
                 size="xs"
@@ -391,15 +414,16 @@ export const AprobarLiquidacionModal = ({
             <Group justify="flex-end" pt="xs">
               <Button
                 variant="subtle"
-                color="gray"
+                color="indigo.3"
                 size="xs"
+                radius="lg"
                 onClick={() => setMostrarFormNuevoAnticipo(false)}
               >
                 Cancelar
               </Button>
               <Button
                 variant="filled"
-                color="amber"
+                color="indigo.4"
                 size="xs"
                 radius="lg"
                 onClick={handleCrearNuevoAnticipo}
@@ -418,15 +442,16 @@ export const AprobarLiquidacionModal = ({
           </Text>
         ) : anticiposDisponibles.length === 0 ? (
           <Text size="xs" c="dimmed" fs="italic">
-            Este proveedor no cuenta con anticipos activos con saldo disponible. Puede
-            aprobar la liquidación sin anticipos o registrar uno nuevo arriba.
+            Este proveedor no cuenta con anticipos con saldo disponible.
           </Text>
         ) : (
           <Stack gap="xs">
             {anticiposDisponibles.map((a) => {
               const seleccionado = a.id_anticipo in anticiposSeleccionados;
               const saldoActual = Number(a.saldo_actual);
-              const montoRetirar = Number(anticiposSeleccionados[a.id_anticipo] ?? 0);
+              const montoRetirar = Number(
+                anticiposSeleccionados[a.id_anticipo] ?? 0,
+              );
 
               return (
                 <div
@@ -496,28 +521,41 @@ export const AprobarLiquidacionModal = ({
       </Paper>
 
       {/* Resumen de Amortización */}
-      <Paper p="md" radius="lg" className="bg-zinc-950/80 border border-zinc-800 space-y-2">
+      <Paper
+        p="md"
+        radius="lg"
+        className="bg-zinc-950/80 border border-zinc-800 space-y-2"
+      >
         <div className="flex justify-between items-center text-xs">
-          <Text c="zinc.4">Total neto de la compra:</Text>
-          <Text fw={700} className="font-mono text-white">
+          <Text size="sm" c="zinc.4">
+            Total neto:
+          </Text>
+          <Text fw={700} size="sm" className="font-mono text-white">
             {formatPEN(totalCompraNeto)}
           </Text>
         </div>
         <div className="flex justify-between items-center text-xs">
-          <Text c="amber.4">(−) Anticipos aplicados:</Text>
-          <Text fw={700} c="amber.4" className="font-mono">
+          <Text c="amber.4" size="sm">
+            (−) Anticipos aplicados:
+          </Text>
+          <Text fw={700} c="amber.4" className="font-mono" size="sm">
             −{formatPEN(totalAnticiposAplicados)}
           </Text>
         </div>
         <Divider color="zinc.8" my={4} />
         <div className="flex justify-between items-center">
-          <Text fw={800} size="sm" c="white" className="uppercase tracking-wider">
-            Saldo Restante a Pagar al Proveedor:
+          <Text
+            fw={800}
+            size="sm"
+            c="white"
+            className="uppercase tracking-wider"
+          >
+            Saldo a Pagar:
           </Text>
           <Text
             fw={900}
-            size="xl"
-            c={saldoPendienteLiquidacion === 0 ? "teal.4" : "emerald.4"}
+            size="sm"
+            c={saldoPendienteLiquidacion === 0 ? "teal.4" : "green.4"}
             className="font-mono"
           >
             {formatPEN(saldoPendienteLiquidacion)}
