@@ -58,43 +58,79 @@ export const DetalleEntregaSection = ({
         0,
       );
 
+  // El item fue registrado con smart calc si la BD persistio los 4
+  // campos de magnitud. En ese caso el badge principal muestra
+  // "items x unidad/ítem" y luego el total en base.
+  const usaMagnitud =
+    Number(detalle.con_magnitud ?? 0) === 1 &&
+    typeof detalle.cantidad_items === "number" &&
+    detalle.cantidad_items > 0 &&
+    typeof detalle.valor_magnitud === "number" &&
+    typeof detalle.valor_magnitud_base === "number";
+
   return (
     <div className="p-5 space-y-5 transition-colors hover:bg-zinc-800/10">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
         <Group gap="xs" wrap="nowrap" align="center" className="pl-1">
-          <Badge
-            variant="light"
-            color="zinc.4"
-            size="md"
-            className="font-black h-8 bg-zinc-800/30 border border-zinc-700/50"
-          >
-            {formatNumber(detalle.cantidad_solicitada)}{" "}
-            {detalle.unidad_medida_sol_abv}
-          </Badge>
-
-          {detalle.unidad_medida_sol_abv !== detalle.unidad_medida_base_abv && (
-            <Group gap="xs" wrap="nowrap" className="items-center">
-              <div className="w-1 h-1 rounded-full bg-zinc-600" />
-              <Text
-                size="10px"
-                c="zinc.5"
-                fw={700}
-                className="italic uppercase tracking-tight opacity-60 ml-1"
+          {usaMagnitud ? (
+            <Group gap="xs" wrap="nowrap" align="center">
+              <Badge
+                variant="light"
+                color="zinc.4"
+                size="md"
+                className="font-black h-8 bg-zinc-800/30 border border-zinc-700/50"
               >
-                ({formatNumber(detalle.contenido_por_presentacion)}{" "}
-                {detalle.unidad_medida_base_abv} x{" "}
-                {detalle.unidad_medida_sol_abv})
-              </Text>
+                {formatNumber(detalle.cantidad_items ?? 0)} ×{" "}
+                {formatNumber(detalle.valor_magnitud ?? 0)}{" "}
+                {detalle.unidad_medida_sol_abv}
+              </Badge>
               <div className="w-1 h-1 rounded-full bg-zinc-600" />
               <Badge
                 variant="light"
                 color="indigo.4"
                 className="bg-zinc-800/30 font-black h-7"
               >
-                {formatNumber(detalle.cantidad_solicitada_base)}{" "}
+                {formatNumber(detalle.valor_magnitud_base ?? 0)}{" "}
                 {detalle.unidad_medida_base_abv}
               </Badge>
             </Group>
+          ) : (
+            <>
+              <Badge
+                variant="light"
+                color="zinc.4"
+                size="md"
+                className="font-black h-8 bg-zinc-800/30 border border-zinc-700/50"
+              >
+                {formatNumber(detalle.cantidad_solicitada)}{" "}
+                {detalle.unidad_medida_sol_abv}
+              </Badge>
+
+              {detalle.unidad_medida_sol_abv !== detalle.unidad_medida_base_abv && (
+                <Group gap="xs" wrap="nowrap" className="items-center">
+                  <div className="w-1 h-1 rounded-full bg-zinc-600" />
+                  <Text
+                    size="10px"
+                    c="zinc.5"
+                    fw={700}
+                    className="italic uppercase tracking-tight opacity-60 ml-1"
+                  >
+                    ({formatNumber(detalle.contenido_por_presentacion)}{" "}
+                    {detalle.unidad_medida_base_abv} x{" "}
+                    {detalle.unidad_medida_sol_abv})
+                  </Text>
+                  <div className="w-1 h-1 rounded-full bg-zinc-600" />
+                  <Badge
+                    variant="light"
+                    color="indigo.4"
+                    className="bg-zinc-800/30 font-black h-7"
+                  >
+                    {formatNumber(detalle.cantidad_solicitada_base)}{" "}
+                    {detalle.unidad_medida_base_abv}
+                  </Badge>
+                </Group>
+              )}
+            </>
           )}
         </Group>
 

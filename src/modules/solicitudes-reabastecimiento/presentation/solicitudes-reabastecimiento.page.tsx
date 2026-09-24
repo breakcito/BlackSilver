@@ -331,7 +331,7 @@ export const SolicitudesReabastecimientoPage = () => {
         opened={openedRegistro}
         close={closeReg}
         title="Nueva Solicitud de Reabastecimiento"
-        size="65%"
+        size="75rem"
       >
         <RegistroSolicitud
           onSuccess={(item) => {

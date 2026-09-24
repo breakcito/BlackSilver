@@ -361,7 +361,17 @@ export const DetalleSolicitud = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {detalles.map((item: DetalleSolicitudExtendido, idx: number) => (
+              {detalles.map((item: DetalleSolicitudExtendido, idx: number) => {
+                // El item fue cargado con smart calc si el backend persiste
+                // los 4 campos de magnitud. En ese caso mostramos el formato
+                // "items x unidad/ítem = total base" en lugar del clasico.
+                const usaMagnitud =
+                  Number(item.con_magnitud ?? 0) === 1 &&
+                  typeof item.cantidad_items === "number" &&
+                  item.cantidad_items > 0 &&
+                  typeof item.valor_magnitud === "number" &&
+                  typeof item.valor_magnitud_base === "number";
+                return (
                 <tr
                   key={item.id_solicitud_detalle}
                   className="hover:bg-zinc-900/40 transition-colors group"
@@ -443,18 +453,18 @@ export const DetalleSolicitud = ({
                   </td>
                   <td className="px-6 py-4 text-center">
                     <Group justify="center" gap={4}>
-                      <Badge
-                        variant="filled"
-                        color="cyan"
-                        radius="sm"
-                        className="font-bold shadow-xs whitespace-nowrap"
-                      >
-                        {formatNumber(item.cantidad_solicitada)}{" "}
-                        {item.unidad_medida_sol_abv}
-                      </Badge>{" "}
-                      {item.unidad_medida_base_abv !==
-                        item.unidad_medida_sol_abv && (
+                      {usaMagnitud ? (
+                        // Modelo "magnitud por item": mostramos
+                        // "items x unidad/ítem = total base".
                         <>
+                          <Badge
+                            variant="filled"
+                            color="cyan"
+                            radius="sm"
+                            className="font-bold shadow-xs whitespace-nowrap"
+                          >
+                            {formatNumber(item.cantidad_items ?? 0)}
+                          </Badge>
                           <Badge
                             variant="filled"
                             color="zinc"
@@ -462,9 +472,7 @@ export const DetalleSolicitud = ({
                             size="sm"
                             className="font-black px-4"
                           >
-                            {formatNumber(item.contenido_por_presentacion)}{" "}
-                            {item.unidad_medida_base_abv}{" "}
-                            <span className="lowercase">x</span>{" "}
+                            × {formatNumber(item.valor_magnitud ?? 0)}{" "}
                             {item.unidad_medida_sol_abv}
                           </Badge>
                           <Badge
@@ -473,9 +481,48 @@ export const DetalleSolicitud = ({
                             radius="sm"
                             className="font-bold shadow-xs whitespace-nowrap"
                           >
-                            {formatNumber(item.cantidad_solicitada_base)}{" "}
+                            = {formatNumber(item.valor_magnitud_base ?? 0)}{" "}
                             {item.unidad_medida_base_abv}
                           </Badge>
+                        </>
+                      ) : (
+                        // Modelo clasico: "cantidad en unidad detalle x factor".
+                        <>
+                          <Badge
+                            variant="filled"
+                            color="cyan"
+                            radius="sm"
+                            className="font-bold shadow-xs whitespace-nowrap"
+                          >
+                            {formatNumber(item.cantidad_solicitada)}{" "}
+                            {item.unidad_medida_sol_abv}
+                          </Badge>{" "}
+                          {item.unidad_medida_base_abv !==
+                            item.unidad_medida_sol_abv && (
+                            <>
+                              <Badge
+                                variant="filled"
+                                color="zinc"
+                                radius="sm"
+                                size="sm"
+                                className="font-black px-4"
+                              >
+                                {formatNumber(item.contenido_por_presentacion)}{" "}
+                                {item.unidad_medida_base_abv}{" "}
+                                <span className="lowercase">x</span>{" "}
+                                {item.unidad_medida_sol_abv}
+                              </Badge>
+                              <Badge
+                                variant="filled"
+                                color="pink"
+                                radius="sm"
+                                className="font-bold shadow-xs whitespace-nowrap"
+                              >
+                                {formatNumber(item.cantidad_solicitada_base)}{" "}
+                                {item.unidad_medida_base_abv}
+                              </Badge>
+                            </>
+                          )}
                         </>
                       )}
                     </Group>
@@ -593,7 +640,8 @@ export const DetalleSolicitud = ({
                     </Group>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </Table>
         </div>

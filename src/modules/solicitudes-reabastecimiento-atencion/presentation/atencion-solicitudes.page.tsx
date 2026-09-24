@@ -339,7 +339,7 @@ export const SolicitudesReabastecimientoAtencionPage = () => {
         opened={openedDetalle}
         close={closeDetalle}
         title={`Detalle de Solicitud de Reabastecimiento`}
-        size="70%"
+        size="75rem"
       >
         {selectedId && (
           <DetalleSolicitud
