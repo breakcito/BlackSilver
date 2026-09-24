@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { CubeIcon } from "@heroicons/react/24/outline";
 import { useMenuNav } from "../../../hooks/useMenuNav";
-import { iconos_menu_navegacion } from "../../../shared/variables/iconos-menu-navegacion";
+import { getIconoPorItem } from "../../../shared/variables/iconos-menu-navegacion";
 
 export interface IAccesoRapido {
   title: string;
@@ -26,23 +26,14 @@ export const useRandomLinks = () => {
     menu.forEach((menuItem) => {
       if (!Array.isArray(menuItem.submenus)) return;
 
-      const menuIconData = iconos_menu_navegacion.find(
-        (i) => i.menu_path === menuItem.path,
-      );
-
       menuItem.submenus.forEach((submenu) => {
         if (!Array.isArray(submenu.modulos)) return;
-
-        const submenuIconData = menuIconData?.submenus?.find(
-          (s) => s.submenu_path === submenu.path,
-        );
-        const icon = submenuIconData?.icono || CubeIcon;
 
         submenu.modulos.forEach((modulo) => {
           accesses.push({
             title: modulo.nombre,
             desc: submenu.nombre,
-            icon: icon,
+            icon: getIconoPorItem(modulo) || CubeIcon,
             url: `/${modulo.path}`,
           });
         });

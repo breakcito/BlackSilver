@@ -15,8 +15,6 @@ export interface SearchableModuloItem {
   path: string;
   menu_nombre: string;
   submenu_nombre: string;
-  menu_path: string;
-  submenu_path: string;
   tags: string[];
   tags_string: string;
 }
@@ -115,8 +113,6 @@ export const useNavbar = (onClose: () => void) => {
             path: mod.path,
             menu_nombre: menuItem.nombre,
             submenu_nombre: submenu.nombre,
-            menu_path: menuItem.path,
-            submenu_path: submenu.path,
             tags: autoTags,
             tags_string: autoTags.join(" "),
           });

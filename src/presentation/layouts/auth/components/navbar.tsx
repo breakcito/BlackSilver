@@ -9,7 +9,7 @@ import {
   MagnifyingGlassIcon,
   HashtagIcon,
 } from "@heroicons/react/24/outline";
-import { iconos_menu_navegacion } from "../../../../shared/variables/iconos-menu-navegacion";
+import { getIconoPorItem } from "../../../../shared/variables/iconos-menu-navegacion";
 import type { RES_Submenu } from "../../../../service/responses/menu-navegacion";
 import { useNavbar } from "../hooks/useNavbar";
 import { motion, AnimatePresence } from "motion/react";
@@ -231,16 +231,8 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                 >
                   {searchResults.map((res) => {
                     const modulo = res.item;
-                    const menuIconData = iconos_menu_navegacion.find(
-                      (i) => i.menu_path === modulo.menu_path,
-                    );
-                    const subIconData = Array.isArray(menuIconData?.submenus)
-                      ? menuIconData?.submenus.find(
-                          (s) => s.submenu_path === modulo.submenu_path,
-                        )
-                      : null;
                     const ModuloIcon =
-                      subIconData?.icono || menuIconData?.icono || CubeIcon;
+                      getIconoPorItem(modulo) || CubeIcon;
 
                     const moduloUrl = `/${modulo.path}`;
                     const isCurrentRoute = location.pathname === moduloUrl;
@@ -374,13 +366,14 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                   >
                     {Array.isArray(menu) &&
                       menu.map((menuItem) => {
-                        const menuIconData = iconos_menu_navegacion.find(
-                          (i) => i.menu_path === menuItem.path,
-                        );
-                        const MenuIcon = menuIconData?.icono || CubeIcon;
+                        const MenuIcon =
+                          getIconoPorItem(menuItem) || CubeIcon;
                         const isMenuExpanded = expanded === menuItem.nombre;
-                        const menuUrl = `/${menuItem.path}`;
-                        const isMenuActive = location.pathname === menuUrl;
+                        const menuUrl = menuItem.path
+                          ? `/${menuItem.path}`
+                          : "";
+                        const isMenuActive =
+                          !!menuUrl && location.pathname === menuUrl;
 
                         // Hoja: ruta directa (sin hijos) -> Link
                         if (!menuItem.es_desplegable) {
@@ -411,7 +404,7 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                                     {menuItem.nombre || "Sin nombre"}
                                   </span>
                                 </div>
-                                <ChevronRightIcon className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
+                                <ArrowRightEndOnRectangleIcon className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors shrink-0" />
                               </Link>
                             </motion.div>
                           );
@@ -473,20 +466,16 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                                   {Array.isArray(menuItem.submenus) &&
                                     menuItem.submenus.map(
                                       (submenu: RES_Submenu) => {
-                                        const submenuIconData = Array.isArray(
-                                          menuIconData?.submenus,
-                                        )
-                                          ? menuIconData?.submenus.find(
-                                              (s) =>
-                                                s.submenu_path === submenu.path,
-                                            )
-                                          : null;
                                         const SubmenuIcon =
-                                          submenuIconData?.icono || CubeIcon;
+                                          getIconoPorItem(submenu) ||
+                                          CubeIcon;
                                         const isSubmenuExpanded =
                                           expandedSub === submenu.nombre;
-                                        const submenuUrl = `/${submenu.path}`;
+                                        const submenuUrl = submenu.path
+                                          ? `/${submenu.path}`
+                                          : "";
                                         const isSubmenuActive =
+                                          !!submenuUrl &&
                                           location.pathname === submenuUrl;
 
                                         // Hoja: ruta directa (sin hijos) -> Link
