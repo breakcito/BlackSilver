@@ -76,9 +76,7 @@ export const SalidaAlmacenPDF = ({
             <Text style={tw("text-[12pt] font-bold text-zinc-900")}>
               {almacen}
             </Text>
-            <Text style={tw("text-[9pt] text-zinc-600 mt-1")}>
-              {titulo}
-            </Text>
+            <Text style={tw("text-[9pt] text-zinc-600 mt-1")}>{titulo}</Text>
           </View>
           <View style={tw("items-end")}>
             <Text style={tw("text-[14pt] font-bold text-zinc-900")}>
@@ -97,13 +95,12 @@ export const SalidaAlmacenPDF = ({
 
         {/* Banda con el tipo de documento */}
         <View style={tw("mb-4")}>
-          <View
-            style={[
-              tw("self-start px-3 py-1 rounded"),
-              tituloColor,
-            ]}
-          >
-            <Text style={tw("text-white text-[9pt] font-bold uppercase tracking-wider")}>
+          <View style={[tw("self-start px-3 py-1 rounded"), tituloColor]}>
+            <Text
+              style={tw(
+                "text-white text-[9pt] font-bold uppercase tracking-wider",
+              )}
+            >
               {titulo}
             </Text>
           </View>
@@ -148,9 +145,7 @@ export const SalidaAlmacenPDF = ({
               <Text style={tw("text-[8pt] font-bold text-zinc-500 mb-1")}>
                 OBSERVACIÓN
               </Text>
-              <Text style={tw("text-[9pt] text-zinc-900")}>
-                {observacion}
-              </Text>
+              <Text style={tw("text-[9pt] text-zinc-900")}>{observacion}</Text>
             </View>
           )}
         </View>
@@ -170,11 +165,11 @@ export const SalidaAlmacenPDF = ({
             >
               PRODUCTO
             </Text>
-            <Text
+            {/* <Text
               style={tw("w-[15%] text-center text-[9pt] font-bold text-white")}
             >
               LOTE / ACTIVO
-            </Text>
+            </Text> */}
             <Text
               style={tw("w-[10%] text-center text-[9pt] font-bold text-white")}
             >
@@ -186,7 +181,9 @@ export const SalidaAlmacenPDF = ({
               CANT.
             </Text>
             <Text
-              style={tw("w-[25%] text-left pl-2 text-[9pt] font-bold text-white")}
+              style={tw(
+                "w-[25%] text-left pl-2 text-[9pt] font-bold text-white",
+              )}
             >
               DESTINO / OBS.
             </Text>
@@ -213,7 +210,11 @@ export const SalidaAlmacenPDF = ({
                       {it.producto}
                     </Text>
                     {it.es_auditable && (
-                      <Text style={tw("text-[8pt] text-red-600 mt-0.5 font-bold uppercase")}>
+                      <Text
+                        style={tw(
+                          "text-[8pt] text-red-600 mt-0.5 font-bold uppercase",
+                        )}
+                      >
                         Auditable
                       </Text>
                     )}
@@ -225,9 +226,11 @@ export const SalidaAlmacenPDF = ({
                       </Text>
                     )}
                   </View>
-                  <Text style={tw("w-[15%] text-center text-[8pt] text-zinc-700")}>
+                  {/* <Text
+                    style={tw("w-[15%] text-center text-[8pt] text-zinc-700")}
+                  >
                     {it.lote_correlativo || it.activo_correlativo || "---"}
-                  </Text>
+                  </Text> */}
                   <Text style={tw("w-[10%] text-center text-[9pt]")}>
                     {it.unidad_medida_abv}
                   </Text>
@@ -237,7 +240,9 @@ export const SalidaAlmacenPDF = ({
                   <View style={tw("w-[25%] text-left pl-2 pr-1")}>
                     {it.destino_detalle && (
                       <Text style={tw("text-[8pt] text-zinc-700")}>
-                        {it.destino_tipo === "mantenimiento" ? "Mantto: " : "Prod: "}
+                        {it.destino_tipo === "mantenimiento"
+                          ? "Mantto: "
+                          : "Prod: "}
                         {it.destino_detalle}
                       </Text>
                     )}
@@ -265,15 +270,14 @@ export const SalidaAlmacenPDF = ({
         {/* Evidencias (lista de nombres) */}
         {evidencias_nombres && evidencias_nombres.length > 0 && (
           <View style={tw("mb-5")}>
-            <Text style={tw("text-[8pt] font-bold text-zinc-500 mb-1 uppercase")}>
+            <Text
+              style={tw("text-[8pt] font-bold text-zinc-500 mb-1 uppercase")}
+            >
               Evidencias adjuntas ({evidencias_nombres.length})
             </Text>
             <View style={tw("bg-zinc-50 border border-zinc-200 rounded p-2")}>
               {evidencias_nombres.map((n, i) => (
-                <Text
-                  key={i}
-                  style={tw("text-[8pt] text-zinc-700")}
-                >
+                <Text key={i} style={tw("text-[8pt] text-zinc-700")}>
                   • {n}
                 </Text>
               ))}

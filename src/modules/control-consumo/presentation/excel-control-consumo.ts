@@ -6,6 +6,7 @@ import type {
   RES_ConsumoDirecto,
   RES_ResumenEntregasReq,
 } from "../service/control-consumo.responses";
+import { formatNumber } from "../../../shared/functions/formatNumber";
 
 const COLOR_HEADER_BG = "FF1E3A8A";
 const COLOR_HEADER_TEXT = "FFFFFFFF";
@@ -18,46 +19,62 @@ const COLOR_TOTAL_BG = "FFE2E8F0";
 
 const HEADERS: Array<{ key: string; title: string; width: number }> = [
   { key: "item", title: "#", width: 5 },
-  { key: "fecha_req", title: "F. Req.", width: 12 },
-  { key: "lote_solicitante", title: "N° Lote", width: 24 },
-  { key: "solicitante", title: "Solicitante", width: 26 },
-  { key: "cargo_solicitante", title: "Cargo Solicitante", width: 18 },
-  { key: "mina", title: "Mina", width: 18 },
-  { key: "labor", title: "Labor", width: 18 },
-  { key: "almacen", title: "Almacén", width: 20 },
-  { key: "producto", title: "Producto", width: 30 },
-  { key: "categoria", title: "Categoría", width: 18 },
-  { key: "tipo_bien", title: "Tipo Bien", width: 12 },
-  { key: "u_base", title: "U.M. Base", width: 10 },
-  { key: "lote_producto", title: "Lote Producto", width: 16 },
-  { key: "cant_entregada_base", title: "Cant. Entregada", width: 14 },
-  { key: "cant_consumida_total", title: "Cant. Consumida", width: 14 },
-  { key: "restante_base", title: "Restante", width: 13 },
-  { key: "moneda", title: "Moneda", width: 8 },
-  { key: "costo_unitario", title: "Costo Unit.", width: 14 },
-  { key: "costo_entregado", title: "Costo Entregado", width: 16 },
-  { key: "costo_total_consumo", title: "Costo Consumo", width: 16 },
-  { key: "costo_restante", title: "Costo Restante", width: 16 },
-  { key: "estado", title: "Estado", width: 14 },
-  { key: "lote_mineral", title: "Lote Mineral", width: 14 },
-  { key: "mina_lote", title: "Mina Lote", width: 16 },
-  { key: "labor_lote", title: "Labor Lote", width: 16 },
-  { key: "empleado_registro", title: "Empleado Reg.", width: 24 },
-  { key: "cargo_registro", title: "Cargo Reg.", width: 18 },
-  { key: "fecha_consumo", title: "F. Consumo", width: 16 },
+  { key: "fecha_req", title: "Fecha Req.", width: 12 },
+  { key: "mes", title: "Mes", width: 12 },
   { key: "tipo_turno", title: "Turno", width: 12 },
-  { key: "estado_consumo", title: "Estado Consumo", width: 14 },
-  { key: "para_mantenimiento", title: "Mant.?", width: 8 },
-  { key: "para_produccion", title: "Prod.?", width: 8 },
-  { key: "af_consumidor", title: "AF Consumidor", width: 14 },
-  { key: "marca_af", title: "Marca AF", width: 16 },
-  { key: "modelo_af", title: "Modelo AF", width: 16 },
-  { key: "costo_af", title: "Costo AF", width: 14 },
-  { key: "labor_destino", title: "Labor Destino", width: 22 },
+  { key: "lote_solicitante", title: "N° Lote", width: 24 },
+  { key: "almacen", title: "Almacén", width: 20 },
+  { key: "consumidor", title: "Consumidor", width: 18 }, // puede ser la labor de destino, un activo fijo (consumo directo por registro de uso o por mantenimiento) o un cliente
+  { key: "tipo_bien", title: "Sistema de Costos", width: 12 },
+  { key: "producto", title: "Producto", width: 30 },
+  { key: "u_base", title: "U.M.", width: 10 },
+  { key: "moneda", title: "Moneda", width: 8 },
+  { key: "costo_unitario", title: "Precio Unit.", width: 14 },
+  { key: "cant_entregada_base", title: "Cant. Entregada", width: 14 },
+  { key: "costo_entregado", title: "Costo Entregado", width: 16 },
+  { key: "cant_consumida_total", title: "Cantidad Consumida", width: 14 },
+  { key: "costo_total_consumo", title: "Costo Consumo", width: 16 },
+  { key: "fecha_consumo", title: "F. Consumo", width: 16 },
   { key: "comentario", title: "Comentario", width: 36 },
+
+  // { key: "solicitante", title: "Solicitante", width: 26 },
+  // { key: "cargo_solicitante", title: "Cargo Solicitante", width: 18 },
+  // { key: "mina", title: "Mina", width: 18 },
+  // { key: "categoria", title: "Sistema de Costos", width: 18 },
+  // { key: "lote_producto", title: "Lote Producto", width: 16 },
+  // { key: "restante_base", title: "Restante", width: 13 },
+  // { key: "costo_restante", title: "Costo Restante", width: 16 },
+  // { key: "estado", title: "Estado", width: 14 },
+  // { key: "lote_mineral", title: "Lote Mineral", width: 14 },
+  // { key: "mina_lote", title: "Mina Lote", width: 16 },
+  // { key: "labor_lote", title: "Labor Lote", width: 16 },
+  // { key: "empleado_registro", title: "Empleado Reg.", width: 24 },
+  // { key: "cargo_registro", title: "Cargo Reg.", width: 18 },
+  // { key: "estado_consumo", title: "Estado Consumo", width: 14 },
+  // { key: "para_mantenimiento", title: "Mant.?", width: 8 },
+  // { key: "para_produccion", title: "Prod.?", width: 8 },
+  // { key: "af_consumidor", title: "Activo Fijo", width: 14 },
+  // { key: "marca_af", title: "Marca AF", width: 16 },
+  // { key: "modelo_af", title: "Modelo AF", width: 16 },
+  // { key: "costo_af", title: "Costo AF", width: 14 },
+  // { key: "labor_destino", title: "Labor Destino", width: 22 },
 ];
 
 const COL_KEYS = HEADERS.map((h) => h.key);
+
+/**
+ * Convierte un índice numérico de columna (1-indexed) a letra Excel (ej: 1 -> A, 15 -> O).
+ */
+const getColLetter = (colIndex: number): string => {
+  let letter = "";
+  let temp = colIndex;
+  while (temp > 0) {
+    const mod = (temp - 1) % 26;
+    letter = String.fromCharCode(65 + mod) + letter;
+    temp = Math.floor((temp - mod) / 26);
+  }
+  return letter;
+};
 
 /**
  * Aplana la estructura agrupada (requerimiento → entrega → detalle → consumos[])
@@ -70,7 +87,8 @@ export const flattenConsumosForExcel = (
   consumo: RES_Consumo;
   detalle: RES_ResumenEntregasReq;
 }> => {
-  const flat: Array<{ consumo: RES_Consumo; detalle: RES_ResumenEntregasReq }> = [];
+  const flat: Array<{ consumo: RES_Consumo; detalle: RES_ResumenEntregasReq }> =
+    [];
 
   // 1. Entregas por requerimiento
   reporte.forEach((det) => {
@@ -78,7 +96,8 @@ export const flattenConsumosForExcel = (
       flat.push({
         consumo: {
           id_consumo: 0,
-          id_requerimiento_almacen_entrega_detalle: det.id_entrega_requerimiento_detalle,
+          id_requerimiento_almacen_entrega_detalle:
+            det.id_entrega_requerimiento_detalle,
           id_activo_fijo_consumidor: null,
           id_labor_destino: null,
           id_empleado_registro: 0,
@@ -105,10 +124,12 @@ export const flattenConsumosForExcel = (
         id_requerimiento_almacen_entrega_detalle: 0,
         tipo_turno: cd.tipo_turno,
         id_activo_fijo_consumidor: cd.id_activo_fijo_consumidor,
-        correlativo_activo_fijo_consumidor: cd.correlativo_activo_fijo_consumidor,
+        correlativo_activo_fijo_consumidor:
+          cd.correlativo_activo_fijo_consumidor,
         producto_activo_fijo_consumidor: cd.producto_activo_fijo_consumidor,
         modelo_activo_fijo_consumidor: cd.modelo_activo_fijo_consumidor,
-        costo_compra_activo_fijo_consumidor: cd.costo_compra_activo_fijo_consumidor,
+        costo_compra_activo_fijo_consumidor:
+          cd.costo_compra_activo_fijo_consumidor,
         id_marca_activo_fijo_consumidor: cd.id_marca_activo_fijo_consumidor,
         marca_activo_fijo_consumidor: cd.marca_activo_fijo_consumidor,
         id_labor_destino: cd.id_labor_destino ?? null,
@@ -186,8 +207,9 @@ export const buildControlConsumoExcel = async (
   mes: number,
   anio: number,
 ) => {
-  const mesNombre =
-    (MESES.find((m) => m.value === String(mes))?.label || String(mes)).toUpperCase();
+  const mesNombre = (
+    MESES.find((m) => m.value === String(mes))?.label || String(mes)
+  ).toUpperCase();
 
   const sheet = workbook.addWorksheet("Consumos", {
     views: [{ showGridLines: true, state: "frozen", ySplit: 4 }],
@@ -195,10 +217,14 @@ export const buildControlConsumoExcel = async (
 
   sheet.columns = HEADERS.map((h) => ({ key: h.key, width: h.width }));
 
+  const totalCols = HEADERS.length;
+  const lastColLetter = getColLetter(totalCols);
+
   // Banda superior: título del reporte
-  sheet.mergeCells("A1:AL2");
+  sheet.mergeCells(`A1:${lastColLetter}2`);
   const titleCell = sheet.getCell("A1");
-  titleCell.value = "REPORTE DE CONTROL DE CONSUMO - ANÁLISIS DE COSTOS DE PRODUCCIÓN";
+  titleCell.value =
+    "REPORTE DE CONTROL DE CONSUMO - ANÁLISIS DE COSTOS DE PRODUCCIÓN";
   titleCell.font = {
     bold: true,
     size: 16,
@@ -216,7 +242,8 @@ export const buildControlConsumoExcel = async (
   );
   const totalConsumosCount = totalConsumosReq + consumosDirectos.length;
 
-  metaRow.getCell(1).value = `Período: ${mesNombre} ${anio}    •    Entregas Req: ${reporte.length}    •    Consumos Directos: ${consumosDirectos.length}    •    Total Consumos: ${totalConsumosCount}`;
+  metaRow.getCell(1).value =
+    `Período: ${mesNombre} ${anio}    •    Entregas Req: ${reporte.length}    •    Consumos Directos: ${consumosDirectos.length}    •    Total Consumos: ${totalConsumosCount}`;
   metaRow.getCell(1).font = {
     bold: true,
     size: 10,
@@ -225,7 +252,9 @@ export const buildControlConsumoExcel = async (
   };
   metaRow.getCell(1).alignment = { horizontal: "left" };
 
-  const generatedCell = sheet.getCell(`AJ${rowIdx}`);
+  const genColStart = Math.max(1, totalCols - 2);
+  const genColStartLetter = getColLetter(genColStart);
+  const generatedCell = sheet.getCell(`${genColStartLetter}${rowIdx}`);
   generatedCell.value = `Generado: ${dayjs().format("DD/MM/YYYY HH:mm")}`;
   generatedCell.font = {
     italic: true,
@@ -234,7 +263,7 @@ export const buildControlConsumoExcel = async (
     name: "Arial",
   };
   generatedCell.alignment = { horizontal: "right" };
-  sheet.mergeCells(`AJ${rowIdx}:AL${rowIdx}`);
+  sheet.mergeCells(`${genColStartLetter}${rowIdx}:${lastColLetter}${rowIdx}`);
 
   rowIdx += 1;
 
@@ -273,7 +302,7 @@ export const buildControlConsumoExcel = async (
   const flat = flattenConsumosForExcel(reporte, consumosDirectos);
 
   if (flat.length === 0) {
-    sheet.mergeCells(`A${rowIdx}:AL${rowIdx + 1}`);
+    sheet.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx + 1}`);
     const empty = sheet.getCell(`A${rowIdx}`);
     empty.value =
       "No hay consumos para los filtros seleccionados (mes / año / búsqueda).";
@@ -288,7 +317,7 @@ export const buildControlConsumoExcel = async (
 
   flat.forEach(({ consumo, detalle }, idx) => {
     const r = sheet.getRow(rowIdx);
-    r.height = 18;
+    r.height = 22;
     const cantConsumidaBase = Number(consumo.cantidad_base_consumida ?? 0);
     const cantConsumidaTotalBase = Number(detalle.cantidad_consumida_base ?? 0);
     const cantEntregadaBase = Number(detalle.cantidad_entregada_base ?? 0);
@@ -315,12 +344,13 @@ export const buildControlConsumoExcel = async (
       consumo.para_mantenimiento === true ||
       Number(consumo.para_mantenimiento) === 1;
     const paraProd =
-      consumo.para_produccion === true ||
-      Number(consumo.para_produccion) === 1;
+      consumo.para_produccion === true || Number(consumo.para_produccion) === 1;
 
     // Formatear lote_solicitante: PRIMER_NOMBRE - CODIGO_LOTE (ej. ROBERTO - GN-12315)
     const solicitanteRaw = (detalle.solicitante || "").trim();
-    const primerNombre = solicitanteRaw ? solicitanteRaw.split(" ")[0].toUpperCase() : "";
+    const primerNombre = solicitanteRaw
+      ? solicitanteRaw.split(" ")[0].toUpperCase()
+      : "";
     const codigoLote =
       consumo.codigo_lote_mineral ||
       detalle.codigo_lote_mineral_destino ||
@@ -335,27 +365,61 @@ export const buildControlConsumoExcel = async (
       loteFormateado = codigoLote;
     }
 
+    // Formatear mes: Nombre del mes del requerimiento o del consumo
+    const fechaParaMes =
+      detalle.fecha_requerimiento || consumo.fecha_hora_consumo;
+    const mesNum = fechaParaMes ? dayjs(fechaParaMes).month() + 1 : mes;
+    const mesTexto = (
+      MESES.find((m) => m.value === String(mesNum))?.label || String(mesNum)
+    ).toUpperCase();
+
+    // Determinar consumidor:
+    // 1) Si tiene activo fijo consumidor: nombre legible del producto AF o su correlativo
+    // 2) Si tiene destino original de activo fijo: correlativo_activo_fijo_destino
+    // 3) Si tiene labor: labor_destino o labor del requerimiento
+    // 4) Fallback a solicitante o mina
+    const afConsumidor =
+      consumo.producto_activo_fijo_consumidor ||
+      consumo.correlativo_activo_fijo_consumidor ||
+      detalle.correlativo_activo_fijo_destino;
+    const laborConsumidor = consumo.labor || detalle.labor;
+    const consumidorFinal = afConsumidor
+      ? consumo.correlativo_activo_fijo_consumidor &&
+        consumo.producto_activo_fijo_consumidor
+        ? `${consumo.producto_activo_fijo_consumidor} (${consumo.correlativo_activo_fijo_consumidor})`
+        : afConsumidor
+      : laborConsumidor || detalle.solicitante || "General";
+
     r.values = {
       item: idx + 1,
       fecha_req: dayjs(detalle.fecha_requerimiento).format("DD/MM/YYYY"),
+      mes: mesTexto,
+      tipo_turno: consumo.tipo_turno ?? "-",
       lote_solicitante: loteFormateado,
+      almacen: detalle.almacen_destino ?? "",
+      consumidor: consumidorFinal,
+      tipo_bien: detalle.tipo_bien ?? "",
+      producto: detalle.producto ?? "",
+      u_base: detalle.unidad_medida_base_abv ?? "",
+      moneda: detalle.moneda ?? "PEN",
+      cant_entregada_base: formatNumber(cantEntregadaBase),
+      costo_entregado: formatNumber(costoEntregado),
+      cant_consumida_total: formatNumber(cantConsumidaTotalBase),
+      costo_unitario: formatNumber(costoUnit),
+      costo_total_consumo: formatNumber(costoTotalConsumo),
+      fecha_consumo: consumo.fecha_hora_consumo
+        ? dayjs(consumo.fecha_hora_consumo).format("DD/MM/YYYY HH:mm")
+        : "",
+      comentario: consumo.comentario_consumo ?? "",
+
+      // Campos comentados que se preservan en r.values por si se reactivan
       solicitante: detalle.solicitante ?? "",
       cargo_solicitante: detalle.cargo_solicitante ?? "",
       mina: detalle.mina ?? "",
       labor: detalle.labor ?? "",
-      almacen: detalle.almacen_destino ?? "",
-      producto: detalle.producto ?? "",
       categoria: detalle.categoria ?? "",
-      tipo_bien: detalle.tipo_bien ?? "",
-      u_base: detalle.unidad_medida_base_abv ?? "",
       lote_producto: detalle.correlativo_lote_producto ?? "",
-      cant_entregada_base: cantEntregadaBase,
-      cant_consumida_total: cantConsumidaTotalBase,
       restante_base: restanteBase,
-      moneda: detalle.moneda ?? "PEN",
-      costo_unitario: costoUnit,
-      costo_entregado: costoEntregado,
-      costo_total_consumo: costoTotalConsumo,
       costo_restante: costoRestante,
       estado: estadoConsumoCalc,
       lote_mineral: consumo.codigo_lote_mineral ?? "",
@@ -363,10 +427,6 @@ export const buildControlConsumoExcel = async (
       labor_lote: consumo.labor_lote_mineral ?? "",
       empleado_registro: consumo.empleado_registro ?? "",
       cargo_registro: consumo.cargo_registro ?? "",
-      fecha_consumo: consumo.fecha_hora_consumo
-        ? dayjs(consumo.fecha_hora_consumo).format("DD/MM/YYYY HH:mm")
-        : "",
-      tipo_turno: consumo.tipo_turno ?? "-",
       estado_consumo: consumo.estado ?? "",
       para_mantenimiento: paraMant ? "Sí" : "No",
       para_produccion: paraProd ? "Sí" : "No",
@@ -378,7 +438,6 @@ export const buildControlConsumoExcel = async (
       modelo_af: consumo.modelo_activo_fijo_consumidor ?? "",
       costo_af: Number(consumo.costo_compra_activo_fijo_consumidor ?? 0),
       labor_destino: consumo.labor ?? "",
-      comentario: consumo.comentario_consumo ?? "",
     };
 
     r.eachCell({ includeEmpty: true }, (cell, colNum) => {
@@ -396,7 +455,11 @@ export const buildControlConsumoExcel = async (
       };
 
       const key = COL_KEYS[colNum - 1];
-      if (key === "cant_entregada_base" || key === "cant_consumida_total" || key === "restante_base") {
+      if (
+        key === "cant_entregada_base" ||
+        key === "cant_consumida_total" ||
+        key === "restante_base"
+      ) {
         cell.numFmt = "0.0000";
         cell.alignment = { vertical: "middle", horizontal: "right" };
       }
@@ -412,10 +475,12 @@ export const buildControlConsumoExcel = async (
       }
       if (
         key === "item" ||
+        key === "mes" ||
         key === "moneda" ||
+        key === "u_base" ||
+        key === "tipo_turno" ||
         key === "para_mantenimiento" ||
-        key === "para_produccion" ||
-        key === "tipo_turno"
+        key === "para_produccion"
       ) {
         cell.alignment = { vertical: "middle", horizontal: "center" };
       }
@@ -463,7 +528,25 @@ export const buildControlConsumoExcel = async (
   // Fila Totalizadora
   const totalRow = sheet.getRow(rowIdx);
   totalRow.height = 24;
-  sheet.mergeCells(`A${rowIdx}:M${rowIdx}`);
+
+  // Encontrar la primera columna numérica de total para hacer el merge de la etiqueta
+  const firstTotalColIdx = Math.min(
+    ...[
+      COL_KEYS.indexOf("cant_entregada_base"),
+      COL_KEYS.indexOf("costo_entregado"),
+      COL_KEYS.indexOf("cant_consumida_total"),
+      COL_KEYS.indexOf("costo_total_consumo"),
+    ].filter((idx) => idx !== -1),
+  );
+
+  const mergeEndCol =
+    firstTotalColIdx !== Infinity && firstTotalColIdx > 0
+      ? getColLetter(firstTotalColIdx)
+      : "A";
+
+  if (mergeEndCol !== "A") {
+    sheet.mergeCells(`A${rowIdx}:${mergeEndCol}${rowIdx}`);
+  }
   const labelTotalCell = totalRow.getCell(1);
   labelTotalCell.value = "TOTAL GENERAL DEL PERÍODO:";
   labelTotalCell.font = { bold: true, size: 10, color: { argb: "FF0F172A" } };
@@ -479,34 +562,35 @@ export const buildControlConsumoExcel = async (
   );
   const totalCostoEntregado = flat.reduce(
     (acc, d) =>
-      acc + Number(d.detalle.cantidad_entregada_base ?? 0) * Number(d.detalle.costo_unitario_base ?? 0),
+      acc +
+      Number(d.detalle.cantidad_entregada_base ?? 0) *
+        Number(d.detalle.costo_unitario_base ?? 0),
     0,
   );
   const totalCostoRestante = flat.reduce(
     (acc, d) =>
       acc +
-      (Number(d.detalle.cantidad_entregada_base ?? 0) - Number(d.consumo.cantidad_base_consumida ?? 0)) *
+      (Number(d.detalle.cantidad_entregada_base ?? 0) -
+        Number(d.consumo.cantidad_base_consumida ?? 0)) *
         Number(d.detalle.costo_unitario_base ?? 0),
     0,
   );
 
-  totalRow.getCell(COL_KEYS.indexOf("cant_entregada_base") + 1).value = totalCantEntregada;
-  totalRow.getCell(COL_KEYS.indexOf("cant_entregada_base") + 1).numFmt = "0.0000";
+  const setTotalCell = (key: string, val: number, fmt: string) => {
+    const colIdx = COL_KEYS.indexOf(key);
+    if (colIdx !== -1) {
+      const cell = totalRow.getCell(colIdx + 1);
+      cell.value = val;
+      cell.numFmt = fmt;
+    }
+  };
 
-  totalRow.getCell(COL_KEYS.indexOf("cant_consumida_total") + 1).value = totalCantConsumidaDetalle;
-  totalRow.getCell(COL_KEYS.indexOf("cant_consumida_total") + 1).numFmt = "0.0000";
-
-  totalRow.getCell(COL_KEYS.indexOf("restante_base") + 1).value = totalRestante;
-  totalRow.getCell(COL_KEYS.indexOf("restante_base") + 1).numFmt = "0.0000";
-
-  totalRow.getCell(COL_KEYS.indexOf("costo_entregado") + 1).value = totalCostoEntregado;
-  totalRow.getCell(COL_KEYS.indexOf("costo_entregado") + 1).numFmt = '"S/."#,##0.0000';
-
-  totalRow.getCell(COL_KEYS.indexOf("costo_total_consumo") + 1).value = totalCostoConsumo;
-  totalRow.getCell(COL_KEYS.indexOf("costo_total_consumo") + 1).numFmt = '"S/."#,##0.0000';
-
-  totalRow.getCell(COL_KEYS.indexOf("costo_restante") + 1).value = totalCostoRestante;
-  totalRow.getCell(COL_KEYS.indexOf("costo_restante") + 1).numFmt = '"S/."#,##0.0000';
+  setTotalCell("cant_entregada_base", totalCantEntregada, "0.00");
+  setTotalCell("cant_consumida_total", totalCantConsumidaDetalle, "0.00");
+  setTotalCell("restante_base", totalRestante, "0.0000");
+  setTotalCell("costo_entregado", totalCostoEntregado, '"S/."#,##0.00');
+  setTotalCell("costo_total_consumo", totalCostoConsumo, '"S/."#,##0.00');
+  setTotalCell("costo_restante", totalCostoRestante, '"S/."#,##0.00');
 
   totalRow.eachCell({ includeEmpty: true }, (cell) => {
     cell.font = { bold: true, size: 10, name: "Arial" };
@@ -542,7 +626,13 @@ export const useControlConsumoExcel = () => {
     return {
       filename,
       builder: async (workbook: ExcelJS.Workbook) => {
-        await buildControlConsumoExcel(workbook, reporte, consumosDirectos, mes, anio);
+        await buildControlConsumoExcel(
+          workbook,
+          reporte,
+          consumosDirectos,
+          mes,
+          anio,
+        );
       },
     };
   };

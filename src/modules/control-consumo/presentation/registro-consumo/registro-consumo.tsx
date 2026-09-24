@@ -66,11 +66,15 @@ export const RegistroConsumo = ({
   const [formActivoFijo, setFormActivoFijo] = useState<string | null>(null);
   const [formLabor, setFormLabor] = useState<string | null>(null);
   const [formLoteMineral, setFormLoteMineral] = useState<string | null>(null);
-  const [destinoTipo, setDestinoTipo] = useState<"mantenimiento" | "produccion">("produccion");
+  const [destinoTipo, setDestinoTipo] = useState<
+    "mantenimiento" | "produccion"
+  >("produccion");
 
   const puedeMantenimiento = useMemo(() => {
-    return selectedDetail.producto_para_mantenimiento === true ||
-      Number(selectedDetail.producto_para_mantenimiento) === 1;
+    return (
+      selectedDetail.producto_para_mantenimiento === true ||
+      Number(selectedDetail.producto_para_mantenimiento) === 1
+    );
   }, [selectedDetail.producto_para_mantenimiento]);
 
   const [labores, setLabores] = useState<RES_Labor[]>([]);
@@ -85,13 +89,23 @@ export const RegistroConsumo = ({
     setFormFechaHora(new Date());
     setFormComentario("");
 
-    const initialTipo = (selectedDetail.para_mantenimiento === true || Number(selectedDetail.para_mantenimiento) === 1)
-      ? "mantenimiento"
-      : "produccion";
+    const initialTipo =
+      selectedDetail.para_mantenimiento === true ||
+      Number(selectedDetail.para_mantenimiento) === 1
+        ? "mantenimiento"
+        : "produccion";
     setDestinoTipo(initialTipo);
 
-    setFormActivoFijo(selectedDetail.id_activo_fijo_destino ? String(selectedDetail.id_activo_fijo_destino) : null);
-    setFormLoteMineral(selectedDetail.id_lote_mineral ? String(selectedDetail.id_lote_mineral) : null);
+    setFormActivoFijo(
+      selectedDetail.id_activo_fijo_destino
+        ? String(selectedDetail.id_activo_fijo_destino)
+        : null,
+    );
+    setFormLoteMineral(
+      selectedDetail.id_lote_mineral
+        ? String(selectedDetail.id_lote_mineral)
+        : null,
+    );
     setFormLabor(null);
     setLabores([]);
     setLotesMineral([]);
@@ -145,7 +159,10 @@ export const RegistroConsumo = ({
       });
     });
 
-    const dataList: Array<{ group: string; items: Array<{ value: string; label: string }> }> = [];
+    const dataList: Array<{
+      group: string;
+      items: Array<{ value: string; label: string }>;
+    }> = [];
     groupsMap.forEach((items, mina) => {
       dataList.push({ group: mina, items });
     });
@@ -261,7 +278,10 @@ export const RegistroConsumo = ({
       });
     });
 
-    const dataList: Array<{ group: string; items: Array<{ value: string; label: string }> }> = [];
+    const dataList: Array<{
+      group: string;
+      items: Array<{ value: string; label: string }>;
+    }> = [];
     groupsMap.forEach((items, product) => {
       dataList.push({ group: product, items });
     });
@@ -371,7 +391,7 @@ export const RegistroConsumo = ({
                 classNames={modalFieldClasses}
               />
 
-              <div className="flex flex-col gap-1.5 h-10 justify-center">
+              <div className="flex flex-col gap-1.5  justify-center">
                 <Text size="xs" fw={600} className="text-zinc-300 ml-0.5 mb-1">
                   Destinado a
                 </Text>
@@ -391,7 +411,9 @@ export const RegistroConsumo = ({
                   <Switch
                     checked={destinoTipo === "mantenimiento"}
                     onChange={(event) => {
-                      const newTipo = event.currentTarget.checked ? "mantenimiento" : "produccion";
+                      const newTipo = event.currentTarget.checked
+                        ? "mantenimiento"
+                        : "produccion";
                       setDestinoTipo(newTipo);
                       if (newTipo === "mantenimiento") {
                         setFormLoteMineral(null);
@@ -418,6 +440,31 @@ export const RegistroConsumo = ({
             </Group>
 
             <Group gap="md" grow>
+              {/* Selector de Labor Destino (Opcional) */}
+              <Select
+                label="Labor"
+                required
+                placeholder={
+                  loadingLabores
+                    ? "Cargando labores..."
+                    : laborsData.length > 0
+                      ? "Seleccione labor..."
+                      : "Sin labores registradas"
+                }
+                data={laborsData}
+                value={formLabor}
+                onChange={setFormLabor}
+                searchable
+                disabled={loadingLabores}
+                clearable
+                radius="lg"
+                size="sm"
+                classNames={modalFieldClasses}
+                comboboxProps={{
+                  withinPortal: true,
+                  zIndex: 9999,
+                }}
+              />
               {destinoTipo === "mantenimiento" ? (
                 <Select
                   label="Activo Fijo (Mantenimiento) *"
@@ -437,8 +484,12 @@ export const RegistroConsumo = ({
                 />
               ) : (
                 <Select
-                  label="Lote en Producción"
-                  placeholder={loadingLotes ? "Cargando lotes..." : "Seleccione lote mineral (opcional)..."}
+                  label="Lote Mineral"
+                  placeholder={
+                    loadingLotes
+                      ? "Cargando lotes..."
+                      : "Seleccione lote mineral (opcional)..."
+                  }
                   data={lotesMineral.map((lm) => ({
                     value: String(lm.id_lote_mineral),
                     label: lm.contratista
@@ -448,6 +499,7 @@ export const RegistroConsumo = ({
                   value={formLoteMineral}
                   onChange={setFormLoteMineral}
                   searchable
+                  required
                   clearable
                   radius="lg"
                   size="sm"
@@ -463,25 +515,27 @@ export const RegistroConsumo = ({
         )}
 
         <Group gap="md" grow>
-          {/* Selector de Labor Destino (Opcional) */}
           <Select
-            label="Labor Destino (opc.)"
-            placeholder={
-              loadingLabores
-                ? "Cargando labores..."
-                : laborsData.length > 0
-                  ? "Seleccione labor..."
-                  : "Sin labores registradas"
+            label="Turno"
+            data={[
+              { value: TipoTurno.Dia, label: "Turno Día" },
+              { value: TipoTurno.Noche, label: "Turno Noche" },
+            ]}
+            value={formTurno}
+            onChange={(val) =>
+              setFormTurno((val as TipoTurno) || TipoTurno.Dia)
             }
-            data={laborsData}
-            value={formLabor}
-            onChange={setFormLabor}
-            searchable
-            disabled={loadingLabores}
-            clearable
+            required
             radius="lg"
             size="sm"
             classNames={modalFieldClasses}
+            leftSection={
+              formTurno === TipoTurno.Dia ? (
+                <SunIcon className="w-4 h-4 text-yellow-400" />
+              ) : (
+                <MoonIcon className="w-4 h-4 text-indigo-400" />
+              )
+            }
             comboboxProps={{
               withinPortal: true,
               zIndex: 9999,
@@ -498,31 +552,6 @@ export const RegistroConsumo = ({
             radius="lg"
             size="sm"
             classNames={modalFieldClasses}
-          />
-
-          <Select
-            label="Turno"
-            data={[
-              { value: TipoTurno.Dia, label: "Turno Día" },
-              { value: TipoTurno.Noche, label: "Turno Noche" },
-            ]}
-            value={formTurno}
-            onChange={(val) => setFormTurno((val as TipoTurno) || TipoTurno.Dia)}
-            required
-            radius="lg"
-            size="sm"
-            classNames={modalFieldClasses}
-            leftSection={
-              formTurno === TipoTurno.Dia ? (
-                <SunIcon className="w-4 h-4 text-yellow-400" />
-              ) : (
-                <MoonIcon className="w-4 h-4 text-indigo-400" />
-              )
-            }
-            comboboxProps={{
-              withinPortal: true,
-              zIndex: 9999,
-            }}
           />
         </Group>
 

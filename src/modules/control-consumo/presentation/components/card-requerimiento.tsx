@@ -13,7 +13,6 @@ import {
   InboxStackIcon,
   ChevronDownIcon,
   BanknotesIcon,
-  ArchiveBoxIcon,
   TagIcon,
   CalendarDaysIcon,
   UserCircleIcon,
@@ -168,18 +167,18 @@ export const CardRequerimiento = ({
     },
     {
       accessor: "lote_costo",
-      title: "Lote / Costo Unit.",
+      title: "Costo",
       textAlign: "center",
-      width: 220,
+      width: 150,
       render: (r) => {
         const costoUnit = Number(r.costo_unitario_base ?? 0);
         const unitBase = r.unidad_medida_base_abv;
-        const tieneLote = !!r.correlativo_lote_producto;
+        // const tieneLote = !!r.correlativo_lote_producto;
         const tieneFactura =
           !!r.serie_factura_compra || !!r.numero_factura_compra;
         return (
           <Stack gap={2} align="center" className="py-1">
-            {tieneLote ? (
+            {/* {tieneLote ? (
               <Group gap={4} wrap="nowrap" justify="center">
                 <ArchiveBoxIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                 <Badge
@@ -201,7 +200,7 @@ export const CardRequerimiento = ({
               >
                 Sin lote
               </Text>
-            )}
+            )} */}
             {costoUnit > 0 ? (
               <Group gap={4} wrap="nowrap" justify="center">
                 <BanknotesIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
