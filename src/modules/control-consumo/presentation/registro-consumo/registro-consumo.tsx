@@ -16,6 +16,8 @@ import { AuxService } from "../../../../service/auxiliar.service";
 import { useNotify } from "../../../../hooks/useNotify";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { TipoBien } from "../../../../shared/enums/_generic/tipo-bien";
+import { TipoTurno } from "../../../../shared/enums/_generic/tipo-turno";
+import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
 import type { RES_ActivoFijoDisponible } from "../../../../service/responses/activo-fijo";
 import type { RES_Labor } from "../../../../service/responses/labor";
 import type { RES_LoteMineral } from "../../../../service/responses/lote-mineral";
@@ -59,6 +61,7 @@ export const RegistroConsumo = ({
     isOtr ? restanteReq : restanteBase,
   );
   const [formFechaHora, setFormFechaHora] = useState<Date | null>(new Date());
+  const [formTurno, setFormTurno] = useState<TipoTurno>(TipoTurno.Dia);
   const [formComentario, setFormComentario] = useState("");
   const [formActivoFijo, setFormActivoFijo] = useState<string | null>(null);
   const [formLabor, setFormLabor] = useState<string | null>(null);
@@ -213,6 +216,7 @@ export const RegistroConsumo = ({
             : null,
         para_mantenimiento: destinoTipo === "mantenimiento",
         para_produccion: destinoTipo === "produccion",
+        tipo_turno: formTurno,
       });
 
       if (resp.success && resp.data) {
@@ -494,6 +498,31 @@ export const RegistroConsumo = ({
             radius="lg"
             size="sm"
             classNames={modalFieldClasses}
+          />
+
+          <Select
+            label="Turno"
+            data={[
+              { value: TipoTurno.Dia, label: "Turno Día" },
+              { value: TipoTurno.Noche, label: "Turno Noche" },
+            ]}
+            value={formTurno}
+            onChange={(val) => setFormTurno((val as TipoTurno) || TipoTurno.Dia)}
+            required
+            radius="lg"
+            size="sm"
+            classNames={modalFieldClasses}
+            leftSection={
+              formTurno === TipoTurno.Dia ? (
+                <SunIcon className="w-4 h-4 text-yellow-400" />
+              ) : (
+                <MoonIcon className="w-4 h-4 text-indigo-400" />
+              )
+            }
+            comboboxProps={{
+              withinPortal: true,
+              zIndex: 9999,
+            }}
           />
         </Group>
 

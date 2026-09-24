@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Divider, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { Badge, Divider, Group, Stack, Text, Tooltip, ActionIcon, Menu } from "@mantine/core";
 import {
   BanknotesIcon,
   CogIcon,
@@ -7,10 +7,14 @@ import {
   UserIcon,
   BriefcaseIcon,
   BeakerIcon,
+  SunIcon,
+  MoonIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { AuxService } from "../../../../service/auxiliar.service";
+import { TipoTurno } from "../../../../shared/enums/_generic/tipo-turno";
 import type { RES_LoteMineral } from "../../../../service/responses/lote-mineral";
 import type {
   RES_ResumenEntregasReq,
@@ -20,6 +24,7 @@ import { isOtros } from "./helpers";
 
 interface HistorialConsumosProps {
   record: RES_ResumenEntregasReq;
+  onActualizarTurno?: (idConsumo: number, nuevoTurno: TipoTurno) => Promise<void>;
 }
 
 /**
@@ -42,9 +47,23 @@ const origenCostoLabel: Record<string, { label: string; color: string }> = {
   sin_costo: { label: "Sin Costo", color: "gray" },
 };
 
-export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
+export const HistorialConsumos = ({
+  record,
+  onActualizarTurno,
+}: HistorialConsumosProps) => {
   const costoUnitDetalle = Number(record.costo_unitario_base ?? 0);
   const [lotesMineral, setLotesMineral] = useState<RES_LoteMineral[]>([]);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const handleCambiarTurno = async (idConsumo: number, turno: TipoTurno) => {
+    if (!onActualizarTurno) return;
+    setUpdatingId(idConsumo);
+    try {
+      await onActualizarTurno(idConsumo, turno);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   useEffect(() => {
     const cargarLotes = async () => {
@@ -133,6 +152,68 @@ export const HistorialConsumos = ({ record }: HistorialConsumosProps) => {
                     >
                       {c.estado}
                     </Badge>
+
+                    {/* Turno con opción a editar */}
+                    <Group gap={4}>
+                      <Badge
+                        size="xs"
+                        variant="light"
+                        color={
+                          c.tipo_turno === TipoTurno.Dia
+                            ? "yellow"
+                            : c.tipo_turno === TipoTurno.Noche
+                              ? "indigo"
+                              : "gray"
+                        }
+                        className="font-extrabold uppercase border border-current/15 py-1 flex items-center gap-1"
+                      >
+                        {c.tipo_turno === TipoTurno.Dia ? (
+                          <SunIcon className="w-3 h-3 inline mr-0.5 text-yellow-400" />
+                        ) : c.tipo_turno === TipoTurno.Noche ? (
+                          <MoonIcon className="w-3 h-3 inline mr-0.5 text-indigo-400" />
+                        ) : null}
+                        {c.tipo_turno ? `Turno ${c.tipo_turno}` : "Sin Turno"}
+                      </Badge>
+
+                      {onActualizarTurno && (
+                        <Menu shadow="md" width={140} position="bottom-end">
+                          <Menu.Target>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
+                              loading={updatingId === c.id_consumo}
+                              className="hover:text-white"
+                              title="Editar turno del consumo"
+                            >
+                              <PencilSquareIcon className="w-3.5 h-3.5" />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown className="bg-zinc-950 border border-zinc-800">
+                            <Menu.Label className="text-zinc-400 text-[10px] uppercase font-bold">
+                              Cambiar Turno
+                            </Menu.Label>
+                            <Menu.Item
+                              leftSection={<SunIcon className="w-3.5 h-3.5 text-yellow-400" />}
+                              onClick={() => handleCambiarTurno(c.id_consumo, TipoTurno.Dia)}
+                              disabled={c.tipo_turno === TipoTurno.Dia}
+                              className="text-xs text-zinc-200 hover:bg-zinc-800"
+                            >
+                              Turno Día
+                            </Menu.Item>
+                            <Menu.Item
+                              leftSection={<MoonIcon className="w-3.5 h-3.5 text-indigo-400" />}
+                              onClick={() => handleCambiarTurno(c.id_consumo, TipoTurno.Noche)}
+                              disabled={c.tipo_turno === TipoTurno.Noche}
+                              className="text-xs text-zinc-200 hover:bg-zinc-800"
+                            >
+                              Turno Noche
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      )}
+                    </Group>
+
                     <Text
                       size="xs"
                       className="text-zinc-200 font-semibold flex items-center gap-1"

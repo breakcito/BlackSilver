@@ -28,7 +28,6 @@ import { DataTableEstandar } from "../../../presentation/utils/datatable-estanda
 import { Kardex_TipoMovimiento } from "../../../shared/enums/kardex";
 import { MESES } from "../../../shared/variables/meses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
-import { Moneda } from "../../../shared/enums/_generic/moneda";
 import { BotonRecargar } from "../../../presentation/utils/boton-recargar";
 
 export const KardexProductosPage = () => {

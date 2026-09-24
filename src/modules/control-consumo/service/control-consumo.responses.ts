@@ -1,4 +1,5 @@
 import type { TipoBien } from "../../../shared/enums/_generic/tipo-bien";
+import type { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import type { Estado_ConsumoDetalleEntregaReq } from "../../../shared/enums/requerimiento-almacen/requerimiento-entrega";
 
 /**
@@ -18,6 +19,8 @@ export type OrigenCostoUnitario =
 export interface RES_Consumo {
   /** ID único del registro de consumo */
   id_consumo: number;
+  /** Turno laboral del consumo (Dia o Noche) */
+  tipo_turno?: TipoTurno | string | null;
   /** ID de la entrega del requerimiento (detalle) asociada */
   id_requerimiento_almacen_entrega_detalle: number;
   /** ID del requerimiento padre */
@@ -233,3 +236,99 @@ export interface RES_ResumenEntregasReq {
   /** Historial cronológico de consumos individuales realizados sobre este detalle de entrega */
   consumos: RES_Consumo[];
 }
+
+/**
+ * Representa un registro de consumo DIRECTO originado desde Control de Uso (maquinaria/horómetro)
+ */
+export interface RES_ConsumoDirecto {
+  id_consumo: number;
+  uuid_control_uso_activo: string;
+  tipo_turno?: TipoTurno | string | null;
+  es_consumo_directo: boolean | number;
+  id_activo_fijo_consumidor: number | null;
+  correlativo_activo_fijo_consumidor?: string | null;
+  modelo_activo_fijo_consumidor?: string | null;
+  costo_compra_activo_fijo_consumidor?: number | null;
+  id_marca_activo_fijo_consumidor?: number | null;
+  marca_activo_fijo_consumidor?: string | null;
+  producto_activo_fijo_consumidor?: string | null;
+
+  id_producto: number;
+  producto: string;
+  id_categoria?: number | null;
+  categoria?: string | null;
+  tipo_bien?: TipoBien;
+  es_consumible?: boolean | number;
+  moneda?: string | null;
+
+  id_almacen: number;
+  almacen: string;
+
+  id_lote_producto: number;
+  correlativo_lote_producto?: string | null;
+
+  id_unidad_medida: number;
+  unidad_medida: string;
+  unidad_medida_abv: string;
+  id_unidad_medida_base: number;
+  unidad_medida_base: string;
+  unidad_medida_base_abv: string;
+
+  contenido_por_presentacion: number;
+  cantidad_consumo: number;
+  cantidad_base: number;
+  cantidad_base_consumida: number;
+  fecha_hora_consumo: string;
+  comentario_consumo: string | null;
+  created_at: string;
+  estado: Estado_ConsumoDetalleEntregaReq;
+
+  id_labor_destino?: number | null;
+  labor_destino?: string | null;
+  id_mina?: number | null;
+  mina?: string | null;
+
+  id_lote_mineral?: number | null;
+  codigo_lote_mineral?: string | null;
+
+  para_mantenimiento?: boolean | number;
+  para_produccion?: boolean | number;
+
+  id_empleado_registro: number;
+  empleado_registro: string;
+  id_cargo_registro?: number | null;
+  cargo_registro?: string | null;
+
+  costo_unitario_base?: number;
+  origen_costo_unitario?: OrigenCostoUnitario;
+  costo_total_consumo?: number;
+}
+
+/**
+ * Representa un gasto extra registrado en las labores/procesos
+ */
+export interface RES_GastoExtra {
+  id_gasto_extra: number;
+  id_labor: number;
+  labor: string;
+  id_mina?: number | null;
+  mina?: string | null;
+  id_empleado_registro: number;
+  empleado_registro: string;
+  id_cargo_registro?: number | null;
+  cargo_registro?: string | null;
+  descripcion: string;
+  monto: number;
+  created_at: string;
+  estado: string;
+}
+
+/**
+ * Estructura completa devuelta por el reporte de control de consumo
+ */
+export interface RES_ReporteControlConsumo {
+  entregas: RES_ResumenEntregasReq[];
+  consumos_directos: RES_ConsumoDirecto[];
+  gastos_extra: RES_GastoExtra[];
+}
+

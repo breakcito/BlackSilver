@@ -2,6 +2,8 @@ import { useTitlePage } from "../../../hooks/useTitlePage";
 import { useListarControlConsumo } from "../hooks/useListarControlConsumo";
 import { FiltrosConsumo } from "./components/filtros-consumo";
 import { CardRequerimiento } from "./components/card-requerimiento";
+import { GastosExtraSection } from "./components/gastos-extra-section";
+import { ConsumosDirectosSection } from "./components/consumos-directos-section";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { RegistroConsumo } from "./registro-consumo/registro-consumo";
 import { Stack, Text } from "@mantine/core";
@@ -21,6 +23,8 @@ export const ControlConsumoPage = () => {
 
   const {
     reporte,
+    consumosDirectos,
+    gastosExtra,
     loading,
     busqueda,
     setBusqueda,
@@ -38,6 +42,8 @@ export const ControlConsumoPage = () => {
     loadingAlmacenes,
     activos,
     agregarConsumoLocal,
+    actualizarTurnoLocal,
+    agregarGastoExtraLocal,
     recargar,
   } = useListarControlConsumo();
 
@@ -104,11 +110,16 @@ export const ControlConsumoPage = () => {
   const { generate: generateExcelConfig } = useControlConsumoExcel();
 
   const handleExportExcel = () => {
-    if (reporte.length === 0) {
+    if (reporte.length === 0 && consumosDirectos.length === 0) {
       notifyError("No hay datos para exportar con los filtros actuales.");
       return;
     }
-    const cfg = generateExcelConfig({ reporte, mes, anio });
+    const cfg = generateExcelConfig({
+      reporte,
+      consumosDirectos,
+      mes,
+      anio,
+    });
     generateExcel({
       filename: cfg.filename,
       builder: cfg.builder,
@@ -117,7 +128,7 @@ export const ControlConsumoPage = () => {
 
   return (
     <Stack gap="lg" className="animate-fade-in text-zinc-100">
-      {/* Search and Period Filter Component */}
+      {/* 1. Search and Period Filter Component */}
       <FiltrosConsumo
         idMina={idMina}
         setIdMina={setIdMina}
@@ -137,10 +148,23 @@ export const ControlConsumoPage = () => {
         loading={loading}
         onExportExcel={handleExportExcel}
         exportingExcel={isGeneratingExcel}
-        exportDisabled={reporte.length === 0}
+        exportDisabled={reporte.length === 0 && consumosDirectos.length === 0}
       />
 
-      {/* Grouped Content Body */}
+      {/* 2. Gastos Extra (3 a 4 por fila) */}
+      <GastosExtraSection
+        gastos={gastosExtra}
+        onGastoRegistrado={agregarGastoExtraLocal}
+      />
+
+      {/* 3. Consumos Directos */}
+      <ConsumosDirectosSection
+        consumos={consumosDirectos}
+        onActualizarTurno={actualizarTurnoLocal}
+        loading={loading}
+      />
+
+      {/* 4. Grouped Content Body (Entregas por Requerimiento) */}
       <div className="relative">
         {loading ? (
           <Stack
@@ -183,6 +207,7 @@ export const ControlConsumoPage = () => {
                 req={req}
                 loading={loading}
                 onConsumir={handleOpenRegistrar}
+                onActualizarTurno={actualizarTurnoLocal}
               />
             ))}
           </div>
@@ -205,7 +230,6 @@ export const ControlConsumoPage = () => {
           />
         )}
       </ModalEstandar>
-
     </Stack>
   );
 };

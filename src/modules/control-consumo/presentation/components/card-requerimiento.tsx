@@ -24,6 +24,7 @@ import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { type DataTableColumn } from "mantine-datatable";
 import dayjs from "dayjs";
 import type { RES_ResumenEntregasReq } from "../../service/control-consumo.responses";
+import type { TipoTurno } from "../../../../shared/enums/_generic/tipo-turno";
 import { HistorialConsumos } from "./historial-consumos";
 import { isActivoFijo, isConsumible, isOtros } from "./helpers";
 
@@ -49,6 +50,7 @@ interface CardRequerimientoProps {
   req: GroupedRequerimiento;
   loading: boolean;
   onConsumir: (det: RES_ResumenEntregasReq) => void;
+  onActualizarTurno?: (idConsumo: number, nuevoTurno: TipoTurno) => Promise<void>;
 }
 
 /**
@@ -69,6 +71,7 @@ export const CardRequerimiento = ({
   req,
   loading,
   onConsumir,
+  onActualizarTurno,
 }: CardRequerimientoProps) => {
   const [expandedRecordIds, setExpandedRecordIds] = useState<number[]>([]);
 
@@ -629,7 +632,10 @@ export const CardRequerimiento = ({
                     onRecordIdsChange: setExpandedRecordIds,
                   },
                   content: ({ record }: { record: RES_ResumenEntregasReq }) => (
-                    <HistorialConsumos record={record} />
+                    <HistorialConsumos
+                      record={record}
+                      onActualizarTurno={onActualizarTurno}
+                    />
                   ),
                 }}
               />
