@@ -10,7 +10,6 @@ export interface RES_ModuloMenu {
   nombre: string;
   path: string;
   numero_orden: number;
-  es_desplegable: boolean;
   estado: string;
 }
 

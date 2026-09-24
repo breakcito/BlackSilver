@@ -6,6 +6,7 @@ import {
   TrashIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ArrowRightEndOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { useNotify } from "../../../../hooks/useNotify";
@@ -226,11 +227,24 @@ export const NavegacionTab = () => {
               {isOpen && menu.submenus.map((sub: RES_SubmenuMenu) => {
                 const skey = `s-${sub.id}`;
                 const sOpen = expanded[skey];
+                const esDirecto = !sub.es_desplegable && !!sub.path;
                 return (
                   <div key={skey} className="ml-6 mt-1">
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all group">
-                      <ActionIcon variant="subtle" color="zinc" size="sm" onClick={() => toggle(skey)}>
-                        {sOpen ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronRightIcon className="w-3 h-3" />}
+                      <ActionIcon
+                        variant="subtle"
+                        color="zinc"
+                        size="sm"
+                        onClick={esDirecto ? undefined : () => toggle(skey)}
+                        style={esDirecto ? { cursor: "default" } : undefined}
+                      >
+                        {esDirecto ? (
+                          <ArrowRightEndOnRectangleIcon className="w-3 h-3" />
+                        ) : sOpen ? (
+                          <ChevronDownIcon className="w-3 h-3" />
+                        ) : (
+                          <ChevronRightIcon className="w-3 h-3" />
+                        )}
                       </ActionIcon>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">

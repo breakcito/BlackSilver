@@ -234,13 +234,13 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                     const ModuloIcon =
                       getIconoPorItem(modulo) || CubeIcon;
 
-                    const moduloUrl = `/${modulo.path}`;
+                    const moduloUrl = modulo.url || `/${modulo.path}`;
                     const isCurrentRoute = location.pathname === moduloUrl;
 
                     return (
                       <motion.div
                         variants={itemVariants}
-                        key={modulo.id_modulo || modulo.path}
+                        key={moduloUrl}
                       >
                         <Link
                           to={moduloUrl}
@@ -373,7 +373,9 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                           ? `/${menuItem.path}`
                           : "";
                         const isMenuActive =
-                          !!menuUrl && location.pathname === menuUrl;
+                          !!menuUrl &&
+                          (location.pathname === menuUrl ||
+                            location.pathname.startsWith(`${menuUrl}/`));
 
                         // Hoja: ruta directa (sin hijos) -> Link
                         if (!menuItem.es_desplegable) {
@@ -476,7 +478,10 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                                           : "";
                                         const isSubmenuActive =
                                           !!submenuUrl &&
-                                          location.pathname === submenuUrl;
+                                          (location.pathname === submenuUrl ||
+                                            location.pathname.startsWith(
+                                              `${submenuUrl}/`,
+                                            ));
 
                                         // Hoja: ruta directa (sin hijos) -> Link
                                         if (!submenu.es_desplegable) {
@@ -491,23 +496,34 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                                               <Link
                                                 to={submenuUrl}
                                                 onClick={handleClose}
-                                                className={`group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-300 ${
+                                                className={`group w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 ${
                                                   isSubmenuActive
                                                     ? "text-blue-400 bg-blue-400/10 font-medium"
                                                     : "text-zinc-500 hover:text-zinc-300 hover:bg-white/2"
                                                 }`}
                                               >
-                                                <SubmenuIcon
-                                                  className={`w-3.5 h-3.5 shrink-0 ${
-                                                    isSubmenuActive
-                                                      ? "text-blue-400"
-                                                      : "group-hover:text-blue-400/70"
-                                                  }`}
-                                                />
-                                                <span className="text-[13px] font-medium tracking-wide whitespace-nowrap overflow-hidden text-ellipsis">
-                                                  {submenu.nombre ||
-                                                    "Sin nombre"}
-                                                </span>
+                                                <div className="flex items-center gap-2.5 overflow-hidden">
+                                                  <SubmenuIcon
+                                                    className={`w-3.5 h-3.5 shrink-0 ${
+                                                      isSubmenuActive
+                                                        ? "text-blue-400"
+                                                        : "group-hover:text-blue-400/70"
+                                                    }`}
+                                                  />
+                                                  <span className="text-[13px] font-medium tracking-wide whitespace-nowrap overflow-hidden text-ellipsis">
+                                                    {submenu.nombre ||
+                                                      "Sin nombre"}
+                                                  </span>
+                                                </div>
+                                                {submenu.path && (
+                                                  <ArrowRightEndOnRectangleIcon
+                                                    className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                                                      isSubmenuActive
+                                                        ? "text-blue-400"
+                                                        : "text-zinc-500 group-hover:text-white"
+                                                    }`}
+                                                  />
+                                                )}
                                               </Link>
                                             </div>
                                           );
@@ -579,8 +595,8 @@ export const Navbar = ({ onClose }: NavbarProps) => {
                                                       (modulo) => {
                                                         const moduloUrl = `/${modulo.path}`;
                                                         const isModuloActive =
-                                                          location.pathname ===
-                                                          moduloUrl;
+                                                          location.pathname === moduloUrl ||
+                                                          location.pathname.startsWith(`${moduloUrl}/`);
                                                         return (
                                                           <Link
                                                             key={
