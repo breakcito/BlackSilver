@@ -15,11 +15,17 @@ const path = "/tipo-carbon";
 export const TipoCarbonService = {
   getTipos: async (filters?: {
     para_compra?: boolean;
+    id_proveedor?: number;
+    id_proveedor_carbon?: number;
   }): Promise<IRespuesta<RES_TipoCarbon[]>> => {
+    const provId = filters?.id_proveedor ?? filters?.id_proveedor_carbon;
     const params = filters
       ? {
           ...(filters.para_compra !== undefined && {
             para_compra: filters.para_compra ? 1 : 0,
+          }),
+          ...(provId !== undefined && {
+            id_proveedor: provId,
           }),
         }
       : undefined;
@@ -51,9 +57,7 @@ export const TipoCarbonService = {
     return data;
   },
 
-  eliminarTipo: async (
-    idTipoCarbon: number,
-  ): Promise<IRespuesta<null>> => {
+  eliminarTipo: async (idTipoCarbon: number): Promise<IRespuesta<null>> => {
     const { data } = await api.delete<IRespuesta<null>>(
       `${path}/${idTipoCarbon}`,
     );

@@ -107,7 +107,9 @@ export const CompraCarbonPDF = ({
   const aplicaIgv = Boolean(cabecera.aplica_igv);
   const igvPct = Number(cabecera.porcentaje_igv);
   const igvMonto = Number(cabecera.monto_igv);
-  const totalEgreso = totalConDescuento + descuentoFleteTotal + igvMonto;
+  // Requerimiento: El total de egreso debe ser el neto (total_con_descuento)
+  const totalEgreso = totalConDescuento;
+  const esPreliminar = (cabecera.estado ?? "") === "Preliminar";
 
   // Datos del proveedor: priorizamos el record completo (incluye
   // direccion + ubigeo), fallback a lo que ya viaja en cabecera.
@@ -298,7 +300,9 @@ export const CompraCarbonPDF = ({
 
           {/* RIGHT: ORDEN DE COMPRA + datos del receptor */}
           <View style={{ alignItems: "flex-end", minWidth: 220 }}>
-            <Text style={styles.documentType}>ORDEN DE COMPRA</Text>
+            <Text style={styles.documentType}>
+              {esPreliminar ? "ORDEN DE COMPRA (PRELIMINAR)" : "ORDEN DE COMPRA"}
+            </Text>
             <Text
               style={{
                 fontSize: 10,
@@ -395,6 +399,19 @@ export const CompraCarbonPDF = ({
                       Humedad: {formatNumber(Number(d.porcentaje_humedad))}%
                     </Text>
                   )}
+                  {Array.isArray(d.tipo_carbon_ficha_tecnica) &&
+                    d.tipo_carbon_ficha_tecnica.length > 0 && (
+                      <View style={{ marginTop: 2, paddingTop: 2, borderTopWidth: 0.5, borderTopColor: accentSoft }}>
+                        <Text style={{ fontSize: 6.5, fontWeight: 700, color: accentDark }}>
+                          Ficha Técnica:
+                        </Text>
+                        {d.tipo_carbon_ficha_tecnica.map((ft, ftIdx) => (
+                          <Text key={ftIdx} style={{ fontSize: 6, color: "#52525b" }}>
+                            • {String(ft)}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
                 </View>
                 <View style={styles.colDesc}>
                   {origen ? (
@@ -494,10 +511,10 @@ export const CompraCarbonPDF = ({
                 "DD/MM/YYYY HH:mm",
               )}`}
             </Text>
-            {cabecera.fecha_hora_aprobacion && (
+            {cabecera.fecha_hora_confirmacion && (
               <Text style={{ fontSize: 8, marginTop: 4 }}>
                 {`Fecha de aprobacion: ${dayjs(
-                  cabecera.fecha_hora_aprobacion,
+                  cabecera.fecha_hora_confirmacion,
                 ).format("DD/MM/YYYY HH:mm")}`}
               </Text>
             )}

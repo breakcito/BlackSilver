@@ -125,6 +125,32 @@ export const ClientesService = {
     return data;
   },
 
+  /**
+   * Lista todos los almacenes de carbon activos de clientes activos.
+   */
+  getAlmacenesCarbonTodos: async (): Promise<
+    IRespuesta<
+      (AlmacenCarbonClienteResponse & {
+        cliente_razon_social?: string;
+        cliente_tipo_entidad?: string;
+        cliente_ruc?: string | null;
+        cliente_dni?: string | null;
+      })[]
+    >
+  > => {
+    const { data } = await api.get<
+      IRespuesta<
+        (AlmacenCarbonClienteResponse & {
+          cliente_razon_social?: string;
+          cliente_tipo_entidad?: string;
+          cliente_ruc?: string | null;
+          cliente_dni?: string | null;
+        })[]
+      >
+    >("/clientes/almacenes-carbon");
+    return data;
+  },
+
   crearAlmacenCarbonPorCliente: async (
     idCliente: number,
     payload: CrearAlmacenCarbonClienteRequest,

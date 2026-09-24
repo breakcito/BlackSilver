@@ -1,6 +1,7 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
 import type { IArchivo } from "../../../shared/interfaces/archivo";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface CompraCarbonResumen {
   id_compra_carbon: number;
@@ -11,27 +12,39 @@ export interface CompraCarbonResumen {
   proveedor_tipo_entidad: TipoEntidad | string;
   proveedor_ruc: string | null;
   proveedor_dni: string | null;
+  tipo_despacho?: string | null;
   id_almacen: number | null;
   almacen: string | null;
+  id_almacen_cliente?: number | null;
+  almacen_cliente_direccion?: string | null;
+  cliente_destino?: string | null;
+  id_almacen_proveedor?: number | null;
+  almacen_proveedor_direccion?: string | null;
   id_empleado_registro: number;
   empleado_registro: string;
-  id_empleado_aprueba: number | null;
+  id_empleado_confirma: number | null;
   empleado_aprueba: string | null;
+  id_empleado_aprueba_liquidacion?: number | null;
+  empleado_aprueba_liquidacion?: string | null;
+  id_empleado_anula?: number | null;
+  empleado_anula?: string | null;
   aplica_igv: boolean;
   porcentaje_igv: number;
   correlativo: string;
   numero_correlativo: number;
   fecha_hora_ingreso: string;
-  fecha_hora_aprobacion: string | null;
+  fecha_hora_confirmacion: string | null;
+  fecha_hora_aprobacion_liquidacion?: string | null;
+  fecha_hora_anulacion?: string | null;
   total_antes_descuento: number;
   monto_igv: number;
   descuento_flete: number;
   total_con_descuento: number;
-  estado_pago: string | null;
   created_at: string;
   estado: EstadoBase | string | null;
   cantidad_items: number;
   evidencias: IArchivo[];
+  log_cambios?: RES_CambiosLog[] | null;
 }
 
 export interface CompraCarbonDetalleItem {
@@ -39,6 +52,7 @@ export interface CompraCarbonDetalleItem {
   id_tipo_carbon: number;
   tipo_carbon_nombre: string;
   tipo_carbon_codigo: string | null;
+  tipo_carbon_ficha_tecnica?: string[] | null;
   id_transportista: number | null;
   transportista_razon_social: string | null;
   transportista_tipo_entidad: TipoEntidad | string | null;
@@ -68,21 +82,45 @@ export interface CompraCarbonDetalleItem {
   descuento_flete: number;
   subtotal_con_descuento: number;
   evidencias: IArchivo[];
+  log_cambios?: RES_CambiosLog[] | null;
+}
+
+export interface CompraCarbonAnticipoUtilizado {
+  id_transaccion_anticipo: number;
+  id_anticipo_proveedor: number;
+  id_compra_carbon: number;
+  monto_retirado: number;
+  medio_pago: string;
+  fecha_hora_pago: string | null;
+  numero_operacion: string | null;
+  saldo_inicial: number;
+  saldo_actual: number;
+  cuenta_bancaria_empresa_numero?: string | null;
+}
+
+export interface DocumentoDuplicadoItem {
+  id_detalle_compra_carbon: number;
+  codigo_ticket_balanza: string | null;
+  guia_remitente: string | null;
+  guia_transportista: string | null;
+  id_compra_carbon: number;
+  correlativo: string;
+  fecha_hora_ingreso: string;
 }
 
 /**
- * Respuesta completa de una compra: cabecera + detalles.
- * Antes llamada `CompraCarbonDetalle` en el codigo legacy.
+ * Respuesta completa de una compra: cabecera + detalles + anticipos utilizados.
  */
 export interface CompraCarbonDetalleResponse {
   cabecera: CompraCarbonCabeceraDetalle;
   detalles: CompraCarbonDetalleItem[];
+  anticipos_utilizados?: CompraCarbonAnticipoUtilizado[];
 }
 
 export interface CompraCarbonCabeceraDetalle extends Omit<
   CompraCarbonResumen,
   | "id_empleado_registro"
-  | "id_empleado_aprueba"
+  | "id_empleado_confirma"
   | "numero_correlativo"
   | "created_at"
   | "estado"
@@ -92,12 +130,15 @@ export interface CompraCarbonCabeceraDetalle extends Omit<
   | "proveedor_dni"
   | "aplica_igv"
   | "porcentaje_igv"
-  | "estado_pago"
 > {
   id_empleado_registro: number;
   empleado_registro: string;
-  id_empleado_aprueba: number | null;
+  id_empleado_confirma: number | null;
   empleado_aprueba: string | null;
+  id_empleado_aprueba_liquidacion?: number | null;
+  empleado_aprueba_liquidacion?: string | null;
+  id_empleado_anula?: number | null;
+  empleado_anula?: string | null;
   numero_correlativo: number;
   created_at: string;
   estado: EstadoBase | string | null;
@@ -106,10 +147,10 @@ export interface CompraCarbonCabeceraDetalle extends Omit<
   proveedor_dni: string | null;
   aplica_igv: boolean;
   porcentaje_igv: number;
-  estado_pago: string | null;
   almacen_id_departamento?: number | null;
   almacen_id_provincia?: number | null;
   almacen_id_distrito?: number | null;
   almacen_direccion?: string | null;
   evidencias: IArchivo[];
+  log_cambios?: RES_CambiosLog[] | null;
 }

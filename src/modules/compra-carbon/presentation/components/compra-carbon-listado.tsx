@@ -5,6 +5,7 @@ import {
   Button,
   Group,
   Modal,
+  Progress,
   Stack,
   Text,
   Textarea,
@@ -12,20 +13,29 @@ import {
 } from "@mantine/core";
 import {
   CheckBadgeIcon,
+  ClockIcon,
   DocumentArrowDownIcon,
   EyeIcon,
   PaperClipIcon,
+  PencilSquareIcon,
+  TruckIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
+import type { DataTableColumn } from "mantine-datatable";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { CambiosLogHistorial } from "../../../../presentation/utils/cambios-log-historial";
 import { CompraCarbonService } from "../../service/compra-carbon.service";
 import { useNotify } from "../../../../hooks/useNotify";
 import { usePrint } from "../../../../hooks/usePrint";
-import { useAprobarCompraCarbon } from "../../hooks/useAprobarCompraCarbon";
 import { useAnularCompraCarbon } from "../../hooks/useAnularCompraCarbon";
 import { EvidenciasCompraModal } from "../evidencias-compra-modal";
+import {
+  ConfirmacionCompraCarbonModal,
+  type ProgresoCompraCarbon,
+} from "../confirmacion-compra-carbon-modal";
+import { AprobarLiquidacionModal } from "../aprobar-liquidacion-modal";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoCompraCarbon } from "../../../../shared/enums/compra-carbon/estado-compra-carbon";
 import type {
@@ -63,10 +73,10 @@ const estadoBadge = (
   estado: string | null,
 ): { color: string; label: string } => {
   const e = (estado ?? "").toString();
-  if (e === EstadoCompraCarbon.Pendiente)
-    return { color: "yellow", label: "Pendiente" };
-  if (e === EstadoCompraCarbon.Aprobado)
-    return { color: "teal", label: "Aprobado" };
+  if (e === EstadoCompraCarbon.Preliminar)
+    return { color: "yellow", label: "Preliminar" };
+  if (e === EstadoCompraCarbon.Confirmado)
+    return { color: "teal", label: "Confirmado" };
   if (e === EstadoCompraCarbon.Anulado)
     return { color: "red", label: "Anulado" };
   return { color: "gray", label: e || "—" };
@@ -92,13 +102,26 @@ export const CompraCarbonListado = ({
 }: Props) => {
   const { notifyError } = useNotify();
   const { print, prepare } = usePrint();
-  const { aprobar, loading: loadingAprobar } = useAprobarCompraCarbon();
   const { anular, loading: loadingAnular } = useAnularCompraCarbon();
 
-  const [openAprobarModal, setOpenAprobarModal] = useState<{
-    id: number;
+  // Modales de flujo
+  const [modalConfirmar, setModalConfirmar] =
+    useState<CompraCarbonResumen | null>(null);
+  const [progresoConfirmar, setProgresoConfirmar] =
+    useState<ProgresoCompraCarbon | null>(null);
+
+  const [modalEditar, setModalEditar] = useState<CompraCarbonResumen | null>(
+    null,
+  );
+  const [progresoEditar, setProgresoEditar] =
+    useState<ProgresoCompraCarbon | null>(null);
+  const [modalLiquidar, setModalLiquidar] =
+    useState<CompraCarbonResumen | null>(null);
+  const [modalHistorial, setModalHistorial] = useState<{
     correlativo: string;
+    log: unknown;
   } | null>(null);
+
   const [openAnularModal, setOpenAnularModal] = useState<{
     id: number;
     correlativo: string;
@@ -126,26 +149,6 @@ export const CompraCarbonListado = ({
         );
     return base.slice().sort((a, b) => b.id_compra_carbon - a.id_compra_carbon);
   }, [compras, busqueda]);
-
-  const handleAprobar = async () => {
-    if (!openAprobarModal) return;
-    const { id } = openAprobarModal;
-    const compra = compras.find((c) => c.id_compra_carbon === id);
-    const result = await aprobar(id);
-    if (!result || !compra) {
-      setOpenAprobarModal(null);
-      return;
-    }
-    onAprobada?.({
-      ...compra,
-      estado: EstadoCompraCarbon.Aprobado,
-      id_empleado_aprueba: result.cabecera.id_empleado_aprueba,
-      empleado_aprueba: result.cabecera.empleado_aprueba ?? null,
-      fecha_hora_aprobacion: result.cabecera.fecha_hora_aprobacion,
-      evidencias: result.cabecera.evidencias ?? [],
-    });
-    setOpenAprobarModal(null);
-  };
 
   const handleAnular = async () => {
     if (!openAnularModal) return;
@@ -234,18 +237,18 @@ export const CompraCarbonListado = ({
     }
   };
 
-  const columns = [
+  const columns: DataTableColumn<CompraCarbonResumen>[] = [
     {
       accessor: "index",
       title: "#",
       width: 60,
-      textAlign: "center" as const,
+      textAlign: "center",
     },
     {
       accessor: "correlativo",
       title: "Correlativo",
       width: 140,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text fw={800} size="xs" c="indigo.3" className="font-mono">
           {r.correlativo}
@@ -256,7 +259,7 @@ export const CompraCarbonListado = ({
       accessor: "fecha_hora_ingreso",
       title: "Ingreso",
       width: 150,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text size="xs" c="zinc.3" className="font-mono">
           {formatDateTime(r.fecha_hora_ingreso)}
@@ -267,7 +270,7 @@ export const CompraCarbonListado = ({
       accessor: "empresa",
       title: "Empresa",
       width: 160,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text size="xs" fw={700} className="text-white">
           {r.empresa}
@@ -277,7 +280,8 @@ export const CompraCarbonListado = ({
     {
       accessor: "proveedor",
       title: "Proveedor",
-      width: 200,
+      width: 180,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const doc =
           r.proveedor_tipo_entidad === "Natural" && r.proveedor_dni
@@ -291,7 +295,7 @@ export const CompraCarbonListado = ({
               {r.proveedor}
             </Text>
             {doc && (
-              <Text size="10px" c="dimmed" className="font-mono">
+              <Text size="10px" c="gray.5" className="font-mono" fw={600}>
                 {doc}
               </Text>
             )}
@@ -302,7 +306,8 @@ export const CompraCarbonListado = ({
     {
       accessor: "proveedor_contacto",
       title: "Contacto",
-      width: 160,
+      width: 100,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const prov = proveedoresById[r.id_proveedor];
         if (!prov) return null;
@@ -330,8 +335,8 @@ export const CompraCarbonListado = ({
     {
       accessor: "almacen",
       title: "Almacen",
-      width: 150,
-      textAlign: "center" as const,
+      width: 130,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) =>
         r.almacen ? (
           <Text size="xs" className="text-zinc-200">
@@ -343,40 +348,12 @@ export const CompraCarbonListado = ({
           </Text>
         ),
     },
-    {
-      accessor: "registrado_por",
-      title: "Registrado por",
-      width: 190,
-      render: (r: CompraCarbonResumen) => (
-        <Stack gap={0}>
-          <Text size="xs" className="text-zinc-200 truncate">
-            {r.empleado_registro}
-          </Text>
-          <Text size="11px" c="gray.5" className="font-mono">
-            {formatDateTime(r.created_at)}
-          </Text>
-        </Stack>
-      ),
-    },
-    {
-      accessor: "estado",
-      title: "Estado",
-      width: 100,
-      textAlign: "center" as const,
-      render: (r: CompraCarbonResumen) => {
-        const b = estadoBadge(r.estado);
-        return (
-          <Badge color={b.color} variant="light" size="sm" radius="sm">
-            {b.label}
-          </Badge>
-        );
-      },
-    },
+
     {
       accessor: "aplica_igv",
       title: "Aplica IGV",
       width: 100,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) =>
         r.aplica_igv ? (
           <Badge variant="light" color="indigo" radius="md" size="sm">
@@ -392,7 +369,7 @@ export const CompraCarbonListado = ({
       accessor: "total_antes_descuento",
       title: "Total",
       width: 120,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text size="xs" c="zinc.3" className="font-mono">
           {formatPEN(Number(r.total_antes_descuento))}
@@ -403,7 +380,7 @@ export const CompraCarbonListado = ({
       accessor: "descuento_flete_total",
       title: "(−) Flete",
       width: 120,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) =>
         Number(r.descuento_flete) > 0 ? (
           <Text size="xs" c="yellow.4" fw={700} className="font-mono">
@@ -419,7 +396,7 @@ export const CompraCarbonListado = ({
       accessor: "total_con_descuento",
       title: "Total neto",
       width: 130,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text size="sm" fw={900} c="emerald.4" className="font-mono">
           {formatPEN(Number(r.total_con_descuento))}
@@ -430,7 +407,7 @@ export const CompraCarbonListado = ({
       accessor: "items",
       title: "Cargas",
       width: 110,
-      textAlign: "center" as const,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <div className="flex items-center justify-center gap-3">
           <Badge variant="light" color="cyan" radius="md" size="md">
@@ -454,21 +431,57 @@ export const CompraCarbonListado = ({
       ),
     },
     {
+      accessor: "registrado_por",
+      title: "Registrado por",
+      width: 160,
+      render: (r: CompraCarbonResumen) => (
+        <Stack gap={0}>
+          <Text size="xs" className="text-zinc-200 truncate">
+            {r.empleado_registro}
+          </Text>
+          <Text size="11px" c="gray.5" className="font-mono">
+            {formatDateTime(r.created_at)}
+          </Text>
+        </Stack>
+      ),
+    },
+    {
+      accessor: "estado",
+      title: "Estado",
+      width: 120,
+      textAlign: "center",
+      render: (r: CompraCarbonResumen) => {
+        const b = estadoBadge(r.estado);
+        return (
+          <Badge color={b.color} variant="light" size="sm" radius="sm">
+            {b.label}
+          </Badge>
+        );
+      },
+    },
+    {
       accessor: "acciones",
       title: "Acciones",
-      width: 170,
-      textAlign: "center" as const,
+      width: 220,
+      textAlign: "center",
       render: (r: CompraCarbonResumen) => {
-        const puedeAprobar = r.estado === EstadoCompraCarbon.Pendiente;
-        const puedeAnular =
-          r.estado === EstadoCompraCarbon.Pendiente ||
-          r.estado === EstadoCompraCarbon.Aprobado;
+        const esPreliminar = r.estado === EstadoCompraCarbon.Preliminar;
+        const esConfirmado = r.estado === EstadoCompraCarbon.Confirmado;
+        const puedeEditar = esConfirmado;
+        const puedeAnular = esPreliminar || esConfirmado;
         const isPrinting = printingId === r.id_compra_carbon;
         const cantEvidencias = (r.evidencias ?? []).length;
+        const tieneCambios =
+          r.log_cambios &&
+          (Array.isArray(r.log_cambios)
+            ? r.log_cambios.length > 0
+            : typeof r.log_cambios === "string" && r.log_cambios !== "[]");
+
         return (
           <Group gap={6} justify="center" wrap="nowrap">
-            {puedeAprobar && (
-              <Tooltip label="Aprobar" withArrow position="top">
+            {/* 1. Confirmar llegada de carga (Preliminar -> Confirmado) */}
+            {esPreliminar && (
+              <Tooltip label="Confirmar llegada" withArrow position="top">
                 <ActionIcon
                   variant="filled"
                   color="green"
@@ -476,16 +489,51 @@ export const CompraCarbonListado = ({
                   size="md"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setOpenAprobarModal({
-                      id: r.id_compra_carbon,
-                      correlativo: r.correlativo,
-                    });
+                    setModalConfirmar(r);
+                  }}
+                >
+                  <TruckIcon className="w-4 h-4 text-white" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* 2. Aprobar Liquidacion con anticipos (Confirmado -> Liquidacion Aprobada) */}
+            {esConfirmado && (
+              <Tooltip label="Aprobar liquidación" withArrow position="top">
+                <ActionIcon
+                  variant="filled"
+                  color="teal"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalLiquidar(r);
                   }}
                 >
                   <CheckBadgeIcon className="w-4 h-4 text-white" />
                 </ActionIcon>
               </Tooltip>
             )}
+
+            {/* 3. Editar compra (Preliminar o Confirmado) */}
+            {puedeEditar && (
+              <Tooltip label="Editar compra" withArrow position="top">
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalEditar(r);
+                  }}
+                >
+                  <PencilSquareIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* 4. Evidencias */}
             <Tooltip
               label={
                 cantEvidencias > 0
@@ -505,11 +553,11 @@ export const CompraCarbonListado = ({
                   setOpenEvidenciasModal({ compra: r });
                 }}
               >
-                <Stack gap={0} align="center" justify="center">
-                  <PaperClipIcon className="w-4 h-4" />
-                </Stack>
+                <PaperClipIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
+
+            {/* 5. PDF */}
             <Tooltip label="Ver documento (PDF)" withArrow position="top">
               <ActionIcon
                 variant="light"
@@ -526,8 +574,31 @@ export const CompraCarbonListado = ({
                 <DocumentArrowDownIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
+
+            {/* 6. Historial de cambios */}
+            {tieneCambios && (
+              <Tooltip label="Historial de cambios" withArrow position="top">
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalHistorial({
+                      correlativo: r.correlativo,
+                      log: r.log_cambios,
+                    });
+                  }}
+                >
+                  <ClockIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* 7. Anular */}
             {puedeAnular && (
-              <Tooltip label="Anular" withArrow position="top">
+              <Tooltip label="Anular compra" withArrow position="top">
                 <ActionIcon
                   variant="light"
                   color="red"
@@ -585,7 +656,7 @@ export const CompraCarbonListado = ({
             ? `Cargas de ${detallesModal.compra.correlativo}`
             : "Cargas"
         }
-        size="85rem"
+        size="90rem"
       >
         {detallesModal && (
           <div className="space-y-4">
@@ -823,59 +894,177 @@ export const CompraCarbonListado = ({
         )}
       </ModalEstandar>
 
-      {/* Modal de confirmacion de aprobacion */}
-      <Modal
-        opened={openAprobarModal !== null}
-        onClose={() => setOpenAprobarModal(null)}
-        centered
-        radius="xl"
-        withCloseButton={false}
-        size="sm"
-        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
-        classNames={{
-          content: "bg-zinc-950 border border-white/10 shadow-2xl shadow-black",
-        }}
-      >
-        <Stack gap="md" align="center" className="p-6 text-center">
-          <Badge color="teal" variant="light" size="lg" radius="xl">
-            <CheckBadgeIcon className="w-5 h-5" />
-          </Badge>
-          <Text fw={800} size="lg" c="white">
-            Aprobar compra {openAprobarModal?.correlativo}
-          </Text>
-          <Text size="sm" c="zinc.4">
-            Al aprobar, la compra cambiara de estado a{" "}
-            <Text component="span" fw={700} c="teal.4">
-              Aprobado
-            </Text>
-            , se registrara tu nombre como aprobador y la fecha/hora actual. Las
-            evidencias podran subirse despues.
-          </Text>
-          <Group justify="center" gap="sm" mt="sm" w="100%">
-            <Button
-              variant="subtle"
-              color="gray"
-              radius="xl"
-              onClick={() => setOpenAprobarModal(null)}
-              disabled={loadingAprobar}
-              fullWidth
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="filled"
-              color="teal"
-              radius="xl"
-              loading={loadingAprobar}
-              onClick={handleAprobar}
-              fullWidth
-              leftSection={<CheckBadgeIcon className="w-4 h-4" />}
-            >
-              Si, aprobar
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+      {/* Modal Confirmar llegada de carga */}
+      {modalConfirmar && (
+        <ModalEstandar
+          opened
+          close={() => {
+            setModalConfirmar(null);
+            setProgresoConfirmar(null);
+          }}
+          title={`Confirmar Llegada — ${modalConfirmar.correlativo}`}
+          size="75rem"
+          rightSection={
+            progresoConfirmar ? (
+              <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 rounded-xl px-3 py-1.5 min-w-70">
+                <Badge
+                  color={
+                    progresoConfirmar.porcentaje === 100 ? "teal" : "indigo"
+                  }
+                  variant="filled"
+                  size="sm"
+                  radius="sm"
+                >
+                  {progresoConfirmar.porcentaje}%
+                </Badge>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between items-center text-[11px] text-zinc-400">
+                    <span className="font-semibold text-zinc-300">
+                      Progreso
+                    </span>
+                    <span>
+                      {progresoConfirmar.llenos}/{progresoConfirmar.totales}{" "}
+                      campos
+                    </span>
+                  </div>
+                  <Progress
+                    value={progresoConfirmar.porcentaje}
+                    color={
+                      progresoConfirmar.porcentaje === 100 ? "teal" : "indigo"
+                    }
+                    size="xs"
+                    radius="xl"
+                    striped={progresoConfirmar.porcentaje < 100}
+                    animated={progresoConfirmar.porcentaje < 100}
+                  />
+                </div>
+              </div>
+            ) : null
+          }
+        >
+          <ConfirmacionCompraCarbonModal
+            compra={modalConfirmar}
+            modo="confirmar"
+            onCancel={() => {
+              setModalConfirmar(null);
+              setProgresoConfirmar(null);
+            }}
+            onProgresoChange={setProgresoConfirmar}
+            onSuccess={(data) => {
+              onAprobada?.({
+                ...modalConfirmar,
+                ...data.cabecera,
+              });
+              setModalConfirmar(null);
+              setProgresoConfirmar(null);
+            }}
+          />
+        </ModalEstandar>
+      )}
+
+      {/* Modal Editar Compra (Preliminar o Confirmado) */}
+      {modalEditar && (
+        <ModalEstandar
+          opened
+          close={() => {
+            setModalEditar(null);
+            setProgresoEditar(null);
+          }}
+          title={`Editar Compra de Carbón — ${modalEditar.correlativo}`}
+          size="75rem"
+          rightSection={
+            progresoEditar ? (
+              <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 rounded-xl px-3 py-1.5 min-w-70">
+                <Badge
+                  color={progresoEditar.porcentaje === 100 ? "teal" : "indigo"}
+                  variant="filled"
+                  size="sm"
+                  radius="sm"
+                >
+                  {progresoEditar.porcentaje}%
+                </Badge>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between items-center text-[10px] text-zinc-400">
+                    <span className="font-semibold text-zinc-300">
+                      Progreso
+                    </span>
+                    <span>
+                      {progresoEditar.llenos}/{progresoEditar.totales} campos
+                    </span>
+                  </div>
+                  <Progress
+                    value={progresoEditar.porcentaje}
+                    color={
+                      progresoEditar.porcentaje === 100 ? "teal" : "indigo"
+                    }
+                    size="xs"
+                    radius="xl"
+                    striped={progresoEditar.porcentaje < 100}
+                    animated={progresoEditar.porcentaje < 100}
+                  />
+                </div>
+              </div>
+            ) : null
+          }
+        >
+          <ConfirmacionCompraCarbonModal
+            compra={modalEditar}
+            modo="editar"
+            onCancel={() => {
+              setModalEditar(null);
+              setProgresoEditar(null);
+            }}
+            onProgresoChange={setProgresoEditar}
+            onSuccess={(data) => {
+              onAprobada?.({
+                ...modalEditar,
+                ...data.cabecera,
+              });
+              setModalEditar(null);
+              setProgresoEditar(null);
+            }}
+          />
+        </ModalEstandar>
+      )}
+
+      {/* Modal Aprobar Liquidación */}
+      {modalLiquidar && (
+        <ModalEstandar
+          opened
+          close={() => setModalLiquidar(null)}
+          title={`Aprobar Liquidación — ${modalLiquidar.correlativo}`}
+          size="55rem"
+        >
+          <AprobarLiquidacionModal
+            compra={modalLiquidar}
+            onCancel={() => setModalLiquidar(null)}
+            onSuccess={(data) => {
+              onAprobada?.({
+                ...modalLiquidar,
+                ...data.cabecera,
+              });
+              setModalLiquidar(null);
+            }}
+          />
+        </ModalEstandar>
+      )}
+
+      {/* Modal Historial de Cambios */}
+      {modalHistorial && (
+        <ModalEstandar
+          opened
+          close={() => setModalHistorial(null)}
+          title={`Historial de Cambios — ${modalHistorial.correlativo}`}
+          size="45rem"
+        >
+          <div className="p-2">
+            <CambiosLogHistorial
+              cambiosLog={modalHistorial.log}
+              titulo="Modificaciones Realizadas"
+            />
+          </div>
+        </ModalEstandar>
+      )}
 
       {/* Modal de confirmacion de anulacion */}
       <Modal

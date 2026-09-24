@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Stack, Text } from "@mantine/core";
+import {  Badge, Group, Stack, Text } from "@mantine/core";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 import { useTitlePage } from "../../../hooks/useTitlePage";
@@ -13,6 +13,7 @@ import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { CompraCarbonFilter } from "./components/compra-carbon-filter";
 import { CompraCarbonListado } from "./components/compra-carbon-listado";
 import { EmptyStateCompraCarbon } from "./components/empty-state-compra-carbon";
+import { Megaphone } from "lucide-react";
 
 export const CompraCarbonPage = () => {
   useTitlePage("Compra de Carbon");
@@ -30,7 +31,9 @@ export const CompraCarbonPage = () => {
     updateCompraLocal,
   } = useCompraCarbon();
 
-  const [empresasById, setEmpresasById] = useState<Record<number, RES_Empresa>>({});
+  const [empresasById, setEmpresasById] = useState<Record<number, RES_Empresa>>(
+    {},
+  );
   const [proveedoresById, setProveedoresById] = useState<
     Record<number, ProveedorResponse>
   >([]);
@@ -118,6 +121,14 @@ export const CompraCarbonPage = () => {
         close={() => setOpenRegistro(false)}
         title="Nueva Compra de Carbon"
         size="55rem"
+        rightSection={
+          <Badge c="indigo" radius="lg" variant="light">
+            <Group gap={4}>
+              <Megaphone className="w-3.5 h-3.5" />
+              Registro Preliminar
+            </Group>
+          </Badge>
+        }
       >
         <RegistroCompraCarbon
           onCancel={() => setOpenRegistro(false)}

@@ -1,5 +1,8 @@
 export enum EstadoCompraCarbon {
-  Pendiente = "Pendiente",
-  Aprobado = "Aprobado",
+  Preliminar = "Preliminar",
+  Confirmado = "Confirmado",
+  LiquidacionAprobada = "Liquidación Aprobada",
+  EnProcesoPago = "En Proceso de Pago",
+  Pagado = "Pagado",
   Anulado = "Anulado",
 }
