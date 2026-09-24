@@ -38,6 +38,9 @@ export const Schema_CotizacionDetalle = z.object({
   comentario: z.string().optional().nullable(),
   no_cotiza: z.boolean().optional().default(false),
   estado: z.nullable(z.nativeEnum(Estado_Cotizacion_Detalle)).optional(),
+  // Vinculacion opcional con la solicitud de reabastecimiento que origino
+  // este item de cotizacion (NULL cuando la cotizacion no vino de una).
+  id_solicitud_reabastecimiento_detalle: z.number().nullable().optional(),
 });
 
 // Cabecera de una cotización (un proveedor)
@@ -65,6 +68,9 @@ export const Schema_CotizacionRequest = z.object({
   // Campo para aprobación inline (solo cuando estado es Aprobada)
   id_empresa_compradora: z.number().optional().nullable(),
   tipo_cambio_aplicado_oc: z.number().optional().nullable(),
+  // Vinculacion opcional con la solicitud de reabastecimiento que origino
+  // la cotizacion (NULL = cotizacion creada normalmente).
+  id_solicitud_reabastecimiento: z.number().nullable().optional(),
   detalles: z
     .array(Schema_CotizacionDetalle)
     .min(1, "Agregue al menos un producto a la cotización"),

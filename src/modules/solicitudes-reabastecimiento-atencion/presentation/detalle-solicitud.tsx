@@ -34,9 +34,13 @@ import { RegistroEntrega } from "./registro-entrega/registro-entrega";
 import { HistorialEntregas } from "./historial-entregas";
 import { TrazabilidadDetalle } from "./trazabilidad-detalle";
 import { RegistrarPrestamoAlmacen } from "./registrar-prestamo-almacen";
-import { HandRaisedIcon } from "@heroicons/react/24/outline";
+import { HandRaisedIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import type { RES_Solicitud } from "../../../service/responses/solicitudes-reabastecimiento/solicitud";
 import { Estado_SolicitudDetalle } from "../../../shared/enums/solicitud-reabastecimiento/solicitud";
+import { NuevaCotizacionDesdeSolicitud } from "../../cotizaciones/presentation/components/nueva-cotizacion-solicitud";
+import { ModalSeleccionAuditable } from "../../cotizaciones/presentation/components/modal-seleccion-auditable";
+import { useDisclosure } from "@mantine/hooks";
+import { useState } from "react";
 
 interface DetalleSolicitudProps {
   solicitud: RES_Solicitud;
@@ -47,6 +51,53 @@ export const DetalleSolicitud = ({
   solicitud,
   onSuccess,
 }: DetalleSolicitudProps) => {
+  // State del modal "Cotizar desde Solicitud". Vive aqui (no en el hook) porque
+  // depende de los items seleccionados que son UI-only.
+  const [openedCotizar, { open: openCotizar, close: closeCotizar }] =
+    useDisclosure(false);
+  // Modal intermedio: cuando los items seleccionados mezclan productos
+  // auditables y no auditables, el usuario debe elegir subset antes de cotizar.
+  const [
+    openedModalAuditable,
+    { open: openModalAuditable, close: closeModalAuditable },
+  ] = useDisclosure(false);
+  // Items filtrados que se pasan a NuevaCotizacionDesdeSolicitud. Cuando
+  // hay mezcla, queda seteado al subset elegido en el modal intermedio.
+  const [itemsParaCotizar, setItemsParaCotizar] = useState<
+    DetalleSolicitudExtendido[]
+  >([]);
+
+  const handleCotizarClick = () => {
+    const seleccionados = detalles.filter((d) =>
+      selectedItemsIds.includes(d.id_solicitud_detalle),
+    );
+    if (seleccionados.length === 0) return;
+
+    const auditables = seleccionados.filter((d) => d.es_auditable);
+    const noAuditables = seleccionados.filter((d) => !d.es_auditable);
+
+    if (auditables.length === 0 || noAuditables.length === 0) {
+      // Sin mezcla: el subset es TODOS los seleccionados. Ir directo.
+      setItemsParaCotizar(seleccionados);
+      openCotizar();
+      return;
+    }
+
+    // Hay mezcla: pedirle al usuario que elija.
+    setItemsParaCotizar(seleccionados);
+    openModalAuditable();
+  };
+
+  const handleElegirAuditable = (subset: "auditable" | "no_auditable") => {
+    setItemsParaCotizar((prev) =>
+      prev.filter((d) =>
+        subset === "auditable" ? d.es_auditable : !d.es_auditable,
+      ),
+    );
+    closeModalAuditable();
+    openCotizar();
+  };
+
   const {
     loading,
     detalles,
@@ -260,6 +311,26 @@ export const DetalleSolicitud = ({
                   Solicitar Préstamo
                 </Button>
               </span>
+            </Tooltip>
+            <Tooltip
+              label={
+                selectedItemsIds.length === 0
+                  ? "Selecciona items de la solicitud para poder cotizar"
+                  : "Cotizar los items seleccionados a proveedores"
+              }
+              position="top"
+              withArrow
+            >
+              <Button
+                variant="light"
+                color="teal"
+                size="xs"
+                leftSection={<DocumentTextIcon className="w-4 h-4" />}
+                onClick={handleCotizarClick}
+                disabled={selectedItemsIds.length === 0}
+              >
+                Cotizar ({selectedItemsIds.length})
+              </Button>
             </Tooltip>
             <Button
               color="indigo"
@@ -788,6 +859,39 @@ export const DetalleSolicitud = ({
           onCancel={closePrestamo}
         />
       </ModalEstandar>
+
+      <NuevaCotizacionDesdeSolicitud
+        opened={openedCotizar}
+        onClose={closeCotizar}
+        idSolicitud={solicitud.id_solicitud}
+        items={itemsParaCotizar.map((d: DetalleSolicitudExtendido) => ({
+          id_solicitud_reabastecimiento_detalle: d.id_solicitud_detalle,
+          id_producto: d.id_producto,
+          id_unidad_medida_base: d.id_unidad_medida_base,
+          cantidad_solicitada_base: d.cantidad_solicitada_base,
+        }))}
+        onSuccess={() => {
+          loadData(true);
+        }}
+      />
+
+      <ModalSeleccionAuditable
+        opened={openedModalAuditable}
+        onClose={closeModalAuditable}
+        auditables={itemsParaCotizar
+          .filter((d: DetalleSolicitudExtendido) => d.es_auditable)
+          .map((d: DetalleSolicitudExtendido) => ({
+            id: d.id_producto,
+            nombre: d.producto,
+          }))}
+        noAuditables={itemsParaCotizar
+          .filter((d: DetalleSolicitudExtendido) => !d.es_auditable)
+          .map((d: DetalleSolicitudExtendido) => ({
+            id: d.id_producto,
+            nombre: d.producto,
+          }))}
+        onElegir={handleElegirAuditable}
+      />
     </Stack>
   );
 };
