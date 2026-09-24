@@ -12,6 +12,61 @@ import type { RES_Empresa } from "../../../../service/responses/empresa";
 import type { RES_Almacen } from "../../../../service/responses/almacen";
 import type { RES_Mina } from "../../../../service/responses/mina";
 
+/**
+ * Producto mínimo para calcular el factor de conversión: solo necesita el id
+ * de la unidad base. Sirve tanto para `RES_Producto` (registro/edición) como
+ * para los objetos "maestros" que se inyectan a las celdas.
+ */
+export interface ProductoConUnidadBase {
+  id_unidad_medida_base: number;
+}
+
+/**
+ * Resuelve el factor de conversión entre la unidad base de un producto y la
+ * unidad de detalle seleccionada por el usuario en una cotización.
+ *
+ * Devuelve:
+ * - `1` si la unidad del detalle es la misma que la base del producto.
+ * - El factor "1 detalle = X base" si la API tiene registrada la conversión
+ *   universal (ej. 1 Metro = 100 Centímetros, factor = 100).
+ * - `null` si las unidades difieren y NO hay conversión registrada: en ese
+ *   caso el usuario debe tipear el factor manualmente.
+ *
+ * Modelo de la API (ver `ConversionUnidadMedida`): la conversión se modela
+ * como "1 destino (B) = factor origens (A)". En la respuesta que devuelve
+ * `AuxService.get_unidades_medida({ incluir_conversiones: true })`, la unidad
+ * consultada aparece como `id_unidad_origen` y la relacionada como
+ * `id_unidad_destino`. El formulario necesita "1 detalle = X base", por lo
+ * que hay que invertir el factor cuando la unidad del detalle es el origen y
+ * la base es el destino (1/factor origens => "1 origen = 1/factor destinos").
+ */
+export function calcularFactorConversion(
+  producto: ProductoConUnidadBase | null | undefined,
+  idUnidadMedida: number,
+  unidadesMaestras: RES_UnidadMedida[],
+): number | null {
+  if (!producto || !idUnidadMedida) return null;
+
+  // Misma unidad: factor implícito = 1. No requiere lookup.
+  if (producto.id_unidad_medida_base === idUnidadMedida) return 1;
+
+  const unidadDetalle = unidadesMaestras.find(
+    (u) => u.id_unidad_medida === idUnidadMedida,
+  );
+  if (!unidadDetalle?.conversiones) return null;
+
+  const conv = unidadDetalle.conversiones.find(
+    (c) => c.id_unidad_destino === producto.id_unidad_medida_base,
+  );
+  if (!conv) return null;
+
+  const factorOrigenesPorDestino = Number(conv.factor_conversion);
+  if (!factorOrigenesPorDestino || factorOrigenesPorDestino <= 0) return null;
+
+  // "1 destino = factor origens"  =>  "1 origen = 1/factor destinos".
+  return 1 / factorOrigenesPorDestino;
+}
+
 export interface MaestrosState {
   proveedores: RES_Proveedor[];
   unidades: RES_UnidadMedida[];

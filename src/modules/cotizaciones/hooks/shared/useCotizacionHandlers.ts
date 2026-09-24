@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type {
   DTO_CotizacionRequest,
   DTO_CotizacionDetalle,
@@ -15,6 +15,7 @@ import { MetodoPago } from "../../../../shared/enums/_generic/metodo-pago";
 import {
   recalcularTotales,
   DIAS_POR_PERIODO,
+  calcularFactorConversion,
   type MaestrosState,
 } from "./utils";
 import { useNotify } from "../../../../hooks/useNotify";
@@ -144,8 +145,15 @@ export const useCotizacionHandlers = (
             (m) => m.id_producto === prodId,
           );
           if (maestro) {
-            if (Number(value) === maestro.id_unidad_medida_base) {
-              upd.contenido_por_presentacion = 1;
+            const factor = calcularFactorConversion(
+              maestro,
+              Number(value),
+              maestros.unidades,
+            );
+            if (factor !== null) {
+              // Misma unidad o conversión registrada: auto-completar el
+              // factor para evitar errores del usuario.
+              upd.contenido_por_presentacion = factor;
             }
 
             // Sugerir precio solo si está vacío/0 Y la moneda del producto coincide
@@ -544,6 +552,57 @@ export const useCotizacionHandlers = (
   }, [copiedCotizacion, setCotizaciones, notify]);
 
   const cancelarCopiaCotizacion = useCallback(() => setCopiedCotizacion(null), []);
+
+  /**
+   * Re-aplica el factor de conversión a los detalles cuando el catálogo de
+   * unidades (con sus conversiones) termina de cargar.
+   *
+   * Esto cierra un race condition: si el usuario seleccionó una unidad
+   * diferente a la base ANTES de que las conversiones estuvieran
+   * disponibles, `updateCotizacionDetail` retornaba `null` y el factor
+   * quedaba en el default `1`. Cuando finalmente llegaban las unidades, el
+   * input se bloqueaba (porque ya había conversión conocida) pero el valor
+   * seguía en `1`. Con este effect, el factor se rellena automáticamente
+   * en cuanto el catálogo está disponible.
+   *
+   * Protección contra sobreescritura manual: solo aplica si el contenido
+   * sigue en el valor por defecto `1`, así respetamos cualquier factor que
+   * el usuario haya tipeado para una unidad sin conversión registrada.
+   */
+  useEffect(() => {
+    if (maestros.unidades.length === 0) return;
+
+    setCotizaciones((prev) =>
+      prev.map((cot) => ({
+        ...cot,
+        detalles: cot.detalles.map((det) => {
+          const maestro = maestros.catalogo.find(
+            (m) => m.id_producto === det.id_producto,
+          );
+          if (!maestro) return det;
+
+          const factor = calcularFactorConversion(
+            maestro,
+            det.id_unidad_medida,
+            maestros.unidades,
+          );
+
+          if (
+            factor !== null &&
+            det.contenido_por_presentacion === 1 &&
+            factor !== 1
+          ) {
+            return {
+              ...det,
+              contenido_por_presentacion: factor,
+            };
+          }
+
+          return det;
+        }),
+      })),
+    );
+  }, [maestros.unidades]);
 
   return {
     updateCotizacionHeader,

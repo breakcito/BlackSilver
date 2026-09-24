@@ -24,6 +24,7 @@ import { Periodo } from "../../../../../shared/enums/_generic/periodo";
 import { TipoBien } from "../../../../../shared/enums/_generic/tipo-bien";
 import type { RES_Proveedor } from "../../../../../service/responses/proveedor";
 import type { RES_Empresa } from "../../../../../service/responses/empresa";
+import type { RES_UnidadMedida } from "../../../../../service/responses/unidad-medida";
 import type { CopiedCotizacion } from "../../../hooks/shared/useCotizacionHandlers";
 import type { LoadingMaestrosState } from "../../../hooks/shared/utils";
 import { Moneda } from "../../../../../shared/enums/_generic/moneda";
@@ -42,6 +43,7 @@ interface ComparativoTablaProps {
   )[];
   cotizaciones: DTO_CotizacionRequest[];
   unidadesMedida: { value: string; label: string; abreviatura: string }[];
+  unidadesCompletas: RES_UnidadMedida[];
   almacenes: RES_Almacen[];
   minas: RES_Mina[];
   proveedores: RES_Proveedor[];
@@ -101,6 +103,7 @@ export const ComparativoTabla = ({
   productos,
   cotizaciones,
   unidadesMedida,
+  unidadesCompletas,
   almacenes,
   minas,
   proveedores,
@@ -297,6 +300,7 @@ export const ComparativoTabla = ({
                   <CeldaDetalle
                     cotIdx={colIdx}
                     unidadesMedida={unidadesMedida}
+                    unidadesCompletas={unidadesCompletas}
                     almacenes={almacenes}
                     minas={minas}
                     onUpdateDetail={onUpdateDetail}
@@ -412,6 +416,7 @@ export const ComparativoTabla = ({
                         cot={cot}
                         cotIdx={cotIdx}
                         unidadesMedida={unidadesMedida}
+                        unidadesCompletas={unidadesCompletas}
                         almacenes={almacenes}
                         minas={minas}
                         onUpdateDetail={onUpdateDetail}
@@ -478,6 +483,7 @@ export const ComparativoTabla = ({
                     <CeldaDetalle
                       cotIdx={numCotizaciones + i}
                       unidadesMedida={unidadesMedida}
+                      unidadesCompletas={unidadesCompletas}
                       almacenes={almacenes}
                       minas={minas}
                       onUpdateDetail={onUpdateDetail}

@@ -62,7 +62,14 @@ export const useCotizacionMaestros = () => {
     };
 
     cargarMaestro("proveedores", AuxService.get_proveedores);
-    cargarMaestro("unidades", AuxService.get_unidades_medida);
+    // `incluir_conversiones: true` devuelve en cada unidad el array
+    // `conversiones` con los factores registrados contra otras unidades. Lo
+    // necesitamos para auto-completar y bloquear el factor de conversión
+    // cuando el usuario selecciona una unidad diferente a la base del
+    // producto pero existe una conversión universal registrada.
+    cargarMaestro("unidades", () =>
+      AuxService.get_unidades_medida({ incluir_conversiones: true }),
+    );
     cargarMaestro("catalogo", AuxService.get_productos);
     cargarMaestro("empresas", AuxService.get_empresas);
     cargarMaestro("almacenes", AuxService.get_almacenes);

@@ -9,6 +9,7 @@ import type { RES_Almacen } from "../../../../../service/responses/almacen";
 import type { RES_Mina } from "../../../../../service/responses/mina";
 import type { RES_Proveedor } from "../../../../../service/responses/proveedor";
 import type { RES_Empresa } from "../../../../../service/responses/empresa";
+import type { RES_UnidadMedida } from "../../../../../service/responses/unidad-medida";
 import { TipoBien } from "../../../../../shared/enums/_generic/tipo-bien";
 import { TipoDespachoCompra } from "../../../../../shared/enums/_generic/tipo-despacho-compra";
 import { Periodo } from "../../../../../shared/enums/_generic/periodo";
@@ -30,6 +31,7 @@ interface EdicionCotizacionTablaProps {
   cotizacion: DTO_CotizacionRequest;
   correlativo?: string;
   unidadesMedida: { value: string; label: string; abreviatura: string }[];
+  unidadesCompletas: RES_UnidadMedida[];
   almacenes: RES_Almacen[];
   minas: RES_Mina[];
   proveedores: RES_Proveedor[];
@@ -65,6 +67,7 @@ export const EdicionCotizacionTabla = ({
   productos,
   cotizacion,
   unidadesMedida,
+  unidadesCompletas,
   almacenes,
   minas,
   proveedores,
@@ -93,6 +96,7 @@ export const EdicionCotizacionTabla = ({
         productos={productos}
         cotizacion={cotizacion}
         unidadesMedida={unidadesMedida}
+        unidadesCompletas={unidadesCompletas}
         almacenes={almacenes}
         minas={minas}
         proveedores={proveedores}

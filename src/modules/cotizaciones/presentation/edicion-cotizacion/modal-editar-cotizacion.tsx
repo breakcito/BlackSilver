@@ -71,6 +71,7 @@ export const ModalEditarCotizacion = ({
             label: u.nombre,
             abreviatura: u.abreviatura,
           }))}
+          unidadesCompletas={maestros.unidades}
           almacenes={maestros.almacenes}
           minas={maestros.minas}
           proveedores={maestros.proveedores}

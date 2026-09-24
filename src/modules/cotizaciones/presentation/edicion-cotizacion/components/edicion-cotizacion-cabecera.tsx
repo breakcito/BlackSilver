@@ -345,7 +345,7 @@ export const EdicionCotizacionCabecera = ({
             </Text>
 
             {/* Subtotal */}
-            <div className="bg-pink-700/20 border border-pink-500/30 rounded-2xl px-4 py-3 shadow-inner flex items-center justify-between">
+            <div className="bg-pink-700/20 border border-pink-500/30 rounded-2xl px-4 py-2.5 shadow-inner flex items-center justify-between">
               <Stack gap={0}>
                 <Text
                   size="9px"
@@ -354,7 +354,7 @@ export const EdicionCotizacionCabecera = ({
                 >
                   Subtotal (antes de IGV)
                 </Text>
-                <Text size="lg" fw={900} className="text-pink-100">
+                <Text size="md" fw={900} className="text-pink-100">
                   {cotizacion.moneda === MONEDAS.PEN.label ? "S/. " : "$ "}
                   {formatNumber(cotizacion.total_antes_igv)}
                 </Text>
@@ -374,7 +374,7 @@ export const EdicionCotizacionCabecera = ({
                 >
                   IGV ({cotizacion.porcentaje_igv}%)
                 </Text>
-                <Text size="lg" fw={900} className="text-purple-100">
+                <Text size="md" fw={900} className="text-purple-100">
                   {cotizacion.moneda === MONEDAS.PEN.label ? "S/. " : "$ "}
                   {formatNumber(cotizacion.monto_igv)}
                 </Text>
@@ -394,7 +394,7 @@ export const EdicionCotizacionCabecera = ({
                 >
                   Total Neto
                 </Text>
-                <Text size="xl" fw={900} className="text-cyan-100">
+                <Text size="lg" fw={900} className="text-cyan-100">
                   {cotizacion.moneda === MONEDAS.PEN.label ? "S/. " : "$ "}
                   {formatNumber(cotizacion.total_despues_igv)}
                 </Text>

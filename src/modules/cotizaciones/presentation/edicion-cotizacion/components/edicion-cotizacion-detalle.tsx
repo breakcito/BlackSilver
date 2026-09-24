@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Group,
   Stack,
@@ -15,7 +15,7 @@ import {
   SegmentedControl,
   Center,
   Box,
-  Switch,
+  Checkbox,
 } from "@mantine/core";
 import {
   TruckIcon,
@@ -42,7 +42,11 @@ import { MONEDAS } from "../../../../../shared/variables/monedas";
 import { enPlural } from "../../../../../shared/functions/en-plural";
 import { formatNumber } from "../../../../../shared/functions/formatNumber";
 import { DataTableEstandar } from "../../../../../presentation/utils/datatable-estandar";
-import type { LoadingMaestrosState } from "../../../hooks/shared/utils";
+import {
+  calcularFactorConversion,
+  type LoadingMaestrosState,
+} from "../../../hooks/shared/utils";
+import type { RES_UnidadMedida } from "../../../../../service/responses/unidad-medida";
 
 interface EdicionCotizacionDetalleProps {
   productos: (
@@ -57,6 +61,13 @@ interface EdicionCotizacionDetalleProps {
   )[];
   cotizacion: DTO_CotizacionRequest;
   unidadesMedida: { value: string; label: string; abreviatura: string }[];
+  /**
+   * Catálogo completo de unidades de medida CON `conversiones` cargadas.
+   * Necesario para auto-calcular el factor de conversión y bloquear el input
+   * cuando existe una conversión universal registrada entre la unidad base
+   * del producto y la unidad de detalle elegida por el usuario.
+   */
+  unidadesCompletas: RES_UnidadMedida[];
   almacenes: RES_Almacen[];
   minas: RES_Mina[];
   proveedores: RES_Proveedor[];
@@ -103,10 +114,87 @@ interface CotizacionDetalleRecord {
   det: DTO_CotizacionDetalle;
 }
 
+interface FactorConversionInputProps {
+  det: DTO_CotizacionDetalle;
+  prod: CotizacionDetalleRecord["prod"];
+  unidadesCompletas: RES_UnidadMedida[];
+  pIdx: number;
+  baseAbrev: string;
+  unidadBrev: string;
+  onUpdateDetail: <K extends keyof DTO_CotizacionDetalle>(
+    cotIndex: number,
+    rowIndex: number,
+    field: K,
+    value: DTO_CotizacionDetalle[K],
+  ) => void;
+}
+
+const FactorConversionInput = ({
+  det,
+  prod,
+  unidadesCompletas,
+  pIdx,
+  baseAbrev,
+  unidadBrev,
+  onUpdateDetail,
+}: FactorConversionInputProps) => {
+  const factorConversion = unidadesCompletas
+    ? calcularFactorConversion(prod, det.id_unidad_medida, unidadesCompletas)
+    : null;
+  const factorBloqueado = factorConversion !== null;
+
+  /**
+   * Auto-completar `contenido_por_presentacion` cuando las conversiones
+   * terminan de cargar. Solo aplica si el contenido está en el default
+   * (1) y el factor difiere, para respetar valores tipeados manualmente
+   * por el usuario en una unidad sin conversión registrada.
+   *
+   * Cubre el race condition entre la carga de unidades y la selección de
+   * unidad por parte del usuario. Si el handler del padre ejecutó el
+   * cambio de unidad antes de que las conversiones llegaran, este effect
+   * aplica el factor conocido en cuanto están disponibles.
+   */
+  useEffect(() => {
+    if (!unidadesCompletas) return;
+    if (det.no_cotiza) return;
+    if (det.contenido_por_presentacion !== 1) return;
+    if (factorConversion === null || factorConversion === 1) return;
+
+    onUpdateDetail(0, pIdx, "contenido_por_presentacion", factorConversion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unidadesCompletas, det.id_unidad_medida]);
+
+  return (
+    <NumberInput
+      value={det.contenido_por_presentacion}
+      onChange={(val) =>
+        onUpdateDetail(0, pIdx, "contenido_por_presentacion", Number(val))
+      }
+      min={1}
+      disabled={det.no_cotiza || factorBloqueado}
+      size="xs"
+      radius="lg"
+      classNames={inputStyles}
+      hideControls
+      rightSection={
+        <Text
+          size="10px"
+          fw={700}
+          className="text-zinc-500 mr-2 uppercase font-mono"
+        >
+          {baseAbrev} <span className="lowercase">x</span> {unidadBrev}
+        </Text>
+      }
+      rightSectionWidth={65}
+    />
+  );
+};
+
 export const EdicionCotizacionDetalle = ({
   productos,
   cotizacion,
   unidadesMedida,
+  unidadesCompletas,
   almacenes,
   minas,
   proveedores,
@@ -198,14 +286,7 @@ export const EdicionCotizacionDetalle = ({
         const { prod, det, pIdx } = record;
         return (
           <Group gap="xs" wrap="nowrap" align="center">
-            <Text
-              size="xs"
-              fw={700}
-              className={`truncate max-w-[240px] ${det.no_cotiza ? "text-zinc-500 line-through" : "text-zinc-200"}`}
-            >
-              {prod.nombre}
-            </Text>
-            <Switch
+            <Checkbox
               size="xs"
               color="red"
               checked={!det.no_cotiza}
@@ -213,6 +294,13 @@ export const EdicionCotizacionDetalle = ({
               classNames={{ label: "cursor-pointer" }}
               className="flex-none"
             />
+            <Text
+              size="xs"
+              fw={700}
+              className={`truncate max-w-60 ${det.no_cotiza ? "text-zinc-500 line-through" : "text-zinc-200"}`}
+            >
+              {prod.nombre}
+            </Text>
           </Group>
         );
       },
@@ -285,33 +373,14 @@ export const EdicionCotizacionDetalle = ({
             />
 
             {isDifferentUnit && (
-              <NumberInput
-                value={det.contenido_por_presentacion}
-                onChange={(val) =>
-                  onUpdateDetail(
-                    0,
-                    pIdx,
-                    "contenido_por_presentacion",
-                    Number(val),
-                  )
-                }
-                min={1}
-                disabled={det.no_cotiza}
-                size="xs"
-                radius="lg"
-                classNames={inputStyles}
-                hideControls
-                rightSection={
-                  <Text
-                    size="10px"
-                    fw={700}
-                    className="text-zinc-500 mr-2 uppercase font-mono"
-                  >
-                    {baseAbrev} <span className="lowercase">x</span>{" "}
-                    {unidadBrev}
-                  </Text>
-                }
-                rightSectionWidth={65}
+              <FactorConversionInput
+                det={det}
+                prod={prod}
+                unidadesCompletas={unidadesCompletas}
+                pIdx={pIdx}
+                baseAbrev={baseAbrev}
+                unidadBrev={unidadBrev}
+                onUpdateDetail={onUpdateDetail}
               />
             )}
           </Stack>
@@ -362,272 +431,283 @@ export const EdicionCotizacionDetalle = ({
         const { prod, det, pIdx } = record;
         const esRecojo = det.tipo_despacho === TipoDespachoCompra.Recojo;
         return (
-          <Popover width={320} position="bottom" withArrow shadow="md">
-            <Popover.Target>
-              <Tooltip label="Configurar Destino y Despacho" withArrow>
-                <Indicator
-                  color="red"
-                  size={8}
-                  offset={2}
-                  disabled={
-                    det.no_cotiza || (!esRecojo && det.tiempo_entrega === 0)
-                  }
-                >
-                  <ActionIcon
-                    variant="light"
-                    color="cyan"
-                    radius="md"
-                    size="md"
-                    disabled={det.no_cotiza}
-                    className="border border-cyan-500/20"
+          <div className="flex items-center justify-center">
+            <Popover width={320} position="bottom" withArrow shadow="md">
+              <Popover.Target>
+                <Tooltip label="Configurar Destino y Despacho" withArrow>
+                  <Indicator
+                    color="red"
+                    size={8}
+                    offset={2}
+                    disabled={
+                      det.no_cotiza || (!esRecojo && det.tiempo_entrega === 0)
+                    }
                   >
-                    <TruckIcon className="w-4 h-4" />
-                  </ActionIcon>
-                </Indicator>
-              </Tooltip>
-            </Popover.Target>
-            <Popover.Dropdown className="bg-zinc-950 border-zinc-800 shadow-2xl p-4 z-10002">
-              <Stack gap="sm">
-                <Text
-                  size="xs"
-                  fw={800}
-                  className="text-white uppercase tracking-wider mb-1"
-                >
-                  Logística por Ítem
-                </Text>
-                {prod.tipo_bien === TipoBien.ActivoFijo && (
-                  <Stack gap={4}>
-                    <Text
-                      size="10px"
-                      fw={700}
-                      className="text-zinc-400 uppercase tracking-widest"
-                    >
-                      Tipo de Destino
-                    </Text>
-                    <SegmentedControl
-                      size="xs"
+                    <ActionIcon
+                      variant="light"
+                      color="cyan"
                       radius="md"
-                      fullWidth
-                      value={det.id_mina_destino !== null ? "mina" : "almacen"}
-                      onChange={(val) => {
-                        if (val === "almacen") {
-                          onUpdateDetail(0, pIdx, "id_mina_destino", null);
-                          if (det.id_almacen_recepcionista === null) {
+                      size="md"
+                      disabled={det.no_cotiza}
+                      className="border border-cyan-500/20"
+                    >
+                      <TruckIcon className="w-4 h-4" />
+                    </ActionIcon>
+                  </Indicator>
+                </Tooltip>
+              </Popover.Target>
+              <Popover.Dropdown className="bg-zinc-950 border-zinc-800 shadow-2xl p-4 z-10002">
+                <Stack gap="sm">
+                  <Text
+                    size="xs"
+                    fw={800}
+                    className="text-white uppercase tracking-wider mb-1"
+                  >
+                    Logística por Ítem
+                  </Text>
+                  {prod.tipo_bien === TipoBien.ActivoFijo && (
+                    <Stack gap={4}>
+                      <Text
+                        size="10px"
+                        fw={700}
+                        className="text-zinc-400 uppercase tracking-widest"
+                      >
+                        Tipo de Destino
+                      </Text>
+                      <SegmentedControl
+                        size="xs"
+                        radius="md"
+                        fullWidth
+                        value={
+                          det.id_mina_destino !== null ? "mina" : "almacen"
+                        }
+                        onChange={(val) => {
+                          if (val === "almacen") {
+                            onUpdateDetail(0, pIdx, "id_mina_destino", null);
+                            if (det.id_almacen_recepcionista === null) {
+                              onUpdateDetail(
+                                0,
+                                pIdx,
+                                "id_almacen_recepcionista",
+                                0,
+                              );
+                            }
+                          } else {
                             onUpdateDetail(
                               0,
                               pIdx,
                               "id_almacen_recepcionista",
-                              0,
+                              null,
                             );
+                            if (det.id_mina_destino === null) {
+                              onUpdateDetail(0, pIdx, "id_mina_destino", 0);
+                            }
                           }
-                        } else {
-                          onUpdateDetail(
-                            0,
-                            pIdx,
-                            "id_almacen_recepcionista",
-                            null,
-                          );
-                          if (det.id_mina_destino === null) {
-                            onUpdateDetail(0, pIdx, "id_mina_destino", 0);
-                          }
-                        }
+                        }}
+                        data={[
+                          {
+                            label: (
+                              <Center style={{ gap: 6 }}>
+                                <BuildingStorefrontIcon className="w-3.5 h-3.5" />
+                                <Box>Almacén</Box>
+                              </Center>
+                            ),
+                            value: "almacen",
+                          },
+                          {
+                            label: (
+                              <Center style={{ gap: 6 }}>
+                                <MapPinIcon className="w-3.5 h-3.5" />
+                                <Box>Mina</Box>
+                              </Center>
+                            ),
+                            value: "mina",
+                          },
+                        ]}
+                        classNames={{
+                          root: "bg-zinc-900 border border-zinc-800",
+                          control: "border-none",
+                          indicator: "bg-cyan-600",
+                          label:
+                            "text-zinc-400 data-[active]:text-white font-bold",
+                        }}
+                      />
+                    </Stack>
+                  )}
+                  {det.id_mina_destino === null ? (
+                    <Select
+                      label="Almacén de Recepción"
+                      placeholder={
+                        loadingMaestros?.almacenes
+                          ? "Cargando almacenes..."
+                          : "Seleccione almacén..."
+                      }
+                      withAsterisk
+                      disabled={loadingMaestros?.almacenes}
+                      leftSection={
+                        <BuildingStorefrontIcon className="w-4 h-4 text-zinc-500" />
+                      }
+                      data={almacenes.map((a) => ({
+                        value: String(a.id_almacen),
+                        label: a.es_principal ? `${a.nombre} ★` : a.nombre,
+                      }))}
+                      value={
+                        det.id_almacen_recepcionista === 0 ||
+                        !det.id_almacen_recepcionista
+                          ? null
+                          : String(det.id_almacen_recepcionista)
+                      }
+                      onChange={(val) => {
+                        onUpdateDetail(
+                          0,
+                          pIdx,
+                          "id_almacen_recepcionista",
+                          Number(val),
+                        );
+                        onUpdateDetail(0, pIdx, "id_mina_destino", null);
                       }}
-                      data={[
-                        {
-                          label: (
-                            <Center style={{ gap: 6 }}>
-                              <BuildingStorefrontIcon className="w-3.5 h-3.5" />
-                              <Box>Almacén</Box>
-                            </Center>
-                          ),
-                          value: "almacen",
-                        },
-                        {
-                          label: (
-                            <Center style={{ gap: 6 }}>
-                              <MapPinIcon className="w-3.5 h-3.5" />
-                              <Box>Mina</Box>
-                            </Center>
-                          ),
-                          value: "mina",
-                        },
-                      ]}
-                      classNames={{
-                        root: "bg-zinc-900 border border-zinc-800",
-                        control: "border-none",
-                        indicator: "bg-cyan-600",
-                        label:
-                          "text-zinc-400 data-[active]:text-white font-bold",
-                      }}
+                      size="xs"
+                      radius="lg"
+                      classNames={inputStyles}
+                      searchable
                     />
-                  </Stack>
-                )}
-                {det.id_mina_destino === null ? (
+                  ) : (
+                    <Select
+                      label="Mina de Destino"
+                      placeholder={
+                        loadingMaestros?.minas
+                          ? "Cargando minas..."
+                          : "Seleccione mina..."
+                      }
+                      withAsterisk
+                      disabled={loadingMaestros?.minas}
+                      leftSection={
+                        <MapPinIcon className="w-4 h-4 text-zinc-500" />
+                      }
+                      data={minas.map((m) => ({
+                        value: String(m.id_mina),
+                        label: m.nombre,
+                      }))}
+                      value={
+                        det.id_mina_destino === 0 || !det.id_mina_destino
+                          ? null
+                          : String(det.id_mina_destino)
+                      }
+                      onChange={(val) => {
+                        onUpdateDetail(0, pIdx, "id_mina_destino", Number(val));
+                        onUpdateDetail(
+                          0,
+                          pIdx,
+                          "id_almacen_recepcionista",
+                          null,
+                        );
+                      }}
+                      size="xs"
+                      radius="lg"
+                      classNames={inputStyles}
+                      searchable
+                    />
+                  )}
                   <Select
-                    label="Almacén de Recepción"
-                    placeholder={
-                      loadingMaestros?.almacenes
-                        ? "Cargando almacenes..."
-                        : "Seleccione almacén..."
-                    }
+                    label="Tipo de Despacho"
                     withAsterisk
-                    disabled={loadingMaestros?.almacenes}
                     leftSection={
-                      <BuildingStorefrontIcon className="w-4 h-4 text-zinc-500" />
+                      <TruckIcon className="w-4 h-4 text-zinc-500" />
                     }
-                    data={almacenes.map((a) => ({
-                      value: String(a.id_almacen),
-                      label: a.es_principal ? `${a.nombre} ★` : a.nombre,
-                    }))}
-                    value={
-                      det.id_almacen_recepcionista === 0 ||
-                      !det.id_almacen_recepcionista
-                        ? null
-                        : String(det.id_almacen_recepcionista)
-                    }
-                    onChange={(val) => {
+                    data={[
+                      { value: TipoDespachoCompra.Envio, label: "Envío" },
+                      { value: TipoDespachoCompra.Recojo, label: "Recojo" },
+                    ]}
+                    value={det.tipo_despacho}
+                    onChange={(val) =>
                       onUpdateDetail(
                         0,
                         pIdx,
-                        "id_almacen_recepcionista",
-                        Number(val),
-                      );
-                      onUpdateDetail(0, pIdx, "id_mina_destino", null);
-                    }}
-                    size="xs"
-                    radius="lg"
-                    classNames={inputStyles}
-                    searchable
-                  />
-                ) : (
-                  <Select
-                    label="Mina de Destino"
-                    placeholder={
-                      loadingMaestros?.minas
-                        ? "Cargando minas..."
-                        : "Seleccione mina..."
-                    }
-                    withAsterisk
-                    disabled={loadingMaestros?.minas}
-                    leftSection={
-                      <MapPinIcon className="w-4 h-4 text-zinc-500" />
-                    }
-                    data={minas.map((m) => ({
-                      value: String(m.id_mina),
-                      label: m.nombre,
-                    }))}
-                    value={
-                      det.id_mina_destino === 0 || !det.id_mina_destino
-                        ? null
-                        : String(det.id_mina_destino)
-                    }
-                    onChange={(val) => {
-                      onUpdateDetail(0, pIdx, "id_mina_destino", Number(val));
-                      onUpdateDetail(0, pIdx, "id_almacen_recepcionista", null);
-                    }}
-                    size="xs"
-                    radius="lg"
-                    classNames={inputStyles}
-                    searchable
-                  />
-                )}
-                <Select
-                  label="Tipo de Despacho"
-                  withAsterisk
-                  leftSection={<TruckIcon className="w-4 h-4 text-zinc-500" />}
-                  data={[
-                    { value: TipoDespachoCompra.Envio, label: "Envío" },
-                    { value: TipoDespachoCompra.Recojo, label: "Recojo" },
-                  ]}
-                  value={det.tipo_despacho}
-                  onChange={(val) =>
-                    onUpdateDetail(
-                      0,
-                      pIdx,
-                      "tipo_despacho",
-                      val as TipoDespachoCompra,
-                    )
-                  }
-                  size="xs"
-                  radius="lg"
-                  classNames={inputStyles}
-                />
-                {esRecojo && (
-                  <TextInput
-                    label="Lugar de Recojo"
-                    placeholder="Dirección, local, etc..."
-                    withAsterisk
-                    leftSection={
-                      <MapPinIcon className="w-4 h-4 text-zinc-500" />
-                    }
-                    value={det.lugar_recojo || ""}
-                    onChange={(e) =>
-                      onUpdateDetail(
-                        0,
-                        pIdx,
-                        "lugar_recojo",
-                        e.currentTarget.value,
+                        "tipo_despacho",
+                        val as TipoDespachoCompra,
                       )
                     }
                     size="xs"
                     radius="lg"
                     classNames={inputStyles}
                   />
-                )}
-                <div>
-                  <Group gap={4} wrap="nowrap" mb={6}>
-                    <ClockIcon className="w-3.5 h-3.5 text-zinc-400" />
-                    <Text
-                      size="xs"
-                      fw={700}
-                      className="text-zinc-300 tracking-wider"
-                    >
-                      Entrega
-                    </Text>
-                  </Group>
-                  <Group grow gap="xs">
-                    <NumberInput
-                      value={det.tiempo_entrega}
-                      onChange={(val) =>
-                        onUpdateDetail(0, pIdx, "tiempo_entrega", Number(val))
+                  {esRecojo && (
+                    <TextInput
+                      label="Lugar de Recojo"
+                      placeholder="Dirección, local, etc..."
+                      withAsterisk
+                      leftSection={
+                        <MapPinIcon className="w-4 h-4 text-zinc-500" />
                       }
-                      min={1}
-                      size="xs"
-                      radius="lg"
-                      classNames={inputStyles}
-                    />
-                    <Select
-                      data={PERIODO_OPTIONS}
-                      value={det.tiempo_entrega_periodo}
-                      onChange={(val) =>
+                      value={det.lugar_recojo || ""}
+                      onChange={(e) =>
                         onUpdateDetail(
                           0,
                           pIdx,
-                          "tiempo_entrega_periodo",
-                          val as Periodo,
+                          "lugar_recojo",
+                          e.currentTarget.value,
                         )
                       }
                       size="xs"
                       radius="lg"
                       classNames={inputStyles}
                     />
-                  </Group>
-                </div>
-                {det.tiempo_entrega_dias > 0 && (
-                  <Badge
-                    variant="light"
-                    color="cyan"
-                    size="xs"
-                    radius="sm"
-                    className="font-bold border border-cyan-500/20 text-center w-full"
-                  >
-                    ≈ {det.tiempo_entrega_dias}{" "}
-                    {enPlural("día", det.tiempo_entrega_dias)}
-                  </Badge>
-                )}
-              </Stack>
-            </Popover.Dropdown>
-          </Popover>
+                  )}
+                  <div>
+                    <Group gap={4} wrap="nowrap" mb={6}>
+                      <ClockIcon className="w-3.5 h-3.5 text-zinc-400" />
+                      <Text
+                        size="xs"
+                        fw={700}
+                        className="text-zinc-300 tracking-wider"
+                      >
+                        Entrega
+                      </Text>
+                    </Group>
+                    <Group grow gap="xs">
+                      <NumberInput
+                        value={det.tiempo_entrega}
+                        onChange={(val) =>
+                          onUpdateDetail(0, pIdx, "tiempo_entrega", Number(val))
+                        }
+                        min={1}
+                        size="xs"
+                        radius="lg"
+                        classNames={inputStyles}
+                      />
+                      <Select
+                        data={PERIODO_OPTIONS}
+                        value={det.tiempo_entrega_periodo}
+                        onChange={(val) =>
+                          onUpdateDetail(
+                            0,
+                            pIdx,
+                            "tiempo_entrega_periodo",
+                            val as Periodo,
+                          )
+                        }
+                        size="xs"
+                        radius="lg"
+                        classNames={inputStyles}
+                      />
+                    </Group>
+                  </div>
+                  {det.tiempo_entrega_dias > 0 && (
+                    <Badge
+                      variant="light"
+                      color="cyan"
+                      size="xs"
+                      radius="sm"
+                      className="font-bold border border-cyan-500/20 text-center w-full"
+                    >
+                      ≈ {det.tiempo_entrega_dias}{" "}
+                      {enPlural("día", det.tiempo_entrega_dias)}
+                    </Badge>
+                  )}
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
+          </div>
         );
       },
     },

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Group,
   Stack,
@@ -38,6 +39,8 @@ import type { RES_Almacen } from "../../../../../service/responses/almacen";
 import type { RES_Mina } from "../../../../../service/responses/mina";
 import { TipoBien } from "../../../../../shared/enums/_generic/tipo-bien";
 import type { LoadingMaestrosState } from "../../../hooks/shared/utils";
+import { calcularFactorConversion } from "../../../hooks/shared/utils";
+import type { RES_UnidadMedida } from "../../../../../service/responses/unidad-medida";
 
 interface CeldaDetalleProps {
   det?: DTO_CotizacionDetalle;
@@ -52,6 +55,13 @@ interface CeldaDetalleProps {
   cot?: DTO_CotizacionRequest;
   cotIdx: number;
   unidadesMedida: { value: string; label: string; abreviatura: string }[];
+  /**
+   * Catálogo completo de unidades de medida CON `conversiones` cargadas.
+   * Necesario para auto-calcular el factor de conversión y bloquear el input
+   * cuando existe una conversión universal registrada entre la unidad base
+   * del producto y la unidad de detalle elegida por el usuario.
+   */
+  unidadesCompletas?: RES_UnidadMedida[];
   almacenes: RES_Almacen[];
   minas: RES_Mina[];
   onUpdateDetail: <K extends keyof DTO_CotizacionDetalle>(
@@ -92,6 +102,7 @@ export const CeldaDetalle = ({
   cot,
   cotIdx,
   unidadesMedida,
+  unidadesCompletas,
   almacenes,
   minas,
   onUpdateDetail,
@@ -140,6 +151,57 @@ export const CeldaDetalle = ({
   const abrev = currentUnit?.abreviatura || "---";
   const baseAbrev = prod.unidad_medida_abreviatura || "UND";
   const esRecojo = det.tipo_despacho === TipoDespachoCompra.Recojo;
+
+  /**
+   * Factor de conversión auto-completado desde la tabla de conversiones.
+   * Si es `null`, significa que las unidades difieren y no hay conversión
+   * registrada: el usuario debe tipear el factor manualmente.
+   */
+  const factorConversion = unidadesCompletas
+    ? calcularFactorConversion(prod, det.id_unidad_medida, unidadesCompletas)
+    : null;
+
+  /**
+   * El input de factor (contenido_por_presentacion) debe estar bloqueado
+   * cuando el sistema ya conoce el factor: ya sea porque las unidades son
+   * idénticas (factor = 1) o porque existe una conversión universal
+   * registrada. En esos casos no debe permitirse al usuario manipular el
+   * factor a mano. Cuando NO existe conversión, el usuario tipea.
+   */
+  const factorBloqueado = factorConversion !== null;
+
+  /**
+   * Auto-completar `contenido_por_presentacion` cuando el catálogo de
+   * unidades (con conversiones) termina de cargar y existe un factor
+   * conocido para la unidad de detalle seleccionada.
+   *
+   * Solo aplica si el contenido sigue en el valor por defecto (1) — así
+   * respetamos cualquier factor tipeado manualmente por el usuario para
+   * una unidad sin conversión registrada.
+   *
+   * Cubre el race condition entre la carga del catálogo de unidades y la
+   * selección de unidad por parte del usuario: si el handler
+   * `updateCotizacionDetail` se ejecutó antes de que llegaran las
+   * conversiones, el contenido quedó en 1; este effect lo corrige en
+   * cuanto las conversiones están disponibles.
+   *
+   * `onUpdateDetail` se omite intencionalmente de las deps para evitar
+   * re-ejecuciones por cambios de referencia cuando solo cambia contenido.
+   */
+  useEffect(() => {
+    if (!unidadesCompletas || !prod || !det) return;
+    if (det.no_cotiza) return;
+    if (det.contenido_por_presentacion !== 1) return;
+    if (factorConversion === null || factorConversion === 1) return;
+
+    onUpdateDetail(
+      cotIdx,
+      rowIndex,
+      "contenido_por_presentacion",
+      factorConversion,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unidadesCompletas, det?.id_unidad_medida]);
 
   const isCopyingThis =
     copySource?.cotIndex === cotIdx && copySource?.rowIndex === rowIndex;
@@ -267,6 +329,7 @@ export const CeldaDetalle = ({
             size="xs"
             radius="lg"
             classNames={inputStyles}
+            searchable
             withAsterisk
             comboboxProps={{ withinPortal: true, zIndex: 9999 }}
           />
@@ -297,7 +360,14 @@ export const CeldaDetalle = ({
                 Number(val),
               )
             }
-            disabled={det.id_unidad_medida === prod.id_unidad_medida_base}
+            disabled={factorBloqueado}
+            // description={
+            //   factorBloqueado
+            //     ? factorConversion === 1
+            //       ? "Misma unidad que la base"
+            //       : "Conversión registrada"
+            //     : undefined
+            // }
             min={1}
             size="xs"
             radius="lg"

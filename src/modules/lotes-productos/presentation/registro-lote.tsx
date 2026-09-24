@@ -197,13 +197,13 @@ export const RegistroLote = ({
                 ? "Auto-completado"
                 : "Ingrese el factor"
           }
-          description={
-            derived.sonUnidadesIdenticas
-              ? "Misma unidad que la base"
-              : derived.conversionAutomatica !== null
-                ? `Conversión registrada: ${enPlural(derived.unidadBase?.nombre) || "unidades"} x ${derived.unidadSeleccionada?.nombre || "unidad de lote"}`
-                : `${enPlural(derived.unidadBase?.nombre) || "unidades"} x ${derived.unidadSeleccionada?.nombre || "unidad de lote"}`
-          }
+          // description={
+          //   derived.sonUnidadesIdenticas
+          //     ? "Misma unidad que la base"
+          //     : derived.conversionAutomatica !== null
+          //       ? `Conversión registrada: ${enPlural(derived.unidadBase?.nombre) || "unidades"} x ${derived.unidadSeleccionada?.nombre || "unidad de lote"}`
+          //       : `${enPlural(derived.unidadBase?.nombre) || "unidades"} x ${derived.unidadSeleccionada?.nombre || "unidad de lote"}`
+          // }
           min={0.1}
           fixedDecimalScale
           withAsterisk
