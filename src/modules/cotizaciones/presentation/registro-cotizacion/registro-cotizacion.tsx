@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useEffect } from "react";
 import { Group, Button } from "@mantine/core";
 import {
   useRegistroCotizacion,
+  type ItemSolicitudParaCotizar,
   type MaestrosState,
 } from "../../hooks/registro-cotizacion/useRegistroCotizacion";
 import { ComparativoTabla } from "./components/comparativo-tabla";
@@ -27,6 +28,16 @@ interface RegistroCotizacionProps {
   onProductosChange?: (
     prods: { id_producto: number; nombre: string }[],
   ) => void;
+  /**
+   * Si viene, el modal pre-rellena el comparativo con los items de la solicitud
+   * de reabastecimiento y crea una cotizacion inicial. Usado desde
+   * Detalle de Solicitud -> "Cotizar".
+   */
+  preCargarDesdeSolicitud?: {
+    idSolicitud: number;
+    items: ItemSolicitudParaCotizar[];
+    empresasIds: number[];
+  };
 }
 
 export const RegistroCotizacion = forwardRef<
@@ -47,6 +58,7 @@ export const RegistroCotizacion = forwardRef<
       monedaFiltro = null,
       onChangeMoneda,
       onProductosChange,
+      preCargarDesdeSolicitud,
     },
     ref,
   ) => {
@@ -112,6 +124,7 @@ export const RegistroCotizacion = forwardRef<
       iniciarCopiaCotizacion,
       pegarCotizacion,
       cancelarCopiaCotizacion,
+      seedFromSolicitud,
     } = useRegistroCotizacion(handleInternalSuccess, monedaFiltro);
 
     // Exponemos la función al componente padre (CotizacionesPage)
@@ -121,18 +134,44 @@ export const RegistroCotizacion = forwardRef<
       hasProductos: () => productos.length > 0,
     }));
 
+    // Auto-pre-cargar si el padre paso `preCargarDesdeSolicitud`. Solo
+    // dispara una vez (cuando productos esta vacio); si el usuario limpia
+    // manualmente el comparativo despues, no se vuelve a auto-rellenar.
+    useEffect(() => {
+      if (
+        preCargarDesdeSolicitud &&
+        preCargarDesdeSolicitud.items.length > 0 &&
+        productos.length === 0
+      ) {
+        seedFromSolicitud(
+          preCargarDesdeSolicitud.idSolicitud,
+          preCargarDesdeSolicitud.items,
+          preCargarDesdeSolicitud.empresasIds,
+        );
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const productosParaMostrar = productos.map((p) => {
       const maestro = maestros.catalogo.find(
         (m) => m.id_producto === p.id_producto,
       );
+      // Cuando el producto del comparativo no se encuentra en el catalogo
+      // cacheado de cotizaciones (porque su maestro no se termino de cargar
+      // o porque la solicitud trae un id_producto que el cache no tiene),
+      // marcamos `requiereCargaProducto: true` para que la UI muestre un
+      // placeholder claro y permita al usuario cargarlo via el modal
+      // ModalSeleccionProductos (boton "+ Nuevo Producto").
+      const requiereCargaProducto = maestro === undefined;
       return {
         ...p,
-        nombre: maestro?.nombre || "Producto desconocido",
+        nombre: maestro?.nombre || `Producto #${p.id_producto}`,
         codigo: "",
         id_unidad_medida_base: maestro?.id_unidad_medida_base || 0,
         unidad_medida_base: maestro?.unidad_medida_base || "unidades",
         unidad_medida_abreviatura: maestro?.unidad_medida_base_abv || "UND",
         tipo_bien: maestro?.tipo_bien,
+        requiereCargaProducto,
       };
     });
 

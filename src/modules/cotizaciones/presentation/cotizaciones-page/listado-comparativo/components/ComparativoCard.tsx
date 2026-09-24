@@ -8,6 +8,7 @@ import {
   Button,
   Collapse,
   Divider,
+  Tooltip,
 } from "@mantine/core";
 import dayjs from "dayjs";
 import {
@@ -17,6 +18,7 @@ import {
   CalendarDaysIcon,
   BuildingStorefrontIcon,
   TableCellsIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import type {
@@ -88,10 +90,30 @@ export const ComparativoCard = ({
 
               {/* Info principal */}
               <Stack gap={2}>
-                <Group gap="xs" wrap="nowrap">
+                <Group gap="xs" wrap="nowrap" align="center">
                   <Text size="sm" fw={900} className="text-white">
                     Comparativo #{comp.numero_correlativo}
                   </Text>
+                  {comp.solicitudes_origen_correlativos && (
+                    <Tooltip
+                      label={`Correlativos de la${comp.solicitudes_origen_correlativos.includes(",") ? "s" : ""} solicitud${comp.solicitudes_origen_correlativos.includes(",") ? "es" : ""} de reabastecimiento que originaron este comparativo`}
+                      position="top"
+                      withArrow
+                    >
+                      <Badge
+                        variant="light"
+                        color="indigo"
+                        size="sm"
+                        radius="md"
+                        leftSection={
+                          <DocumentTextIcon className="w-3 h-3" />
+                        }
+                        className="font-mono tracking-tight cursor-help"
+                      >
+                        {comp.solicitudes_origen_correlativos}
+                      </Badge>
+                    </Tooltip>
+                  )}
                   <Badge
                     variant="dot"
                     color={tieneAprobada ? "teal" : "orange"}

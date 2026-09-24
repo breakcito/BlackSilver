@@ -3,6 +3,7 @@ import {
   ActionIcon,
   Badge,
   Button,
+  Checkbox,
   Group,
   NumberInput,
   Select,
@@ -10,6 +11,7 @@ import {
   Table,
   Text,
   TextInput,
+  Tooltip,
 } from "@mantine/core";
 import {
   TrashIcon,
@@ -58,7 +60,6 @@ export const RegistroSolicitud = ({
     state: {
       almacenes,
       productos,
-      productosFiltrados,
       unidades,
       idAlmacenSolicitante,
       setIdAlmacenSolicitante,
@@ -76,8 +77,14 @@ export const RegistroSolicitud = ({
       setCantidad,
       contenido,
       setContenido,
+      calculoInteligente,
+      setCalculoInteligente,
       comentarioItem,
       setComentarioItem,
+      productoBusqueda,
+      setProductoBusqueda,
+      unidadBusqueda,
+      setUnidadBusqueda,
       detalles,
       observacion,
       setObservacion,
@@ -86,7 +93,12 @@ export const RegistroSolicitud = ({
       sonUnidadesIdenticas,
       productoSeleccionado,
       isActivoFijo,
+      conversionAutomatica,
+      contenidoBloqueado,
+      calculoInteligenteDisponible,
       canAdd,
+      productosVisibles,
+      unidadesVisibles,
     },
     status: { submitting, loadingCatalogs, error },
     actions: { agregarItem, eliminarItem, handleSubmit, cargarCatalogos },
@@ -112,7 +124,20 @@ export const RegistroSolicitud = ({
   const unidadNombre = unidadSeleccionada?.nombre || "";
   const unidadAbbr = unidadSeleccionada?.abreviatura || "---";
   const baseAbbr = productoSeleccionado?.unidad_medida_base_abv || "---";
-  const totalBase = cantidad * contenido;
+  /**
+   * Totales del item en el resumen, coherentes entre si.
+   * - `totalEnDetalle`: el numero que se muestra en la unidad del detalle.
+   *   Modelo clasico: el usuario ya tipeo la cantidad en esa unidad, asi
+   *   que es `cantidad`. Smart calc: `cantidad` son items y `contenido`
+   *   es la magnitud por item, asi que el total es `cantidad * contenido`.
+   * - `factor`: 1 si las unidades son identicas; si difieren, se
+   *   multiplica por el factor de conversion conocido.
+   * - `totalEnBase`: `totalEnDetalle * factor`. En tu ejemplo
+   *   (5 items * 5 m/guia, factor 100 cm/m) = 25 m y 2500 cm.
+   */
+  const factor = sonUnidadesIdenticas ? 1 : conversionAutomatica ?? 1;
+  const totalEnDetalle = calculoInteligente ? cantidad * contenido : cantidad;
+  const totalEnBase = totalEnDetalle * factor;
 
   return (
     <Stack gap={32} p="md" className="animate-fade-in">
@@ -237,17 +262,22 @@ export const RegistroSolicitud = ({
         <div className="space-y-6">
           <div className="bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800 shadow-inner">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-6 items-end">
-              <div className="md:col-span-5">
+              <div className="md:col-span-4">
                 <Select
                   label="Producto"
                   placeholder="Seleccione producto"
-                  data={productosFiltrados.map((p) => ({
+                  data={productosVisibles.map((p) => ({
                     value: String(p.id_producto),
                     label: p.nombre,
                   }))}
                   value={idProducto ? String(idProducto) : null}
                   onChange={(val) => setIdProducto(Number(val))}
                   searchable
+                  searchValue={productoBusqueda}
+                  onSearchChange={setProductoBusqueda}
+                  // Ver comentario en el Select de Unidad mas abajo.
+                  filter={({ options }) => options}
+                  nothingFoundMessage="Sin coincidencias"
                   classNames={inputClasses}
                   radius="lg"
                   size="sm"
@@ -255,25 +285,42 @@ export const RegistroSolicitud = ({
               </div>
 
               <div className="md:col-span-3">
-                <Select
-                  label="Unidad de Medida"
-                  placeholder="Seleccione unidad"
-                  data={unidades.map((u) => ({
-                    value: String(u.id_unidad_medida),
-                    label: `${u.nombre} (${u.abreviatura})`,
-                  }))}
-                  value={idUnidadMedida ? String(idUnidadMedida) : null}
-                  onChange={(val) => setIdUnidadMedida(Number(val))}
-                  disabled={isActivoFijo}
-                  classNames={inputClasses}
-                  radius="lg"
-                  size="sm"
-                />
-              </div>
-
-              <div className="md:col-span-2">
+                <div className="flex items-center justify-between gap-2 mb-1.5 min-h-5">
+                  <Text
+                    component="label"
+                    fw={600}
+                    fz="sm"
+                    c="zinc.3"
+                    className="tracking-tight"
+                  >
+                    {calculoInteligente ? "Cantidad (ítems)" : "Cantidad"}
+                  </Text>
+                  {calculoInteligenteDisponible && (
+                    <Tooltip
+                      label="Cálculo inteligente: ingresas 'cantidad de ítems' y 'magnitud por ítem' por separado"
+                      position="top"
+                      withArrow
+                      multiline
+                      w={220}
+                    >
+                      <Checkbox
+                        size="xs"
+                        color="indigo"
+                        radius="sm"
+                        checked={calculoInteligente}
+                        onChange={(event) =>
+                          setCalculoInteligente(event.currentTarget.checked)
+                        }
+                        classNames={{
+                          input: "cursor-pointer",
+                          label:
+                            "text-zinc-300 text-[11px] font-semibold uppercase tracking-wider cursor-pointer",
+                        }}
+                      />
+                    </Tooltip>
+                  )}
+                </div>
                 <NumberInput
-                  label={`Cantidad`}
                   placeholder="0"
                   value={cantidad}
                   onChange={(val) => setCantidad(Number(val))}
@@ -284,14 +331,58 @@ export const RegistroSolicitud = ({
                 />
               </div>
 
+              <div className="md:col-span-3">
+                <Select
+                  label="Unidad de Medida"
+                  placeholder="Seleccione unidad"
+                  data={unidadesVisibles.map((u) => ({
+                    value: String(u.id_unidad_medida),
+                    label: `${u.nombre} (${u.abreviatura})`,
+                  }))}
+                  value={idUnidadMedida ? String(idUnidadMedida) : null}
+                  onChange={(val) => setIdUnidadMedida(Number(val))}
+                  disabled={isActivoFijo}
+                  searchable
+                  searchValue={unidadBusqueda}
+                  onSearchChange={setUnidadBusqueda}
+                  filter={({ options }) => options}
+                  nothingFoundMessage="Sin coincidencias"
+                  classNames={inputClasses}
+                  radius="lg"
+                  size="sm"
+                />
+              </div>
+
               <div className="md:col-span-2">
+                <Text
+                  component="label"
+                  fw={600}
+                  fz="sm"
+                  c="zinc.3"
+                  className="tracking-tight mb-1.5 block"
+                >
+                  {calculoInteligente
+                    ? // Magnitud por ítem: si las unidades son idénticas, la
+                      // magnitud está en la unidad base; si difieren, está en
+                      // la unidad del detalle seleccionada.
+                      `${sonUnidadesIdenticas ? productoSeleccionado?.unidad_medida_base_abv || unidadAbbr : unidadAbbr} por ${productoSeleccionado?.nombre ? enPlural(productoSeleccionado.nombre.toLowerCase()) : "pieza"}`
+                    : // Factor de conversión: "base x detalle" (1 detalle = N base).
+                      `${productoSeleccionado?.unidad_medida_base_abv || "---"} x ${unidadAbbr}`}
+                </Text>
                 <NumberInput
-                  label={`${productoSeleccionado?.unidad_medida_base_abv || "---"} x ${unidadAbbr}`}
-                  placeholder="Ej: 10"
+                  placeholder={
+                    calculoInteligente
+                      ? sonUnidadesIdenticas
+                        ? "Ej: 70"
+                        : "Ej: 1.2"
+                      : conversionAutomatica !== null
+                        ? `Ej: ${conversionAutomatica.toFixed(2)}`
+                        : "Ej: 10"
+                  }
                   value={contenido}
                   onChange={(val) => setContenido(Number(val))}
-                  min={0.01}
-                  disabled={sonUnidadesIdenticas}
+                  min={calculoInteligente ? 0 : 0.01}
+                  disabled={contenidoBloqueado}
                   classNames={inputClasses}
                   radius="lg"
                   size="sm"
@@ -349,7 +440,13 @@ export const RegistroSolicitud = ({
                         fw={700}
                         className="uppercase"
                       >
-                        En {unidadNombre ? enPlural(unidadNombre) : "---"}
+                        {calculoInteligente && sonUnidadesIdenticas
+                          ? `Cantidad (${
+                              productoSeleccionado?.nombre
+                                ? enPlural(productoSeleccionado.nombre.toLowerCase())
+                                : "piezas"
+                            })`
+                          : `En ${unidadNombre ? enPlural(unidadNombre) : "---"}`}
                       </Text>
                       <div className="flex items-baseline gap-1.5">
                         <Text
@@ -359,9 +456,13 @@ export const RegistroSolicitud = ({
                             idUnidadMedida > 0 ? "text-white" : "text-zinc-700"
                           }
                         >
-                          {cantidad.toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                          })}
+                          {calculoInteligente && sonUnidadesIdenticas
+                            ? cantidad.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                              })
+                            : totalEnDetalle.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                              })}
                         </Text>
                         <Text
                           size="xs"
@@ -369,7 +470,11 @@ export const RegistroSolicitud = ({
                           c="zinc.5"
                           className="uppercase tracking-wider"
                         >
-                          {unidadAbbr}
+                          {calculoInteligente && sonUnidadesIdenticas
+                            ? productoSeleccionado?.nombre
+                              ? enPlural(productoSeleccionado.nombre.toLowerCase())
+                              : "pz"
+                            : unidadAbbr}
                         </Text>
                       </div>
                     </Stack>
@@ -383,20 +488,23 @@ export const RegistroSolicitud = ({
                         fw={700}
                         className="uppercase"
                       >
-                        En{" "}
-                        {productoSeleccionado?.unidad_medida_base
-                          ? enPlural(productoSeleccionado?.unidad_medida_base)
-                          : "---"}
+                        {calculoInteligente && sonUnidadesIdenticas
+                          ? "Total"
+                          : `En ${
+                              productoSeleccionado?.unidad_medida_base
+                                ? enPlural(productoSeleccionado?.unidad_medida_base)
+                                : "---"
+                            }`}
                       </Text>
                       <div className="flex items-baseline gap-1.5">
                         <Text
                           fw={800}
                           size="xl"
                           className={
-                            idProducto > 0 ? "text-indigo-400" : "text-zinc-700"
+                            idProducto > 0 ? "text-emerald-400" : "text-zinc-700"
                           }
                         >
-                          {totalBase.toLocaleString("en-US", {
+                          {totalEnBase.toLocaleString("en-US", {
                             minimumFractionDigits: 2,
                           })}
                         </Text>
@@ -456,6 +564,34 @@ export const RegistroSolicitud = ({
                 const uni = unidades.find(
                   (u) => u.id_unidad_medida === det.id_unidad_medida,
                 );
+                // Detecta si el item fue agregado con smart calc. Reconstruye
+                // los campos en formato legible (siguiendo el patron de
+                // Requerimientos) para mostrar "N items x M unidad/ítem = total".
+                const usaMagnitud =
+                  Number(det.con_magnitud ?? 0) === 1 &&
+                  typeof det.cantidad_items === "number" &&
+                  det.cantidad_items > 0 &&
+                  typeof det.valor_magnitud === "number" &&
+                  typeof det.valor_magnitud_base === "number";
+                const itemsFmt = usaMagnitud
+                  ? det.cantidad_items!.toLocaleString("en-US", {
+                      maximumFractionDigits: 2,
+                    })
+                  : null;
+                const magFmt = usaMagnitud
+                  ? det.valor_magnitud!.toLocaleString("en-US", {
+                      maximumFractionDigits: 2,
+                    })
+                  : null;
+                // Total en unidad base = items x magnitud_base. Como la BD
+                // guarda `valor_magnitud_base` = magnitud × factor (no el total),
+                // multiplicamos por items para reconstruir el total real.
+                // Caso identico: 2 × 5 × 1 = 10. Caso diferente: 2 × 5 × 100 = 1000.
+                const totalBaseFmt = usaMagnitud
+                  ? (
+                      (det.cantidad_items ?? 0) * (det.valor_magnitud_base ?? 0)
+                    ).toLocaleString("en-US", { maximumFractionDigits: 2 })
+                  : null;
 
                 return (
                   <tr
@@ -476,28 +612,52 @@ export const RegistroSolicitud = ({
                         size="sm"
                         className="font-bold shadow-xs whitespace-nowrap"
                       >
-                        {det.cantidad_solicitada.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                        })}{" "}
-                        {uni?.abreviatura}
+                        {usaMagnitud
+                          ? `${itemsFmt} ${prod?.nombre ? enPlural(prod.nombre.toLowerCase()) : "pz"}`
+                          : `${det.cantidad_solicitada.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                            })} ${uni?.abreviatura}`}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-sm text-right">
-                      <Badge
-                        variant="filled"
-                        color="violet"
-                        radius="sm"
-                        size="sm"
-                        className="font-bold shadow-xs whitespace-nowrap"
-                      >
-                        {(
-                          det.cantidad_solicitada *
-                          det.contenido_por_presentacion
-                        ).toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                        })}{" "}
-                        {prod?.unidad_medida_base_abv}
-                      </Badge>
+                      {usaMagnitud ? (
+                        <Stack gap={2} align="flex-end">
+                          <Badge
+                            variant="light"
+                            color="violet"
+                            radius="sm"
+                            size="sm"
+                            className="font-bold whitespace-nowrap"
+                          >
+                            × {magFmt} {uni?.abreviatura} c/u
+                          </Badge>
+                          <Badge
+                            variant="filled"
+                            color="pink"
+                            radius="sm"
+                            size="sm"
+                            className="font-bold shadow-xs whitespace-nowrap"
+                          >
+                            = {totalBaseFmt} {prod?.unidad_medida_base_abv}
+                          </Badge>
+                        </Stack>
+                      ) : (
+                        <Badge
+                          variant="filled"
+                          color="violet"
+                          radius="sm"
+                          size="sm"
+                          className="font-bold shadow-xs whitespace-nowrap"
+                        >
+                          {(
+                            det.cantidad_solicitada *
+                            det.contenido_por_presentacion
+                          ).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                          })}{" "}
+                          {prod?.unidad_medida_base_abv}
+                        </Badge>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">
                       {det.comentario || "-"}

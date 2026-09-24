@@ -8,7 +8,7 @@ import {
   Badge,
   Stack,
 } from "@mantine/core";
-import { DocumentDuplicateIcon,  TrashIcon } from "@heroicons/react/24/outline";
+import { DocumentDuplicateIcon,  TrashIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 import type {
   DTO_CotizacionRequest,
@@ -38,6 +38,12 @@ interface ComparativoTablaProps {
         unidad_medida_base: string;
         unidad_medida_abreviatura: string;
         tipo_bien?: TipoBien;
+        /**
+         * true cuando el producto del comparativo no se encontro en el
+         * catalogo cacheado de cotizaciones. La UI debe mostrar un badge
+         * "Pendiente" y permitir cargar el producto via ModalSeleccionProductos.
+         */
+        requiereCargaProducto?: boolean;
       })
     | null
   )[];
@@ -329,10 +335,35 @@ export const ComparativoTabla = ({
                       <Text
                         size="xs"
                         fw={700}
-                        className="text-zinc-200 text-left"
+                        className={
+                          prod.requiereCargaProducto
+                            ? "text-amber-300 text-left italic"
+                            : "text-zinc-200 text-left"
+                        }
                       >
                         {prod.nombre}
                       </Text>
+                      {prod.requiereCargaProducto && (
+                        <Tooltip
+                          label="Este producto no se encuentra cargado en el catálogo. Ábrelo desde 'Añadir Productos' para registrarlo antes de cotizar."
+                          position="bottom"
+                          withArrow
+                          multiline
+                          w={260}
+                        >
+                          <Badge
+                            color="amber"
+                            variant="light"
+                            size="xs"
+                            radius="md"
+                            leftSection={
+                              <ExclamationTriangleIcon className="w-3 h-3" />
+                            }
+                          >
+                            Pendiente de cargar
+                          </Badge>
+                        </Tooltip>
+                      )}
                       <div className="flex gap-2">
                         {onDuplicarFila && (
                           <Tooltip

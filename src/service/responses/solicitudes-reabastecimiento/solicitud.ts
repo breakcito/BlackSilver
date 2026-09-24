@@ -60,4 +60,11 @@ export interface RES_SolicitudDetalle {
   comentario_decision: string | null;
   //
   estado: Estado_SolicitudDetalle;
+  //
+  // Campos de magnitud por item (smart calc). Solo tienen valor cuando
+  // el item se registro con el modelo "N items de X magnitud c/u".
+  con_magnitud?: number | boolean;
+  cantidad_items?: number | null;
+  valor_magnitud?: number | null;
+  valor_magnitud_base?: number | null;
 }

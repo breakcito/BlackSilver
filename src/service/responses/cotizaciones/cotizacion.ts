@@ -57,6 +57,9 @@ export interface RES_CotizacionDetalle {
   //
   comentario: string | null;
   estado: Estado_Cotizacion_Detalle;
+  // Vinculacion con el detalle de la solicitud de reabastecimiento que origino
+  // este item de cotizacion (NULL cuando la cotizacion no vino de una).
+  id_solicitud_reabastecimiento_detalle: number | null;
 }
 
 export interface RES_Cotizacion {
@@ -92,6 +95,9 @@ export interface RES_Cotizacion {
   evidencias: IArchivo[] | null;
   //
   id_empleado_registro: number;
+  // Vinculacion con la solicitud de reabastecimiento que origino esta
+  // cotizacion (NULL = cotizacion creada sin venir de una solicitud).
+  id_solicitud_reabastecimiento: number | null;
   empleado_registro: string | null;
   cargo_empleado_registro: string | null;
   //
@@ -106,5 +112,12 @@ export interface RES_Comparativo {
   id_comparativo: number;
   numero_correlativo: number;
   created_at: string;
+  /**
+   * Correlativos UNICOS de las solicitudes de reabastecimiento que
+   * originaron las cotizaciones de este comparativo, concatenados con ", ".
+   * NULL cuando el comparativo no se genero desde una solicitud.
+   * Ej: "SCR-26-00005, SCR-26-00003".
+   */
+  solicitudes_origen_correlativos: string | null;
   cotizaciones: RES_Cotizacion[];
 }
