@@ -75,6 +75,48 @@ export const useOrdenesCompraPage = () => {
     fetchOrdenes();
   }, [fetchOrdenes]);
 
+  // Atajo de registro de comprobante desde el listado
+  const [selectedOrdenForComprobante, setSelectedOrdenForComprobante] =
+    useState<RES_OrdenCompra | null>(null);
+  const [selectedRecepcionesIds, setSelectedRecepcionesIds] = useState<
+    number[]
+  >([]);
+  const [
+    openedHistorialComprobante,
+    { open: openHistorialComprobante, close: closeHistorialComprobante },
+  ] = useDisclosure(false);
+  const [
+    openedRegistroComprobante,
+    { open: openRegistroComprobante, close: closeRegistroComprobante },
+  ] = useDisclosure(false);
+
+  const handleAbrirRegistroComprobante = useCallback(
+    (orden: RES_OrdenCompra) => {
+      setSelectedOrdenForComprobante(orden);
+      setSelectedRecepcionesIds([]);
+      openHistorialComprobante();
+    },
+    [openHistorialComprobante],
+  );
+
+  const handleCerrarHistorialComprobante = useCallback(() => {
+    setSelectedOrdenForComprobante(null);
+    setSelectedRecepcionesIds([]);
+    closeHistorialComprobante();
+  }, [closeHistorialComprobante]);
+
+  const handleCerrarRegistroComprobante = useCallback(() => {
+    closeRegistroComprobante();
+  }, [closeRegistroComprobante]);
+
+  const handleComprobanteRegistrado = useCallback(() => {
+    closeRegistroComprobante();
+    closeHistorialComprobante();
+    setSelectedOrdenForComprobante(null);
+    setSelectedRecepcionesIds([]);
+    fetchOrdenes();
+  }, [closeRegistroComprobante, closeHistorialComprobante, fetchOrdenes]);
+
   const handlePrintOC = useCallback(
     async (orden: RES_OrdenCompra) => {
       setPrintingId(orden.id_orden_compra);
@@ -157,9 +199,10 @@ export const useOrdenesCompraPage = () => {
       getOrdenCompraColumns({
         handleVerDetalle,
         handlePrintOC,
+        handleAbrirRegistroComprobante,
         printingId,
       }),
-    [printingId, handlePrintOC, handleVerDetalle],
+    [printingId, handleVerDetalle, handleAbrirRegistroComprobante],
   );
 
   const groupedOrders = useMemo(() => {
@@ -314,9 +357,19 @@ export const useOrdenesCompraPage = () => {
     closeDet,
     handlePrintOC,
     handleVerDetalle,
+    handleAbrirRegistroComprobante,
     columns,
     groupedOrders,
     tableColumns,
     updateLocalStateAfterReception,
+    selectedOrdenForComprobante,
+    selectedRecepcionesIds,
+    setSelectedRecepcionesIds,
+    openedHistorialComprobante,
+    handleCerrarHistorialComprobante,
+    openedRegistroComprobante,
+    handleCerrarRegistroComprobante,
+    handleAbrirRegistroComprobanteModal: openRegistroComprobante,
+    handleComprobanteRegistrado,
   };
 };

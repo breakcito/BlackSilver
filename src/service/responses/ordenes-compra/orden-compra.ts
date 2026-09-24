@@ -49,6 +49,8 @@ export interface RES_OrdenCompra {
   //
   created_at: string;
   estado: Estado_OrdenCompra;
+  // para saber tiene un comrpobante registrado
+  tiene_comprobante: boolean | number;
   // Detalles insertados por la api
   detalles?: RES_OrdenCompraDetalle[];
 }

@@ -1,5 +1,5 @@
 import { Badge, Group, Stack, Text, ActionIcon, Tooltip } from "@mantine/core";
-import { FileText, Eye, AlertCircle } from "lucide-react";
+import { FileText, Eye, AlertCircle, Receipt } from "lucide-react";
 import dayjs from "dayjs";
 import { type DataTableColumn } from "mantine-datatable";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
@@ -18,11 +18,13 @@ export const COLOR_BY_STATE: Record<string, { color: string; label: string }> =
 interface GetColumnsProps {
   handleVerDetalle: (orden: RES_OrdenCompra) => void;
   handlePrintOC: (orden: RES_OrdenCompra) => void;
+  handleAbrirRegistroComprobante: (orden: RES_OrdenCompra) => void;
   printingId: number | null;
 }
 export const getOrdenCompraColumns = ({
   handleVerDetalle,
   handlePrintOC,
+  handleAbrirRegistroComprobante,
   printingId,
 }: GetColumnsProps): DataTableColumn<RES_OrdenCompra>[] => [
   {
@@ -113,22 +115,46 @@ export const getOrdenCompraColumns = ({
     accessor: "total_despues_igv",
     title: "Importe Total",
     textAlign: "center",
-    width: 140,
-    render: (item) => (
-      <Stack gap={0} justify="center">
-        <Text
-          size="sm"
-          fw={900}
-          className="text-zinc-100 font-mono leading-none"
-        >
-          {item.moneda === "Soles" ? "S/." : "$"}{" "}
-          {formatNumber(Number(item.total_despues_igv))}
-        </Text>
-        <Text size="9px" c="zinc.5" fw={700} className="uppercase mt-1">
-          {item.metodo_pago}
-        </Text>
-      </Stack>
-    ),
+    width: 170,
+    render: (item) => {
+      const sinComprobante = !item.tiene_comprobante;
+      return (
+        <Stack gap={2} justify="center" align="center">
+          <Text
+            size="sm"
+            fw={900}
+            className="text-zinc-100 font-mono leading-none"
+          >
+            {item.moneda === "Soles" ? "S/." : "$"}{" "}
+            {formatNumber(Number(item.total_despues_igv))}
+          </Text>
+          <Text size="9px" c="zinc.5" fw={700} className="uppercase tracking-widest">
+            {item.metodo_pago}
+          </Text>
+          {sinComprobante && (
+            <Tooltip
+              label="Seleccionar recepciones para registrar comprobante"
+              withArrow
+              color="red"
+            >
+              <Badge
+                variant="light"
+                color="red"
+                size="sm"
+                radius="sm"
+                onClick={() => handleAbrirRegistroComprobante(item)}
+                className="cursor-pointer uppercase tracking-widest font-extrabold hover:bg-red-500/30 hover:text-red-300 transition-colors"
+              >
+                <span className="inline-flex items-center gap-1">
+                  <Receipt size={10} className="shrink-0" />
+                  Sin Comprobante
+                </span>
+              </Badge>
+            </Tooltip>
+          )}
+        </Stack>
+      );
+    },
   },
   {
     accessor: "estado",
