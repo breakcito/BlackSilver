@@ -24,10 +24,10 @@ const COLOR_ESTADO_TEXT = "FF1E293B";
 
 const HEADERS = [
   "#",
+  "F. Solicitud",
   "Requerimiento",
   "Solicitante",
   "Labor",
-  "F. Solicitud",
   "F. Entrega Est.",
   "Turno",
   "Estado",
@@ -37,7 +37,7 @@ const HEADERS = [
   "Comentario",
 ];
 
-const COL_WIDTHS = [5, 16, 28, 22, 13, 13, 10, 18, 28, 10, 14, 38];
+const COL_WIDTHS = [5, 13, 16, 28, 22, 13, 10, 18, 28, 10, 14, 38];
 
 /**
  * Color de fondo según el estado del requerimiento.
@@ -245,10 +245,10 @@ const writeRow = (
 ) => {
   const row = sheet.getRow(rowIdx);
   row.getCell(1).value = counter;
-  row.getCell(2).value = req.correlativo;
-  row.getCell(3).value = req.solicitante;
-  row.getCell(4).value = req.labor || "—";
-  row.getCell(5).value = fechaSol;
+  row.getCell(2).value = fechaSol;
+  row.getCell(3).value = req.correlativo;
+  row.getCell(4).value = req.solicitante;
+  row.getCell(5).value = req.labor || "—";
   row.getCell(6).value = fechaEnt;
   // Columna 7 = Turno: "Dia" | "Noche" | "—" (sin turno)
   row.getCell(7).value =
@@ -264,9 +264,9 @@ const writeRow = (
   // Alineación
   row.getCell(1).alignment = { horizontal: "center" };
   row.getCell(2).alignment = { horizontal: "center" };
-  row.getCell(3).alignment = { horizontal: "left" };
+  row.getCell(3).alignment = { horizontal: "center" };
   row.getCell(4).alignment = { horizontal: "left" };
-  row.getCell(5).alignment = { horizontal: "center" };
+  row.getCell(5).alignment = { horizontal: "left" };
   row.getCell(6).alignment = { horizontal: "center" };
   row.getCell(7).alignment = { horizontal: "center" };
   row.getCell(8).alignment = { horizontal: "center" };
