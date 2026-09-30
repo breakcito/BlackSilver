@@ -77,6 +77,12 @@ export const AtencionService = {
           String(det.id_activo_fijo_destino),
         );
       }
+      if (det.para_mantenimiento !== undefined) {
+        formData.append(
+          `detalles[${index}][para_mantenimiento]`,
+          det.para_mantenimiento ? "1" : "0",
+        );
+      }
       // Campos de cálculo inteligente con magnitud
       if (det.con_magnitud !== undefined) {
         formData.append(
@@ -386,6 +392,12 @@ export const AtencionService = {
         formData.append(
           `detalles_crear[${index}][id_activo_fijo_destino]`,
           String(det.id_activo_fijo_destino),
+        );
+      }
+      if (det.para_mantenimiento !== undefined) {
+        formData.append(
+          `detalles_crear[${index}][para_mantenimiento]`,
+          det.para_mantenimiento ? "1" : "0",
         );
       }
       if (det.con_magnitud !== undefined) {
