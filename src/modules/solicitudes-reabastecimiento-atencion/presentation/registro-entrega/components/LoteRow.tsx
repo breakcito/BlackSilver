@@ -134,15 +134,14 @@ export const LoteRow = ({
               placeholder="0"
               clampBehavior="strict"
               hideControls
-              rightSection={
-                <Text size="10px" fw={600} c="zinc.5" className="mr-3">
+              leftSection={
+                <Text size="10px" fw={600} c="gray.5" className="ml-2">
                   {lote.unidad_medida_lote_abv}
                 </Text>
               }
-              rightSectionWidth={60}
-              className="w-28"
+              className="w-32"
               classNames={{
-                input: `bg-zinc-950/50 border-zinc-800 focus:border-indigo-500/50 font-black text-sm h-10 shadow-inner ${cant > 0 ? "text-indigo-400 ring-1 ring-indigo-500/20" : "text-white"} text-right pr-12`,
+                input: `bg-zinc-950/40 border-zinc-800 focus:border-indigo-500/50 font-black text-sm shadow-inner ${cant > 0 ? "text-indigo-400 ring-1 ring-indigo-500/20" : "text-white"} text-center`,
               }}
             />
           )}
@@ -159,15 +158,14 @@ export const LoteRow = ({
             placeholder="0"
             clampBehavior="strict"
             hideControls
-            rightSection={
-              <Text size="10px" fw={600} c="zinc.5" className="mr-2">
+            leftSection={
+              <Text size="10px" fw={600} c="gray.5" className="ml-2">
                 {unidadMedidaBaseAbv}
               </Text>
             }
-            rightSectionWidth={60}
-            className="w-28"
+            className="w-32"
             classNames={{
-              input: `bg-zinc-950/50 border-zinc-800 focus:border-indigo-500/50 font-black text-sm h-10 shadow-inner ${cant > 0 ? "text-indigo-400 ring-1 ring-indigo-500/20" : "text-white"} text-right pr-12`,
+              input: `bg-zinc-950/40 border-zinc-800 focus:border-indigo-500/50 font-black text-sm shadow-inner ${cant > 0 ? "text-indigo-400 ring-1 ring-indigo-500/20" : "text-white"} text-center`,
             }}
           />
         </div>

@@ -110,7 +110,7 @@ export const LoteRow = ({
             {lote.unidad_medida_lote_abv}
           </Text>
         )}
-        <Badge variant="light" color="blue.4" size="sm">
+        <Badge variant="light" color="blue.4" size="md">
           {formatNumber(stockVisible)} {detalle_req.unidad_medida_base_abv}
         </Badge>
       </td>
@@ -137,7 +137,7 @@ export const LoteRow = ({
               placeholder="0"
               clampBehavior="strict"
               hideControls
-              rightSection={
+              leftSection={
                 <Text
                   size="11px"
                   fw={600}
@@ -147,9 +147,8 @@ export const LoteRow = ({
                   {lote.unidad_medida_lote_abv}
                 </Text>
               }
-              rightSectionWidth={48}
               classNames={{
-                input: `w-24`,
+                input: `w-30 text-center`,
               }}
             />
           )}
@@ -166,7 +165,7 @@ export const LoteRow = ({
             placeholder="0"
             clampBehavior="strict"
             hideControls
-            rightSection={
+            leftSection={
               <Text
                 size="11px"
                 fw={600}
@@ -176,9 +175,8 @@ export const LoteRow = ({
                 {detalle_req.unidad_medida_base_abv}
               </Text>
             }
-            rightSectionWidth={48}
             classNames={{
-              input: `w-24`,
+              input: `w-30 text-center`,
             }}
           />
         </div>
