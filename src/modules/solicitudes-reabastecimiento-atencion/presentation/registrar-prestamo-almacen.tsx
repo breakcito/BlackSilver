@@ -387,7 +387,7 @@ export const RegistrarPrestamoAlmacen = ({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   window.open(
-                                    `/logistica/inventario/lotes?idAlmacen=${aliado.id_almacen}`,
+                                    `/lotes?idAlmacen=${aliado.id_almacen}`,
                                     "_blank",
                                   );
                                 }}
