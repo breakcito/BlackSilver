@@ -76,7 +76,7 @@ export interface REQ_RegistrarUsoBulk {
 export interface REQ_ItemUsoBulkVueltas {
   id_tarifa?: number | null;
   precio_unitario: number;
-  cantidad_vueltas: number;
+  cantidad_vueltas?: number | null;
   cantidad_sacos?: number | null;
   horometro_inicio?: number | null;
   horometro_fin?: number | null;
@@ -93,7 +93,7 @@ export interface REQ_ItemUsoBulkVueltas {
 export interface REQ_RegistrarUsoBulkVueltas {
   id_activo_fijo: number;
   id_mina: number;
-  id_labor: number;
+  id_labor?: number | null;
   /**
    * Lote de mineral ahora es OPCIONAL: hay vueltas (servicios,
    * carguios iniciales) donde aun no se asigna lote.

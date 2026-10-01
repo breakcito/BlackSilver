@@ -1062,15 +1062,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
     }
 
     // ===== Validaciones comunes =====
+    // ===== Validaciones comunes =====
     if (tipoControl === "vueltas" && !idMina) {
       notifyError("La mina es obligatoria para registrar un control por vueltas.");
       return;
     }
-    if (tipoControl === "vueltas" && !idLabor) {
-      notifyError("La labor es obligatoria para registrar un control por vueltas.");
-      return;
-    }
-    // Lote de mineral: OPCIONAL. Ya no se valida aca.
+    // Lote de mineral y labor: OPCIONALES en vueltas.
 
     if (tipoControl === "horometro") {
       if (!fechaDia) {
@@ -1124,26 +1121,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         notifyError("La mina es obligatoria para registrar un control por vueltas.");
         return;
       }
-      if (!idLabor) {
-        notifyError("La labor es obligatoria para registrar un control por vueltas.");
-        return;
-      }
-      if (!idLoteMineral) {
-        notifyError(
-          "El lote de mineral en producción es obligatorio para registrar un control por vueltas.",
-        );
-        return;
-      }
       // Validacion por item
       for (let i = 0; i < itemsVueltas.length; i++) {
         const it = itemsVueltas[i];
         const idx = i + 1;
         if (!it.idTarifa) {
           notifyError(`Bloque #${idx}: debe seleccionar una Tarifa de Uso.`);
-          return;
-        }
-        if (Number(it.cantidadVueltas) <= 0) {
-          notifyError(`Bloque #${idx}: la cantidad de vueltas debe ser mayor a cero.`);
           return;
         }
         if (!it.fechaTrabajo) {
@@ -1158,13 +1141,26 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
               .toLowerCase()
               .includes("saco")
           : false;
-        if (
-          esSacoItem &&
-          (it.cantidadSacos === "" || Number(it.cantidadSacos) <= 0)
-        ) {
-          notifyError(`Bloque #${idx}: la cantidad de sacos es obligatoria.`);
-          return;
+
+        const vNum = Number(it.cantidadVueltas) || 0;
+        const sNum = Number(it.cantidadSacos) || 0;
+
+        if (esSacoItem) {
+          if (vNum <= 0 && sNum <= 0) {
+            notifyError(
+              `Bloque #${idx}: para tarifas por sacos, debe ingresar al menos la cantidad de vueltas o la cantidad de sacos.`,
+            );
+            return;
+          }
+        } else {
+          if (vNum <= 0) {
+            notifyError(
+              `Bloque #${idx}: la cantidad de vueltas debe ser mayor a cero.`,
+            );
+            return;
+          }
         }
+
         if (
           it.horometroInicio !== "" &&
           it.horometroFin !== "" &&
@@ -1258,7 +1254,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         const payload = {
           id_activo_fijo: idActivoFijo,
           id_mina: Number(idMina),
-          id_labor: Number(idLabor),
+          id_labor: idLabor ? Number(idLabor) : null,
           // Lote de mineral ahora es OPCIONAL.
           id_lote_mineral: idLoteMineral ? Number(idLoteMineral) : null,
           items: itemsVueltas.map((it) => {
@@ -1275,7 +1271,10 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
               precio_unitario: tarifaItem
                 ? Number(tarifaItem.precio_unitario)
                 : 0,
-              cantidad_vueltas: Number(it.cantidadVueltas),
+              cantidad_vueltas:
+                it.cantidadVueltas !== "" && it.cantidadVueltas !== null
+                  ? Number(it.cantidadVueltas)
+                  : null,
               cantidad_sacos:
                 esSacoItem &&
                 it.cantidadSacos !== "" &&
@@ -1489,15 +1488,21 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         </SimpleGrid>
       )}
 
-      {/* Cabecera ESPECIFICA de vueltas: Mina, Labor y Lote de Mineral
+      {/* Cabecera ESPECIFICA de vueltas: Mina, Labor (OPCIONAL) y Lote de Mineral
           (OPCIONAL). La Fecha del Trabajo pasa a vivir dentro de cada
           Bloque #N, no aqui, porque cada viaje puede caer en dia
           distinto. */}
       {tipoControl === "vueltas" &&
         (() => {
-          const lotesFiltrados = idLabor
-            ? lotesMineral.filter((lm) => lm.id_labor === Number(idLabor))
-            : [];
+          const lotesFiltrados = lotesMineral.filter((lm) => {
+            if (idLabor) {
+              return lm.id_labor === Number(idLabor);
+            }
+            if (idMina) {
+              return lm.id_mina === Number(idMina);
+            }
+            return false;
+          });
           return (
             <Card
               withBorder
@@ -1519,12 +1524,13 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   size="xs"
                 />
                 <Select
-                  label="Labor"
-                  placeholder="Seleccione labor"
+                  label="Labor (Opcional)"
+                  placeholder="Seleccione labor (opcional)"
                   data={labores}
                   value={idLabor}
                   onChange={setIdLabor}
                   searchable
+                  clearable
                   disabled={!idMina}
                   classNames={fieldClasses}
                   radius="lg"
@@ -1537,7 +1543,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 placeholder={
                   idLabor
                     ? "Seleccione lote de la labor (opcional)..."
-                    : "Seleccione primero una labor"
+                    : idMina
+                      ? "Seleccione lote de la mina (opcional)..."
+                      : "Seleccione primero una mina"
                 }
                 data={lotesFiltrados.map((lm) => ({
                   value: String(lm.id_lote_mineral),
@@ -1547,7 +1555,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 onChange={setIdLoteMineral}
                 searchable
                 clearable
-                disabled={!idLabor}
+                disabled={!idMina}
                 classNames={fieldClasses}
                 radius="lg"
                 size="xs"
@@ -2318,7 +2326,11 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                       (span=3) para que se vean cuadrados en la fila. */}
                   <Grid.Col span={{ base: 6, sm: 3 }}>
                     <NumberInput
-                      label="Cantidad de Vueltas"
+                      label={
+                        esSacoItem
+                          ? "Cantidad de Vueltas (Opc.)"
+                          : "Cantidad de Vueltas"
+                      }
                       placeholder="Ej: 3"
                       value={it.cantidadVueltas}
                       onChange={(val) =>
@@ -2331,7 +2343,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                       min={0}
                       decimalScale={0}
                       fixedDecimalScale
-                      required
+                      required={!esSacoItem}
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
@@ -2434,7 +2446,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   {esSacoItem && (
                     <Grid.Col span={3}>
                       <NumberInput
-                        label="Cantidad de Sacos"
+                        label="Cantidad de Sacos (Opc.)"
                         placeholder="Ej: 30"
                         value={it.cantidadSacos}
                         onChange={(val) =>
@@ -2446,7 +2458,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                         }
                         min={0}
                         allowDecimal={false}
-                        required
+                        required={false}
                         classNames={fieldClasses}
                         size="xs"
                         radius="lg"
