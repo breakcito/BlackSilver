@@ -3,6 +3,7 @@ import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
   REQ_ActualizarActivo,
   REQ_ActualizarUbicacion,
+  REQ_AjustarTotalesActivo,
   REQ_CrearActivo,
 } from "./activos.requests";
 import type { RES_ActivoFijoResumen } from "./activos.responses";
@@ -159,6 +160,21 @@ export const ActivosService = {
   }) => {
     const { data } = await api.post<IRespuesta<null>>(
       `${path}/mantenimiento`,
+      payload,
+    );
+    return data;
+  },
+
+  /**
+   * Ajuste manual de contadores de uso de un activo fijo.
+   * El backend registra el cambio en `cambios_log` con el motivo provisto.
+   */
+  ajustarTotalesActivo: async (
+    id_activo: number,
+    payload: REQ_AjustarTotalesActivo,
+  ): Promise<IRespuesta<RES_ActivoFijoResumen>> => {
+    const { data } = await api.put<IRespuesta<RES_ActivoFijoResumen>>(
+      `${path}/${id_activo}/ajustar-totales`,
       payload,
     );
     return data;

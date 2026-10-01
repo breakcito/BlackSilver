@@ -49,6 +49,10 @@ interface ProductGroupCardProps {
     record: RES_ActivoFijoResumen,
     tipo: "horometro" | "odometro" | "vueltas",
   ) => void;
+  onAjustarTotales: (
+    record: RES_ActivoFijoResumen,
+    tipo: "horometro" | "odometro" | "vueltas",
+  ) => void;
   onEditarActivo: (record: RES_ActivoFijoResumen) => void;
   onEliminarActivo: (record: RES_ActivoFijoResumen) => void;
   deletingId: number | null;
@@ -69,6 +73,7 @@ export const ProductGroupCard = ({
   //onMoverActivo,
   onConfigurarAlertas,
   onResolverMantenimiento,
+  onAjustarTotales,
   onEditarActivo,
   onVerHistorial,
   onEliminarActivo,
@@ -334,6 +339,7 @@ export const ProductGroupCard = ({
         }
 
         const renderControlRow = (
+          tipo: "horometro" | "odometro" | "vueltas",
           icon: React.ReactNode,
           actualVal: number,
           alertVal: number | null,
@@ -341,6 +347,7 @@ export const ProductGroupCard = ({
           unit: string,
           onResolve: () => void,
         ) => {
+          const dadoDeBaja = record.estado === "Dado de Baja";
           return (
             <Group
               gap={8}
@@ -365,15 +372,30 @@ export const ProductGroupCard = ({
                   >
                     Uso Actual
                   </Text>
-                  <Badge
-                    variant="light"
-                    color="indigo"
-                    radius="sm"
-                    size="sm"
-                    className="font-bold border border-indigo-500/10 px-1.5 mt-0.5"
-                  >
-                    {actualVal} {unit}
-                  </Badge>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Badge
+                      variant="light"
+                      color="indigo"
+                      radius="sm"
+                      size="sm"
+                      className="font-bold border border-indigo-500/10 px-1.5"
+                    >
+                      {actualVal} {unit}
+                    </Badge>
+                    <Tooltip label="Ajustar contadores" withArrow>
+                      <ActionIcon
+                        size="xs"
+                        variant="subtle"
+                        color="zinc.5"
+                        radius="md"
+                        disabled={dadoDeBaja}
+                        onClick={() => onAjustarTotales(record, tipo)}
+                        className="text-zinc-400 hover:text-indigo-300 disabled:cursor-not-allowed"
+                      >
+                        <PencilSquareIcon className="w-3.5 h-3.5" />
+                      </ActionIcon>
+                    </Tooltip>
+                  </div>
                 </div>
 
                 {/* Separator Divider */}
@@ -431,6 +453,7 @@ export const ProductGroupCard = ({
           <Stack gap={10} align="center" className="w-full">
             {product.control_por_horometro &&
               renderControlRow(
+                "horometro",
                 <ClockIcon className="w-4 h-4 text-zinc-400" />,
                 record.total_horas,
                 record.proxima_advertencia_horas,
@@ -440,6 +463,7 @@ export const ProductGroupCard = ({
               )}
             {product.control_por_odometro &&
               renderControlRow(
+                "odometro",
                 <ArrowTrendingUpIcon className="w-4 h-4 text-zinc-400" />,
                 record.total_kilometros,
                 record.proxima_advertencia_kilometros,
@@ -449,6 +473,7 @@ export const ProductGroupCard = ({
               )}
             {product.control_por_vueltas &&
               renderControlRow(
+                "vueltas",
                 <ArrowPathIcon className="w-4 h-4 text-zinc-400" />,
                 record.total_vueltas,
                 record.proxima_advertencia_vueltas,

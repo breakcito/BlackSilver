@@ -32,6 +32,10 @@ import {
 } from "./components/product-group-card";
 import { ActivoConfigAlertasModal } from "./components/config-alertas-modal";
 import { ActivoMantenimientoModal } from "./components/resolver-mantenimiento-modal";
+import {
+  AjustarTotalesModal,
+  type TipoAjuste,
+} from "./components/ajustar-totales-modal";
 
 export const ActivosFijosPage = () => {
   useTitlePage("Activos Fijos");
@@ -71,6 +75,9 @@ export const ActivosFijosPage = () => {
   const [openedHistorial, { open: openHistorial, close: closeHistorial }] =
     useDisclosure(false);
   const [tipoMantenimiento, setTipoMantenimiento] = useState<"horometro" | "odometro" | "vueltas">("horometro");
+  const [openedAjustarTotales, { open: openAjustarTotales, close: closeAjustarTotales }] =
+    useDisclosure(false);
+  const [tipoAjuste, setTipoAjuste] = useState<TipoAjuste>("horometro");
 
   const handleOpenHistory = (record: RES_ActivoFijoResumen) => {
     setSelectedActivo(record);
@@ -243,6 +250,11 @@ export const ActivosFijosPage = () => {
                 setTipoMantenimiento(tipo);
                 openMantenimiento();
               }}
+              onAjustarTotales={(record, tipo) => {
+                setSelectedActivo(record);
+                setTipoAjuste(tipo);
+                openAjustarTotales();
+              }}
               onEditarActivo={(record) => {
                 setSelectedActivo(record);
                 openEdit();
@@ -334,6 +346,19 @@ export const ActivosFijosPage = () => {
             activo={selectedActivo}
             tipoControl={tipoMantenimiento}
             onSuccess={() => refresh(false)}
+          />
+          <AjustarTotalesModal
+            opened={openedAjustarTotales}
+            close={() => {
+              closeAjustarTotales();
+              setSelectedActivo(null);
+            }}
+            activo={selectedActivo}
+            tipo={tipoAjuste}
+            onSuccess={(actualizado) => {
+              updateActivo(actualizado);
+              refresh(false);
+            }}
           />
         </>
       )}

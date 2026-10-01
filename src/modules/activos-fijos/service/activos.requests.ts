@@ -61,3 +61,16 @@ export interface REQ_ActualizarActivo {
   id_mina?: number | null;
   descripcion_ubicacion?: string | null;
 }
+
+/**
+ * Ajuste manual de los contadores de uso de un activo.
+ * Solo se envían los totales que el usuario efectivamente cambió respecto al
+ * valor actual; los omitidos se conservan. `motivo` es opcional; si se
+ * envía queda registrado en `activo_fijo.cambios_log`.
+ */
+export interface REQ_AjustarTotalesActivo {
+  total_horas?: number | null;
+  total_kilometros?: number | null;
+  total_vueltas?: number | null;
+  motivo?: string;
+}
