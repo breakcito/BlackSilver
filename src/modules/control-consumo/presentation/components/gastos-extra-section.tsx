@@ -24,6 +24,7 @@ import { AuxService } from "../../../../service/auxiliar.service";
 import { ControlConsumoService } from "../../service/control-consumo.service";
 import { useNotify } from "../../../../hooks/useNotify";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { CustomDatePicker } from "../../../../presentation/utils/date-picker-input";
 import type { RES_Labor } from "../../../../service/responses/labor";
 import type { RES_GastoExtra } from "../../service/control-consumo.responses";
 
@@ -47,6 +48,9 @@ export const GastosExtraSection = ({
   const [idLabor, setIdLabor] = useState<string | null>(null);
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState<number | string>("");
+  // Fecha real del gasto. Por defecto es hoy, pero el usuario puede cambiarla
+  // (ej: registrar un gasto de ayer que se atraso la carga). Es obligatoria.
+  const [fechaGasto, setFechaGasto] = useState<Date | null>(new Date());
   const [submitting, setSubmitting] = useState(false);
 
   // Fetch labors when opening modal
@@ -104,6 +108,7 @@ export const GastosExtraSection = ({
     setIdLabor(null);
     setDescripcion("");
     setMonto("");
+    setFechaGasto(new Date());
     setModalOpen(true);
   };
 
@@ -112,6 +117,7 @@ export const GastosExtraSection = ({
     setIdLabor(null);
     setDescripcion("");
     setMonto("");
+    setFechaGasto(new Date());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,6 +136,10 @@ export const GastosExtraSection = ({
       notifyError("Debe ingresar un monto válido mayor a 0.");
       return;
     }
+    if (!fechaGasto || !dayjs(fechaGasto).isValid()) {
+      notifyError("Debe seleccionar la fecha del gasto.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -137,6 +147,7 @@ export const GastosExtraSection = ({
         id_labor: Number(idLabor),
         descripcion: desc,
         monto: montoNum,
+        fecha_gasto: dayjs(fechaGasto).format("YYYY-MM-DD"),
       });
 
       if (resp.success && resp.data) {
@@ -274,7 +285,7 @@ export const GastosExtraSection = ({
                     className="flex items-center gap-1 justify-end"
                   >
                     <CalendarDaysIcon className="w-3 h-3 text-zinc-500" />
-                    {dayjs(g.created_at).format("DD/MM/YYYY")}
+                    {dayjs(g.fecha_gasto ?? g.created_at).format("DD/MM/YYYY")}
                   </Text>
                   {g.empleado_registro && (
                     <Text
@@ -338,6 +349,17 @@ export const GastosExtraSection = ({
               prefix="S/. "
             />
           </Group>
+
+          <CustomDatePicker
+            label="Fecha del Gasto"
+            placeholder="Seleccione la fecha"
+            value={fechaGasto}
+            onChange={(val) => setFechaGasto(val as Date | null)}
+            radius="lg"
+            size="xs"
+            required
+            classNames={modalFieldClasses}
+          />
 
           <Textarea
             label="Descripción"

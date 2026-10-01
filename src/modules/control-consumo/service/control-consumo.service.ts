@@ -107,6 +107,7 @@ export const ControlConsumoService = {
     id_labor: number;
     descripcion: string;
     monto: number;
+    fecha_gasto: string;
   }) => {
     const { data } = await api.post<IRespuesta<RES_GastoExtra>>(
       `${path}/gastos-extra`,

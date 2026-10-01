@@ -319,6 +319,13 @@ export interface RES_GastoExtra {
   cargo_registro?: string | null;
   descripcion: string;
   monto: number;
+  /**
+   * Fecha real del gasto (la que el usuario eligio al registrarlo). Se usa
+   * para filtrar el listado por mes/anio y para mostrar en la card. Si una
+   * fila existente no la tiene (registros previos al ALTER TABLE), la
+   * UI cae al `created_at` para no mostrar "Invalid Date".
+   */
+  fecha_gasto: string | null;
   created_at: string;
   estado: string;
 }
