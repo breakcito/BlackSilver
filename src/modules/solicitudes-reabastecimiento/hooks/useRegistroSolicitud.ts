@@ -4,23 +4,48 @@ import { useNotify } from "../../../hooks/useNotify";
 import { ReabastecimientoService } from "../service/reabastecimiento.service";
 import type {
   DTO_CrearSolicitud,
+  DTO_EditarSolicitud,
   DTO_SolicitudDetalle,
+  DTO_SolicitudDetalleEditado,
 } from "../service/reabastecimiento.requests";
 import { Premura } from "../../../shared/enums/_generic/premura";
 import type { RES_Almacen } from "../../../service/responses/almacen";
 import type { RES_UnidadMedida } from "../../../service/responses/unidad-medida";
-import type { RES_Solicitud } from "../../../service/responses/solicitudes-reabastecimiento/solicitud";
+import type {
+  RES_Solicitud,
+  RES_SolicitudDetalle,
+} from "../../../service/responses/solicitudes-reabastecimiento/solicitud";
 import { AuxService } from "../../../service/auxiliar.service";
 import type { RES_Producto } from "../../../service/responses/producto";
 import { TipoBien } from "../../../shared/enums/_generic/tipo-bien";
 import { useAuthStore } from "../../../stores/auth.store";
 import { getCoincidencias } from "../../../shared/functions/get-coincidencias";
 
-interface Props {
-  onSuccess: (item: RES_Solicitud) => void;
+/**
+ * Item interno del formulario. Para edicion cada item trae `id_detalle`
+ * (id_solicitud_reabastecimiento_detalle) y `bloqueado` (no editable cuando
+ * ya tiene entregas iniciadas).
+ */
+export interface DetalleFormItem extends DTO_SolicitudDetalle {
+  id_detalle?: number;
+  bloqueado?: boolean;
 }
 
-export const useRegistroSolicitud = ({ onSuccess }: Props) => {
+export type ModoSolicitud = "crear" | "editar";
+
+interface Props {
+  modo?: ModoSolicitud;
+  onSuccess: (item: RES_Solicitud) => void;
+  solicitudInicial?: RES_Solicitud;
+  detallesIniciales?: RES_SolicitudDetalle[];
+}
+
+export const useRegistroSolicitud = ({
+  modo = "crear",
+  onSuccess,
+  solicitudInicial,
+  detallesIniciales,
+}: Props) => {
   const { notifySuccess, notifyError } = useNotify();
   const [submitting, setSubmitting] = useState(false);
   const [loadingCatalogs, setLoadingCatalogs] = useState(false);
@@ -60,7 +85,48 @@ export const useRegistroSolicitud = ({ onSuccess }: Props) => {
   const [unidadBusqueda, setUnidadBusqueda] = useState<string>("");
 
   // Lista de detalles agregados
-  const [detalles, setDetalles] = useState<DTO_SolicitudDetalle[]>([]);
+  const [detalles, setDetalles] = useState<DetalleFormItem[]>([]);
+
+  /**
+   * Precarga los valores de la solicitud cuando se abre el modal en modo
+   * edicion. Se hace en un useEffect independiente para que dispare tambien
+   * si las props de entrada cambian (re-mount con otra solicitud).
+   */
+  useEffect(() => {
+    if (modo !== "editar" || !solicitudInicial) return;
+
+    setIdAlmacenSolicitante(solicitudInicial.id_almacen_solicitante);
+    setPremura((solicitudInicial.premura as Premura) ?? Premura.Normal);
+    setFechaSolicitud(
+      solicitudInicial.fecha_solicitud
+        ? dayjs(solicitudInicial.fecha_solicitud).toDate()
+        : new Date(),
+    );
+    setFechaEntregaRequerida(
+      solicitudInicial.fecha_entrega_requerida
+        ? dayjs(solicitudInicial.fecha_entrega_requerida).toDate()
+        : new Date(),
+    );
+    setObservacion(solicitudInicial.observacion ?? "");
+
+    if (detallesIniciales && detallesIniciales.length > 0) {
+      setDetalles(
+        detallesIniciales.map<DetalleFormItem>((d) => ({
+          id_producto: d.id_producto,
+          id_unidad_medida: d.id_unidad_medida_sol,
+          cantidad_solicitada: Number(d.cantidad_solicitada ?? 0),
+          contenido_por_presentacion: Number(d.contenido_por_presentacion ?? 1),
+          comentario: d.comentario ?? undefined,
+          con_magnitud: Number(d.con_magnitud ?? 0) === 1,
+          cantidad_items: d.cantidad_items ?? undefined,
+          valor_magnitud: d.valor_magnitud ?? undefined,
+          valor_magnitud_base: d.valor_magnitud_base ?? undefined,
+          id_detalle: d.id_solicitud_detalle,
+          bloqueado: Number(d.cantidad_entregada_base ?? 0) > 0,
+        })),
+      );
+    }
+  }, [modo, solicitudInicial, detallesIniciales]);
 
   // 1. Acción para cargar Catálogos (se llamará On Demand)
   const cargarCatalogos = useCallback(async () => {
@@ -298,7 +364,7 @@ export const useRegistroSolicitud = ({ onSuccess }: Props) => {
       ? conversionAutomatica ?? 1
       : contenido;
 
-    const nuevoItem: DTO_SolicitudDetalle = {
+    const nuevoItem: DetalleFormItem = {
       id_producto: idProducto,
       id_unidad_medida: idUnidadMedida,
       cantidad_solicitada: cantidadSolicitadaFinal,
@@ -360,35 +426,126 @@ export const useRegistroSolicitud = ({ onSuccess }: Props) => {
       return prod?.es_auditable;
     });
 
-    const dto: DTO_CrearSolicitud = {
-      id_almacen_solicitante: idAlmacenSolicitante,
+    // Modo creacion
+    if (modo === "crear") {
+      const dto: DTO_CrearSolicitud = {
+        id_almacen_solicitante: idAlmacenSolicitante,
+        premura,
+        observacion: observacion || undefined,
+        es_auditable: esAuditable,
+        fecha_solicitud: fechaSolicitud
+          ? dayjs(fechaSolicitud).format("YYYY-MM-DD")
+          : null,
+        fecha_entrega_requerida: fechaEntregaRequerida
+          ? dayjs(fechaEntregaRequerida).format("YYYY-MM-DD")
+          : null,
+        detalles,
+      };
+
+      try {
+        const res = await ReabastecimientoService.crear(dto);
+        if (res.success) {
+          notifySuccess("Solicitud registrada correctamente");
+          onSuccess(res.data);
+        } else {
+          setError(res.message);
+        }
+      } catch (err) {
+        setError("Error al registrar solicitud");
+        console.error(err);
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Modo edicion
+    if (!solicitudInicial) {
+      setError("No hay solicitud inicial para editar");
+      setSubmitting(false);
+      return;
+    }
+
+    // Items con `id_detalle` (y no bloqueados) van a `detalles_editar`. Los
+    // que NO tienen `id_detalle` son productos NUEVOS que el usuario agrego
+    // durante la edicion y van a `detalles_crear`.
+    const detalles_editar: DTO_SolicitudDetalleEditado[] = detalles
+      .filter((d) => !d.bloqueado && Boolean(d.id_detalle))
+      .map((d) => ({
+        id_solicitud_reabastecimiento_detalle: d.id_detalle!,
+        id_unidad_medida: d.id_unidad_medida,
+        cantidad_solicitada: d.cantidad_solicitada,
+        contenido_por_presentacion: d.contenido_por_presentacion,
+        comentario: d.comentario ?? null,
+        con_magnitud: d.con_magnitud,
+        cantidad_items: d.cantidad_items,
+        valor_magnitud: d.valor_magnitud,
+        valor_magnitud_base: d.valor_magnitud_base,
+      }));
+
+    const detalles_crear: DTO_SolicitudDetalle[] = detalles
+      .filter((d) => !d.id_detalle && !d.bloqueado)
+      .map((d) => ({
+        id_producto: d.id_producto,
+        id_unidad_medida: d.id_unidad_medida,
+        cantidad_solicitada: d.cantidad_solicitada,
+        contenido_por_presentacion: d.contenido_por_presentacion,
+        comentario: d.comentario,
+        con_magnitud: d.con_magnitud ? 1 : 0,
+        cantidad_items: d.cantidad_items,
+        valor_magnitud: d.valor_magnitud,
+        valor_magnitud_base: d.valor_magnitud_base,
+      }));
+
+    // Para detectar eliminaciones: comparar ids originales vs actuales.
+    const idsOriginales = new Set(
+      (detallesIniciales ?? []).map((d) =>
+        Number(d.id_solicitud_detalle),
+      ),
+    );
+    const idsActualesNoBloqueados = new Set(
+      detalles
+        .filter((d) => !d.bloqueado && d.id_detalle)
+        .map((d) => Number(d.id_detalle)),
+    );
+    const detalles_eliminar = Array.from(idsOriginales).filter(
+      (id) => !idsActualesNoBloqueados.has(id),
+    );
+
+    const dto: DTO_EditarSolicitud = {
+      observacion: observacion || null,
       premura,
-      observacion: observacion || undefined,
-      es_auditable: esAuditable,
       fecha_solicitud: fechaSolicitud
         ? dayjs(fechaSolicitud).format("YYYY-MM-DD")
         : null,
       fecha_entrega_requerida: fechaEntregaRequerida
         ? dayjs(fechaEntregaRequerida).format("YYYY-MM-DD")
         : null,
-      detalles,
+      es_auditable: esAuditable,
+      detalles_editar,
+      detalles_crear,
+      detalles_eliminar,
     };
 
     try {
-      const res = await ReabastecimientoService.crear(dto);
+      const res = await ReabastecimientoService.editar(
+        solicitudInicial.id_solicitud,
+        dto,
+      );
       if (res.success) {
-        notifySuccess("Solicitud registrada correctamente");
+        notifySuccess("Solicitud actualizada correctamente");
         onSuccess(res.data);
       } else {
         setError(res.message);
       }
     } catch (err) {
-      setError("Error al registrar solicitud");
+      setError("Error al editar solicitud");
       console.error(err);
     } finally {
       setSubmitting(false);
     }
   }, [
+    modo,
     idAlmacenSolicitante,
     premura,
     observacion,
@@ -398,6 +555,8 @@ export const useRegistroSolicitud = ({ onSuccess }: Props) => {
     onSuccess,
     notifySuccess,
     productos,
+    solicitudInicial,
+    detallesIniciales,
   ]);
 
   return {

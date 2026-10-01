@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   Badge,
+  Button,
   Group,
   Stack,
   Text,
@@ -17,6 +18,7 @@ import {
   CalendarDaysIcon,
   PlayCircleIcon,
   CheckBadgeIcon,
+  DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { type DataTableColumn } from "mantine-datatable";
@@ -31,6 +33,9 @@ import { useDisclosure } from "@mantine/hooks";
 import { Premura } from "../../../shared/enums/_generic/premura.ts";
 import { Estado_Solicitud } from "../../../shared/enums/solicitud-reabastecimiento/solicitud.ts";
 import { BotonRecargar } from "../../../presentation/utils/boton-recargar.tsx";
+import { useExcel } from "../../../hooks/useExcel.ts";
+import { useSolicitudesExcel } from "./excel-solicitudes.ts";
+import { useAuditoriaStore } from "../../../stores/auditoria.store.ts";
 
 export const SolicitudesReabastecimientoAtencionPage = () => {
   const setTitle = useUIStore((state) => state.setTitle);
@@ -55,6 +60,10 @@ export const SolicitudesReabastecimientoAtencionPage = () => {
     recargar,
     updateSolicitudLocal,
   } = useAtencionSolicitudes();
+
+  const { generateExcel: enqueueExcel, isGeneratingExcel } = useExcel();
+  const excelBuilder = useSolicitudesExcel();
+  const { en_modo_auditable } = useAuditoriaStore();
 
   useEffect(() => {
     setTitle("Atención de Solicitudes de Reabastecimiento");
@@ -309,6 +318,40 @@ export const SolicitudesReabastecimientoAtencionPage = () => {
               }}
             />
             <BotonRecargar onReload={recargar} loading={loading} />
+            <Tooltip
+              label="Exportar a Excel"
+              position="top"
+              withArrow
+              disabled={!idAlmacen || solicitudes.length === 0}
+            >
+              <Button
+                leftSection={<DocumentArrowDownIcon className="w-5 h-5" />}
+                onClick={() => {
+                  if (solicitudes.length === 0) return;
+                  const almacenNombre =
+                    almacenes.find(
+                      (a) => String(a.id_almacen) === idAlmacen,
+                    )?.nombre || "—";
+                  const config = excelBuilder.generate({
+                    solicitudes,
+                    mes,
+                    yearcito,
+                    almacenNombre,
+                    en_modo_auditable,
+                  });
+                  enqueueExcel(config);
+                }}
+                radius="lg"
+                size="sm"
+                variant="light"
+                color="teal"
+                disabled={!idAlmacen || solicitudes.length === 0}
+                loading={isGeneratingExcel}
+                className="shadow-md active:scale-95 transition-all font-semibold shrink-0"
+              >
+                Excel
+              </Button>
+            </Tooltip>
           </div>
         </div>
       </div>

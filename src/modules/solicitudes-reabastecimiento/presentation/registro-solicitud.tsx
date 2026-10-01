@@ -23,15 +23,24 @@ import {
   ClipboardDocumentListIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/outline";
-import { useRegistroSolicitud } from "../hooks/useRegistroSolicitud";
+import {
+  useRegistroSolicitud,
+  type ModoSolicitud,
+} from "../hooks/useRegistroSolicitud";
 import { Premura } from "../../../shared/enums/_generic/premura";
 import { CustomDatePicker } from "../../../presentation/utils/date-picker-input";
 import { enPlural } from "../../../shared/functions/en-plural";
-import type { RES_Solicitud } from "../../../service/responses/solicitudes-reabastecimiento/solicitud";
+import type {
+  RES_Solicitud,
+  RES_SolicitudDetalle,
+} from "../../../service/responses/solicitudes-reabastecimiento/solicitud";
 
 interface RegistroSolicitudProps {
   onSuccess: (item: RES_Solicitud) => void;
   onCancel: () => void;
+  modo?: ModoSolicitud;
+  solicitudInicial?: RES_Solicitud;
+  detallesIniciales?: RES_SolicitudDetalle[];
 }
 
 const SectionHeader = ({
@@ -55,6 +64,9 @@ const SectionHeader = ({
 export const RegistroSolicitud = ({
   onSuccess,
   onCancel,
+  modo,
+  solicitudInicial,
+  detallesIniciales,
 }: RegistroSolicitudProps) => {
   const {
     state: {
@@ -102,7 +114,12 @@ export const RegistroSolicitud = ({
     },
     status: { submitting, loadingCatalogs, error },
     actions: { agregarItem, eliminarItem, handleSubmit, cargarCatalogos },
-  } = useRegistroSolicitud({ onSuccess });
+  } = useRegistroSolicitud({
+    modo,
+    onSuccess,
+    solicitudInicial,
+    detallesIniciales,
+  });
 
   useEffect(() => {
     cargarCatalogos();
@@ -144,7 +161,11 @@ export const RegistroSolicitud = ({
       <section>
         <SectionHeader
           icon={ClipboardDocumentListIcon}
-          title="Datos de la solicitud"
+          title={
+            modo === "editar"
+              ? `Editar Solicitud ${solicitudInicial?.correlativo ?? ""}`
+              : "Datos de la solicitud"
+          }
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-8">
@@ -163,7 +184,7 @@ export const RegistroSolicitud = ({
             leftSection={
               <BuildingStorefrontIcon className="w-4 h-4 text-zinc-400" />
             }
-            disabled={loadingCatalogs}
+            disabled={loadingCatalogs || modo === "editar"}
           />
 
           <CustomDatePicker
@@ -663,15 +684,33 @@ export const RegistroSolicitud = ({
                       {det.comentario || "-"}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        onClick={() => eliminarItem(index)}
-                        radius="md"
-                        size="sm"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </ActionIcon>
+                      {det.bloqueado ? (
+                        <Tooltip
+                          label="Este item ya tiene entregas iniciadas y no puede eliminarse"
+                          position="top"
+                          withArrow
+                        >
+                          <ActionIcon
+                            color="zinc"
+                            variant="subtle"
+                            radius="md"
+                            size="sm"
+                            disabled
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </ActionIcon>
+                        </Tooltip>
+                      ) : (
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => eliminarItem(index)}
+                          radius="md"
+                          size="sm"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      )}
                     </td>
                   </tr>
                 );

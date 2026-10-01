@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Badge,
   Group,
@@ -19,16 +19,19 @@ import {
   ClockIcon,
   ListBulletIcon,
   CubeIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { HistorialEntregas } from "./historial-entregas";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
+import { RegistroSolicitud } from "./registro-solicitud";
 import type {
   RES_Solicitud,
   RES_SolicitudDetalle,
 } from "../../../service/responses/solicitudes-reabastecimiento/solicitud";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { Estado_SolicitudDetalleLog } from "../../../shared/enums/solicitud-reabastecimiento/solicitud";
+import { Estado_Solicitud } from "../../../shared/enums/solicitud-reabastecimiento/solicitud";
 
 interface DetalleSolicitudProps {
   headerData: RES_Solicitud;
@@ -67,9 +70,23 @@ export const DetalleSolicitud = ({
   onOpenTrazabilidad,
 }: DetalleSolicitudProps) => {
   const [openedHistorial, setOpenedHistorial] = useState(false);
+  const [openedEditar, setOpenedEditar] = useState(false);
 
   const handleOpenHistorial = () => setOpenedHistorial(true);
   const handleCloseHistorial = () => setOpenedHistorial(false);
+
+  // Se puede editar si NO esta anulada Y NINGUN detalle tiene entregas
+  // iniciadas (regla todo-o-nada: si logistica ya comenzo a despachar
+  // cualquier item, la solicitud completa queda bloqueada). El backend
+  // replica esta validacion.
+  const puedeEditar = useMemo(
+    () =>
+      headerData.estado !== Estado_Solicitud.Anulada &&
+      detalles.every(
+        (d) => Number(d.cantidad_entregada_base ?? 0) === 0,
+      ),
+    [detalles, headerData.estado],
+  );
 
   if (loading) {
     return (
@@ -301,6 +318,17 @@ export const DetalleSolicitud = ({
             </Text>
           </Group>
           <Group gap="sm">
+            {puedeEditar && (
+              <Button
+                variant="filled"
+                color="indigo"
+                size="xs"
+                leftSection={<PencilSquareIcon className="w-4 h-4" />}
+                onClick={() => setOpenedEditar(true)}
+              >
+                Editar Solicitud
+              </Button>
+            )}
             <Button
               variant="light"
               color="indigo"
@@ -494,6 +522,22 @@ export const DetalleSolicitud = ({
           idSolicitud={headerData.id_solicitud}
           idAlmacenSolicitante={headerData.id_almacen_solicitante}
           almacenSolicitante={headerData.almacen_solicitante}
+        />
+      </ModalEstandar>
+
+      <ModalEstandar
+        opened={openedEditar}
+        close={() => setOpenedEditar(false)}
+        title={`Editar Solicitud ${headerData.correlativo}`}
+        size="90%"
+        validateClose
+      >
+        <RegistroSolicitud
+          modo="editar"
+          solicitudInicial={headerData}
+          detallesIniciales={detalles}
+          onSuccess={() => setOpenedEditar(false)}
+          onCancel={() => setOpenedEditar(false)}
         />
       </ModalEstandar>
     </Stack>

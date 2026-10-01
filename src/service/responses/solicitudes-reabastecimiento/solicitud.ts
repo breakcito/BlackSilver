@@ -27,6 +27,13 @@ export interface RES_Solicitud {
   //
   created_at: string;
   estado: Estado_Solicitud;
+  // Datos del transportista de la ultima entrega registrada (si existe).
+  // Provistos por la API para alimentar el Excel de atencion sin necesidad
+  // de hacer N+1 llamadas extra.
+  medio_entrega?: string | null;
+  proveedor_transporte?: string | null;
+  agencia_transporte?: string | null;
+  guia_transportista?: string | null;
 }
 
 export interface RES_SolicitudDetalle {

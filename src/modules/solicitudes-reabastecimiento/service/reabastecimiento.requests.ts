@@ -8,6 +8,29 @@ export interface DTO_CrearSolicitud {
   detalles: DTO_SolicitudDetalle[];
 }
 
+export interface DTO_SolicitudDetalleEditado {
+  id_solicitud_reabastecimiento_detalle: number;
+  id_unidad_medida?: number;
+  cantidad_solicitada?: number;
+  contenido_por_presentacion?: number;
+  comentario?: string | null;
+  con_magnitud?: boolean | number;
+  cantidad_items?: number;
+  valor_magnitud?: number;
+  valor_magnitud_base?: number;
+}
+
+export interface DTO_EditarSolicitud {
+  observacion?: string | null;
+  premura?: string | null;
+  fecha_solicitud?: string | null;
+  fecha_entrega_requerida?: string | null;
+  es_auditable?: boolean | null;
+  detalles_editar?: DTO_SolicitudDetalleEditado[];
+  detalles_eliminar?: number[];
+  detalles_crear?: DTO_SolicitudDetalle[];
+}
+
 export interface DTO_SolicitudDetalle {
   id_producto: number;
   id_unidad_medida: number;

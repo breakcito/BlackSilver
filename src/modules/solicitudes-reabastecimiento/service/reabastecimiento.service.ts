@@ -2,6 +2,7 @@ import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
   DTO_CrearSolicitud,
+  DTO_EditarSolicitud,
   DTO_RegistrarRecepcion,
 } from "./reabastecimiento.requests";
 import type { RES_TicketLote } from "../../../service/responses/lote-producto";
@@ -30,6 +31,16 @@ export const ReabastecimientoService = {
 
   crear: async (dto: DTO_CrearSolicitud) => {
     const res = await api.post<IRespuesta<RES_Solicitud>>(path, dto);
+    return res.data;
+  },
+
+  /**
+   * Edita cabecera + detalles de una solicitud. Solo valido mientras al
+   * menos un detalle no tenga entregas iniciadas (validacion replicada en
+   * backend, pero el front la respeta via `puedeEditar`).
+   */
+  editar: async (id: number, dto: DTO_EditarSolicitud) => {
+    const res = await api.put<IRespuesta<RES_Solicitud>>(`${path}/${id}`, dto);
     return res.data;
   },
 
