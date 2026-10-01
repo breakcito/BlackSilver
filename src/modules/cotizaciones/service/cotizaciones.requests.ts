@@ -30,7 +30,11 @@ export const Schema_CotizacionDetalle = z.object({
   contenido_por_presentacion: z.number().min(0.01, "Mínimo 1"),
   cantidad_base: z.number(), // Calculado: cantidad * contenido
   // Precios
-  precio_unitario: z.number().min(0, "Precio no válido").optional().nullable(),
+  // `nullable().optional()` para que TS compile contra inicializadores que
+  // ponen `null`/`undefined` (ej. `utils.ts:crearCotizacionDetalleVacia`).
+  // El handleSave y el backend validan que cuando el item NO es `no_cotiza`
+  // el precio debe estar presente y ser >= 0.01.
+  precio_unitario: z.number().min(0.01, "El precio debe ser mayor a 0").nullable().optional(),
   precio_unitario_base: z.number().optional().nullable(),
   // Precio confirmado para la OC (solo se envía al aprobar desde el wizard)
   precio_confirmado_oc: z.number().min(0).optional().nullable(),

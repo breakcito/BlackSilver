@@ -339,7 +339,7 @@ export const CeldaDetalle = ({
             onChange={(val) =>
               onUpdateDetail(cotIdx, rowIndex, "cantidad", Number(val))
             }
-            min={0}
+            min={0.01}
             size="xs"
             radius="lg"
             withAsterisk
@@ -385,7 +385,7 @@ export const CeldaDetalle = ({
                 val === "" ? undefined : Number(val),
               )
             }
-            min={0}
+            min={0.01}
             size="xs"
             radius="lg"
             classNames={inputStyles}

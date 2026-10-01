@@ -48,8 +48,28 @@ export const useCotizacionPersistence = (
       notify({ type: "info", content: "Cada proveedor debe cotizar al menos un producto." });
       return;
     }
-    if (cotizaciones.some((c) => c.detalles.some((d) => !d.no_cotiza && (d.precio_unitario ?? 0) < 0))) {
-      notify({ type: "info", content: "Los precios no pueden ser negativos." });
+    // Cantidad y precio deben ser > 0 en TODOS los productos cotizados (no
+    // aplica a los que estan marcados como "no_cotiza", que ni siquiera se
+    // envian al backend). Bloquea 0, vacio, null y negativos.
+    if (cotizaciones.some((c) => c.detalles.some((d) => {
+      if (d.no_cotiza) return false;
+      return (
+        d.cantidad === undefined ||
+        d.cantidad === null ||
+        Number(d.cantidad) <= 0
+      );
+    }))) {
+      notify({
+        type: "error",
+        content: "Todos los productos cotizados deben tener una cantidad mayor a 0. Si no va a cotizar un producto, use el interruptor 'No cotizar'.",
+      });
+      return;
+    }
+    if (cotizaciones.some((c) => c.detalles.some((d) => !d.no_cotiza && (d.precio_unitario === undefined || d.precio_unitario === null || Number(d.precio_unitario) <= 0)))) {
+      notify({
+        type: "error",
+        content: "Todos los productos cotizados deben tener un precio mayor a 0. Si no va a cotizar un producto, use el interruptor 'No cotizar'.",
+      });
       return;
     }
     if (cotizaciones.some((c) => c.detalles.some((d) => {
