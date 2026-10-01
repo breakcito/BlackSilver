@@ -100,3 +100,35 @@ export interface RES_ReporteMensual {
     { cantidad: number; unidad: string; producto: string }
   >;
 }
+
+/**
+ * Respuesta del endpoint `POST /control-consumo/consumo-directo`.
+ *
+ * El backend devuelve la fila del consumo registrado con todos los joins
+ * que `ControlConsumoData::get_consumos` materializa (datos del activo,
+ * del producto, del lote, costos, etc.). El front no necesita todos
+ * estos campos — solo confirma el id_consumo para mostrar feedback al
+ * usuario — pero declaramos los principales para que TypeScript no se
+ * queje si en el futuro se quiere usar mas informacion.
+ */
+export interface RES_ConsumoDirecto {
+  id_consumo: number;
+  id_activo_fijo_consumidor: number | null;
+  correlativo_activo_fijo_consumidor: string | null;
+  producto_activo_fijo_consumidor: string | null;
+  id_producto: number | null;
+  id_almacen: number | null;
+  id_lote_producto: number | null;
+  id_unidad_medida: number | null;
+  cantidad_consumo: string | number | null;
+  contenido_por_presentacion: string | number | null;
+  cantidad_base: string | number | null;
+  cantidad_base_consumida: string | number | null;
+  fecha_hora_consumo: string | null;
+  comentario_consumo: string | null;
+  estado: string | null;
+  para_mantenimiento: boolean | number | null;
+  para_produccion: boolean | number | null;
+  uuid_control_uso_activo: string | null;
+  created_at: string | null;
+}

@@ -114,3 +114,35 @@ export interface REQ_CrearTarifa {
 export interface REQ_CrearMaterial {
   nombre: string;
 }
+
+/**
+ * Payload para registrar un consumo directo de un activo fijo.
+ *
+ * Se envia a `POST /control-consumo/consumo-directo`. A diferencia del consumo
+ * dentro de un "Registrar Control por Horometro" (bulk), este flujo
+ * nace del boton independiente "Registrar Consumo" del listado y NO
+ * esta atado a un `uuid_control_uso_activo` (queda como consumo
+ * directo "huerfano" si no se provee).
+ *
+ * Todos los campos son obligatorios excepto `uuid_control_uso_activo`,
+ * `comentario_consumo`, `para_mantenimiento`, `para_produccion`,
+ * `id_lote_mineral`, `id_labor_destino`. El backend valida que
+ * `cantidad_base > 0` (calculado como `cantidad_consumo *
+ * contenido_por_presentacion`).
+ */
+export interface REQ_RegistrarConsumoDirecto {
+  id_activo_fijo_consumidor: number;
+  id_producto: number;
+  id_almacen: number;
+  id_lote_producto: number;
+  id_unidad_medida: number;
+  cantidad_consumo: number;
+  contenido_por_presentacion: number;
+  cantidad_base: number;
+  uuid_control_uso_activo?: string | null;
+  comentario_consumo?: string;
+  para_mantenimiento?: boolean;
+  para_produccion?: boolean;
+  id_lote_mineral?: number | null;
+  id_labor_destino?: number | null;
+}

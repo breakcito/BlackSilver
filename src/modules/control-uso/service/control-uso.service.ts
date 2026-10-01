@@ -3,11 +3,13 @@ import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
   REQ_CrearMaterial,
   REQ_CrearTarifa,
+  REQ_RegistrarConsumoDirecto,
   REQ_RegistrarUso,
   REQ_RegistrarUsoBulk,
   REQ_RegistrarUsoBulkVueltas,
 } from "./control-uso.requests";
 import type {
+  RES_ConsumoDirecto,
   RES_ControlUsoLog,
   RES_Tarifa,
   RES_TipoMaterial,
@@ -145,6 +147,29 @@ export const ControlUsoService = {
     const { data } = await api.get<IRespuesta<RES_ReporteMensual>>(`${path}/reportes/mensual`, {
       params: { mes, anio },
     });
+    return data;
+  },
+
+  /**
+   * Registra un consumo DIRECTO de un activo fijo sin necesidad de un
+   * "Registrar Control por Horometro" previo. Endpoint independiente
+   * `POST /control-consumo/consumo-directo`.
+   *
+   * Si `payload.uuid_control_uso_activo` es null/undefined, el consumo
+   * queda como "consumo directo huerfano" (sin grupo de control de uso).
+   * Esto es lo que usa el boton "Registrar Consumo" del listado.
+   *
+   * El backend:
+   *  - Inserta la fila en `requerimiento_almacen_entrega_detalle_consumo`
+   *    con `es_consumo_directo=1`.
+   *  - Ejecuta `update_stock` (origen=Consumo, SALIDA) sobre el lote
+   *    seleccionado, descontando stock y registrando movimiento en Kardex.
+   */
+  registrarConsumoDirecto: async (payload: REQ_RegistrarConsumoDirecto) => {
+    const { data } = await api.post<IRespuesta<RES_ConsumoDirecto>>(
+      "/control-consumo/consumo-directo",
+      payload,
+    );
     return data;
   },
 };

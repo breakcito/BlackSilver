@@ -7,6 +7,7 @@ import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { RegistroUso } from "./registro-uso";
 import { EdicionControlUsoModal } from "./EdicionControlUsoModal";
+import { RegistrarConsumoModal } from "./components/registrar-consumo-modal";
 import { useExcel } from "../../../hooks/useExcel";
 import { useNotify } from "../../../hooks/useNotify";
 import { ControlUsoService } from "../service/control-uso.service";
@@ -39,6 +40,7 @@ import {
   EllipsisVerticalIcon,
   PencilSquareIcon,
   TagIcon,
+  BeakerIcon,
 } from "@heroicons/react/24/outline";
 import { type DataTableColumn } from "mantine-datatable";
 import type { RES_ControlUsoLog } from "../service/control-uso.responses";
@@ -70,6 +72,10 @@ export const ControlUsoPage = () => {
   } = useControlUso();
 
   const [opened, { open, close }] = useDisclosure(false);
+  const [
+    consumoDirectoOpened,
+    { open: openConsumoDirecto, close: closeConsumoDirecto },
+  ] = useDisclosure(false);
 
   // Estado del modal de anulacion de control de uso
   const [anularOpened, { open: openAnular, close: closeAnular }] =
@@ -724,6 +730,16 @@ export const ControlUsoPage = () => {
           >
             Registrar Uso
           </Button>
+          <Button
+            color="amber.6"
+            leftSection={<BeakerIcon className="w-4 h-4" />}
+            onClick={openConsumoDirecto}
+            radius="lg"
+            disabled={!idActivoFijo}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-9 shadow-lg shadow-amber-900/20 transition-all px-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Registrar Consumo
+          </Button>
         </div>
       </div>
 
@@ -948,6 +964,48 @@ export const ControlUsoPage = () => {
           />
         )}
       </ModalEstandar>
+
+      {/* Registrar Consumo (consumo directo del activo seleccionado, sin
+          requerir un "Registrar Control por Horometro" previo). */}
+      {selectedAssetObj && (
+        <RegistrarConsumoModal
+          opened={consumoDirectoOpened}
+          close={closeConsumoDirecto}
+          id_activo_fijo_consumidor={selectedAssetObj.id_activo}
+          uuid_control_uso_activo={null}
+          onSubmit={async (payload) => {
+            try {
+              const res = await ControlUsoService.registrarConsumoDirecto({
+                id_activo_fijo_consumidor: payload.id_activo_fijo_consumidor,
+                id_producto: payload.id_producto,
+                id_almacen: payload.id_almacen,
+                id_lote_producto: payload.id_lote_producto,
+                id_unidad_medida: payload.id_unidad_medida,
+                cantidad_consumo: payload.cantidad_consumo,
+                contenido_por_presentacion: payload.contenido_por_presentacion,
+                cantidad_base: payload.cantidad_base,
+                uuid_control_uso_activo: payload.uuid_control_uso_activo ?? null,
+                comentario_consumo: payload.comentario || undefined,
+              });
+              if (res.success) {
+                notifySuccess(
+                  res.message ?? "Consumo registrado correctamente",
+                );
+                closeConsumoDirecto();
+              } else {
+                notifyError(
+                  res.message ?? "Error al registrar el consumo",
+                );
+              }
+              return res.success;
+            } catch (err) {
+              console.error(err);
+              notifyError("Error de conexión al registrar el consumo");
+              return false;
+            }
+          }}
+        />
+      )}
 
       {/* Anular Control de Uso Modal */}
       <ModalEstandar

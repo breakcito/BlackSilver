@@ -15,6 +15,8 @@ import { ExclamationTriangleIcon, BeakerIcon } from "@heroicons/react/24/outline
 import { ControlConsumoService } from "../../service/control-consumo.service";
 import { AuxService } from "../../../../service/auxiliar.service";
 import { useNotify } from "../../../../hooks/useNotify";
+import { enPlural } from "../../../../shared/functions/en-plural";
+import { formatNumber } from "../../../../shared/functions/formatNumber";
 import type { RES_ActivoFijoDisponible } from "../../../../service/responses/activo-fijo";
 import type { RES_LoteDisponible } from "../../../../service/responses/lote-producto";
 import type { RES_UnidadMedida } from "../../../../service/responses/unidad-medida";
@@ -240,6 +242,7 @@ export const RegistrarConsumoDirectoModal = ({
   const cppNum =
     contenidoPorPresentacion === "" ? 0 : Number(contenidoPorPresentacion);
   const cantidadBaseCalc = cantidadConsumoNum * cppNum;
+  const tieneCantidad = cantidadConsumoNum > 0 && cppNum > 0;
 
   const submit = async () => {
     if (!idAlmacen) {
@@ -552,24 +555,98 @@ export const RegistrarConsumoDirectoModal = ({
         minRows={2}
       />
 
-      {/* Resumen calculo */}
+      {/* Resumen del consumo */}
       <Card
         withBorder
         padding="sm"
         radius="lg"
-        className="bg-amber-950/10 border-amber-500/30"
+        className="bg-indigo-950/10 border-indigo-500/20"
       >
-        <Group justify="space-between">
-          <Text size="xs" fw={700} className="text-amber-300 uppercase">
-            Cantidad base (descuento de stock)
+        <Group justify="space-between" align="center" mb={6}>
+          <Text
+            size="9px"
+            c="indigo.3"
+            fw={900}
+            tt="uppercase"
+            lts="0.08em"
+          >
+            Resumen del consumo
           </Text>
-          <Text size="md" fw={800} className="text-amber-200 font-mono">
-            {cantidadBaseCalc.toFixed(6)}
-          </Text>
+          {productoLabel ? (
+            <Badge size="xs" color="indigo" variant="light" radius="sm">
+              {productoLabel}
+            </Badge>
+          ) : null}
         </Group>
-        <Text size="9px" c="dimmed" mt={4}>
-          cantidad_consumo x contenido_por_presentacion = {cantidadConsumoNum} x{" "}
-          {cppNum || "?"}
+        <Group gap="lg" wrap="nowrap">
+          <Stack gap={2}>
+            <Text size="10px" c="zinc.5" fw={700} className="uppercase">
+              {`En ${
+                unidadSel?.nombre
+                  ? enPlural(unidadSel.nombre)
+                  : "---"
+              }`}
+            </Text>
+            <Group gap={6} align="baseline" wrap="nowrap">
+              <Text
+                fw={800}
+                size="xl"
+                className={
+                  tieneCantidad ? "text-white" : "text-zinc-700"
+                }
+              >
+                {formatNumber(cantidadConsumoNum)}
+              </Text>
+              <Text
+                size="xs"
+                fw={700}
+                c="zinc.5"
+                className="uppercase tracking-wider"
+              >
+                {unidadSel?.abreviatura ?? "--"}
+              </Text>
+            </Group>
+          </Stack>
+          <div className="h-10 w-px bg-indigo-500/20" />
+          <Stack gap={2}>
+            <Text size="10px" c="zinc.5" fw={700} className="uppercase">
+              {`En ${
+                unidadBase?.nombre
+                  ? enPlural(unidadBase.nombre)
+                  : "---"
+              }`}
+            </Text>
+            <Group gap={6} align="baseline" wrap="nowrap">
+              <Text
+                fw={800}
+                size="xl"
+                className={
+                  tieneCantidad
+                    ? "text-emerald-400"
+                    : "text-zinc-700"
+                }
+              >
+                {formatNumber(cantidadBaseCalc)}
+              </Text>
+              <Text
+                size="xs"
+                fw={700}
+                c="zinc.5"
+                className="uppercase tracking-wider"
+              >
+                {unidadBase?.abreviatura ?? "--"}
+              </Text>
+            </Group>
+          </Stack>
+        </Group>
+        <Text size="9px" c="dimmed" mt={6} ta="center">
+          {tieneCantidad
+            ? `${formatNumber(cantidadConsumoNum)} ${
+                unidadSel?.abreviatura ?? "?"
+              } × ${cppNum} = ${formatNumber(cantidadBaseCalc)} ${
+                unidadBase?.abreviatura ?? "?"
+              }`
+            : "Complete cantidad y contenido para ver la equivalencia."}
         </Text>
       </Card>
 
