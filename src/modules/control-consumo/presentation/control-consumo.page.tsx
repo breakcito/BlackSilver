@@ -110,13 +110,18 @@ export const ControlConsumoPage = () => {
   const { generate: generateExcelConfig } = useControlConsumoExcel();
 
   const handleExportExcel = () => {
-    if (reporte.length === 0 && consumosDirectos.length === 0) {
+    if (
+      reporte.length === 0 &&
+      consumosDirectos.length === 0 &&
+      gastosExtra.length === 0
+    ) {
       notifyError("No hay datos para exportar con los filtros actuales.");
       return;
     }
     const cfg = generateExcelConfig({
       reporte,
       consumosDirectos,
+      gastosExtra,
       mes,
       anio,
     });
@@ -148,7 +153,11 @@ export const ControlConsumoPage = () => {
         loading={loading}
         onExportExcel={handleExportExcel}
         exportingExcel={isGeneratingExcel}
-        exportDisabled={reporte.length === 0 && consumosDirectos.length === 0}
+        exportDisabled={
+          reporte.length === 0 &&
+          consumosDirectos.length === 0 &&
+          gastosExtra.length === 0
+        }
       />
 
       {/* 2. Gastos Extra (3 a 4 por fila) */}

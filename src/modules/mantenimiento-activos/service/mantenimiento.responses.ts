@@ -19,6 +19,8 @@ export interface RES_Mantenimiento {
   fecha_hora_mantenimiento: string;
   observacion: string | null;
   lugar_trabajo: string | null;
+  serie_factura: string | null;
+  numero_factura: string | null;
   costo_mano_obra: number | string | null;
   otros_gastos: Array<{ concepto: string; costo: number }> | string | null;
   total_horas: number | null;
@@ -26,6 +28,8 @@ export interface RES_Mantenimiento {
   total_vueltas: number | null;
   id_proveedor: number | null;
   proveedor_razon_social: string | null;
+  id_personal_externo: number | null;
+  personal_externo_nombre: string | null;
   id_empleado_ejecutor: number | null;
   ejecutor_nombre: string | null;
   id_empleado_supervisor: number | null;
@@ -33,6 +37,16 @@ export interface RES_Mantenimiento {
   evidencias: IArchivo[] | null;
   consumos: RES_MantenimientoConsumo[];
 }
+
+/**
+ * Registro enriquecido para la grilla del listado. `costo_total` y
+ * `costo_otros_gastos` son derivados en el cliente para poder ordenarlos
+ * por accessor (mantine-datatable v8 no soporta accessor de calculo).
+ */
+export type RES_MantenimientoFila = RES_Mantenimiento & {
+  costo_otros_gastos: number;
+  costo_total: number;
+};
 
 export interface RES_ProductoDespachadoPendiente {
   id_entrega_detalle: number;

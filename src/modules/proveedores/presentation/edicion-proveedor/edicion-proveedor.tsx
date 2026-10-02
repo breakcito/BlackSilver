@@ -163,7 +163,7 @@ export const EdicionProveedor = ({
         {esCarbon && (
           <Grid.Col span={12}>
             <TextInput
-              label="Codigo REINFO (opcional)"
+              label="Codigo REINFO (opc)"
               placeholder="Ej. REINFO-XXXX-YYYY"
               radius="xl"
               size="xs"

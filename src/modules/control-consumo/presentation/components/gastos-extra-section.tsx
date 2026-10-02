@@ -314,7 +314,7 @@ export const GastosExtraSection = ({
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Group>
+          <Group grow>
             <Select
               label="Labor"
               placeholder={

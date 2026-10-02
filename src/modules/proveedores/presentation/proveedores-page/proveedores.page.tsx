@@ -41,7 +41,6 @@ import type {
   ProveedorResponse,
   TipoCarbonProveedorResponse,
 } from "../../service/proveedores.responses";
-import { ProveedoresService } from "../../service/proveedores.service";
 import { Proveedor } from "./components/proveedor";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { BotonRecargar } from "../../../../presentation/utils/boton-recargar";
@@ -109,53 +108,47 @@ export const ProveedoresPage = () => {
     useState<ProveedorResponse | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
-  const proveedorEnGestion =
-    selectedProveedor
-      ? (proveedores.find((p) => p.id_proveedor === selectedProveedor.id_proveedor) ??
-        selectedProveedor)
-      : null;
+  const proveedorEnGestion = selectedProveedor
+    ? (proveedores.find(
+        (p) => p.id_proveedor === selectedProveedor.id_proveedor,
+      ) ?? selectedProveedor)
+    : null;
 
-  const proveedorPersonalEnGestion =
-    proveedorPersonal
-      ? (proveedores.find(
-          (p) => p.id_proveedor === proveedorPersonal.id_proveedor,
-        ) ?? proveedorPersonal)
-      : null;
+  const proveedorPersonalEnGestion = proveedorPersonal
+    ? (proveedores.find(
+        (p) => p.id_proveedor === proveedorPersonal.id_proveedor,
+      ) ?? proveedorPersonal)
+    : null;
 
-  const proveedorTiposCarbonEnGestion =
-    proveedorTiposCarbon
-      ? (proveedores.find(
-          (p) => p.id_proveedor === proveedorTiposCarbon.id_proveedor,
-        ) ?? proveedorTiposCarbon)
-      : null;
+  const proveedorTiposCarbonEnGestion = proveedorTiposCarbon
+    ? (proveedores.find(
+        (p) => p.id_proveedor === proveedorTiposCarbon.id_proveedor,
+      ) ?? proveedorTiposCarbon)
+    : null;
 
-  const proveedorLugaresEnGestion =
-    proveedorLugares
-      ? (proveedores.find(
-          (p) => p.id_proveedor === proveedorLugares.id_proveedor,
-        ) ?? proveedorLugares)
-      : null;
+  const proveedorLugaresEnGestion = proveedorLugares
+    ? (proveedores.find(
+        (p) => p.id_proveedor === proveedorLugares.id_proveedor,
+      ) ?? proveedorLugares)
+    : null;
 
-  const proveedorAlmacenesEnGestion =
-    proveedorAlmacenes
-      ? (proveedores.find(
-          (p) => p.id_proveedor === proveedorAlmacenes.id_proveedor,
-        ) ?? proveedorAlmacenes)
-      : null;
+  const proveedorAlmacenesEnGestion = proveedorAlmacenes
+    ? (proveedores.find(
+        (p) => p.id_proveedor === proveedorAlmacenes.id_proveedor,
+      ) ?? proveedorAlmacenes)
+    : null;
 
-  const proveedorAnticiposEnGestion =
-    proveedorAnticipos
-      ? (proveedores.find(
-          (p) => p.id_proveedor === proveedorAnticipos.id_proveedor,
-        ) ?? proveedorAnticipos)
-      : null;
+  const proveedorAnticiposEnGestion = proveedorAnticipos
+    ? (proveedores.find(
+        (p) => p.id_proveedor === proveedorAnticipos.id_proveedor,
+      ) ?? proveedorAnticipos)
+    : null;
 
-  const proveedorContratoEnGestion =
-    proveedorContrato
-      ? (proveedores.find(
-          (p) => p.id_proveedor === proveedorContrato.id_proveedor,
-        ) ?? proveedorContrato)
-      : null;
+  const proveedorContratoEnGestion = proveedorContrato
+    ? (proveedores.find(
+        (p) => p.id_proveedor === proveedorContrato.id_proveedor,
+      ) ?? proveedorContrato)
+    : null;
 
   const actualizarCuentas = (
     proveedor: ProveedorResponse,
@@ -182,7 +175,10 @@ export const ProveedoresPage = () => {
 
     updateProveedor(
       selectedProveedor.id_proveedor,
-      actualizarCuentas(proveedorActual ?? selectedProveedor, cuentasActualizadas),
+      actualizarCuentas(
+        proveedorActual ?? selectedProveedor,
+        cuentasActualizadas,
+      ),
     );
   };
 
@@ -200,7 +196,10 @@ export const ProveedoresPage = () => {
 
     updateProveedor(
       selectedProveedor.id_proveedor,
-      actualizarCuentas(proveedorActual ?? selectedProveedor, cuentasActualizadas),
+      actualizarCuentas(
+        proveedorActual ?? selectedProveedor,
+        cuentasActualizadas,
+      ),
     );
   };
 
@@ -395,7 +394,11 @@ export const ProveedoresPage = () => {
 
           <div className="flex gap-2 items-center shrink-0 mb-px">
             <BotonRecargar onReload={recargar} loading={loading} />
-            <Tooltip label="Ver historial de cambios" position="bottom" withArrow>
+            <Tooltip
+              label="Ver historial de cambios"
+              position="bottom"
+              withArrow
+            >
               <ActionIcon
                 variant="default"
                 color="zinc.4"
@@ -571,9 +574,7 @@ export const ProveedoresPage = () => {
         size="lg"
       >
         {proveedorPersonalEnGestion && (
-          <PersonalExternoProveedor
-            proveedor={proveedorPersonalEnGestion}
-          />
+          <PersonalExternoProveedor proveedor={proveedorPersonalEnGestion} />
         )}
       </ModalEstandar>
 
@@ -589,10 +590,7 @@ export const ProveedoresPage = () => {
             proveedor={proveedorTiposCarbonEnGestion}
             key={proveedorTiposCarbonEnGestion.id_proveedor}
             onGuardados={(tipos) => {
-              handleTiposCarbonGuardados(
-                proveedorTiposCarbonEnGestion,
-                tipos,
-              );
+              handleTiposCarbonGuardados(proveedorTiposCarbonEnGestion, tipos);
               setProveedorTiposCarbon(null);
             }}
           />
@@ -629,10 +627,7 @@ export const ProveedoresPage = () => {
           <AlmacenesCarbonProveedor
             proveedor={proveedorAlmacenesEnGestion}
             onAlmacenGuardado={(almacenes) => {
-              handleAlmacenesGuardados(
-                proveedorAlmacenesEnGestion,
-                almacenes,
-              );
+              handleAlmacenesGuardados(proveedorAlmacenesEnGestion, almacenes);
               // NO cerramos el modal: el componente refresca su lista
               // local tras cada accion y emite el array refrescado para
               // que el padre actualice su estado global. El usuario
@@ -642,31 +637,19 @@ export const ProveedoresPage = () => {
         )}
       </ModalEstandar>
 
-      {/* Modal: Anticipos de carbon del proveedor (solo tab Carbon) */}
-      <ModalEstandar
-        opened={!!proveedorAnticipos}
-        close={() => setProveedorAnticipos(null)}
-        title={
-          proveedorAnticiposEnGestion
-            ? `Anticipos: ${proveedorAnticiposEnGestion.razon_social}`
-            : "Anticipos"
-        }
-        size="xl"
-      >
-        {proveedorAnticiposEnGestion && (
-          <AnticiposProveedor
-            idProveedor={proveedorAnticiposEnGestion.id_proveedor}
-            razonSocial={proveedorAnticiposEnGestion.razon_social}
-            service={ProveedoresService}
-            onChanged={(anticipos) => {
-              handleAnticiposGuardados(
-                proveedorAnticiposEnGestion,
-                anticipos,
-              );
-            }}
-          />
-        )}
-      </ModalEstandar>
+      {/* Anticipos de carbon del proveedor (solo tab Carbon).
+          El componente monta su propio `ModalEstandar` porque necesita
+          inyectar los KPIs de resumen en el `rightSection` de la cabecera. */}
+      {proveedorAnticiposEnGestion && (
+        <AnticiposProveedor
+          proveedor={proveedorAnticiposEnGestion}
+          abierto={!!proveedorAnticipos}
+          onClose={() => setProveedorAnticipos(null)}
+          onChanged={(anticipos) => {
+            handleAnticiposGuardados(proveedorAnticiposEnGestion, anticipos);
+          }}
+        />
+      )}
 
       {/* Modal: Archivos del Contrato del proveedor (solo tab Carbon, read-only) */}
       <ModalEstandar

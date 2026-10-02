@@ -3,7 +3,12 @@ import dayjs from "dayjs";
 import { useNotify } from "../../../hooks/useNotify";
 import { MantenimientoService } from "../service/mantenimiento.service";
 import { AuxService } from "../../../service/auxiliar.service";
-import type { DTO_CrearMantenimiento } from "../service/mantenimiento.requests";
+import {
+  Schema_CrearMantenimiento,
+  issuesToFieldErrors,
+  type DTO_CrearMantenimiento,
+} from "../service/mantenimiento.requests";
+import { getCoincidencias } from "../../../shared/functions/get-coincidencias";
 import type { RES_ActivoFijoDisponible } from "../../../service/responses/activo-fijo";
 import type { RES_Mina } from "../../../service/responses/mina";
 import type { RES_Almacen } from "../../../service/responses/almacen";
@@ -109,6 +114,29 @@ export const useRegistrarMantenimiento = ({
   >([]);
   const [evidencias, setEvidencias] = useState<File[]>([]);
 
+  // Errores de campo derivados del safeParse de Zod (se pintan inline).
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Queries de busqueda de los Selects (controladas para getCoincidencias).
+  // Supervisor y Ejecutor tienen queries separadas: son dos Selects visibles a
+  // la vez y compartirla filtraria ambos con el texto del otro.
+  const [qActivo, setQActivo] = useState("");
+  const [qSupervisor, setQSupervisor] = useState("");
+  const [qEjecutor, setQEjecutor] = useState("");
+  const [qProveedor, setQProveedor] = useState("");
+  const [qPersonal, setQPersonal] = useState("");
+  const [qLugar, setQLugar] = useState("");
+
+  /** Limpia el error de un campo en cuanto el usuario lo corrige. */
+  const clearFieldError = useCallback((campo: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[campo]) return prev;
+      const next = { ...prev };
+      delete next[campo];
+      return next;
+    });
+  }, []);
+
   // Initial catalogs fetch
   useEffect(() => {
     const loadCatalogs = async () => {
@@ -197,6 +225,50 @@ export const useRegistrarMantenimiento = ({
     }
   };
 
+  // Catálogo de activos con búsqueda tolerante (Fuse + FlexSearch + substring).
+  const activosSelectData = useMemo(() => {
+    const q = qActivo.trim();
+    const lista = q
+      ? getCoincidencias(activos, q, {
+          keys: ["producto", "correlativo", "categoria"],
+          fuseThreshold: 0.4,
+        }).map((r) => r.item)
+      : activos;
+    return lista.map((a) => ({
+      value: String(a.id_activo),
+      label: `${a.correlativo} - ${a.producto}`,
+    }));
+  }, [activos, qActivo]);
+
+  // Un Select de empleados por contexto: el texto buscado por el supervisor
+  // no debe recortar el catalogo del ejecutor (y viceversa).
+  const construirSelectEmpleados = useCallback(
+    (q: string) => {
+      const limpio = q.trim();
+      const lista = limpio
+        ? getCoincidencias(empleados, limpio, {
+            keys: ["nombre_completo"],
+            fuseThreshold: 0.4,
+          }).map((r) => r.item)
+        : empleados;
+      return lista.map((e) => ({
+        value: String(e.id_empleado),
+        label: e.nombre_completo,
+      }));
+    },
+    [empleados],
+  );
+
+  const supervisorSelectData = useMemo(
+    () => construirSelectEmpleados(qSupervisor),
+    [construirSelectEmpleados, qSupervisor],
+  );
+
+  const ejecutorSelectData = useMemo(
+    () => construirSelectEmpleados(qEjecutor),
+    [construirSelectEmpleados, qEjecutor],
+  );
+
   // Memoized providers data
   const proveedoresSelectData = useMemo(() => {
     let list = proveedores;
@@ -208,11 +280,18 @@ export const useRegistrarMantenimiento = ({
           p.id_proveedor === idProveedor,
       );
     }
+    const q = qProveedor.trim();
+    if (q) {
+      list = getCoincidencias(list, q, {
+        keys: ["razon_social"],
+        fuseThreshold: 0.4,
+      }).map((r) => r.item);
+    }
     return list.map((p) => ({
       value: String(p.id_proveedor),
       label: p.razon_social,
     }));
-  }, [proveedores, verTodosProveedores, idProveedor]);
+  }, [proveedores, verTodosProveedores, idProveedor, qProveedor]);
 
   // Memoized personal data
   const personalExternoSelectData = useMemo(() => {
@@ -224,11 +303,63 @@ export const useRegistrarMantenimiento = ({
           pe.id_personal === idPersonalExterno,
       );
     }
+    const q = qPersonal.trim();
+    if (q) {
+      list = getCoincidencias(list, q, {
+        keys: ["nombre", "apellido"],
+        fuseThreshold: 0.4,
+      }).map((r) => r.item);
+    }
     return list.map((pe) => ({
       value: String(pe.id_personal),
-      label: pe.nombre + " " + pe.apellido,
+      label: `${pe.nombre} ${pe.apellido}`.trim(),
     }));
-  }, [personalExterno, verTodoPersonal, idProveedor, idPersonalExterno]);
+  }, [personalExterno, verTodoPersonal, idProveedor, idPersonalExterno, qPersonal]);
+
+  // Catalogo agrupado de lugares (almacenes / minas / otro).
+  const lugarSelectData = useMemo(() => {
+    const data: { group: string; items: { value: string; label: string }[] }[] =
+      [];
+    if (almacenes.length > 0) {
+      data.push({
+        group: "Almacenes",
+        items: almacenes.map((a) => ({
+          value: `almacen-${a.id_almacen}`,
+          label: a.nombre,
+        })),
+      });
+    }
+    if (minas.length > 0) {
+      data.push({
+        group: "Minas",
+        items: minas.map((m) => ({
+          value: `mina-${m.id_mina}`,
+          label: m.nombre,
+        })),
+      });
+    }
+    data.push({
+      group: "Otros",
+      items: [{ value: "otro", label: "Otro (Especificar)..." }],
+    });
+
+    const q = qLugar.trim();
+    if (!q) return data;
+
+    // Filtra los items de cada grupo; si un grupo se queda vacio, se descarta.
+    // "Otros" nunca se descarta: es la unica via para un lugar que no esta en
+    // el catalogo, asi que debe seguir disponible aunque la query no matchee.
+    return data
+      .map((g) => {
+        if (g.group === "Otros") return g;
+        const items = getCoincidencias(g.items, q, {
+          keys: ["label"],
+          fuseThreshold: 0.4,
+        }).map((r) => r.item);
+        return { ...g, items };
+      })
+      .filter((g) => g.items.length > 0);
+  }, [almacenes, minas, qLugar]);
 
   // Load provider personnel when provider changes
   useEffect(() => {
@@ -386,58 +517,89 @@ export const useRegistrarMantenimiento = ({
   // Submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idActivoFijo || !fechaHoraMantenimiento) {
-      notifyError("Complete los campos obligatorios");
+
+    const payload = {
+      id_activo_fijo: idActivoFijo,
+      tipo_ejecutor: tipoEjecutor,
+      id_mina: tipoLugar === "mina" ? idMina : null,
+      id_almacen: tipoLugar === "almacen" ? idAlmacen : null,
+      lugar_trabajo: tipoLugar === "otro" ? lugarOtro.trim() || null : null,
+      id_empleado_ejecutor:
+        tipoEjecutor === "interno" ? idEmpleadoEjecutor : null,
+      id_proveedor: tipoEjecutor === "externo" ? idProveedor : null,
+      id_personal_externo:
+        tipoEjecutor === "externo" ? idPersonalExterno : null,
+      fecha_hora_mantenimiento: fechaHoraMantenimiento
+        ? dayjs(fechaHoraMantenimiento).format("YYYY-MM-DD HH:mm:ss")
+        : "",
+      observacion: observacion.trim() || null,
+      serie_factura: serieFactura.trim().toUpperCase() || null,
+      numero_factura: numeroFactura.trim().toUpperCase() || null,
+      costo_mano_obra: costoManoObra === "" ? null : Number(costoManoObra),
+      // No se filtran los gastos con costo 0 en silencio: si el usuario escribio
+      // el concepto pero dejo el costo vacio, Zod tiene que avisarle en vez de
+      // descartar la fila y guardarla como si nunca existiera.
+      otros_gastos: otrosGastos.filter(
+        (g) => g.concepto.trim() !== "" || Number(g.costo) > 0,
+      ),
+      productos_consumidos: productosConsumidos.filter((p) => p.cantidad > 0),
+    };
+
+    const validacion = Schema_CrearMantenimiento.safeParse(payload);
+
+    if (!validacion.success) {
+      const errores = issuesToFieldErrors(validacion.error.issues);
+      setFieldErrors(errores);
+      const primerError = Object.values(errores)[0];
+      if (primerError) {
+        notifyError(primerError);
+      }
       return;
     }
 
+    setFieldErrors({});
+
+    // `lugar_trabajo` guarda siempre el nombre resuelto del lugar (no el id),
+    // para que el listado no tenga que resolver warehouses/minas en el cliente.
+    const lugarResuelto =
+      tipoLugar === "otro"
+        ? (lugarOtro.trim() || null)
+        : tipoLugar === "almacen"
+          ? (almacenes.find((a) => a.id_almacen === idAlmacen)?.nombre ?? null)
+          : tipoLugar === "mina"
+            ? (minas.find((m) => m.id_mina === idMina)?.nombre ?? null)
+            : null;
+
+    const dto: DTO_CrearMantenimiento = {
+      id_activo_fijo: payload.id_activo_fijo as number,
+      id_mina: payload.id_mina,
+      id_almacen: payload.id_almacen,
+      id_empleado_supervisor: idEmpleadoSupervisor,
+      id_proveedor: payload.id_proveedor,
+      id_personal_externo: payload.id_personal_externo,
+      id_empleado_ejecutor: payload.id_empleado_ejecutor,
+      fecha_hora_mantenimiento: payload.fecha_hora_mantenimiento,
+      observacion: payload.observacion,
+      lugar_trabajo: lugarResuelto,
+      serie_factura: validacion.data.serie_factura,
+      numero_factura: validacion.data.numero_factura,
+      costo_mano_obra: payload.costo_mano_obra,
+      otros_gastos: payload.otros_gastos.length > 0 ? payload.otros_gastos : null,
+      productos_consumidos:
+        payload.productos_consumidos.length > 0
+          ? payload.productos_consumidos.map((p) => ({
+              id_entrega_detalle: p.id_entrega_detalle,
+              cantidad: p.cantidad,
+              comentario: p.comentario.trim() || null,
+            }))
+          : null,
+      consumos_confirmados:
+        consumosConfirmados.length > 0 ? consumosConfirmados : null,
+      evidencias: evidencias.length > 0 ? evidencias : null,
+    };
+
     setSubmitting(true);
     try {
-      const gns = otrosGastos.filter(
-        (g) => g.concepto.trim() !== "" && g.costo > 0,
-      );
-      const prs = productosConsumidos.filter((p) => p.cantidad > 0);
-
-      const dto: DTO_CrearMantenimiento = {
-        id_activo_fijo: idActivoFijo,
-        id_mina: tipoLugar === "mina" ? idMina : null,
-        id_almacen: tipoLugar === "almacen" ? idAlmacen : null,
-        id_empleado_supervisor: idEmpleadoSupervisor,
-        id_proveedor: tipoEjecutor === "externo" ? idProveedor : null,
-        id_personal_externo:
-          tipoEjecutor === "externo" ? idPersonalExterno : null,
-        id_empleado_ejecutor:
-          tipoEjecutor === "interno" ? idEmpleadoEjecutor : null,
-        fecha_hora_mantenimiento: dayjs(fechaHoraMantenimiento).format(
-          "YYYY-MM-DD HH:mm:ss",
-        ),
-        observacion: observacion.trim() || null,
-        lugar_trabajo:
-          tipoLugar === "otro"
-            ? lugarOtro.trim()
-            : tipoLugar === "almacen"
-              ? almacenes.find((a) => a.id_almacen === idAlmacen)?.nombre ||
-                null
-              : tipoLugar === "mina"
-                ? minas.find((m) => m.id_mina === idMina)?.nombre || null
-                : null,
-        serie_factura: serieFactura.trim().toUpperCase() || null,
-        numero_factura: numeroFactura.trim().toUpperCase() || null,
-        costo_mano_obra: costoManoObra !== "" ? Number(costoManoObra) : null,
-        otros_gastos: gns.length > 0 ? gns : null,
-        productos_consumidos:
-          prs.length > 0
-            ? prs.map((p) => ({
-                id_entrega_detalle: p.id_entrega_detalle,
-                cantidad: p.cantidad,
-                comentario: p.comentario.trim() || null,
-              }))
-            : null,
-        consumos_confirmados:
-          consumosConfirmados.length > 0 ? consumosConfirmados : null,
-        evidencias: evidencias.length > 0 ? evidencias : null,
-      };
-
       const res = await MantenimientoService.crearMantenimiento(dto);
       if (res.success) {
         notifySuccess("Mantenimiento registrado con éxito");
@@ -500,6 +662,7 @@ export const useRegistrarMantenimiento = ({
       productosConsumidos,
       evidencias,
       setEvidencias,
+      fieldErrors,
     },
     status: {
       loadingCatalogs,
@@ -520,10 +683,29 @@ export const useRegistrarMantenimiento = ({
       handleVerTodosProveedores,
       handleVerTodoPersonal,
       toggleConsumoConfirmado,
+      clearFieldError,
     },
     selectsData: {
+      activosSelectData,
+      supervisorSelectData,
+      ejecutorSelectData,
       proveedoresSelectData,
       personalExternoSelectData,
+      lugarSelectData,
+    },
+    searchData: {
+      qActivo,
+      setQActivo,
+      qSupervisor,
+      setQSupervisor,
+      qEjecutor,
+      setQEjecutor,
+      qProveedor,
+      setQProveedor,
+      qPersonal,
+      setQPersonal,
+      qLugar,
+      setQLugar,
     },
   };
 };

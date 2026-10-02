@@ -111,16 +111,32 @@ export interface AnticipoProveedorResponse {
   id_empleado_anulacion: number | null;
   empleado_anulacion_nombre: string | null;
   empleado_anulacion_apellido: string | null;
+  /** Cuenta ORIGEN: de que cuenta de la empresa salio el dinero. */
   id_cuenta_bancaria_empresa: number | null;
   cuenta_bancaria_numero: string | null;
   cuenta_bancaria_moneda: Moneda | null;
+  /** Cuenta DESTINO: a que cuenta del proveedor llego el dinero. */
+  id_cuenta_bancaria_proveedor: number | null;
+  cuenta_proveedor_numero: string | null;
+  cuenta_proveedor_moneda: Moneda | null;
+  cuenta_proveedor_cci: string | null;
+  cuenta_proveedor_banco: string | null;
   medio_pago: MedioPago | null;
   fecha_hora_pago: string | null;
   numero_operacion: string | null;
+  /** Factura / comprobante que respalda el anticipo (texto libre). */
+  codigo_comprobante: string | null;
+  observacion: string | null;
+  /**
+   * El anticipo NO fue a una cuenta del proveedor (pago de deuda, etc).
+   * Es informativo: sigue pudiendo descontarse en la liquidacion de una
+   * compra de carbon.
+   */
+  pago_a_terceros: boolean;
   saldo_inicial: number;
   saldo_actual: number;
   evidencias: IArchivo[] | null;
-  esta_anulado: boolean;
+  esta_anulado: boolean | number;
   fecha_hora_anulacion: string | null;
   created_at: string;
   estado: EstadoAnticipo | string | null;

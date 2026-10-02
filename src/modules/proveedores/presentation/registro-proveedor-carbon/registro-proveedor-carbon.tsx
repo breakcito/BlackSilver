@@ -6,6 +6,7 @@ import {
   Grid,
   Group,
   MultiSelect,
+  Paper,
   Select,
   Stack,
   Text,
@@ -151,7 +152,9 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
       keys: ["nombre", "codigo"],
     }).map((r) => ({
       value: String(r.item.id_tipo_carbon),
-      label: r.item.codigo ? `${r.item.nombre} (${r.item.codigo})` : r.item.nombre,
+      label: r.item.codigo
+        ? `${r.item.nombre} (${r.item.codigo})`
+        : r.item.nombre,
     }));
   }, [tiposData, todosTipos, searchTipo]);
 
@@ -168,7 +171,12 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
       }));
     }
     return getCoincidencias(catalogoLugares, q, {
-      keys: ["direccion", "departamento_nombre", "provincia_nombre", "distrito_nombre"],
+      keys: [
+        "direccion",
+        "departamento_nombre",
+        "provincia_nombre",
+        "distrito_nombre",
+      ],
     }).map((r) => ({
       value: String(r.item.id_lugar_extraccion),
       label: r.item.direccion,
@@ -213,7 +221,10 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
   const handleNuevoLugarCreado = (nuevo: RES_LugarExtraccionCarbon) => {
     setCatalogoLugares((prev: RES_LugarExtraccionCarbon[]) => [...prev, nuevo]);
     setLugaresExtraccion((prev: LugarExtraccionTemporal[]) =>
-      prev.some((x: LugarExtraccionTemporal) => x.id_lugar_extraccion_carbon === nuevo.id_lugar_extraccion)
+      prev.some(
+        (x: LugarExtraccionTemporal) =>
+          x.id_lugar_extraccion_carbon === nuevo.id_lugar_extraccion,
+      )
         ? prev
         : [
             ...prev,
@@ -281,7 +292,8 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
   const almacenEnEdicion: AlmacenCarbonTemporal | null =
     almacenEnEdicionTempId === null
       ? null
-      : almacenesCarbon.find((a) => a.tempId === almacenEnEdicionTempId) ?? null;
+      : (almacenesCarbon.find((a) => a.tempId === almacenEnEdicionTempId) ??
+        null);
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
@@ -339,17 +351,32 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
             radius="xl"
             withAsterisk
             value={payload.razon_social || ""}
-            onChange={(e) => handleChange("razon_social", e.currentTarget.value)}
+            onChange={(e) =>
+              handleChange("razon_social", e.currentTarget.value)
+            }
             classNames={fieldClasses}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12 }}>
+        <Grid.Col span={{ base: 6 }}>
           <TextInput
             label="Dirección Principal (opc)"
             placeholder="Ej. Av. Principal 123, Ciudad"
             radius="xl"
             value={payload.direccion || ""}
             onChange={(e) => handleChange("direccion", e.currentTarget.value)}
+            classNames={fieldClasses}
+          />
+        </Grid.Col>
+
+        <Grid.Col span={6}>
+          <TextInput
+            label="Codigo REINFO (opc)"
+            placeholder="Ej. REINFO-XXXX-YYYY"
+            radius="xl"
+            value={payload.codigo_reinfo ?? ""}
+            onChange={(e) =>
+              handleChange("codigo_reinfo", e.currentTarget.value.toUpperCase())
+            }
             classNames={fieldClasses}
           />
         </Grid.Col>
@@ -380,53 +407,37 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
             classNames={fieldClasses}
           />
         </Grid.Col>
-        <Grid.Col span={12}>
-          <TextInput
-            label="Codigo REINFO (opcional)"
-            placeholder="Ej. REINFO-XXXX-YYYY"
-            radius="xl"
-            size="xs"
-            maxLength={64}
-            value={payload.codigo_reinfo ?? ""}
-            onChange={(e) =>
-              handleChange(
-                "codigo_reinfo",
-                e.currentTarget.value.toUpperCase(),
-              )
-            }
-            classNames={{
-              input:
-                "bg-zinc-900/50 border-zinc-800 text-white uppercase placeholder:text-zinc-500 placeholder:normal-case focus:border-zinc-300 transition-all",
-              label: "text-zinc-400 font-medium text-xs",
-            }}
-          />
-        </Grid.Col>
       </Grid>
 
-      <MultiFilePicker
-        label="Archivos del contrato (opcional)"
-        description="PDF, JPG, PNG, etc. Se subiran al guardar."
-        files={contratosNuevos}
-        onFilesChange={setContratosFiles}
-      />
+      <Paper
+        withBorder
+        p="xs"
+        radius="lg"
+        className="bg-zinc-900/30 border-zinc-800/60"
+      >
+        <MultiFilePicker
+          label="Archivos del contrato (opcional)"
+          description="PDF, JPG, PNG, etc. Se subiran al guardar."
+          files={contratosNuevos}
+          className="my-2"
+          onFilesChange={setContratosFiles}
+        />
+      </Paper>
 
       {/* Tipos de Carbon (opcional) */}
       <div className="flex flex-col gap-3">
-        <div>
-          <Text size="sm" fw={600} className="text-zinc-300">
+        <Stack gap={2} justify="center" align="center">
+          <Text size="sm" fw={800} className="text-zinc-300 uppercase">
             Tipos de Carbón que ofrece
           </Text>
-          <Text size="xs" className="text-zinc-500">
+          <Text size="xs" className="text-zinc-300 italic">
             Selecciona los tipos que este proveedor puede suministrar.
           </Text>
-        </div>
+        </Stack>
 
         <MultiSelect
-          label="Tipos de carbón"
           placeholder={
-            loadingTipos
-              ? "Cargando tipos..."
-              : "Selecciona uno o varios tipos"
+            loadingTipos ? "Cargando tipos..." : "Selecciona uno o varios tipos"
           }
           radius="xl"
           searchable
@@ -445,24 +456,25 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
             pill: "bg-indigo-500/20 text-indigo-200",
           }}
         />
+        {/* <Text size="xs" className="text-zinc-500">
+          {tiposCarbon.length} tipo(s) seleccionado(s).
+        </Text> */}
       </div>
 
       {/* Lugares de Extraccion */}
       <div className="flex flex-col gap-3">
-        <div>
-          <Text size="sm" fw={600} className="text-zinc-300">
+        <Stack gap={2} justify="center" align="center">
+          <Text size="sm" fw={800} className="text-zinc-300 uppercase">
             Lugares de extracción
           </Text>
-          <Text size="xs" className="text-zinc-500">
-            Selecciona los sitios de donde este proveedor extrae carbón. Usa el botón "+" para agregar uno
-            nuevo.
+          <Text size="xs" className="text-zinc-300 italic">
+            Selecciona los sitios de donde este proveedor extrae carbón.
           </Text>
-        </div>
+        </Stack>
 
         <Group gap="xs" align="flex-end" wrap="nowrap">
           <div className="flex-1">
             <MultiSelect
-              label="Lugares de extracción"
               placeholder={
                 loadingLugares
                   ? "Cargando catálogo..."
@@ -530,39 +542,44 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
           </Button>
         </Group>
 
-        <Text size="xs" className="text-zinc-500">
+        {/* <Text size="xs" className="text-zinc-500">
           {lugaresExtraccion.length} lugar(es) seleccionado(s).
-        </Text>
+        </Text> */}
       </div>
 
       {/* Almacenes de Carbon */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <Text size="sm" fw={600} className="text-zinc-300">
+        <div className="grid grid-cols-3 items-center w-full">
+          <div />
+
+          <Stack gap={2} align="center">
+            <Text size="sm" fw={800} className="text-zinc-300 uppercase">
               Almacenes de Carbón
             </Text>
-            <Text size="xs" className="text-zinc-500">
+            <Text size="xs" className="text-zinc-300 italic text-nowrap">
               Añadir almacenes del proveedor
             </Text>
+          </Stack>
+
+          <div className="flex justify-end">
+            <Button
+              leftSection={<IconPlus size={14} />}
+              radius="xl"
+              size="xs"
+              variant="filled"
+              color="teal"
+              onClick={abrirNuevoAlmacen}
+              className="font-semibold shadow-md shadow-teal-900/30"
+            >
+              Añadir almacén
+            </Button>
           </div>
-          <Button
-            leftSection={<IconPlus size={14} />}
-            radius="xl"
-            size="xs"
-            variant="filled"
-            color="teal"
-            onClick={abrirNuevoAlmacen}
-            className="font-semibold shadow-md shadow-teal-900/30"
-          >
-            Añadir almacén
-          </Button>
         </div>
 
         {almacenesCarbon.length === 0 ? (
-          <div className="text-zinc-500 text-xs italic px-3 py-2 border border-dashed border-zinc-800 rounded-lg">
-            Sin almacenes. Si el proveedor no tiene almacenes, puedes dejar
-            esta sección vacía y agregarlos después desde la lista.
+          <div className="text-zinc-400 text-xs italic px-3 py-2 border border-dashed border-zinc-800 rounded-lg">
+            Sin almacenes. Si el proveedor no tiene almacenes, puedes dejar esta
+            sección vacía y agregarlos después desde la lista.
           </div>
         ) : (
           <Stack gap="xs">
@@ -628,10 +645,9 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
           </Stack>
         )}
 
-        <Text size="xs" className="text-zinc-500">
-          {almacenesCarbon.length} almacén(es) agregado(s) — se guardarán al
-          confirmar el proveedor.
-        </Text>
+        {/* <Text size="xs" className="text-zinc-500">
+          {almacenesCarbon.length} almacén(es) agregado(s).
+        </Text> */}
       </div>
 
       {/* personal (opcional, antes de guardar) */}

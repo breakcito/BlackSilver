@@ -142,6 +142,7 @@ export const LoteRow = ({
                   size="11px"
                   fw={600}
                   c="teal"
+                  className="ml-2"
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
                   {lote.unidad_medida_lote_abv}
@@ -170,6 +171,7 @@ export const LoteRow = ({
                 size="11px"
                 fw={600}
                 c="blue"
+                className="ml-2"
                 style={{ pointerEvents: "none", userSelect: "none" }}
               >
                 {detalle_req.unidad_medida_base_abv}

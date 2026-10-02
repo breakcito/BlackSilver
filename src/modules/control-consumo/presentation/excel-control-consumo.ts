@@ -4,6 +4,7 @@ import { MESES } from "../../../shared/variables/meses";
 import type {
   RES_Consumo,
   RES_ConsumoDirecto,
+  RES_GastoExtra,
   RES_ResumenEntregasReq,
 } from "../service/control-consumo.responses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
@@ -16,10 +17,13 @@ const COLOR_COST = "FFF0FDF4";
 const COLOR_AUDITABLE_BG = "FFFEE2E2";
 const COLOR_AUDITABLE_TEXT = "FF991B1B";
 const COLOR_TOTAL_BG = "FFE2E8F0";
+const COLOR_SEPARADOR_BG = "FFE7E9ED";
+const COLOR_SEPARADOR_TEXT = "FF334155";
+const FMT_MONTO = '"S/."#,##0.00';
 
 const HEADERS: Array<{ key: string; title: string; width: number }> = [
   { key: "item", title: "#", width: 5 },
-  { key: "fecha_req", title: "Fecha Req.", width: 12 },
+  { key: "fecha_salida", title: "Fecha Salida", width: 12 },
   { key: "mes", title: "Mes", width: 12 },
   { key: "tipo_turno", title: "Turno", width: 12 },
   { key: "lote_solicitante", title: "N° Lote", width: 24 },
@@ -61,6 +65,20 @@ const HEADERS: Array<{ key: string; title: string; width: number }> = [
 ];
 
 const COL_KEYS = HEADERS.map((h) => h.key);
+
+/**
+ * Tipos de fila que se renderizan en la grilla del reporte, en orden:
+ * consumos de almacén + consumos directos, luego la fila separadora
+ * "GASTOS EXTRA" y los gastos extra del período.
+ */
+type FilaExcel =
+  | {
+      kind: "consumo";
+      consumo: RES_Consumo;
+      detalle: RES_ResumenEntregasReq;
+    }
+  | { kind: "separador" }
+  | { kind: "gasto"; gasto: RES_GastoExtra };
 
 /**
  * Convierte un índice numérico de columna (1-indexed) a letra Excel (ej: 1 -> A, 15 -> O).
@@ -204,6 +222,7 @@ export const buildControlConsumoExcel = async (
   workbook: ExcelJS.Workbook,
   reporte: RES_ResumenEntregasReq[],
   consumosDirectos: RES_ConsumoDirecto[] = [],
+  gastosExtra: RES_GastoExtra[] = [],
   mes: number,
   anio: number,
 ) => {
@@ -243,7 +262,7 @@ export const buildControlConsumoExcel = async (
   const totalConsumosCount = totalConsumosReq + consumosDirectos.length;
 
   metaRow.getCell(1).value =
-    `Período: ${mesNombre} ${anio}    •    Entregas Req: ${reporte.length}    •    Consumos Directos: ${consumosDirectos.length}    •    Total Consumos: ${totalConsumosCount}`;
+    `Período: ${mesNombre} ${anio}    •    Entregas Req: ${reporte.length}    •    Consumos Directos: ${consumosDirectos.length}    •    Total Consumos: ${totalConsumosCount}    •    Gastos Extra: ${gastosExtra.length}`;
   metaRow.getCell(1).font = {
     bold: true,
     size: 10,
@@ -301,7 +320,7 @@ export const buildControlConsumoExcel = async (
 
   const flat = flattenConsumosForExcel(reporte, consumosDirectos);
 
-  if (flat.length === 0) {
+  if (flat.length === 0 && gastosExtra.length === 0) {
     sheet.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx + 1}`);
     const empty = sheet.getCell(`A${rowIdx}`);
     empty.value =
@@ -311,13 +330,168 @@ export const buildControlConsumoExcel = async (
     return;
   }
 
-  let totalCantConsumida = 0;
+  const subtotalGastosExtra = gastosExtra.reduce(
+    (acc, g) => acc + Number(g.monto ?? 0),
+    0,
+  );
+
   let totalCostoConsumo = 0;
   let totalRestante = 0;
+  let itemCounter = 0;
 
-  flat.forEach(({ consumo, detalle }, idx) => {
+  /** Estilo común de las filas de datos: bordes, fuente, formatos y alineación. */
+  const estilizarFilaDatos = (r: ExcelJS.Row) => {
+    r.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      cell.font = { size: 9, name: "Arial" };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "left",
+        wrapText: true,
+      };
+      cell.border = {
+        top: { style: "thin", color: { argb: COLOR_BORDER } },
+        left: { style: "thin", color: { argb: COLOR_BORDER } },
+        right: { style: "thin", color: { argb: COLOR_BORDER } },
+        bottom: { style: "thin", color: { argb: COLOR_BORDER } },
+      };
+
+      const key = COL_KEYS[colNum - 1];
+      if (
+        key === "cant_entregada_base" ||
+        key === "cant_consumida_total" ||
+        key === "restante_base"
+      ) {
+        cell.numFmt = "0.0000";
+        cell.alignment = { vertical: "middle", horizontal: "right" };
+      }
+      if (
+        key === "costo_unitario" ||
+        key === "costo_entregado" ||
+        key === "costo_total_consumo" ||
+        key === "costo_restante" ||
+        key === "costo_af"
+      ) {
+        cell.numFmt = '"S/."#,##0.0000';
+        cell.alignment = { vertical: "middle", horizontal: "right" };
+      }
+      if (
+        key === "item" ||
+        key === "mes" ||
+        key === "moneda" ||
+        key === "u_base" ||
+        key === "tipo_turno" ||
+        key === "para_mantenimiento" ||
+        key === "para_produccion"
+      ) {
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      }
+    });
+  };
+
+  /**
+   * Los gastos extra se renderizan dentro de la MISMA grilla que los consumos,
+   * precedidos por una fila separadora. No comparten el modelo de datos de un
+   * consumo de almacén (no hay producto, cantidad, unidad, turno ni almacén),
+   * así que solo se llenan las columnas que sí tienen equivalente y el resto
+   * va con "-". Esto mantiene intacto el formato exportable original en vez de
+   * sumar un bloque con otro set de columnas al pie de la hoja.
+   */
+  const filas: FilaExcel[] = [
+    ...flat.map(({ consumo, detalle }) => ({
+      kind: "consumo" as const,
+      consumo,
+      detalle,
+    })),
+    ...(gastosExtra.length > 0
+      ? [
+          { kind: "separador" as const },
+          ...gastosExtra.map((gasto) => ({ kind: "gasto" as const, gasto })),
+        ]
+      : []),
+  ];
+
+  filas.forEach((fila, idx) => {
+    // Fila separadora que titula la sección de gastos extra
+    if (fila.kind === "separador") {
+      const sepRow = sheet.getRow(rowIdx);
+      sepRow.height = 20;
+      sheet.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx}`);
+      const sepCell = sepRow.getCell(1);
+      sepCell.value = "GASTOS EXTRA";
+      sepCell.font = {
+        bold: true,
+        size: 9,
+        color: { argb: COLOR_SEPARADOR_TEXT },
+        name: "Arial",
+      };
+      sepCell.alignment = {
+        vertical: "middle",
+        horizontal: "left",
+        indent: 1,
+      };
+      sepCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: COLOR_SEPARADOR_BG },
+      };
+      sepCell.border = {
+        top: { style: "thin", color: { argb: COLOR_BORDER } },
+        bottom: { style: "thin", color: { argb: COLOR_BORDER } },
+      };
+      rowIdx += 1;
+      return;
+    }
+
     const r = sheet.getRow(rowIdx);
     r.height = 22;
+
+    // Fila de gasto extra
+    if (fila.kind === "gasto") {
+      const { gasto } = fila;
+      const fechaGasto = gasto.fecha_gasto || gasto.created_at;
+      const mesNum = fechaGasto ? dayjs(fechaGasto).month() + 1 : mes;
+      const mesTexto = (
+        MESES.find((m) => m.value === String(mesNum))?.label || String(mesNum)
+      ).toUpperCase();
+
+      r.values = {
+        item: ++itemCounter,
+        fecha_salida: fechaGasto ? dayjs(fechaGasto).format("DD/MM/YYYY") : "-",
+        mes: mesTexto,
+        tipo_turno: "-",
+        lote_solicitante: "-",
+        almacen: "-",
+        consumidor: "-",
+        tipo_bien: "Gasto Extra",
+        producto: gasto.descripcion ?? "-",
+        u_base: "-",
+        moneda: "S/.",
+        costo_unitario: "-",
+        cant_entregada_base: "-",
+        costo_entregado: "-",
+        cant_consumida_total: "-",
+        costo_total_consumo: formatNumber(gasto.monto ?? 0),
+        fecha_consumo: "-",
+        comentario: "-",
+      };
+
+      estilizarFilaDatos(r);
+
+      if (idx % 2 === 1) {
+        r.eachCell({ includeEmpty: true }, (cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: COLOR_ROW_ALT },
+          };
+        });
+      }
+
+      rowIdx += 1;
+      return;
+    }
+
+    const { consumo, detalle } = fila;
     const cantConsumidaBase = Number(consumo.cantidad_base_consumida ?? 0);
     const cantConsumidaTotalBase = Number(detalle.cantidad_consumida_base ?? 0);
     const cantEntregadaBase = Number(detalle.cantidad_entregada_base ?? 0);
@@ -336,7 +510,6 @@ export const buildControlConsumoExcel = async (
           ? "Consumo Parcial"
           : "Sin Consumir";
 
-    totalCantConsumida += cantConsumidaBase;
     totalCostoConsumo += costoTotalConsumo;
     totalRestante += restanteBase;
 
@@ -346,7 +519,7 @@ export const buildControlConsumoExcel = async (
     const paraProd =
       consumo.para_produccion === true || Number(consumo.para_produccion) === 1;
 
-    // Formatear lote_solicitante: PRIMER_NOMBRE - CODIGO_LOTE (ej. ROBERTO - GN-12315)
+    // Formatear lote_solicitante: PRIMER_NOMBRE - CODIGO_LOTE (ej: ROBERTO - GN-12315)
     const solicitanteRaw = (detalle.solicitante || "").trim();
     const primerNombre = solicitanteRaw
       ? solicitanteRaw.split(" ")[0].toUpperCase()
@@ -390,9 +563,15 @@ export const buildControlConsumoExcel = async (
         : afConsumidor
       : laborConsumidor || detalle.solicitante || "General";
 
+    // La columna "Fecha Salida" muestra la fecha en que el almacén entregó el
+    // material, no la del requerimiento. Cae a la del requerimiento si el
+    // detalle no trae fecha de entrega.
+    const fechaSalida =
+      detalle.fecha_hora_entrega || detalle.fecha_requerimiento;
+
     r.values = {
-      item: idx + 1,
-      fecha_req: dayjs(detalle.fecha_requerimiento).format("DD/MM/YYYY"),
+      item: ++itemCounter,
+      fecha_salida: fechaSalida ? dayjs(fechaSalida).format("DD/MM/YYYY") : "-",
       mes: mesTexto,
       tipo_turno: consumo.tipo_turno ?? "-",
       lote_solicitante: loteFormateado,
@@ -440,51 +619,7 @@ export const buildControlConsumoExcel = async (
       labor_destino: consumo.labor ?? "",
     };
 
-    r.eachCell({ includeEmpty: true }, (cell, colNum) => {
-      cell.font = { size: 9, name: "Arial" };
-      cell.alignment = {
-        vertical: "middle",
-        horizontal: "left",
-        wrapText: true,
-      };
-      cell.border = {
-        top: { style: "thin", color: { argb: COLOR_BORDER } },
-        left: { style: "thin", color: { argb: COLOR_BORDER } },
-        right: { style: "thin", color: { argb: COLOR_BORDER } },
-        bottom: { style: "thin", color: { argb: COLOR_BORDER } },
-      };
-
-      const key = COL_KEYS[colNum - 1];
-      if (
-        key === "cant_entregada_base" ||
-        key === "cant_consumida_total" ||
-        key === "restante_base"
-      ) {
-        cell.numFmt = "0.0000";
-        cell.alignment = { vertical: "middle", horizontal: "right" };
-      }
-      if (
-        key === "costo_unitario" ||
-        key === "costo_entregado" ||
-        key === "costo_total_consumo" ||
-        key === "costo_restante" ||
-        key === "costo_af"
-      ) {
-        cell.numFmt = '"S/."#,##0.0000';
-        cell.alignment = { vertical: "middle", horizontal: "right" };
-      }
-      if (
-        key === "item" ||
-        key === "mes" ||
-        key === "moneda" ||
-        key === "u_base" ||
-        key === "tipo_turno" ||
-        key === "para_mantenimiento" ||
-        key === "para_produccion"
-      ) {
-        cell.alignment = { vertical: "middle", horizontal: "center" };
-      }
-    });
+    estilizarFilaDatos(r);
 
     // Alternado
     if (idx % 2 === 1) {
@@ -588,9 +723,15 @@ export const buildControlConsumoExcel = async (
   setTotalCell("cant_entregada_base", totalCantEntregada, "0.00");
   setTotalCell("cant_consumida_total", totalCantConsumidaDetalle, "0.00");
   setTotalCell("restante_base", totalRestante, "0.0000");
-  setTotalCell("costo_entregado", totalCostoEntregado, '"S/."#,##0.00');
-  setTotalCell("costo_total_consumo", totalCostoConsumo, '"S/."#,##0.00');
-  setTotalCell("costo_restante", totalCostoRestante, '"S/."#,##0.00');
+  setTotalCell("costo_entregado", totalCostoEntregado, FMT_MONTO);
+  // El costo de consumo arrastra los gastos extra: en el reporte forman parte
+  // del costo del período aunque no tengan producto ni cantidad.
+  setTotalCell(
+    "costo_total_consumo",
+    totalCostoConsumo + subtotalGastosExtra,
+    FMT_MONTO,
+  );
+  setTotalCell("costo_restante", totalCostoRestante, FMT_MONTO);
 
   totalRow.eachCell({ includeEmpty: true }, (cell) => {
     cell.font = { bold: true, size: 10, name: "Arial" };
@@ -604,11 +745,14 @@ export const buildControlConsumoExcel = async (
       bottom: { style: "double", color: { argb: "FF0F172A" } },
     };
   });
+
+  rowIdx += 1;
 };
 
 export interface BuildControlConsumoExcelParams {
   reporte: RES_ResumenEntregasReq[];
   consumosDirectos?: RES_ConsumoDirecto[];
+  gastosExtra?: RES_GastoExtra[];
   mes: number;
   anio: number;
 }
@@ -618,7 +762,13 @@ export interface BuildControlConsumoExcelParams {
  */
 export const useControlConsumoExcel = () => {
   const generate = (params: BuildControlConsumoExcelParams) => {
-    const { reporte, consumosDirectos = [], mes, anio } = params;
+    const {
+      reporte,
+      consumosDirectos = [],
+      gastosExtra = [],
+      mes,
+      anio,
+    } = params;
     const mesNombre =
       MESES.find((m) => m.value === String(mes))?.label || String(mes);
     const filename = `Control_Consumo_Costos_${mesNombre}_${anio}.xlsx`;
@@ -630,6 +780,7 @@ export const useControlConsumoExcel = () => {
           workbook,
           reporte,
           consumosDirectos,
+          gastosExtra,
           mes,
           anio,
         );

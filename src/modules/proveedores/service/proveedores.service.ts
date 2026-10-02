@@ -241,13 +241,57 @@ export const ProveedoresService = {
     return data;
   },
 
+  /**
+   * Registra un anticipo.
+   *
+   * Se envia como `multipart/form-data`: las evidencias viajan como
+   * archivos en `evidencias[]` y el backend las persiste con
+   * `ArchivoHelper::guardarArchivos()` antes de insertar la cabecera. El
+   * servicio NUNCA acepta URLs de archivos del cliente, para que no se
+   * pueda registrar una evidencia que nunca se subio al storage.
+   */
   registrarAnticipoPorProveedor: async (
     idProveedor: number,
     payload: RegistrarAnticipoRequest,
   ): Promise<IRespuesta<AnticipoProveedorResponse>> => {
+    const fd = new FormData();
+    fd.append("id_empresa", String(payload.id_empresa));
+    if (payload.id_cuenta_bancaria_empresa) {
+      fd.append(
+        "id_cuenta_bancaria_empresa",
+        String(payload.id_cuenta_bancaria_empresa),
+      );
+    }
+    if (payload.id_cuenta_bancaria_proveedor) {
+      fd.append(
+        "id_cuenta_bancaria_proveedor",
+        String(payload.id_cuenta_bancaria_proveedor),
+      );
+    }
+    if (payload.medio_pago) {
+      fd.append("medio_pago", String(payload.medio_pago));
+    }
+    if (payload.fecha_hora_pago) {
+      fd.append("fecha_hora_pago", payload.fecha_hora_pago);
+    }
+    if (payload.numero_operacion?.trim()) {
+      fd.append("numero_operacion", payload.numero_operacion.trim());
+    }
+    if (payload.codigo_comprobante?.trim()) {
+      fd.append("codigo_comprobante", payload.codigo_comprobante.trim());
+    }
+    if (payload.observacion?.trim()) {
+      fd.append("observacion", payload.observacion.trim());
+    }
+    fd.append("pago_a_terceros", payload.pago_a_terceros ? "1" : "0");
+    fd.append("saldo", String(payload.saldo));
+
+    payload.evidencias?.forEach((file) => fd.append("evidencias[]", file));
+
     const { data } = await api.post<IRespuesta<AnticipoProveedorResponse>>(
       `/proveedores/${idProveedor}/anticipos`,
-      payload,
+      fd,
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return data;
   },

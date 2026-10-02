@@ -50,13 +50,19 @@ export const Schema_CrearProveedor = z
           message: "El RUC debe tener exactamente 11 dígitos",
           path: ["ruc"],
         });
-      } else if (data.tipo_entidad === TipoEntidad.Juridica && !ruc.startsWith("20")) {
+      } else if (
+        data.tipo_entidad === TipoEntidad.Juridica &&
+        !ruc.startsWith("20")
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El RUC de una persona jurídica debe comenzar con 20",
           path: ["ruc"],
         });
-      } else if (data.tipo_entidad === TipoEntidad.Natural && !ruc.startsWith("10")) {
+      } else if (
+        data.tipo_entidad === TipoEntidad.Natural &&
+        !ruc.startsWith("10")
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El RUC de una persona natural debe comenzar con 10",
@@ -239,7 +245,9 @@ export const Schema_AlmacenCarbon = z.object({
     .max(256, "La dirección no puede superar 256 caracteres"),
 });
 export type CrearAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon>;
-export type ActualizarAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon>;
+export type ActualizarAlmacenCarbonRequest = z.infer<
+  typeof Schema_AlmacenCarbon
+>;
 
 /**
  * Registro de un anticipo a proveedor (modulo carbon).
@@ -252,30 +260,110 @@ export type ActualizarAlmacenCarbonRequest = z.infer<typeof Schema_AlmacenCarbon
  * `saldo` es el unico campo numerico visible: el form lo guarda en
  * `saldo_inicial` y `saldo_actual` (iguales al registrar).
  *
- * `evidencias` es la lista de IArchivo (subidos antes via
- * POST /archivos/upload con carpeta=anticipos-proveedor).
+ * Cuentas: `id_cuenta_bancaria_empresa` es la cuenta ORIGEN (de donde
+ * sale el dinero) e `id_cuenta_bancaria_proveedor` la cuenta DESTINO
+ * (del proveedor). El destino es opcional y, cuando `pago_a_terceros`
+ * esta activo, el backend lo fuerza a null porque el dinero no llego a
+ * ninguna cuenta del proveedor.
+ *
+ * `codigo_comprobante` es la factura que respalda el anticipo (texto
+ * libre, no referencia a otra tabla). `observacion` es una nota libre.
+ * Los max coinciden con el VARCHAR declarado en la tabla y con las
+ * reglas del controller: 64 y 500.
+ *
+ * `evidencias` NO entra en el schema a proposito: son los archivos
+ * binarios que viajan en el multipart y los valida el backend (o el propio
+ * upload del browser), no nuestras reglas de negocio. Se anexa al tipo de
+ * transporte en `RegistrarAnticipoRequest`.
  */
-export const Schema_RegistrarAnticipo = z.object({
-  id_empresa: z.number().int().positive("La empresa es obligatoria"),
-  id_cuenta_bancaria_empresa: z.number().int().positive().nullable().optional(),
-  medio_pago: z.nativeEnum(MedioPago).nullable().optional(),
-  fecha_hora_pago: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, "Formato de fecha y hora invalido")
-    .nullable()
-    .optional(),
-  numero_operacion: z.string().max(64).nullable().optional(),
-  saldo: z.number().positive("El saldo debe ser mayor a 0"),
-  evidencias: z
-    .array(
-      z.object({
-        url: z.string(),
-        path_relativo: z.string(),
-        nombre_original: z.string().nullable().optional(),
-        extension: z.string().nullable().optional(),
-      }),
-    )
-    .nullable()
-    .optional(),
-});
-export type RegistrarAnticipoRequest = z.infer<typeof Schema_RegistrarAnticipo>;
+export const Schema_RegistrarAnticipo = z
+  .object({
+    id_empresa: z.number().int().positive("La empresa es obligatoria"),
+    id_cuenta_bancaria_empresa: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional(),
+    id_cuenta_bancaria_proveedor: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional(),
+    medio_pago: z.nativeEnum(MedioPago, {
+      error: "Seleccione el medio de pago",
+    }),
+    fecha_hora_pago: z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+        "Formato de fecha y hora invalido",
+      )
+      .nullable()
+      .optional(),
+    numero_operacion: z
+      .string()
+      .max(64, "El numero de operacion no puede superar 64 caracteres")
+      .nullable()
+      .optional(),
+    codigo_comprobante: z
+      .string()
+      .max(64, "La factura no puede superar 64 caracteres")
+      .nullable()
+      .optional(),
+    observacion: z
+      .string()
+      .max(500, "La observacion no puede superar 500 caracteres")
+      .nullable()
+      .optional(),
+    // Opcional (no `.default`) a proposito: asi el tipo de salida sigue
+    // aceptando payloads que no lo envian, como el registro rapido de
+    // anticipo dentro de la liquidacion de compra-carbon.
+    pago_a_terceros: z.boolean().optional(),
+    saldo: z.number().positive("El saldo debe ser mayor a 0"),
+  })
+  .superRefine((data, ctx) => {
+    // Transferencia y Deposito salen de una cuenta bancaria: sin origen,
+    // fecha y numero de operacion el anticipo no es trazable.
+    const requiereBanco =
+      data.medio_pago === MedioPago.Transferencia ||
+      data.medio_pago === MedioPago.Deposito;
+
+    if (!requiereBanco) return;
+
+    if (!data.id_cuenta_bancaria_empresa) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Selecciona la cuenta de la empresa de donde sale el dinero",
+        path: ["id_cuenta_bancaria_empresa"],
+      });
+    }
+    if (!data.fecha_hora_pago) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Indica la fecha del pago",
+        path: ["fecha_hora_pago"],
+      });
+    }
+    if (!data.numero_operacion?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Indica el numero de operacion",
+        path: ["numero_operacion"],
+      });
+    }
+  });
+
+/** Campos de negocio del anticipo (los que valida el schema). */
+export type RegistrarAnticipoData = z.infer<typeof Schema_RegistrarAnticipo>;
+
+/**
+ * Payload de transporte: los datos de negocio mas los adjuntos. El service
+ * lo arma como `multipart/form-data` y el backend guarda los archivos con
+ * `ArchivoHelper::guardarArchivos()`, que devuelve la metadata que se
+ * persiste en la columna JSON `evidencias`.
+ */
+export interface RegistrarAnticipoRequest extends RegistrarAnticipoData {
+  evidencias?: File[] | null;
+}

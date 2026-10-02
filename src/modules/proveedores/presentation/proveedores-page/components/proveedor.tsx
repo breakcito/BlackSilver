@@ -74,51 +74,52 @@ export const Proveedor = ({
     {
       accessor: "razon_social",
       title: "Proveedor",
-      width: 340,
+      width: 220,
+      textAlign: "center",
       render: (r: ProveedorResponse) => (
-        <Group gap="sm">
-          <ThemeIcon
-            variant="light"
-            color={
-              r.tipo_entidad === TipoEntidad.Natural ? "cyan" : "indigo"
-            }
-            radius="xl"
-            size="lg"
-          >
-            {r.tipo_entidad === TipoEntidad.Natural ? (
-              <IconUser className="w-5 h-5" />
-            ) : (
-              <IconBuilding className="w-5 h-5" />
-            )}
-          </ThemeIcon>
-          <div className="min-w-0">
-            <Text size="sm" fw={500} className="text-zinc-200 truncate">
-              {r.razon_social}
-            </Text>
-            <Text size="xs" className="text-zinc-500">
-              {r.tipo_entidad}
-              {r.ruc && ` · RUC: ${r.ruc}`}
-              {r.dni && ` · DNI: ${r.dni}`}
-            </Text>
-            {modoCarbon && r.codigo_reinfo && (
-              <Group gap={4} wrap="nowrap" mt={2}>
-                <Text size="xs" className="text-zinc-500 shrink-0">
-                  Cod. Reinfo:
-                </Text>
-                <Badge
-                  color="pink"
-                  variant="light"
-                  size="sm"
-                  radius="xl"
-                  className="font-mono tracking-wide truncate"
-                  title={r.codigo_reinfo}
-                >
-                  {r.codigo_reinfo}
-                </Badge>
-              </Group>
-            )}
-          </div>
-        </Group>
+        <div className="flex text-left">
+          <Group gap="sm">
+            <ThemeIcon
+              variant="light"
+              color={r.tipo_entidad === TipoEntidad.Natural ? "cyan" : "indigo"}
+              radius="xl"
+              size="lg"
+            >
+              {r.tipo_entidad === TipoEntidad.Natural ? (
+                <IconUser className="w-5 h-5" />
+              ) : (
+                <IconBuilding className="w-5 h-5" />
+              )}
+            </ThemeIcon>
+            <div className="min-w-0">
+              <Text size="sm" fw={500} className="text-zinc-200 truncate">
+                {r.razon_social}
+              </Text>
+              <Text size="xs" c={"gray.5"}>
+                {r.tipo_entidad}
+                {r.ruc && ` · RUC: ${r.ruc}`}
+                {r.dni && ` · DNI: ${r.dni}`}
+              </Text>
+              {modoCarbon && r.codigo_reinfo && (
+                <Group gap={4} wrap="nowrap" mt={2}>
+                  <Text size="xs" c={"gray.5"}>
+                    Cod. Reinfo:
+                  </Text>
+                  <Badge
+                    color="pink"
+                    variant="light"
+                    size="sm"
+                    radius="xl"
+                    className="font-mono tracking-wide truncate"
+                    title={r.codigo_reinfo}
+                  >
+                    {r.codigo_reinfo}
+                  </Badge>
+                </Group>
+              )}
+            </div>
+          </Group>
+        </div>
       ),
     },
     {
@@ -333,11 +334,12 @@ export const Proveedor = ({
     {
       accessor: "contacto",
       title: "Contacto",
-      width: 180,
+      width: 150,
+      textAlign: "center",
       render: (r: ProveedorResponse) => (
         <Stack gap={2}>
           {r.correo && (
-            <Group gap={4}>
+            <Group gap={4} justify="center">
               <IconMail
                 size={14}
                 stroke={1.5}
@@ -349,7 +351,7 @@ export const Proveedor = ({
             </Group>
           )}
           {r.telefono && (
-            <Group gap={4}>
+            <Group gap={4} justify="center">
               <IconPhone
                 size={14}
                 stroke={1.5}
@@ -362,7 +364,7 @@ export const Proveedor = ({
           )}
           {!r.correo && !r.telefono && (
             <Text size="xs" c="dimmed" fs="italic">
-              Sin contacto
+              -
             </Text>
           )}
         </Stack>
@@ -380,7 +382,7 @@ export const Proveedor = ({
               const total = r.suma_saldo_anticipos ?? 0;
               return (
                 <Group gap="xs" justify="center" wrap="nowrap">
-                  <Stack gap={4} align="center">
+                  <Stack gap={6} align="center">
                     {n > 0 ? (
                       <Badge
                         color="indigo"
@@ -449,14 +451,26 @@ export const Proveedor = ({
         const badges = [];
         if (r.para_mantenimiento) {
           badges.push(
-            <Badge key="maint" color="blue" variant="light" size="sm" radius="xl">
+            <Badge
+              key="maint"
+              color="blue"
+              variant="light"
+              size="sm"
+              radius="xl"
+            >
               Da Mantenimiento
             </Badge>,
           );
         }
         if (r.para_transporte) {
           badges.push(
-            <Badge key="trans" color="teal" variant="light" size="sm" radius="xl">
+            <Badge
+              key="trans"
+              color="teal"
+              variant="light"
+              size="sm"
+              radius="xl"
+            >
               Transporte
             </Badge>,
           );
