@@ -37,6 +37,8 @@ export interface CrearCompraCarbonPreliminarRequest {
 
 /**
  * Confirmación de llegada de carga: completa cabecera y detalles.
+ * Los adjuntos NO van aquí: viajan como `evidencias[]` en el multipart y la
+ * API genera su metadata al persistirlos.
  */
 export interface ConfirmarCompraCarbonRequest {
   id_empresa: number;
@@ -48,12 +50,12 @@ export interface ConfirmarCompraCarbonRequest {
   aplica_igv: boolean;
   porcentaje_igv: number;
   fecha_hora_ingreso: string;
-  evidencias?: IArchivo[] | null;
   detalles: CrearCompraCarbonDetalle[];
 }
 
 /**
  * Edición de una compra (preliminar o confirmada).
+ * Los adjuntos viajan como `evidencias[]` en el multipart.
  */
 export interface ActualizarCompraCarbonRequest {
   id_empresa: number;
@@ -66,7 +68,6 @@ export interface ActualizarCompraCarbonRequest {
   porcentaje_igv?: number;
   fecha_hora_ingreso: string;
   motivo?: string | null;
-  evidencias?: IArchivo[] | null;
   detalles: CrearCompraCarbonDetalle[];
 }
 

@@ -9,6 +9,7 @@ import type { RES_Empresa } from "../../../service/responses/empresa";
 import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import { RegistroCompraCarbon } from "./registro-compra-carbon";
+import type { CompraCarbonDetalleResponse } from "../service/compra-carbon.responses";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { CompraCarbonFilter } from "./components/compra-carbon-filter";
 import { CompraCarbonListado } from "./components/compra-carbon-listado";
@@ -40,10 +41,12 @@ export const CompraCarbonPage = () => {
   const [openRegistro, setOpenRegistro] = useState(false);
   /**
    * Cuando se registra una compra, el listado imprime automaticamente su PDF.
-   * La pagina solo dispara el id; el listado maneja la descarga con todo
-   * el contexto (empresa + proveedor) que ya tiene cargado.
+   * Se guarda el payload completo que devuelve el POST (cabecera + detalles)
+   * para que el listado genere el documento sin volver a consultar la compra.
    */
-  const [autoPrintId, setAutoPrintId] = useState<number | null>(null);
+  const [autoPrint, setAutoPrint] = useState<CompraCarbonDetalleResponse | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancel = false;
@@ -111,8 +114,9 @@ export const CompraCarbonPage = () => {
           onAprobada={updateCompraLocal}
           onEvidenciasActualizadas={updateCompraLocal}
           onAnulada={updateCompraLocal}
-          autoPrintId={autoPrintId}
-          onAutoPrintConsumido={() => setAutoPrintId(null)}
+          onReimprimir={(detalle) => setAutoPrint(detalle)}
+          autoPrint={autoPrint}
+          onAutoPrintConsumido={() => setAutoPrint(null)}
         />
       )}
 
@@ -133,11 +137,12 @@ export const CompraCarbonPage = () => {
       >
         <RegistroCompraCarbon
           onCancel={() => setOpenRegistro(false)}
-          onCreated={(cabecera) => {
+          onCreated={(cabecera, detalle) => {
             insertCompra(cabecera);
             setOpenRegistro(false);
-            // Dispara auto-impresion del PDF en el siguiente render del listado.
-            setAutoPrintId(cabecera.id_compra_carbon);
+            // Dispara auto-impresion del PDF en el siguiente render del listado,
+            // usando los datos que ya devolvio el POST.
+            setAutoPrint(detalle);
           }}
         />
       </ModalEstandar>

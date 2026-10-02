@@ -173,17 +173,16 @@ export const AlmacenesCarbonProveedor = ({
 
   return (
     <Stack gap="md">
+      <Group justify="space-between">
       <div>
         <Text size="sm" fw={600} className="text-zinc-200">
           {proveedor.razon_social}
         </Text>
         <Text size="xs" className="text-zinc-400">
-          Almacenes propios donde este proveedor guarda carbon. Cada registro
-          vive bajo este proveedor.
+          Almacenes donde este proveedor guarda carbon.
         </Text>
       </div>
 
-      <Group justify="flex-end">
         <Button
           leftSection={<IconPlus size={14} />}
           radius="xl"

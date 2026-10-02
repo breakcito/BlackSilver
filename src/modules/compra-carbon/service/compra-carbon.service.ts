@@ -68,15 +68,44 @@ export const CompraCarbonService = {
   },
 
   /**
-   * Confirmación de llegada de carga.
+   * Arma el multipart de confirmar/editar. `detalles` viaja como JSON string
+   * y los booleanos como "1"/"0": en multipart todo llega como texto, y un
+   * `false` en PHP seria truthy.
+   */
+  buildFormCompraCarbon: (
+    payload: ActualizarCompraCarbonRequest,
+    archivos: File[] = [],
+  ): FormData => {
+    const { detalles, aplica_igv, motivo, ...cabecera } = payload;
+    const form = new FormData();
+
+    Object.entries(cabecera).forEach(([key, value]) => {
+      if (value === null || value === undefined) return;
+      form.append(key, String(value));
+    });
+
+    form.append("aplica_igv", aplica_igv ? "1" : "0");
+    form.append("detalles", JSON.stringify(detalles ?? []));
+    if (motivo) form.append("motivo", motivo);
+
+    archivos.forEach((file) => form.append("evidencias[]", file));
+
+    return form;
+  },
+
+  /**
+   * Confirmación de llegada de carga. Los adjuntos viajan en el mismo request:
+   * la API los persiste con su ArchivoHelper y devuelve el `evidencias` final.
    */
   confirmar: async (
     idCompraCarbon: number,
     payload: ConfirmarCompraCarbonRequest,
+    archivos: File[] = [],
   ): Promise<IRespuesta<CompraCarbonDetalleResponse>> => {
-    const { data } = await api.put<IRespuesta<CompraCarbonDetalleResponse>>(
+    const { data } = await api.post<IRespuesta<CompraCarbonDetalleResponse>>(
       `${path}/${idCompraCarbon}/confirmar`,
-      payload,
+      CompraCarbonService.buildFormCompraCarbon(payload, archivos),
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return data;
   },
@@ -87,10 +116,12 @@ export const CompraCarbonService = {
   actualizar: async (
     idCompraCarbon: number,
     payload: ActualizarCompraCarbonRequest,
+    archivos: File[] = [],
   ): Promise<IRespuesta<CompraCarbonDetalleResponse>> => {
-    const { data } = await api.put<IRespuesta<CompraCarbonDetalleResponse>>(
+    const { data } = await api.post<IRespuesta<CompraCarbonDetalleResponse>>(
       `${path}/${idCompraCarbon}`,
-      payload,
+      CompraCarbonService.buildFormCompraCarbon(payload, archivos),
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return data;
   },

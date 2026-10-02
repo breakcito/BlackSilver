@@ -4,10 +4,10 @@ import {
   Badge,
   Button,
   Group,
+  Loader,
   NumberInput,
   Paper,
   Select,
-
   Text,
 } from "@mantine/core";
 import {
@@ -25,13 +25,25 @@ import type { RES_TarifaCarbon } from "../../../service/responses/tarifa-carbon"
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
 import { CompraCarbonService } from "../service/compra-carbon.service";
-import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
+import type {
+  CompraCarbonDetalleResponse,
+  CompraCarbonResumen,
+} from "../service/compra-carbon.responses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { getCoincidencias } from "../../../shared/functions/get-coincidencias";
 
 interface Props {
   onCancel: () => void;
-  onCreated: (cabecera: CompraCarbonResumen) => void;
+  /**
+   * @param cabecera Fila para insertar en el listado.
+   * @param detalle Payload completo devuelto por el POST (cabecera + detalles).
+   *   Se pasa entero para que la impresion automatica no tenga que volver a
+   *   consultar la compra recien creada.
+   */
+  onCreated: (
+    cabecera: CompraCarbonResumen,
+    detalle: CompraCarbonDetalleResponse,
+  ) => void;
 }
 
 const inputClasses = {
@@ -53,7 +65,11 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
   const [proveedores, setProveedores] = useState<ProveedorResponse[]>([]);
   const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
   const [tarifas, setTarifas] = useState<RES_TarifaCarbon[]>([]);
-  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+
+  // Un estado de carga por request: cada input refleja solo el suyo
+  const [loadingEmpresas, setLoadingEmpresas] = useState(true);
+  const [loadingProveedores, setLoadingProveedores] = useState(true);
+  const [loadingTarifas, setLoadingTarifas] = useState(true);
 
   // Búsqueda tolerante en proveedores
   const [proveedorBusqueda, setProveedorBusqueda] = useState("");
@@ -72,17 +88,13 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
   const [loadingTipos, setLoadingTipos] = useState(false);
 
   // Carga inicial de empresas, proveedores y tarifas
+  // Cada catálogo se pide por separado: si uno falla o tarda, no bloquea a los demás
   useEffect(() => {
     let cancel = false;
+    setLoadingEmpresas(true);
     (async () => {
-      setLoadingCatalogos(true);
       try {
-        const [empRes, provArr, tarifasRes] = await Promise.all([
-          AuxService.get_empresas(),
-          ProveedoresService.getProveedores({ para_carbon: true }),
-          AuxService.get_tarifas_carbon(),
-        ]);
-
+        const empRes = await AuxService.get_empresas();
         if (cancel) return;
 
         if (empRes.success && empRes.data) {
@@ -97,11 +109,51 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             setIdEmpresa(String(empRes.data[0].id_empresa));
           }
         }
+      } catch (e) {
+        console.error(e);
+        if (!cancel) notifyError("Error al cargar las empresas");
+      } finally {
+        if (!cancel) setLoadingEmpresas(false);
+      }
+    })();
 
-        if (provArr) {
-          setProveedores(provArr);
-        }
+    return () => {
+      cancel = true;
+    };
+  }, [notifyError]);
 
+  // Proveedores de carbón
+  useEffect(() => {
+    let cancel = false;
+    setLoadingProveedores(true);
+    (async () => {
+      try {
+        const provArr = await ProveedoresService.getProveedores({
+          para_carbon: true,
+        });
+        if (cancel) return;
+        if (Array.isArray(provArr)) setProveedores(provArr);
+      } catch (e) {
+        console.error(e);
+        if (!cancel) notifyError("Error al cargar los proveedores de carbón");
+      } finally {
+        if (!cancel) setLoadingProveedores(false);
+      }
+    })();
+
+    return () => {
+      cancel = true;
+    };
+  }, [notifyError]);
+
+  // Tarifas de carbón (alimentan el precio unitario estimado)
+  useEffect(() => {
+    let cancel = false;
+    setLoadingTarifas(true);
+    (async () => {
+      try {
+        const tarifasRes = await AuxService.get_tarifas_carbon();
+        if (cancel) return;
         if (tarifasRes.success && tarifasRes.data) {
           setTarifas(
             Array.isArray(tarifasRes.data)
@@ -111,9 +163,9 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         }
       } catch (e) {
         console.error(e);
-        notifyError("Error al cargar los catálogos para compra preliminar");
+        if (!cancel) notifyError("Error al cargar las tarifas de carbón");
       } finally {
-        if (!cancel) setLoadingCatalogos(false);
+        if (!cancel) setLoadingTarifas(false);
       }
     })();
 
@@ -135,7 +187,9 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     (async () => {
       setLoadingTipos(true);
       try {
-        const res = await CompraCarbonService.getTiposPorProveedor(Number(idProveedor));
+        const res = await CompraCarbonService.getTiposPorProveedor(
+          Number(idProveedor),
+        );
         if (cancel) return;
         if (res.success && res.data) {
           setTipos(res.data);
@@ -229,10 +283,13 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
       notifySuccess(
         `Compra preliminar ${resp.data.cabecera.correlativo} registrada exitosamente`,
       );
-      onCreated({
-        ...resp.data.cabecera,
-        cantidad_items: resp.data.detalles.length || 1,
-      });
+      onCreated(
+        {
+          ...resp.data.cabecera,
+          cantidad_items: resp.data.detalles.length || 1,
+        },
+        resp.data,
+      );
     } catch (e) {
       console.error(e);
       setError("Ocurrió un error inesperado al registrar la compra preliminar");
@@ -266,7 +323,9 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         <Group gap="md" grow>
           <Select
             label="Empresa compradora"
-            placeholder="Seleccione la empresa"
+            placeholder={
+              loadingEmpresas ? "Cargando empresas..." : "Seleccione la empresa"
+            }
             leftSection={
               <IconBuildingStore className="w-4 h-4 text-zinc-400" />
             }
@@ -280,13 +339,20 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             radius="lg"
             classNames={inputClasses}
             searchable
-            disabled={loadingCatalogos || saving}
+            disabled={loadingEmpresas || saving}
+            rightSection={
+              loadingEmpresas ? <Loader size="xs" color="indigo" /> : undefined
+            }
             required
           />
 
           <Select
             label="Proveedor de Carbón"
-            placeholder="Buscar por razón social o documento..."
+            placeholder={
+              loadingProveedores
+                ? "Cargando proveedores..."
+                : "Buscar por razón social o documento..."
+            }
             leftSection={<IconUsers className="w-4 h-4 text-zinc-400" />}
             data={proveedoresVisibles.map((p) => ({
               value: String(p.id_proveedor),
@@ -302,7 +368,12 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             classNames={inputClasses}
             searchable
             nothingFoundMessage="No se encontraron proveedores"
-            disabled={loadingCatalogos || saving}
+            disabled={loadingProveedores || saving}
+            rightSection={
+              loadingProveedores ? (
+                <Loader size="xs" color="indigo" />
+              ) : undefined
+            }
             required
           />
         </Group>
@@ -345,10 +416,11 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             radius="lg"
             classNames={inputClasses}
             searchable
-            disabled={
-              !idProveedor || loadingTipos || loadingCatalogos || saving
-            }
+            disabled={!idProveedor || loadingTipos || saving}
             nothingFoundMessage="No hay tipos de carbón para este proveedor"
+            rightSection={
+              loadingTipos ? <Loader size="xs" color="orange" /> : undefined
+            }
             required
           />
 
@@ -372,10 +444,14 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         <div className="mt-4 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-3">
           <div>
             <Group gap="xs">
-              <Badge variant="light" color="amber" size="sm">
+              <Badge variant="light" color="yellow" size="sm">
                 Tarifa Mayor Aplicada
               </Badge>
-              {tarifaMayor ? (
+              {loadingTarifas ? (
+                <Text size="xs" c="gray.5">
+                  Cargando tarifas...
+                </Text>
+              ) : tarifaMayor ? (
                 <Text size="xs" c="zinc.3">
                   Ceniza: {tarifaMayor.inicio_porcentaje_ceniza}% -{" "}
                   {tarifaMayor.fin_porcentaje_ceniza}%
@@ -391,7 +467,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             <Text size="xs" c="zinc.4" mt={2}>
               Precio por TM:{" "}
               <span className="font-mono font-bold text-white">
-                {formatPEN(precioUnitarioEstimado)}
+                {loadingTarifas ? "S/ --" : formatPEN(precioUnitarioEstimado)}
               </span>
             </Text>
           </div>

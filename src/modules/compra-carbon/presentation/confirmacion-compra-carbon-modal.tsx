@@ -54,7 +54,7 @@ import type {
 } from "../service/compra-carbon.responses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { MultiFilePicker } from "../../../presentation/utils/archivo/multifile-picker";
-import { useEvidenciasCompraCarbon } from "../hooks/useEvidenciasCompraCarbon";
+import { ArchivoCard } from "../../../presentation/utils/archivo/archivo-card";
 
 export interface ProgresoCompraCarbon {
   porcentaje: number;
@@ -185,7 +185,7 @@ export const ConfirmacionCompraCarbonModal = ({
   );
   const [porcentajeIgv, setPorcentajeIgv] = useState<number | string>(
     compra.porcentaje_igv !== undefined && compra.porcentaje_igv !== null
-      ? Number(compra.porcentaje_igv)
+      ? (Number(compra.porcentaje_igv) || 18)
       : 18,
   );
   const [fechaHoraIngreso, setFechaHoraIngreso] = useState<Date | null>(
@@ -195,11 +195,13 @@ export const ConfirmacionCompraCarbonModal = ({
   );
   const [motivoEdicion, setMotivoEdicion] = useState<string>("");
 
-  // Evidencias cabecera
-  const [evidenciasFiles, setEvidenciasFiles] = useState<File[]>([]);
-  const { subirArchivos: subirArchivosCabecera } = useEvidenciasCompraCarbon(
-    compra.id_compra_carbon,
+  // Evidencias cabecera: las ya registradas (solo lectura) y los archivos
+  // nuevos que se envian junto al POST.
+  const evidenciasExistentes = useMemo(
+    () => compra.evidencias ?? [],
+    [compra.evidencias],
   );
+  const [evidenciasFiles, setEvidenciasFiles] = useState<File[]>([]);
 
   // Detalles
   const [detalles, setDetalles] = useState<LineaDetalleForm[]>([lineaVacia()]);
@@ -357,35 +359,7 @@ export const ConfirmacionCompraCarbonModal = ({
       .then((res) => {
         if (cancel) return;
         if (res.success && res.data) {
-          const cab = res.data.cabecera;
           const dets = res.data.detalles;
-
-          if (cab.tipo_despacho === "recojo") {
-            setTipoDespacho("recojo");
-            if (cab.id_almacen_proveedor) {
-              setIdAlmacenProveedor(String(cab.id_almacen_proveedor));
-            }
-          } else if (cab.tipo_despacho === "envio") {
-            setTipoDespacho("envio");
-          }
-
-          if (cab.id_almacen_cliente) {
-            setDestinoTipo("cliente");
-            setIdAlmacenCliente(String(cab.id_almacen_cliente));
-          } else if (cab.id_almacen) {
-            setDestinoTipo("empresa");
-            setIdAlmacenEmpresa(String(cab.id_almacen));
-          }
-
-          if (cab.aplica_igv !== undefined && cab.aplica_igv !== null) {
-            setAplicaIgv(Boolean(cab.aplica_igv));
-          }
-          if (cab.porcentaje_igv !== undefined && cab.porcentaje_igv !== null) {
-            setPorcentajeIgv(Number(cab.porcentaje_igv));
-          }
-          if (cab.fecha_hora_ingreso) {
-            setFechaHoraIngreso(new Date(cab.fecha_hora_ingreso));
-          }
 
           if (dets && dets.length > 0) {
             setDetalles(
@@ -726,12 +700,9 @@ export const ConfirmacionCompraCarbonModal = ({
 
     setSaving(true);
     try {
-      // Subir evidencias si hay
-      let evidenciasUrls = null;
-      if (evidenciasFiles.length > 0) {
-        evidenciasUrls = await subirArchivosCabecera(evidenciasFiles);
-      }
-
+      // Los adjuntos viajan dentro del mismo POST de confirmar/editar: la API
+      // los persiste y devuelve el `evidencias` ya guardado. No se suben por
+      // separado (eso dejaba archivos huerfanos si la compra fallaba).
       const payloadComun = {
         id_empresa: compra.id_empresa,
         id_proveedor: compra.id_proveedor,
@@ -751,7 +722,6 @@ export const ConfirmacionCompraCarbonModal = ({
         aplica_igv: aplicaIgv,
         porcentaje_igv: aplicaIgv ? Number(porcentajeIgv) : 0,
         fecha_hora_ingreso: toBackendDateTime(fechaHoraIngreso),
-        evidencias: evidenciasUrls,
         detalles: detalles.map((d) => ({
           id_detalle_compra_carbon: d.id_detalle_compra_carbon,
           id_tipo_carbon: Number(d.id_tipo_carbon),
@@ -785,12 +755,17 @@ export const ConfirmacionCompraCarbonModal = ({
         resp = await CompraCarbonService.confirmar(
           compra.id_compra_carbon,
           payloadComun,
+          evidenciasFiles,
         );
       } else {
-        resp = await CompraCarbonService.actualizar(compra.id_compra_carbon, {
-          ...payloadComun,
-          motivo: motivoEdicion.trim() || null,
-        });
+        resp = await CompraCarbonService.actualizar(
+          compra.id_compra_carbon,
+          {
+            ...payloadComun,
+            motivo: motivoEdicion.trim() || null,
+          },
+          evidenciasFiles,
+        );
       }
 
       if (!resp.success || !resp.data) {
@@ -1017,10 +992,11 @@ export const ConfirmacionCompraCarbonModal = ({
               label="% IGV"
               value={porcentajeIgv}
               onChange={setPorcentajeIgv}
-              min={0}
               max={100}
               size="xs"
               radius="lg"
+              hideControls
+              disabled
               classNames={inputClasses}
             />
           )}
@@ -1243,7 +1219,8 @@ export const ConfirmacionCompraCarbonModal = ({
                         value={item.codigo_ticket_balanza}
                         onChange={(e) =>
                           updateDetalle(index, {
-                            codigo_ticket_balanza: e.currentTarget.value,
+                            codigo_ticket_balanza:
+                              e.currentTarget.value.toUpperCase(),
                           })
                         }
                         size="xs"
@@ -1258,7 +1235,7 @@ export const ConfirmacionCompraCarbonModal = ({
                         value={item.guia_remitente}
                         onChange={(e) =>
                           updateDetalle(index, {
-                            guia_remitente: e.currentTarget.value,
+                            guia_remitente: e.currentTarget.value.toUpperCase(),
                           })
                         }
                         size="xs"
@@ -1272,7 +1249,8 @@ export const ConfirmacionCompraCarbonModal = ({
                         value={item.guia_transportista}
                         onChange={(e) =>
                           updateDetalle(index, {
-                            guia_transportista: e.currentTarget.value,
+                            guia_transportista:
+                              e.currentTarget.value.toUpperCase(),
                           })
                         }
                         size="xs"
@@ -1505,23 +1483,23 @@ export const ConfirmacionCompraCarbonModal = ({
               {formatPEN(totalesCalculados.totalAntesDescuento)}
             </Text>
           </div>
-          {totalesCalculados.descuentoFleteTotal > 0 && (
-            <div className="flex justify-between items-center text-xs">
-              <Text size="sm" c="amber.4">
-                (−) Descuento por flete:
-              </Text>
-              <Text fw={700} c="amber.4" className="font-mono" size="sm">
-                −{formatPEN(totalesCalculados.descuentoFleteTotal)}
-              </Text>
-            </div>
-          )}
           {aplicaIgv && (
             <div className="flex justify-between items-center text-xs">
               <Text size="sm" c="indigo.3">
-                (+) IGV ({porcentajeIgv}%):
+                IGV incluído ({porcentajeIgv}%):
               </Text>
               <Text fw={700} size="sm" c="indigo.3" className="font-mono">
-                +{formatPEN(totalesCalculados.montoIgv)}
+                {formatPEN(totalesCalculados.montoIgv)}
+              </Text>
+            </div>
+          )}
+          {totalesCalculados.descuentoFleteTotal > 0 && (
+            <div className="flex justify-between items-center text-xs">
+              <Text size="sm" c="orange.4">
+                (−) Descuento por flete:
+              </Text>
+              <Text fw={700} c="orange.4" className="font-mono" size="sm">
+                −{formatPEN(totalesCalculados.descuentoFleteTotal)}
               </Text>
             </div>
           )}
@@ -1547,11 +1525,46 @@ export const ConfirmacionCompraCarbonModal = ({
           radius="lg"
           className="bg-zinc-900/40 border border-zinc-800 col-span-2"
         >
-          <MultiFilePicker
-            files={evidenciasFiles}
-            onFilesChange={setEvidenciasFiles}
-            label="Adjuntar fotos de ticket, guías o evidencias de la carga"
-          />
+          <Stack gap="sm">
+            {/* Archivos ya registrados en la compra */}
+            {evidenciasExistentes.length > 0 && (
+              <div>
+                <Group gap="xs" mb="xs">
+                  <Text
+                    size="xs"
+                    fw={800}
+                    c="zinc.4"
+                    className="uppercase tracking-widest"
+                  >
+                    Archivos en la compra ({evidenciasExistentes.length})
+                  </Text>
+                  <Badge variant="light" color="gray" size="xs" radius="sm">
+                    Se conservan al guardar
+                  </Badge>
+                </Group>
+                <div className="grid grid-cols-2 gap-2">
+                  {evidenciasExistentes.map((a) => (
+                    <ArchivoCard key={a.path_relativo} archivo={a} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <MultiFilePicker
+              files={evidenciasFiles}
+              onFilesChange={setEvidenciasFiles}
+              label={
+                evidenciasExistentes.length > 0
+                  ? "Agregar más evidencias"
+                  : "Adjuntar fotos de ticket, guías o evidencias de la carga"
+              }
+              description={
+                evidenciasExistentes.length > 0
+                  ? "Los archivos nuevos se suman a los ya registrados"
+                  : undefined
+              }
+            />
+          </Stack>
         </Paper>
       </div>
 

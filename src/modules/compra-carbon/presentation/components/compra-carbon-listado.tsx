@@ -54,11 +54,19 @@ interface Props {
   onAprobada?: (cabecera: CompraCarbonResumen) => void;
   onEvidenciasActualizadas?: (cabecera: CompraCarbonResumen) => void;
   onAnulada?: (cabecera: CompraCarbonResumen) => void;
-  /** Compra que se imprime automaticamente al montarse. */
-  autoPrintId?: number | null;
-  /** Callback cuando el listado ya proceso el autoPrintId. */
+  /** Reimprime el PDF de la compra recien confirmada. */
+  onReimprimir?: (detalle: CompraCarbonDetalleResponse) => void;
+  /** Compra recien registrada, con cabecera + detalles, a imprimir al montarse. */
+  autoPrint?: CompraCarbonDetalleResponse | null;
+  /** Callback cuando el listado ya proceso el autoPrint. */
   onAutoPrintConsumido?: () => void;
 }
+
+/** Datos minimos que el PDF necesita identificar la compra a imprimir. */
+type PrintTarget = Pick<
+  CompraCarbonResumen,
+  "id_compra_carbon" | "id_empresa" | "id_proveedor" | "correlativo"
+>;
 
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
 
@@ -97,7 +105,8 @@ export const CompraCarbonListado = ({
   onAprobada,
   onEvidenciasActualizadas,
   onAnulada,
-  autoPrintId,
+  onReimprimir,
+  autoPrint,
   onAutoPrintConsumido,
 }: Props) => {
   const { notifyError } = useNotify();
@@ -186,20 +195,20 @@ export const CompraCarbonListado = ({
     }
   };
 
-  // Auto-imprimir cuando la pagina dispara autoPrintId tras registrar.
-  // Se incluyen `compras` en las deps para que el efecto re-corra cuando la
-  // nueva compra ya este insertada en la lista (React 18 batchea los dos
-  // setState del padre, pero la prop tarda un tick en propagarse).
+  // Auto-imprimir la compra recien registrada. Los datos ya vienen en el payload
+  // del POST, asi que no hay que esperar a que la fila exista en `compras` ni
+  // volver a consultar /compras-carbon/{id}.
   useEffect(() => {
-    if (!autoPrintId) return;
-    const compra = compras.find((c) => c.id_compra_carbon === autoPrintId);
-    if (!compra) return;
-    handlePrint(compra);
+    if (!autoPrint) return;
+    void handlePrint(autoPrint.cabecera, autoPrint);
     onAutoPrintConsumido?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPrintId, compras]);
+  }, [autoPrint]);
 
-  const handlePrint = async (compra: CompraCarbonResumen) => {
+  const handlePrint = async (
+    compra: PrintTarget,
+    datosPrecargados?: CompraCarbonDetalleResponse,
+  ) => {
     const empresa = empresasById[compra.id_empresa];
     if (!empresa) {
       notifyError("No se encontro la empresa para generar el PDF");
@@ -207,14 +216,19 @@ export const CompraCarbonListado = ({
     }
     setPrintingId(compra.id_compra_carbon);
     try {
-      const resp = await CompraCarbonService.getCompraConDetalles(
-        compra.id_compra_carbon,
-      );
-      if (!resp.success) {
-        notifyError(resp.message || "No se pudo cargar el detalle");
-        return;
+      // Si el payload ya viene listo (registro recio creado) se imprime directo;
+      // si no, se consulta el detalle de la compra.
+      let data = datosPrecargados;
+      if (!data) {
+        const resp = await CompraCarbonService.getCompraConDetalles(
+          compra.id_compra_carbon,
+        );
+        if (!resp.success) {
+          notifyError(resp.message || "No se pudo cargar el detalle");
+          return;
+        }
+        data = resp.data;
       }
-      const data: CompraCarbonDetalleResponse = resp.data;
       const target = `CompraCarbon_${compra.correlativo}_${Date.now()}`;
       prepare(target);
       const CompraCarbonPDFModule = await import("../compra-carbon-pdf");
@@ -904,6 +918,7 @@ export const CompraCarbonListado = ({
           }}
           title={`Confirmar Llegada — ${modalConfirmar.correlativo}`}
           size="75rem"
+          validateClose
           rightSection={
             progresoConfirmar ? (
               <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 rounded-xl px-3 py-1.5 min-w-70">
@@ -957,6 +972,9 @@ export const CompraCarbonListado = ({
               });
               setModalConfirmar(null);
               setProgresoConfirmar(null);
+              // Reimprime el PDF ya actualizado (estado Confirmado, fletes y
+              // evidencias definitivos) sin volver a consultar la compra.
+              onReimprimir?.(data);
             }}
           />
         </ModalEstandar>
