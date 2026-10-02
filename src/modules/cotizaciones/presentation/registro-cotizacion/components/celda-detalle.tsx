@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 import { useEffect } from "react";
 import {
   Group,
@@ -13,9 +14,7 @@ import {
   ActionIcon,
   Indicator,
   Badge,
-  SegmentedControl,
-  Center,
-  Box,
+  Tabs,
 } from "@mantine/core";
 
 import {
@@ -511,18 +510,18 @@ export const CeldaDetalle = ({
                       <Text
                         size="10px"
                         fw={700}
-                        className="text-zinc-400 uppercase tracking-widest"
+                        c="zinc.4"
+                        tt="uppercase"
+                        style={{ letterSpacing: "0.1em" }}
                       >
                         Tipo de Destino
                       </Text>
-                      <SegmentedControl
-                        size="xs"
-                        radius="md"
-                        fullWidth
+                      <Tabs
                         value={
                           det.id_mina_destino !== null ? "mina" : "almacen"
                         }
                         onChange={(val) => {
+                          if (!val) return;
                           if (val === "almacen") {
                             onUpdateDetail(
                               cotIdx,
@@ -555,34 +554,36 @@ export const CeldaDetalle = ({
                             }
                           }
                         }}
-                        data={[
-                          {
-                            label: (
-                              <Center style={{ gap: 6 }}>
-                                <BuildingStorefrontIcon className="w-3.5 h-3.5" />
-                                <Box>Almacén</Box>
-                              </Center>
-                            ),
-                            value: "almacen",
-                          },
-                          {
-                            label: (
-                              <Center style={{ gap: 6 }}>
-                                <MapPinIcon className="w-3.5 h-3.5" />
-                                <Box>Mina</Box>
-                              </Center>
-                            ),
-                            value: "mina",
-                          },
-                        ]}
-                        classNames={{
-                          root: "bg-zinc-900 border border-zinc-800",
-                          control: "border-none",
-                          indicator: "bg-cyan-600",
-                          label:
-                            "text-zinc-400 data-[active]:text-white font-bold",
-                        }}
-                      />
+                        variant="pills"
+                        color="teal"
+                        radius="md"
+                      >
+                        <Tabs.List
+                          grow
+                          p={2}
+                        >
+                          <Tabs.Tab
+                            value="almacen"
+                            leftSection={
+                              <BuildingStorefrontIcon className="w-3.5 h-3.5" />
+                            }
+                            fw={700}
+                            fz="xs"
+                            h={28}
+                          >
+                            Almacén
+                          </Tabs.Tab>
+                          <Tabs.Tab
+                            value="mina"
+                            leftSection={<MapPinIcon className="w-3.5 h-3.5" />}
+                            fw={700}
+                            fz="xs"
+                            h={28}
+                          >
+                            Mina
+                          </Tabs.Tab>
+                        </Tabs.List>
+                      </Tabs>
                     </Stack>
                   )}
 

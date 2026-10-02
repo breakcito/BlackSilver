@@ -14,10 +14,8 @@ import {
   Tooltip,
   Button,
   Badge,
-  SegmentedControl,
-  Center,
-  Box,
   Menu,
+  Tabs,
 } from "@mantine/core";
 import {
   XMarkIcon,
@@ -535,46 +533,43 @@ export const CabeceraCotizacion = ({
                     >
                       Tipo de Destino
                     </Text>
-                    <SegmentedControl
-                      size="xs"
-                      radius="md"
-                      fullWidth
+
+                    <Tabs
                       value={globalDestinoTipo}
-                      onChange={(val) =>
-                        setGlobalDestinoTipo(val as "almacen" | "mina")
-                      }
-                      data={[
-                        {
-                          label: (
-                            <Center style={{ gap: 6 }}>
-                              <BuildingStorefrontIcon className="w-3.5 h-3.5" />
-                              <Box>Almacén</Box>
-                            </Center>
-                          ),
-                          value: "almacen",
-                        },
-                        {
-                          label: (
-                            <Center style={{ gap: 6 }}>
-                              <MapPinIcon className="w-3.5 h-3.5" />
-                              <Box>Mina</Box>
-                            </Center>
-                          ),
-                          value: "mina",
-                        },
-                      ]}
-                      classNames={{
-                        root: "bg-zinc-900 border border-zinc-800",
-                        control: "border-none",
-                        indicator: "bg-cyan-600",
-                        label:
-                          "text-zinc-400 data-[active]:text-white font-bold",
+                      onChange={(val) => {
+                        if (val)
+                          setGlobalDestinoTipo(val as "almacen" | "mina");
                       }}
-                    />
+                      variant="pills"
+                      radius="md"
+                      classNames={{
+                        root: "w-full",
+                        list: "bg-zinc-900 border border-zinc-800 p-1 rounded-md",
+                        tab: "text-zinc-400 font-bold text-xs py-1 data-[active]:bg-cyan-600 data-[active]:text-white transition-colors border-none",
+                      }}
+                    >
+                      <Tabs.List grow>
+                        <Tabs.Tab
+                          value="almacen"
+                          leftSection={
+                            <BuildingStorefrontIcon className="w-3.5 h-3.5" />
+                          }
+                        >
+                          Almacén
+                        </Tabs.Tab>
+                        <Tabs.Tab
+                          value="mina"
+                          leftSection={<MapPinIcon className="w-3.5 h-3.5" />}
+                        >
+                          Mina
+                        </Tabs.Tab>
+                      </Tabs.List>
+                    </Tabs>
+
                     {globalDestinoTipo === "mina" && (
                       <Text
-                        size="10px"
-                        className="text-amber-500/80 italic text-center px-2"
+                        size="11px"
+                        className="text-amber-400 text-center px-2"
                       >
                         * La mina se aplicará solo a los Activos Fijos.
                       </Text>
@@ -869,22 +864,26 @@ export const CabeceraCotizacion = ({
                     <Text size="xs" fw={500} className="font-medium">
                       Incluye IGV
                     </Text>
-                    <SegmentedControl
-                      size="xs"
-                      radius="xl"
-                      data={[
-                        { label: "SÍ", value: "true" },
-                        { label: "NO", value: "false" },
-                      ]}
+                    <Tabs
                       value={String(cot.incluye_igv)}
-                      onChange={(val) =>
-                        onUpdateHeader(idx, "incluye_igv", val === "true")
-                      }
-                      color="teal"
-                      classNames={{
-                        root: "bg-zinc-900 border border-zinc-800",
+                      onChange={(val) => {
+                        if (val !== null) {
+                          onUpdateHeader(idx, "incluye_igv", val === "true");
+                        }
                       }}
-                    />
+                      variant="pills"
+                      color="teal"
+                      radius="xl"
+                      classNames={{
+                        list: "bg-zinc-900 border border-zinc-800 p-0.5 rounded-full",
+                        tab: "text-xs font-semibold text-zinc-400 py-1 px-3 border-none rounded-full data-[active]:text-white transition-colors",
+                      }}
+                    >
+                      <Tabs.List grow>
+                        <Tabs.Tab value="true">SÍ</Tabs.Tab>
+                        <Tabs.Tab value="false">NO</Tabs.Tab>
+                      </Tabs.List>
+                    </Tabs>
                   </Stack>
 
                   <Stack gap={2}>

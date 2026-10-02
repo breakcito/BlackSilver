@@ -12,10 +12,8 @@ import {
   ActionIcon,
   Indicator,
   Badge,
-  SegmentedControl,
-  Center,
-  Box,
   Checkbox,
+  Tabs,
 } from "@mantine/core";
 import {
   TruckIcon,
@@ -470,18 +468,18 @@ export const EdicionCotizacionDetalle = ({
                       <Text
                         size="10px"
                         fw={700}
-                        className="text-zinc-400 uppercase tracking-widest"
+                        c="gray.4"
+                        tt="uppercase"
+                        style={{ letterSpacing: "0.1em" }}
                       >
                         Tipo de Destino
                       </Text>
-                      <SegmentedControl
-                        size="xs"
-                        radius="md"
-                        fullWidth
+                      <Tabs
                         value={
                           det.id_mina_destino !== null ? "mina" : "almacen"
                         }
                         onChange={(val) => {
+                          if (!val) return;
                           if (val === "almacen") {
                             onUpdateDetail(0, pIdx, "id_mina_destino", null);
                             if (det.id_almacen_recepcionista === null) {
@@ -504,34 +502,33 @@ export const EdicionCotizacionDetalle = ({
                             }
                           }
                         }}
-                        data={[
-                          {
-                            label: (
-                              <Center style={{ gap: 6 }}>
-                                <BuildingStorefrontIcon className="w-3.5 h-3.5" />
-                                <Box>Almacén</Box>
-                              </Center>
-                            ),
-                            value: "almacen",
-                          },
-                          {
-                            label: (
-                              <Center style={{ gap: 6 }}>
-                                <MapPinIcon className="w-3.5 h-3.5" />
-                                <Box>Mina</Box>
-                              </Center>
-                            ),
-                            value: "mina",
-                          },
-                        ]}
-                        classNames={{
-                          root: "bg-zinc-900 border border-zinc-800",
-                          control: "border-none",
-                          indicator: "bg-cyan-600",
-                          label:
-                            "text-zinc-400 data-[active]:text-white font-bold",
-                        }}
-                      />
+                        variant="pills"
+                        color="teal"
+                        radius="md"
+                      >
+                        <Tabs.List grow p={2}>
+                          <Tabs.Tab
+                            value="almacen"
+                            leftSection={
+                              <BuildingStorefrontIcon className="w-3.5 h-3.5" />
+                            }
+                            fw={700}
+                            fz="xs"
+                            h={28}
+                          >
+                            Almacén
+                          </Tabs.Tab>
+                          <Tabs.Tab
+                            value="mina"
+                            leftSection={<MapPinIcon className="w-3.5 h-3.5" />}
+                            fw={700}
+                            fz="xs"
+                            h={28}
+                          >
+                            Mina
+                          </Tabs.Tab>
+                        </Tabs.List>
+                      </Tabs>
                     </Stack>
                   )}
                   {det.id_mina_destino === null ? (
@@ -852,45 +849,63 @@ export const EdicionCotizacionDetalle = ({
                   <Text
                     size="10px"
                     fw={700}
-                    className="text-zinc-400 uppercase tracking-widest"
+                    c="zinc.4"
+                    tt="uppercase"
+                    style={{ letterSpacing: "0.1em" }}
                   >
                     Tipo de Destino
                   </Text>
-                  <SegmentedControl
-                    size="xs"
-                    radius="md"
-                    fullWidth
+                  <Tabs
                     value={globalDestinoTipo}
-                    onChange={(val) =>
-                      setGlobalDestinoTipo(val as "almacen" | "mina")
-                    }
-                    data={[
-                      {
-                        label: (
-                          <Center style={{ gap: 6 }}>
-                            <BuildingStorefrontIcon className="w-3.5 h-3.5" />
-                            <Box>Almacén</Box>
-                          </Center>
-                        ),
-                        value: "almacen",
-                      },
-                      {
-                        label: (
-                          <Center style={{ gap: 6 }}>
-                            <MapPinIcon className="w-3.5 h-3.5" />
-                            <Box>Mina</Box>
-                          </Center>
-                        ),
-                        value: "mina",
-                      },
-                    ]}
-                    classNames={{
-                      root: "bg-zinc-900 border border-zinc-800",
-                      control: "border-none",
-                      indicator: "bg-cyan-600",
-                      label: "text-zinc-400 data-[active]:text-white font-bold",
+                    onChange={(val) => {
+                      if (val) setGlobalDestinoTipo(val as "almacen" | "mina");
                     }}
-                  />
+                    variant="pills"
+                    color="cyan.7"
+                    radius="md"
+                  >
+                    <Tabs.List
+                      grow
+                      bg="var(--mantine-color-dark-8)"
+                      bd="1px solid var(--mantine-color-dark-5)"
+                      p={2}
+                      style={{ borderRadius: "var(--mantine-radius-md)" }}
+                    >
+                      <Tabs.Tab
+                        value="almacen"
+                        leftSection={
+                          <BuildingStorefrontIcon className="w-3.5 h-3.5" />
+                        }
+                        fw={700}
+                        fz="xs"
+                        h={28}
+                        c="dimmed"
+                      >
+                        Almacén
+                      </Tabs.Tab>
+                      <Tabs.Tab
+                        value="mina"
+                        leftSection={<MapPinIcon className="w-3.5 h-3.5" />}
+                        fw={700}
+                        fz="xs"
+                        h={28}
+                        c="dimmed"
+                      >
+                        Mina
+                      </Tabs.Tab>
+                    </Tabs.List>
+                  </Tabs>
+                  {globalDestinoTipo === "mina" && (
+                    <Text
+                      size="10px"
+                      c="yellow.6"
+                      fs="italic"
+                      ta="center"
+                      px="xs"
+                    >
+                      * La mina se aplicará solo a los Activos Fijos.
+                    </Text>
+                  )}
                 </Stack>
               )}
               {globalDestinoTipo === "almacen" ? (

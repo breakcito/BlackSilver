@@ -584,7 +584,7 @@ export const MantenimientoPage = () => {
         opened={isRegistrando}
         close={() => setIsRegistrando(false)}
         title="Registrar Mantenimiento"
-        size="75%"
+        size="60rem"
       >
         <RegistroMantenimiento
           initialActivoId={redirectActivoId}

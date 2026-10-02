@@ -10,14 +10,12 @@ import {
   Card,
   SimpleGrid,
   Select,
-  SegmentedControl,
-  Center,
-  Box,
   ActionIcon,
   Tooltip,
   Checkbox,
   Alert,
   Loader,
+  Tabs,
 } from "@mantine/core";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -27,7 +25,10 @@ import { AuxService } from "../../../service/auxiliar.service";
 import type { RES_LoteMineral } from "../../../service/responses/lote-mineral";
 import { MinasService } from "../../../modules/minas-labores/service/minas.service";
 import { ClientesService } from "../../../modules/clientes/service/clientes.service";
-import type { RES_ControlUsoLog, RES_Tarifa } from "../service/control-uso.responses";
+import type {
+  RES_ControlUsoLog,
+  RES_Tarifa,
+} from "../service/control-uso.responses";
 import type { RES_ActivoFijoDisponible } from "../../../service/responses/activo-fijo";
 import type { RES_LoteDisponible } from "../../../service/responses/lote-producto";
 import type { RES_Producto } from "../../../service/responses/producto";
@@ -42,10 +43,10 @@ import {
   QueueListIcon,
   PlusCircleIcon,
   TrashIcon,
-   ClockIcon,
-   BanknotesIcon,
-   PencilSquareIcon,
-   BeakerIcon,
+  ClockIcon,
+  BanknotesIcon,
+  PencilSquareIcon,
+  BeakerIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { TimeInput } from "@mantine/dates";
@@ -141,10 +142,14 @@ export const RegistroUso = ({
   const [saving, setSaving] = useState(false);
 
   const [tarifas, setTarifas] = useState<RES_Tarifa[]>([]);
-const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
-  const [labores, setLabores] = useState<{ value: string; label: string }[]>([]);
+  const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
+  const [labores, setLabores] = useState<{ value: string; label: string }[]>(
+    [],
+  );
   const [lotesMineral, setLotesMineral] = useState<RES_LoteMineral[]>([]);
-  const [clientes, setClientes] = useState<{ value: string; label: string }[]>([]);
+  const [clientes, setClientes] = useState<{ value: string; label: string }[]>(
+    [],
+  );
   // Catálogos para consumos directos (solo horometro).
   // Guardamos el RES_Producto completo para tener acceso a
   // `id_unidad_medida_base`, `unidad_medida_base_abv`, etc.
@@ -223,9 +228,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   const [observacion, setObservacion] = useState("");
 
   // ===== Estados bulk (horometro, vueltas) =====
-// Inicializamos con el primer bloque ya creado SEGÚN el tipoControl,
-// para que el modal renderice inmediato sin esperar a la API de catalogos.
-// Los catalogos y el pre-fill de ultima lectura se cargan en background.
+  // Inicializamos con el primer bloque ya creado SEGÚN el tipoControl,
+  // para que el modal renderice inmediato sin esperar a la API de catalogos.
+  // Los catalogos y el pre-fill de ultima lectura se cargan en background.
   const [items, setItems] = useState<ItemForm[]>(() => {
     if (tipoControl === "horometro") {
       return [
@@ -270,7 +275,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
     return tarifas.find((t) => t.id.toString() === idTarifa) || null;
   }, [idTarifa, tarifas]);
 
-  const precioUnitario = selectedTarifa ? Number(selectedTarifa.precio_unitario) : 0;
+  const precioUnitario = selectedTarifa
+    ? Number(selectedTarifa.precio_unitario)
+    : 0;
 
   // Detecta si la tarifa seleccionada es de material Saco (sin precio) - usado en vueltas
   const esTarifaSaco = selectedTarifa
@@ -306,10 +313,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         const respMinas = await AuxService.get_minas();
         if (respMinas.success) {
           setMinas(
-            respMinas.data.map((m: { id_mina: string | number; nombre: string }) => ({
-              value: m.id_mina.toString(),
-              label: m.nombre,
-            })),
+            respMinas.data.map(
+              (m: { id_mina: string | number; nombre: string }) => ({
+                value: m.id_mina.toString(),
+                label: m.nombre,
+              }),
+            ),
           );
         }
 
@@ -317,10 +326,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         const respClientes = await ClientesService.getClientes();
         if (Array.isArray(respClientes)) {
           setClientes(
-            respClientes.map((c: { id_cliente: string | number; razon_social: string }) => ({
-              value: c.id_cliente.toString(),
-              label: c.razon_social,
-            })),
+            respClientes.map(
+              (c: { id_cliente: string | number; razon_social: string }) => ({
+                value: c.id_cliente.toString(),
+                label: c.razon_social,
+              }),
+            ),
           );
         }
 
@@ -473,9 +484,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         setConsumoForm((prev) => {
           const sigueValido =
             prev.idLoteProducto !== null &&
-            ordenados.some(
-              (l) => String(l.id_lote) === prev.idLoteProducto,
-            );
+            ordenados.some((l) => String(l.id_lote) === prev.idLoteProducto);
           if (sigueValido) return prev;
           if (ordenados.length > 0) {
             return {
@@ -495,38 +504,34 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
     return () => {
       cancelado = true;
     };
-  }, [
-    consumoForm.idAlmacen,
-    consumoForm.idProducto,
-    consumoModalOpen,
-  ]);
+  }, [consumoForm.idAlmacen, consumoForm.idProducto, consumoModalOpen]);
 
   /**
-* Auto-completar `contenidoPorPresentacion` cuando cambia el producto
-    * o la unidad de medida en el modal del consumo directo.
-    *
-    * Reglas:
-    * - Si la unidad seleccionada es la misma que la base del producto
-    *   -> contenidoPorPresentacion = 1.
-    * - Si difieren y existe la conversion en la lista de conversiones
-    *   de la unidad SELECCIONADA (donde id_unidad_destino = base),
-    *   entonces contenidoPorPresentacion = 1 / factor (porque el
-    *   factor que devuelve la API esta en direccion "origens por
-    *   destino", y nosotros necesitamos "base por detalle").
-    * - Si difieren y NO existe la conversion -> queda en blanco y el
-    *   usuario debe tipear el factor manualmente.
-    *
-    * MISMO lookup que `useRegistroRequerimiento.ts` ("Nuevo Requerimiento").
-    * La convencion del backend es:
-    * - "1 destino = factor origens"  =>  "1 origen = 1/factor destinos".
-    * - En la respuesta de `get_unidades_medida({incluir_conversiones})`,
-    *   la unidad consultada aparece como `id_unidad_origen` y la
-    *   relacionada como `id_unidad_destino`.
-    *
-    * Solo aplica cuando el modal esta abierto. Ademas solo "tocamos"
-    * el campo si su valor previo es "" o 1 (defaults), para no pisar
-    * lo que el usuario haya tipeado a mano.
-    */
+   * Auto-completar `contenidoPorPresentacion` cuando cambia el producto
+   * o la unidad de medida en el modal del consumo directo.
+   *
+   * Reglas:
+   * - Si la unidad seleccionada es la misma que la base del producto
+   *   -> contenidoPorPresentacion = 1.
+   * - Si difieren y existe la conversion en la lista de conversiones
+   *   de la unidad SELECCIONADA (donde id_unidad_destino = base),
+   *   entonces contenidoPorPresentacion = 1 / factor (porque el
+   *   factor que devuelve la API esta en direccion "origens por
+   *   destino", y nosotros necesitamos "base por detalle").
+   * - Si difieren y NO existe la conversion -> queda en blanco y el
+   *   usuario debe tipear el factor manualmente.
+   *
+   * MISMO lookup que `useRegistroRequerimiento.ts` ("Nuevo Requerimiento").
+   * La convencion del backend es:
+   * - "1 destino = factor origens"  =>  "1 origen = 1/factor destinos".
+   * - En la respuesta de `get_unidades_medida({incluir_conversiones})`,
+   *   la unidad consultada aparece como `id_unidad_origen` y la
+   *   relacionada como `id_unidad_destino`.
+   *
+   * Solo aplica cuando el modal esta abierto. Ademas solo "tocamos"
+   * el campo si su valor previo es "" o 1 (defaults), para no pisar
+   * lo que el usuario haya tipeado a mano.
+   */
   useEffect(() => {
     if (!consumoModalOpen) return;
     if (!consumoForm.idProducto || !consumoForm.idUnidadMedida) return;
@@ -734,9 +739,24 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   }, [idMina, tipoControl]);
 
   // Dynamic naming segun tipo (single)
-  const labelLectura = tipoControl === "horometro" ? "Horometro" : tipoControl === "odometro" ? "Odometro" : "Vueltas";
-  const labelDiferencia = tipoControl === "vueltas" ? "Vueltas" : tipoControl === "horometro" ? "Horas" : "Km";
-  const unitMeasure = tipoControl === "vueltas" ? "vuelta(s)" : tipoControl === "horometro" ? "hrs" : "Km";
+  const labelLectura =
+    tipoControl === "horometro"
+      ? "Horometro"
+      : tipoControl === "odometro"
+        ? "Odometro"
+        : "Vueltas";
+  const labelDiferencia =
+    tipoControl === "vueltas"
+      ? "Vueltas"
+      : tipoControl === "horometro"
+        ? "Horas"
+        : "Km";
+  const unitMeasure =
+    tipoControl === "vueltas"
+      ? "vuelta(s)"
+      : tipoControl === "horometro"
+        ? "hrs"
+        : "Km";
 
   /**
    * Formatea horas totales para el display:
@@ -759,14 +779,13 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   // Calculo totalUso single (solo se usa para odometro; las ramas bulk calculan por item)
   const totalUso = useMemo(() => {
     if (tipoControl === "odometro") {
-      return Math.max(0, (Number(lecturaFin) || 0) - (Number(lecturaInicio) || 0));
+      return Math.max(
+        0,
+        (Number(lecturaFin) || 0) - (Number(lecturaInicio) || 0),
+      );
     }
     return 0;
-  }, [
-    tipoControl,
-    lecturaInicio,
-    lecturaFin,
-  ]);
+  }, [tipoControl, lecturaInicio, lecturaFin]);
 
   const costoTotal = useMemo(() => {
     return totalUso * precioUnitario;
@@ -778,12 +797,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   // Si ninguno aplica, totalHoras = 0.
   const calculosPorItem = useMemo(() => {
     return items.map((it) => {
-      const usarHoras =
-        it.usarHoras && !!it.horaInicioStr && !!it.horaFinStr;
+      const usarHoras = it.usarHoras && !!it.horaInicioStr && !!it.horaFinStr;
       const usarHorometro =
-        it.usarHorometro &&
-        it.lecturaInicio !== "" &&
-        it.lecturaFin !== "";
+        it.usarHorometro && it.lecturaInicio !== "" && it.lecturaFin !== "";
 
       if (usarHoras && fechaDia) {
         const baseDate = dayjs(fechaDia).format("YYYY-MM-DD");
@@ -964,7 +980,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   };
 
   const quitarItem = (id: string) => {
-    setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
+    setItems((prev) =>
+      prev.length > 1 ? prev.filter((it) => it.id !== id) : prev,
+    );
   };
 
   // Calculos por item (bulk vueltas)
@@ -1028,13 +1046,18 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   // Enriquecer un log nuevo con los labels locales de catalogos
   const enriquecerLog = (log: RES_ControlUsoLog): RES_ControlUsoLog => {
     const e = { ...log };
-    if (idMina) e.mina = minas.find((m) => m.value === String(idMina))?.label || null;
-    if (idLabor) e.labor = labores.find((l) => l.value === String(idLabor))?.label || null;
+    if (idMina)
+      e.mina = minas.find((m) => m.value === String(idMina))?.label || null;
+    if (idLabor)
+      e.labor = labores.find((l) => l.value === String(idLabor))?.label || null;
     if (idLoteMineral)
       e.lote_mineral =
-        lotesMineral.find((lm) => String(lm.id_lote_mineral) === String(idLoteMineral))?.codigo || null;
+        lotesMineral.find(
+          (lm) => String(lm.id_lote_mineral) === String(idLoteMineral),
+        )?.codigo || null;
     if (idCliente)
-      e.cliente = clientes.find((c) => c.value === String(idCliente))?.label || null;
+      e.cliente =
+        clientes.find((c) => c.value === String(idCliente))?.label || null;
     return e;
   };
 
@@ -1064,7 +1087,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
     // ===== Validaciones comunes =====
     // ===== Validaciones comunes =====
     if (tipoControl === "vueltas" && !idMina) {
-      notifyError("La mina es obligatoria para registrar un control por vueltas.");
+      notifyError(
+        "La mina es obligatoria para registrar un control por vueltas.",
+      );
       return;
     }
     // Lote de mineral y labor: OPCIONALES en vueltas.
@@ -1086,9 +1111,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         }
         if (it.usarHoras) {
           if (!it.horaInicioStr || !it.horaFinStr) {
-            errores.push(
-              `Bloque #${idx}: complete las horas de inicio y fin.`,
-            );
+            errores.push(`Bloque #${idx}: complete las horas de inicio y fin.`);
           } else if (calculosPorItem[i].totalHoras <= 0) {
             errores.push(
               `Bloque #${idx}: la hora de fin debe ser posterior a la hora de inicio.`,
@@ -1118,7 +1141,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
     if (tipoControl === "vueltas") {
       // Validacion cabecera
       if (!idMina) {
-        notifyError("La mina es obligatoria para registrar un control por vueltas.");
+        notifyError(
+          "La mina es obligatoria para registrar un control por vueltas.",
+        );
         return;
       }
       // Validacion por item
@@ -1133,13 +1158,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           notifyError(`Bloque #${idx}: la fecha del trabajo es obligatoria.`);
           return;
         }
-        const tarifaItem = tarifas.find(
-          (t) => t.id.toString() === it.idTarifa,
-        );
+        const tarifaItem = tarifas.find((t) => t.id.toString() === it.idTarifa);
         const esSacoItem = tarifaItem
-          ? (tarifaItem.tipo_material || "")
-              .toLowerCase()
-              .includes("saco")
+          ? (tarifaItem.tipo_material || "").toLowerCase().includes("saco")
           : false;
 
         const vNum = Number(it.cantidadVueltas) || 0;
@@ -1220,9 +1241,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
             id_almacen: Number(cs.idAlmacen),
             id_lote_producto: Number(cs.idLoteProducto),
             id_unidad_medida: Number(cs.idUnidadMedida),
-            cantidad_consumo: cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo),
+            cantidad_consumo:
+              cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo),
             contenido_por_presentacion:
-              cs.contenidoPorPresentacion === "" ? 0 : Number(cs.contenidoPorPresentacion),
+              cs.contenidoPorPresentacion === ""
+                ? 0
+                : Number(cs.contenidoPorPresentacion),
             // Activo fijo consumidor: la maquina que se esta controlando
             // (siempre la misma para todos los consumos de este modal).
             id_activo_fijo_consumidor: idActivoFijo,
@@ -1231,7 +1255,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
             // uuid_grupo (no a un item puntual).
             uuid_control_uso_activo: uuidGrupoControlUso,
             id_lote_mineral: cs.idLoteMineral ? Number(cs.idLoteMineral) : null,
-            id_labor_destino: cs.idLaborDestino ? Number(cs.idLaborDestino) : null,
+            id_labor_destino: cs.idLaborDestino
+              ? Number(cs.idLaborDestino)
+              : null,
             para_produccion: cs.paraProduccion,
             para_mantenimiento: cs.paraMantenimiento,
             comentario: cs.comentario.trim() ? cs.comentario.trim() : null,
@@ -1241,10 +1267,14 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
 
         const resp = await ControlUsoService.registrarUsoBulk(payload);
         if (resp.success) {
-          const enriched = (resp.data as RES_ControlUsoLog[]).map(enriquecerLog);
+          const enriched = (resp.data as RES_ControlUsoLog[]).map(
+            enriquecerLog,
+          );
           onSuccess(enriched);
         } else {
-          notifyError(resp.message || "Error al registrar los controles de uso");
+          notifyError(
+            resp.message || "Error al registrar los controles de uso",
+          );
         }
         return;
       }
@@ -1262,9 +1292,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
               (t) => t.id.toString() === it.idTarifa,
             );
             const esSacoItem = tarifaItem
-              ? (tarifaItem.tipo_material || "")
-                  .toLowerCase()
-                  .includes("saco")
+              ? (tarifaItem.tipo_material || "").toLowerCase().includes("saco")
               : false;
             return {
               id_tarifa: it.idTarifa ? Number(it.idTarifa) : null,
@@ -1294,11 +1322,8 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
               // dia distinto). El submit ya valida que `fechaTrabajo`
               // no este vacio, asi que el fallback solo aplica si por
               // algun motivo llega vacio.
-              fecha_trabajo:
-                it.fechaTrabajo || dayjs().format("YYYY-MM-DD"),
-              observacion: it.observacion.trim()
-                ? it.observacion.trim()
-                : null,
+              fecha_trabajo: it.fechaTrabajo || dayjs().format("YYYY-MM-DD"),
+              observacion: it.observacion.trim() ? it.observacion.trim() : null,
             };
           }),
         };
@@ -1310,7 +1335,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           );
           onSuccess(enriched);
         } else {
-          notifyError(resp.message || "Error al registrar los controles de uso");
+          notifyError(
+            resp.message || "Error al registrar los controles de uso",
+          );
         }
         return;
       }
@@ -1395,7 +1422,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
             <span className="text-[10px] uppercase tracking-wider font-extrabold text-zinc-500">
               Activo Fijo
             </span>
-            <Badge size="xs" color="pink" variant="light" className="font-bold shrink-0 border border-pink-500/10">
+            <Badge
+              size="xs"
+              color="pink"
+              variant="light"
+              className="font-bold shrink-0 border border-pink-500/10"
+            >
               {asset.correlativo}
             </Badge>
           </div>
@@ -1403,7 +1435,10 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
             {asset.producto}
           </Text>
           {(asset.almacen || asset.mina) && (
-            <Text size="10px" className="text-zinc-500 mt-1.5 flex items-center gap-1.5">
+            <Text
+              size="10px"
+              className="text-zinc-500 mt-1.5 flex items-center gap-1.5"
+            >
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500/50 animate-pulse" />
               <span className="font-medium">Ubicacion:</span>
               <span className="text-zinc-400 font-semibold truncate">
@@ -1569,21 +1604,21 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         <Stack gap="sm">
           {/* Lote Mineral + Tipo de Carga (Opc.) en la misma fila */}
           <SimpleGrid cols={2} spacing="md">
-              <Select
-                label="Lote Mineral (Opc.)"
-                placeholder="Seleccione lote de mineral..."
-                data={lotesMineral.map((lm) => ({
-                  value: String(lm.id_lote_mineral),
-                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-                }))}
-                value={idLoteMineral}
-                onChange={setIdLoteMineral}
-                searchable
-                clearable
-                classNames={fieldClasses}
-                radius="lg"
-                size="xs"
-              />
+            <Select
+              label="Lote Mineral (Opc.)"
+              placeholder="Seleccione lote de mineral..."
+              data={lotesMineral.map((lm) => ({
+                value: String(lm.id_lote_mineral),
+                label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
+              }))}
+              value={idLoteMineral}
+              onChange={setIdLoteMineral}
+              searchable
+              clearable
+              classNames={fieldClasses}
+              radius="lg"
+              size="xs"
+            />
             <Select
               label="Tipo de Carga (Opc.)"
               placeholder="Seleccione..."
@@ -1598,46 +1633,45 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           </SimpleGrid>
 
           {/* Destino del Trabajo (cabecera del bulk) */}
-          <Card withBorder padding="md" radius="lg" className="bg-zinc-950/20 border-zinc-800/60">
-            <Group justify="flex-start" align="center" mb="sm" gap="xs">
+          <Card
+            withBorder
+            padding="md"
+            radius="lg"
+            className="bg-zinc-950/20 border-zinc-800/60"
+          >
+            <Group justify="flex-start" align="center" gap="xs">
               <Text size="xs" fw={600} className="text-zinc-300">
                 Destino del Trabajo:
               </Text>
-              <SegmentedControl
+              <Tabs
                 value={esParaMina ? "mina" : "terceros"}
-                onChange={(value) => setEsParaMina(value === "mina")}
-                data={[
-                  {
-                    value: "mina",
-                    label: (
-                      <Center style={{ gap: 6 }}>
-                        <MapPinIcon className="w-4 h-4" />
-                        <Box>En Mina</Box>
-                      </Center>
-                    ),
-                  },
-                  {
-                    value: "terceros",
-                    label: (
-                      <Center style={{ gap: 6 }}>
-                        <BriefcaseIcon className="w-4 h-4" />
-                        <Box>Para Terceros</Box>
-                      </Center>
-                    ),
-                  },
-                ]}
-                radius="md"
-                size="xs"
-                classNames={{
-                  root: "bg-zinc-900/50 border border-zinc-800",
-                  control: "border-none",
-                  indicator: "bg-indigo-600",
-                  label: "text-zinc-400 data-[active]:text-white font-bold",
+                onChange={(val) => {
+                  if (val) setEsParaMina(val === "mina");
                 }}
-              />
+                variant="pills"
+                color="teal"
+                radius="md"
+              >
+                <Tabs.List className="">
+                  <Tabs.Tab
+                    value="mina"
+                    leftSection={<MapPinIcon className="w-4 h-4" />}
+                    className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
+                  >
+                    En Mina
+                  </Tabs.Tab>
+                  <Tabs.Tab
+                    value="terceros"
+                    leftSection={<BriefcaseIcon className="w-4 h-4" />}
+                    className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
+                  >
+                    Para Terceros
+                  </Tabs.Tab>
+                </Tabs.List>
+              </Tabs>
             </Group>
 
-            <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="md">
+            <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="xs">
               {esParaMina ? (
                 <>
                   <Select
@@ -1655,7 +1689,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   <Select
                     label="Labor (Opcional)"
                     placeholder={
-                      loadingLabores ? "Cargando labores..." : "Seleccione labor"
+                      loadingLabores
+                        ? "Cargando labores..."
+                        : "Seleccione labor"
                     }
                     data={labores}
                     value={idLabor}
@@ -1663,7 +1699,11 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     searchable
                     clearable
                     disabled={!idMina || loadingLabores}
-                    rightSection={loadingLabores ? <Loader size={12} color="indigo" /> : undefined}
+                    rightSection={
+                      loadingLabores ? (
+                        <Loader size={12} color="indigo" />
+                      ) : undefined
+                    }
                     classNames={fieldClasses}
                     radius="lg"
                     size="xs"
@@ -1691,11 +1731,20 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
               de los selects de mina/labor. Un mismo consumo (p. ej. 50
               galones de combustible) cubre a todos los bloques horometrados
               del grupo, no a uno puntual. */}
-          <Card withBorder padding="md" radius="lg" className="bg-amber-950/10 border-amber-500/30">
-            <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
+          <Card
+            withBorder
+            padding="md"
+            radius="lg"
+            className="bg-amber-950/10 border-amber-500/30"
+          >
+            <Group justify="space-between" align="center" mb="xs" wrap="nowrap">
               <Group gap="xs" wrap="nowrap">
                 <BeakerIcon className="w-4 h-4 text-amber-400" />
-                <Text size="xs" fw={800} className="text-amber-200 uppercase tracking-wider">
+                <Text
+                  size="xs"
+                  fw={800}
+                  className="text-amber-200 uppercase tracking-wider"
+                >
                   Consumos asociados
                 </Text>
                 {consumos.length > 0 && (
@@ -1718,23 +1767,24 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
             </Group>
 
             {consumos.length === 0 ? (
-              <Text size="11px" c="dimmed" fs="italic">
-                Sin consumos asociados. Si este control representa salida directa de
-                stock (p. ej. combustible gastado por el activo), agrega un consumo.
+              <Text size="xs" c="gray.4" fs="italic">
+                Sin consumos asociados. Si este control representa salida
+                directa de stock (p. ej. combustible gastado por el activo),
+                agrega un consumo.
               </Text>
             ) : (
               <Stack gap={6} mt={4}>
                 {consumos.map((cs) => {
                   const prodSel =
                     productos.find(
-                      (p) =>
-                        String(p.id_producto) === String(cs.idProducto),
+                      (p) => String(p.id_producto) === String(cs.idProducto),
                     ) ?? null;
                   const prodLabel = prodSel?.nombre ?? "Producto";
                   const almLabel =
-                    almacenesConsumo.find((a) => a.value === cs.idAlmacen)?.label ??
-                    "Almacen";
-                  const cantNum = cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo);
+                    almacenesConsumo.find((a) => a.value === cs.idAlmacen)
+                      ?.label ?? "Almacen";
+                  const cantNum =
+                    cs.cantidadConsumo === "" ? 0 : Number(cs.cantidadConsumo);
                   const cppNum =
                     cs.contenidoPorPresentacion === ""
                       ? 1
@@ -1866,7 +1916,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                               fw={800}
                               size="md"
                               className={
-                                tieneCantidad ? "text-emerald-400" : "text-zinc-700"
+                                tieneCantidad
+                                  ? "text-emerald-400"
+                                  : "text-zinc-700"
                               }
                             >
                               {formatNumber(baseNum)}
@@ -1882,12 +1934,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                           </Group>
                         </Stack>
                       </Group>
-                      <Text
-                        size="10px"
-                        c="dimmed"
-                        ta="center"
-                        mt={6}
-                      >
+                      <Text size="10px" c="dimmed" ta="center" mt={6}>
                         {tieneCantidad
                           ? `${formatNumber(cantNum)} ${selAbbr} × ${cppNum} = ${formatNumber(baseNum)} ${baseAbbr}`
                           : "Complete los datos para ver la equivalencia."}
@@ -1909,7 +1956,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 radius="lg"
                 className="bg-zinc-950/40 border-zinc-800"
               >
-                <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
+                <Group
+                  justify="space-between"
+                  align="center"
+                  mb="sm"
+                  wrap="nowrap"
+                >
                   <Group gap="xs" wrap="nowrap">
                     <Badge color="indigo" variant="light" size="sm" radius="sm">
                       Bloque #{idx + 1}
@@ -1972,13 +2024,22 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                       ref={(el) => {
                         refInicioRefs.current[it.id] = el;
                       }}
-                      label={it.usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"}
+                      label={
+                        it.usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"
+                      }
                       placeholder="08:00"
                       value={it.horaInicioStr}
                       onChange={(event) => {
-                        actualizarItem(it.id, "horaInicioStr", formatHora(event.currentTarget.value));
+                        actualizarItem(
+                          it.id,
+                          "horaInicioStr",
+                          formatHora(event.currentTarget.value),
+                        );
                       }}
-                      onClick={() => it.usarHoras && refInicioRefs.current[it.id]?.showPicker?.()}
+                      onClick={() =>
+                        it.usarHoras &&
+                        refInicioRefs.current[it.id]?.showPicker?.()
+                      }
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
@@ -1986,8 +2047,18 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                       disabled={!it.usarHoras}
                     />
                     {it.horaInicioStr && it.usarHoras && (
-                      <Text size="10px" c="blue.4" fw={700} mt={3} className="ml-1">
-                        ({dayjs(`2000-01-01 ${it.horaInicioStr}`).format("hh:mm A")})
+                      <Text
+                        size="10px"
+                        c="blue.4"
+                        fw={700}
+                        mt={3}
+                        className="ml-1"
+                      >
+                        (
+                        {dayjs(`2000-01-01 ${it.horaInicioStr}`).format(
+                          "hh:mm A",
+                        )}
+                        )
                       </Text>
                     )}
                   </div>
@@ -2001,9 +2072,16 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                       placeholder="10:00"
                       value={it.horaFinStr}
                       onChange={(event) => {
-                        actualizarItem(it.id, "horaFinStr", formatHora(event.currentTarget.value));
+                        actualizarItem(
+                          it.id,
+                          "horaFinStr",
+                          formatHora(event.currentTarget.value),
+                        );
                       }}
-                      onClick={() => it.usarHoras && refFinRefs.current[it.id]?.showPicker?.()}
+                      onClick={() =>
+                        it.usarHoras &&
+                        refFinRefs.current[it.id]?.showPicker?.()
+                      }
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
@@ -2011,14 +2089,24 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                       disabled={!it.usarHoras}
                     />
                     {it.horaFinStr && it.usarHoras && (
-                      <Text size="10px" c="blue.4" fw={700} mt={3} className="ml-1">
-                        ({dayjs(`2000-01-01 ${it.horaFinStr}`).format("hh:mm A")})
+                      <Text
+                        size="10px"
+                        c="blue.4"
+                        fw={700}
+                        mt={3}
+                        className="ml-1"
+                      >
+                        (
+                        {dayjs(`2000-01-01 ${it.horaFinStr}`).format("hh:mm A")}
+                        )
                         {it.horaInicioStr &&
                           it.horaFinStr &&
                           dayjs(`2000-01-01 ${it.horaFinStr}`).isBefore(
                             dayjs(`2000-01-01 ${it.horaInicioStr}`),
                           ) && (
-                            <span className="text-amber-400 font-bold ml-1">(Dia siguiente)</span>
+                            <span className="text-amber-400 font-bold ml-1">
+                              (Dia siguiente)
+                            </span>
                           )}
                       </Text>
                     )}
@@ -2034,7 +2122,11 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   ]}
                   value={it.tipoTurno === "" ? null : it.tipoTurno}
                   onChange={(val) =>
-                    actualizarItem(it.id, "tipoTurno", (val ?? "") as TipoTurno | "")
+                    actualizarItem(
+                      it.id,
+                      "tipoTurno",
+                      (val ?? "") as TipoTurno | "",
+                    )
                   }
                   clearable
                   classNames={fieldClasses}
@@ -2043,7 +2135,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   mt="sm"
                 />
 
-                <SimpleGrid cols={2} spacing="md" mt="sm" className="opacity-85">
+                <SimpleGrid
+                  cols={2}
+                  spacing="md"
+                  mt="sm"
+                  className="opacity-85"
+                >
                   <NumberInput
                     label={
                       it.usarHorometro
@@ -2052,7 +2149,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     }
                     placeholder="Ej: 1250.00"
                     value={it.lecturaInicio}
-                    onChange={(val) => actualizarItem(it.id, "lecturaInicio", val as number | "")}
+                    onChange={(val) =>
+                      actualizarItem(it.id, "lecturaInicio", val as number | "")
+                    }
                     min={0}
                     decimalScale={2}
                     fixedDecimalScale
@@ -2070,7 +2169,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     }
                     placeholder="Ej: 1252.00"
                     value={it.lecturaFin}
-                    onChange={(val) => actualizarItem(it.id, "lecturaFin", val as number | "")}
+                    onChange={(val) =>
+                      actualizarItem(it.id, "lecturaFin", val as number | "")
+                    }
                     min={0}
                     decimalScale={2}
                     fixedDecimalScale
@@ -2086,7 +2187,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   label="Observacion"
                   placeholder="Notas u observaciones de este bloque (opcional)..."
                   value={it.observacion}
-                  onChange={(e) => actualizarItem(it.id, "observacion", e.currentTarget.value)}
+                  onChange={(e) =>
+                    actualizarItem(it.id, "observacion", e.currentTarget.value)
+                  }
                   classNames={fieldClasses}
                   size="xs"
                   radius="lg"
@@ -2102,27 +2205,51 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                   <Group gap={6} align="center" wrap="nowrap">
                     <ClockIcon className="w-4 h-4 text-indigo-400 shrink-0" />
                     <div className="min-w-0">
-                      <Text size="9px" c="zinc.500" fw={900} tt="uppercase" lts="0.08em">
+                      <Text
+                        size="9px"
+                        c="zinc.500"
+                        fw={900}
+                        tt="uppercase"
+                        lts="0.08em"
+                      >
                         Total Horas
                       </Text>
                       <Text size="md" fw={800} className="text-indigo-300">
-                        {formatHorasDisplay(calculosPorItem[idx]?.totalHoras ?? 0)}{" "}
-                        <span className="text-[10px] text-zinc-500 italic font-medium">hrs</span>
+                        {formatHorasDisplay(
+                          calculosPorItem[idx]?.totalHoras ?? 0,
+                        )}{" "}
+                        <span className="text-[10px] text-zinc-500 italic font-medium">
+                          hrs
+                        </span>
                       </Text>
                     </div>
                   </Group>
-                  <Group gap={6} align="center" wrap="nowrap" justify="flex-end">
+                  <Group
+                    gap={6}
+                    align="center"
+                    wrap="nowrap"
+                    justify="flex-end"
+                  >
                     <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div className="min-w-0 text-right">
-                      <Text size="9px" c="zinc.500" fw={900} tt="uppercase" lts="0.08em">
+                      <Text
+                        size="9px"
+                        c="zinc.500"
+                        fw={900}
+                        tt="uppercase"
+                        lts="0.08em"
+                      >
                         Costo Operativo
                       </Text>
                       <Text size="md" fw={800} className="text-emerald-300">
                         S/.{" "}
-                        {calculosPorItem[idx]?.costoTotal?.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }) ?? "0.00"}
+                        {calculosPorItem[idx]?.costoTotal?.toLocaleString(
+                          undefined,
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          },
+                        ) ?? "0.00"}
                       </Text>
                     </div>
                   </Group>
@@ -2145,7 +2272,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           </Stack>
 
           {items.length > 1 && (
-            <Card withBorder padding="sm" radius="lg" className="bg-zinc-950/60 border-indigo-500/30">
+            <Card
+              withBorder
+              padding="sm"
+              radius="lg"
+              className="bg-zinc-950/60 border-indigo-500/30"
+            >
               <Group justify="space-between" align="center" wrap="wrap">
                 <Group gap="xs">
                   <Badge size="sm" color="indigo" variant="filled" radius="sm">
@@ -2162,7 +2294,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     </Text>
                     <Text size="sm" fw={800} className="text-indigo-300">
                       {formatHorasDisplay(totalGeneral.horas)}{" "}
-                      <span className="text-[10px] text-zinc-500 italic">hrs</span>
+                      <span className="text-[10px] text-zinc-500 italic">
+                        hrs
+                      </span>
                     </Text>
                   </Group>
                   <Group gap={6}>
@@ -2226,290 +2360,340 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     .includes("saco")
                 : false;
               return (
-              <Card
-                key={it.id}
-                withBorder
-                padding="md"
-                radius="lg"
-                className="bg-zinc-950/40 border-zinc-800"
-              >
-                <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
-                  <Group gap="xs" wrap="nowrap">
-                    <Badge color="indigo" variant="light" size="sm" radius="sm">
-                      Bloque #{idx + 1}
-                    </Badge>
-                    <Text size="xs" c="zinc.500" fw={600}>
-                      Viaje independiente
-                    </Text>
-                  </Group>
-                  {itemsVueltas.length > 1 && (
-                    <Tooltip label="Quitar bloque">
-                      <ActionIcon
-                        onClick={() => quitarItemVueltas(it.id)}
-                        variant="subtle"
-                        color="red"
+                <Card
+                  key={it.id}
+                  withBorder
+                  padding="md"
+                  radius="lg"
+                  className="bg-zinc-950/40 border-zinc-800"
+                >
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    mb="sm"
+                    wrap="nowrap"
+                  >
+                    <Group gap="xs" wrap="nowrap">
+                      <Badge
+                        color="indigo"
+                        variant="light"
                         size="sm"
-                        radius="xl"
-                        aria-label={`Quitar bloque ${idx + 1}`}
+                        radius="sm"
                       >
-                        <TrashIcon className="w-4 h-4" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </Group>
+                        Bloque #{idx + 1}
+                      </Badge>
+                      <Text size="xs" c="zinc.500" fw={600}>
+                        Viaje independiente
+                      </Text>
+                    </Group>
+                    {itemsVueltas.length > 1 && (
+                      <Tooltip label="Quitar bloque">
+                        <ActionIcon
+                          onClick={() => quitarItemVueltas(it.id)}
+                          variant="subtle"
+                          color="red"
+                          size="sm"
+                          radius="xl"
+                          aria-label={`Quitar bloque ${idx + 1}`}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
 
-                {/* Fila 1: Tarifa de Uso | Cantidad de Vueltas | Fecha del Trabajo.
+                  {/* Fila 1: Tarifa de Uso | Cantidad de Vueltas | Fecha del Trabajo.
                     Los tres al mismo ancho (Cantidad y Fecha ambos span=3)
                     para que se vean cuadrados. Turno y Cantidad de Sacos
                     viven en la Fila 2 con los horometros. */}
-                <Grid align="flex-end" gutter="md">
-                  <Grid.Col span={{ base: 12, sm: 6 }}>
-                    <Group gap={6} align="flex-end" wrap="nowrap">
-                      <Select
-                        label="Tarifa de Uso"
-                        placeholder="Seleccione tarifa..."
-                        data={tarifas
-                          .filter((t) => t.tipo_control === "vueltas")
-                          .map((t) => {
-                            const esSaco = (t.tipo_material || "")
-                              .toLowerCase()
-                              .includes("saco");
-                            const parts = [
-                              esSaco
-                                ? "Sin precio"
-                                : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
-                              t.distancia_metros ? `x ${t.distancia_metros}m` : null,
-                              t.tipo_material ? `x ${t.tipo_material}` : null,
-                            ].filter(Boolean);
-                            return { value: t.id.toString(), label: parts.join(" ") };
-                          })}
-                        value={it.idTarifa}
-                        onChange={(val) =>
-                          actualizarItemVueltas(it.id, "idTarifa", val ?? null)
-                        }
-                        searchable
-                        clearable
-                        required
-                        className="flex-1"
-                        classNames={fieldClasses}
-                        radius="lg"
-                        size="xs"
-                      />
-                      <Tooltip label="Historial de Tarifas">
-                        <ActionIcon
-                          onClick={() => setModalHistorialOpened(true)}
-                          variant="light"
-                          color="zinc.4"
-                          size={32}
+                  <Grid align="flex-end" gutter="md">
+                    <Grid.Col span={{ base: 12, sm: 6 }}>
+                      <Group gap={6} align="flex-end" wrap="nowrap">
+                        <Select
+                          label="Tarifa de Uso"
+                          placeholder="Seleccione tarifa..."
+                          data={tarifas
+                            .filter((t) => t.tipo_control === "vueltas")
+                            .map((t) => {
+                              const esSaco = (t.tipo_material || "")
+                                .toLowerCase()
+                                .includes("saco");
+                              const parts = [
+                                esSaco
+                                  ? "Sin precio"
+                                  : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                                t.distancia_metros
+                                  ? `x ${t.distancia_metros}m`
+                                  : null,
+                                t.tipo_material ? `x ${t.tipo_material}` : null,
+                              ].filter(Boolean);
+                              return {
+                                value: t.id.toString(),
+                                label: parts.join(" "),
+                              };
+                            })}
+                          value={it.idTarifa}
+                          onChange={(val) =>
+                            actualizarItemVueltas(
+                              it.id,
+                              "idTarifa",
+                              val ?? null,
+                            )
+                          }
+                          searchable
+                          clearable
+                          required
+                          className="flex-1"
+                          classNames={fieldClasses}
                           radius="lg"
-                          className="mb-[3px] border border-zinc-700/50"
-                        >
-                          <QueueListIcon className="w-4 h-4" />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Nueva Tarifa">
-                        <ActionIcon
-                          onClick={() => setModalTarifaOpened(true)}
-                          variant="filled"
-                          color="indigo.6"
-                          size={32}
-                          radius="lg"
-                          className="mb-[3px]"
-                        >
-                          <PlusIcon className="w-4 h-4" />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Grid.Col>
+                          size="xs"
+                        />
+                        <Tooltip label="Historial de Tarifas">
+                          <ActionIcon
+                            onClick={() => setModalHistorialOpened(true)}
+                            variant="light"
+                            color="zinc.4"
+                            size={32}
+                            radius="lg"
+                            className="mb-0.75 border border-zinc-700/50"
+                          >
+                            <QueueListIcon className="w-4 h-4" />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Nueva Tarifa">
+                          <ActionIcon
+                            onClick={() => setModalTarifaOpened(true)}
+                            variant="filled"
+                            color="indigo.6"
+                            size={32}
+                            radius="lg"
+                            className="mb-0.75"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Group>
+                    </Grid.Col>
 
-                  {/* Cantidad de Vueltas: mismo ancho que Fecha del Trabajo
+                    {/* Cantidad de Vueltas: mismo ancho que Fecha del Trabajo
                       (span=3) para que se vean cuadrados en la fila. */}
-                  <Grid.Col span={{ base: 6, sm: 3 }}>
-                    <NumberInput
-                      label={
-                        esSacoItem
-                          ? "Cantidad de Vueltas (Opc.)"
-                          : "Cantidad de Vueltas"
-                      }
-                      placeholder="Ej: 3"
-                      value={it.cantidadVueltas}
-                      onChange={(val) =>
-                        actualizarItemVueltas(
-                          it.id,
-                          "cantidadVueltas",
-                          val as number | "",
-                        )
-                      }
-                      min={0}
-                      decimalScale={0}
-                      fixedDecimalScale
-                      required={!esSacoItem}
-                      classNames={fieldClasses}
-                      size="xs"
-                      radius="lg"
-                    />
-                  </Grid.Col>
-
-                  {/* Fecha del Trabajo: al final del row, span=3 (igual que
-                      Cantidad de Vueltas). */}
-                  <Grid.Col span={{ base: 6, sm: 3 }}>
-                    <CustomDatePicker
-                      label="Fecha del Trabajo"
-                      placeholder="Seleccione fecha"
-                      value={
-                        it.fechaTrabajo
-                          ? dayjs(it.fechaTrabajo).toDate()
-                          : null
-                      }
-                      onChange={(val) =>
-                        actualizarItemVueltas(
-                          it.id,
-                          "fechaTrabajo",
-                          val ? dayjs(val as Date).format("YYYY-MM-DD") : "",
-                        )
-                      }
-                      radius="lg"
-                      size="xs"
-                      required
-                    />
-                  </Grid.Col>
-                </Grid>
-
-                {/* Fila 2: Turno (opcional) | Horometro Inicial (Opc.) |
-                    Horometro Final (Opc.) | Cantidad de Sacos (solo si
-                    la tarifa es Saco, al lado de Horometro Final).
-                    Sin sacos: 3 cols de span=4 cada una.
-                    Con sacos: 4 cols de span=3 cada una (mismo tamano). */}
-                <Grid align="flex-end" gutter="md" mt="sm">
-                  <Grid.Col span={esSacoItem ? 3 : 4}>
-                    <Select
-                      label="Turno (opcional)"
-                      placeholder="Seleccione turno..."
-                      data={[
-                        { value: TipoTurno.Dia, label: "Día" },
-                        { value: TipoTurno.Noche, label: "Noche" },
-                      ]}
-                      value={it.tipoTurno === "" ? null : it.tipoTurno}
-                      onChange={(val) =>
-                        actualizarItemVueltas(
-                          it.id,
-                          "tipoTurno",
-                          (val ?? "") as TipoTurno | "",
-                        )
-                      }
-                      clearable
-                      classNames={fieldClasses}
-                      radius="lg"
-                      size="xs"
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={esSacoItem ? 3 : 4}>
-                    <NumberInput
-                      label="Horometro Inicial (Opc.)"
-                      placeholder="Ej: 1250.00"
-                      value={it.horometroInicio}
-                      onChange={(val) =>
-                        actualizarItemVueltas(
-                          it.id,
-                          "horometroInicio",
-                          val as number | "",
-                        )
-                      }
-                      min={0}
-                      decimalScale={2}
-                      fixedDecimalScale
-                      classNames={fieldClasses}
-                      size="xs"
-                      radius="lg"
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={esSacoItem ? 3 : 4}>
-                    <NumberInput
-                      label="Horometro Final (Opc.)"
-                      placeholder="Ej: 1252.00"
-                      value={it.horometroFin}
-                      onChange={(val) =>
-                        actualizarItemVueltas(
-                          it.id,
-                          "horometroFin",
-                          val as number | "",
-                        )
-                      }
-                      min={0}
-                      decimalScale={2}
-                      fixedDecimalScale
-                      classNames={fieldClasses}
-                      size="xs"
-                      radius="lg"
-                    />
-                  </Grid.Col>
-                  {esSacoItem && (
-                    <Grid.Col span={3}>
+                    <Grid.Col span={{ base: 6, sm: 3 }}>
                       <NumberInput
-                        label="Cantidad de Sacos (Opc.)"
-                        placeholder="Ej: 30"
-                        value={it.cantidadSacos}
+                        label={
+                          esSacoItem
+                            ? "Cantidad de Vueltas (Opc.)"
+                            : "Cantidad de Vueltas"
+                        }
+                        placeholder="Ej: 3"
+                        value={it.cantidadVueltas}
                         onChange={(val) =>
                           actualizarItemVueltas(
                             it.id,
-                            "cantidadSacos",
+                            "cantidadVueltas",
                             val as number | "",
                           )
                         }
                         min={0}
-                        allowDecimal={false}
-                        required={false}
+                        decimalScale={0}
+                        fixedDecimalScale
+                        required={!esSacoItem}
                         classNames={fieldClasses}
                         size="xs"
                         radius="lg"
                       />
                     </Grid.Col>
-                  )}
-                </Grid>
 
-                <Textarea
-                  label="Observacion"
-                  placeholder="Notas u observaciones de este bloque (opcional)..."
-                  value={it.observacion}
-                  onChange={(e) => actualizarItemVueltas(it.id, "observacion", e.currentTarget.value)}
-                  classNames={fieldClasses}
-                  size="xs"
-                  radius="lg"
-                  minRows={2}
-                  mt="sm"
-                />
+                    {/* Fecha del Trabajo: al final del row, span=3 (igual que
+                      Cantidad de Vueltas). */}
+                    <Grid.Col span={{ base: 6, sm: 3 }}>
+                      <CustomDatePicker
+                        label="Fecha del Trabajo"
+                        placeholder="Seleccione fecha"
+                        value={
+                          it.fechaTrabajo
+                            ? dayjs(it.fechaTrabajo).toDate()
+                            : null
+                        }
+                        onChange={(val) =>
+                          actualizarItemVueltas(
+                            it.id,
+                            "fechaTrabajo",
+                            val ? dayjs(val as Date).format("YYYY-MM-DD") : "",
+                          )
+                        }
+                        radius="lg"
+                        size="xs"
+                        required
+                      />
+                    </Grid.Col>
+                  </Grid>
 
-                <SimpleGrid cols={2} spacing="md" mt="md">
-                  <Group gap={6} align="center" wrap="nowrap">
-                    <ArrowPathRoundedSquareIcon className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <div className="min-w-0">
-                      <Text size="9px" c="zinc.500" fw={900} tt="uppercase" lts="0.08em">
-                        Total Vueltas
-                      </Text>
-                      <Text size="md" fw={800} className="text-indigo-300">
-                        {calculosPorItemVueltas[idx]?.vueltas?.toLocaleString() ?? "0"}{" "}
-                        <span className="text-[10px] text-zinc-500 italic font-medium">vuelta(s)</span>
-                      </Text>
-                    </div>
-                  </Group>
-                  <Group gap={6} align="center" wrap="nowrap" justify="flex-end">
-                    <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div className="min-w-0 text-right">
-                      <Text size="9px" c="zinc.500" fw={900} tt="uppercase" lts="0.08em">
-                        Costo Operativo
-                      </Text>
-                      <Text size="md" fw={800} className="text-emerald-300">
-                        S/.{" "}
-                        {calculosPorItemVueltas[idx]?.costo?.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }) ?? "0.00"}
-                      </Text>
-                    </div>
-                  </Group>
-                </SimpleGrid>
-              </Card>
-            );})}
+                  {/* Fila 2: Turno (opcional) | Horometro Inicial (Opc.) |
+                    Horometro Final (Opc.) | Cantidad de Sacos (solo si
+                    la tarifa es Saco, al lado de Horometro Final).
+                    Sin sacos: 3 cols de span=4 cada una.
+                    Con sacos: 4 cols de span=3 cada una (mismo tamano). */}
+                  <Grid align="flex-end" gutter="md" mt="sm">
+                    <Grid.Col span={esSacoItem ? 3 : 4}>
+                      <Select
+                        label="Turno (opcional)"
+                        placeholder="Seleccione turno..."
+                        data={[
+                          { value: TipoTurno.Dia, label: "Día" },
+                          { value: TipoTurno.Noche, label: "Noche" },
+                        ]}
+                        value={it.tipoTurno === "" ? null : it.tipoTurno}
+                        onChange={(val) =>
+                          actualizarItemVueltas(
+                            it.id,
+                            "tipoTurno",
+                            (val ?? "") as TipoTurno | "",
+                          )
+                        }
+                        clearable
+                        classNames={fieldClasses}
+                        radius="lg"
+                        size="xs"
+                      />
+                    </Grid.Col>
+                    <Grid.Col span={esSacoItem ? 3 : 4}>
+                      <NumberInput
+                        label="Horometro Inicial (Opc.)"
+                        placeholder="Ej: 1250.00"
+                        value={it.horometroInicio}
+                        onChange={(val) =>
+                          actualizarItemVueltas(
+                            it.id,
+                            "horometroInicio",
+                            val as number | "",
+                          )
+                        }
+                        min={0}
+                        decimalScale={2}
+                        fixedDecimalScale
+                        classNames={fieldClasses}
+                        size="xs"
+                        radius="lg"
+                      />
+                    </Grid.Col>
+                    <Grid.Col span={esSacoItem ? 3 : 4}>
+                      <NumberInput
+                        label="Horometro Final (Opc.)"
+                        placeholder="Ej: 1252.00"
+                        value={it.horometroFin}
+                        onChange={(val) =>
+                          actualizarItemVueltas(
+                            it.id,
+                            "horometroFin",
+                            val as number | "",
+                          )
+                        }
+                        min={0}
+                        decimalScale={2}
+                        fixedDecimalScale
+                        classNames={fieldClasses}
+                        size="xs"
+                        radius="lg"
+                      />
+                    </Grid.Col>
+                    {esSacoItem && (
+                      <Grid.Col span={3}>
+                        <NumberInput
+                          label="Cantidad de Sacos (Opc.)"
+                          placeholder="Ej: 30"
+                          value={it.cantidadSacos}
+                          onChange={(val) =>
+                            actualizarItemVueltas(
+                              it.id,
+                              "cantidadSacos",
+                              val as number | "",
+                            )
+                          }
+                          min={0}
+                          allowDecimal={false}
+                          required={false}
+                          classNames={fieldClasses}
+                          size="xs"
+                          radius="lg"
+                        />
+                      </Grid.Col>
+                    )}
+                  </Grid>
+
+                  <Textarea
+                    label="Observacion"
+                    placeholder="Notas u observaciones de este bloque (opcional)..."
+                    value={it.observacion}
+                    onChange={(e) =>
+                      actualizarItemVueltas(
+                        it.id,
+                        "observacion",
+                        e.currentTarget.value,
+                      )
+                    }
+                    classNames={fieldClasses}
+                    size="xs"
+                    radius="lg"
+                    minRows={2}
+                    mt="sm"
+                  />
+
+                  <SimpleGrid cols={2} spacing="md" mt="md">
+                    <Group gap={6} align="center" wrap="nowrap">
+                      <ArrowPathRoundedSquareIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <div className="min-w-0">
+                        <Text
+                          size="9px"
+                          c="zinc.500"
+                          fw={900}
+                          tt="uppercase"
+                          lts="0.08em"
+                        >
+                          Total Vueltas
+                        </Text>
+                        <Text size="md" fw={800} className="text-indigo-300">
+                          {calculosPorItemVueltas[
+                            idx
+                          ]?.vueltas?.toLocaleString() ?? "0"}{" "}
+                          <span className="text-[10px] text-zinc-500 italic font-medium">
+                            vuelta(s)
+                          </span>
+                        </Text>
+                      </div>
+                    </Group>
+                    <Group
+                      gap={6}
+                      align="center"
+                      wrap="nowrap"
+                      justify="flex-end"
+                    >
+                      <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div className="min-w-0 text-right">
+                        <Text
+                          size="9px"
+                          c="zinc.500"
+                          fw={900}
+                          tt="uppercase"
+                          lts="0.08em"
+                        >
+                          Costo Operativo
+                        </Text>
+                        <Text size="md" fw={800} className="text-emerald-300">
+                          S/.{" "}
+                          {calculosPorItemVueltas[idx]?.costo?.toLocaleString(
+                            undefined,
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            },
+                          ) ?? "0.00"}
+                        </Text>
+                      </div>
+                    </Group>
+                  </SimpleGrid>
+                </Card>
+              );
+            })}
 
             <Button
               variant="light"
@@ -2526,7 +2710,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           </Stack>
 
           {itemsVueltas.length > 1 && (
-            <Card withBorder padding="sm" radius="lg" className="bg-zinc-950/60 border-indigo-500/30">
+            <Card
+              withBorder
+              padding="sm"
+              radius="lg"
+              className="bg-zinc-950/60 border-indigo-500/30"
+            >
               <Group justify="space-between" align="center" wrap="wrap">
                 <Group gap="xs">
                   <Badge size="sm" color="indigo" variant="filled" radius="sm">
@@ -2543,7 +2732,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     </Text>
                     <Text size="sm" fw={800} className="text-indigo-300">
                       {totalGeneralVueltas.vueltas.toLocaleString()}{" "}
-                      <span className="text-[10px] text-zinc-500 italic">vlts</span>
+                      <span className="text-[10px] text-zinc-500 italic">
+                        vlts
+                      </span>
                     </Text>
                   </Group>
                   {esTarifaSaco && (
@@ -2641,10 +2832,23 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
 
       {/* Acciones */}
       <Group justify="flex-end" mt="lg" gap="xs">
-        <Button variant="subtle" color="zinc.5" onClick={onCancel} disabled={saving} size="xs" radius="lg">
+        <Button
+          variant="subtle"
+          color="zinc.5"
+          onClick={onCancel}
+          disabled={saving}
+          size="xs"
+          radius="lg"
+        >
           Cancelar
         </Button>
-        <Button color="indigo" onClick={handleSubmit} loading={saving} size="xs" radius="lg">
+        <Button
+          color="indigo"
+          onClick={handleSubmit}
+          loading={saving}
+          size="xs"
+          radius="lg"
+        >
           {tipoControl === "horometro" && items.length > 1
             ? `Guardar ${items.length} Controles`
             : tipoControl === "vueltas" && itemsVueltas.length > 1
@@ -2666,7 +2870,8 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           onCancel={() => setModalTarifaOpened(false)}
           onSuccess={async (nuevaTarifa) => {
             try {
-              const respTarifas = await ControlUsoService.getTarifas(idActivoFijo);
+              const respTarifas =
+                await ControlUsoService.getTarifas(idActivoFijo);
               if (respTarifas.success) {
                 setTarifas(respTarifas.data);
               } else {
@@ -2701,7 +2906,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 title: "#",
                 width: 50,
                 render: (_record, index) => (
-                  <span className="text-zinc-500 text-xs font-mono">{(index ?? 0) + 1}</span>
+                  <span className="text-zinc-500 text-xs font-mono">
+                    {(index ?? 0) + 1}
+                  </span>
                 ),
               },
               {
@@ -2709,10 +2916,19 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 title: "Precio Unit.",
                 render: (record) => {
                   if (Number(record.precio_unitario) === 0) {
-                    return <span className="text-zinc-600 text-xs italic">Sin precio</span>;
+                    return (
+                      <span className="text-zinc-600 text-xs italic">
+                        Sin precio
+                      </span>
+                    );
                   }
                   return (
-                    <Badge color="violet" variant="filled" size="sm" radius="sm">
+                    <Badge
+                      color="violet"
+                      variant="filled"
+                      size="sm"
+                      radius="sm"
+                    >
                       S/. {Number(record.precio_unitario).toFixed(2)}
                     </Badge>
                   );
@@ -2730,7 +2946,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                             {record.distancia_metros} m.
                           </Badge>
                         ) : (
-                          <span className="text-zinc-600 text-xs italic">-</span>
+                          <span className="text-zinc-600 text-xs italic">
+                            -
+                          </span>
                         ),
                     },
                   ]
@@ -2747,7 +2965,9 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                             {record.tipo_material}
                           </Badge>
                         ) : (
-                          <span className="text-zinc-600 text-xs italic">-</span>
+                          <span className="text-zinc-600 text-xs italic">
+                            -
+                          </span>
                         ),
                     },
                   ]
@@ -2757,9 +2977,13 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                 title: "Descripcion",
                 render: (record) =>
                   record.descripcion ? (
-                    <span className="text-zinc-400 text-xs">{record.descripcion}</span>
+                    <span className="text-zinc-400 text-xs">
+                      {record.descripcion}
+                    </span>
                   ) : (
-                    <span className="text-zinc-600 text-xs italic">Sin descripcion</span>
+                    <span className="text-zinc-600 text-xs italic">
+                      Sin descripcion
+                    </span>
                   ),
               },
               {
@@ -2776,7 +3000,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
         </div>
       </ModalEstandar>
 
-{/* Modal de Consumo directo (se abre desde el boton "Agregar Consumo" del bloque) */}
+      {/* Modal de Consumo directo (se abre desde el boton "Agregar Consumo" del bloque) */}
       <ModalEstandar
         opened={consumoModalOpen}
         close={() => setConsumoModalOpen(false)}
@@ -2865,8 +3089,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
             {(() => {
               const prodSel = productos.find(
-                (p) =>
-                  String(p.id_producto) === String(consumoForm.idProducto),
+                (p) => String(p.id_producto) === String(consumoForm.idProducto),
               );
               const baseAbbr =
                 prodSel?.unidad_medida_base_abv ||
@@ -2883,18 +3106,12 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                     String(consumoForm.idUnidadMedida ?? ""),
                 )?.abreviatura || "--";
               const unidadesIdenticas =
-                baseAbbr !== "--" &&
-                selAbbr !== "--" &&
-                baseAbbr === selAbbr;
+                baseAbbr !== "--" && selAbbr !== "--" && baseAbbr === selAbbr;
               // Misma logica que `useRegistroRequerimiento.ts`:
               // buscar en `selected.conversiones` el entry donde
               // `id_unidad_destino === baseId`, y devolver 1/factor.
               let conversionAutomatica: number | null = null;
-              if (
-                !unidadesIdenticas &&
-                prodSel &&
-                consumoForm.idUnidadMedida
-              ) {
+              if (!unidadesIdenticas && prodSel && consumoForm.idUnidadMedida) {
                 const baseId = String(prodSel.id_unidad_medida_base);
                 const selId = String(consumoForm.idUnidadMedida);
                 const unidadSel = unidadesMedida.find(
@@ -3039,8 +3256,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
             {/* Resumen del consumo */}
             {(() => {
               const prodSelResumen = productos.find(
-                (p) =>
-                  String(p.id_producto) === String(consumoForm.idProducto),
+                (p) => String(p.id_producto) === String(consumoForm.idProducto),
               );
               const baseNombre =
                 prodSelResumen?.unidad_medida_base ||
@@ -3150,9 +3366,7 @@ const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
                           fw={800}
                           size="xl"
                           className={
-                            tieneCantidad
-                              ? "text-emerald-400"
-                              : "text-zinc-700"
+                            tieneCantidad ? "text-emerald-400" : "text-zinc-700"
                           }
                         >
                           {formatNumber(cantBaseNum)}

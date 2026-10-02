@@ -891,7 +891,7 @@ export const ControlUsoPage = () => {
                             </Badge>
                           );
                         })()}
-                        {uuid ? (
+                        {/* {uuid ? (
                           <Badge
                             variant="light"
                             color="grape"
@@ -911,7 +911,7 @@ export const ControlUsoPage = () => {
                           >
                             Sin grupo
                           </Badge>
-                        )}
+                        )} */}
                       </Group>
                       <Badge
                         size="sm"

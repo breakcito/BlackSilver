@@ -7,17 +7,15 @@ import {
   Textarea,
   NumberInput,
   Button,
-  SegmentedControl,
   Card,
   Badge,
-  Box,
-  Center,
   Checkbox,
   Loader,
   SimpleGrid,
   Grid,
   ActionIcon,
   Tooltip,
+  Tabs,
 } from "@mantine/core";
 import {
   Cog8ToothIcon,
@@ -42,7 +40,10 @@ import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { CustomDatePicker } from "../../../presentation/utils/date-picker-input";
 import { NuevaTarifaModal } from "./nueva-tarifa-modal";
-import type { RES_ControlUsoLog, RES_Tarifa } from "../service/control-uso.responses";
+import type {
+  RES_ControlUsoLog,
+  RES_Tarifa,
+} from "../service/control-uso.responses";
 import { TipoTurno } from "../../../shared/enums/_generic/tipo-turno";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 
@@ -101,9 +102,9 @@ export const EdicionControlUsoModal = ({
 
   // Catálogos
   const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
-  const [clientes, setClientes] = useState<
-    { value: string; label: string }[]
-  >([]);
+  const [clientes, setClientes] = useState<{ value: string; label: string }[]>(
+    [],
+  );
   const [tarifas, setTarifas] = useState<RES_Tarifa[]>([]);
   const [labores, setLabores] = useState<{ value: string; label: string }[]>(
     [],
@@ -198,10 +199,12 @@ export const EdicionControlUsoModal = ({
         const respMinas = await AuxService.get_minas();
         if (respMinas.success) {
           setMinas(
-            respMinas.data.map((m: { id_mina: string | number; nombre: string }) => ({
-              value: m.id_mina.toString(),
-              label: m.nombre,
-            })),
+            respMinas.data.map(
+              (m: { id_mina: string | number; nombre: string }) => ({
+                value: m.id_mina.toString(),
+                label: m.nombre,
+              }),
+            ),
           );
         }
 
@@ -508,11 +511,7 @@ export const EdicionControlUsoModal = ({
         if (!saving) close();
       }}
       title={`Editar Control por ${
-        esHorometro
-          ? "Horómetro"
-          : esOdometro
-            ? "Odómetro"
-            : "Vueltas"
+        esHorometro ? "Horómetro" : esOdometro ? "Odómetro" : "Vueltas"
       }`}
       size="xl"
     >
@@ -544,7 +543,11 @@ export const EdicionControlUsoModal = ({
                 {target.correlativo}
               </Badge>
             </div>
-            <Text size="sm" fw={800} className="text-white leading-snug truncate">
+            <Text
+              size="sm"
+              fw={800}
+              className="text-white leading-snug truncate"
+            >
               {target.producto}
             </Text>
             {(target.ubicacion_activo || target.mina) && (
@@ -587,9 +590,8 @@ export const EdicionControlUsoModal = ({
                 data={tarifas
                   .filter(
                     (t) =>
-                      t.tipo_control === (esHorometro
-                        ? "horometro"
-                        : "odometro"),
+                      t.tipo_control ===
+                      (esHorometro ? "horometro" : "odometro"),
                   )
                   .map((t) => {
                     const parts = [
@@ -614,7 +616,7 @@ export const EdicionControlUsoModal = ({
                   color="zinc.4"
                   size={32}
                   radius="lg"
-                  className="mb-[3px] border border-zinc-700/50"
+                  className="mb-0.75 border border-zinc-700/50"
                 >
                   <QueueListIcon className="w-4 h-4" />
                 </ActionIcon>
@@ -626,7 +628,7 @@ export const EdicionControlUsoModal = ({
                   color="indigo.6"
                   size={32}
                   radius="lg"
-                  className="mb-[3px]"
+                  className="mb-0.75"
                 >
                   <PlusIcon className="w-4 h-4" />
                 </ActionIcon>
@@ -758,38 +760,32 @@ export const EdicionControlUsoModal = ({
               <Text size="xs" fw={600} className="text-zinc-300">
                 Destino del Trabajo:
               </Text>
-              <SegmentedControl
+              <Tabs
                 value={esParaMina ? "mina" : "terceros"}
-                onChange={(value) => setEsParaMina(value === "mina")}
-                data={[
-                  {
-                    value: "mina",
-                    label: (
-                      <Center style={{ gap: 6 }}>
-                        <MapPinIcon className="w-4 h-4" />
-                        <Box>En Mina</Box>
-                      </Center>
-                    ),
-                  },
-                  {
-                    value: "terceros",
-                    label: (
-                      <Center style={{ gap: 6 }}>
-                        <BriefcaseIcon className="w-4 h-4" />
-                        <Box>Para Terceros</Box>
-                      </Center>
-                    ),
-                  },
-                ]}
-                radius="md"
-                size="xs"
-                classNames={{
-                  root: "bg-zinc-900/50 border border-zinc-800",
-                  control: "border-none",
-                  indicator: "bg-indigo-600",
-                  label: "text-zinc-400 data-[active]:text-white font-bold",
+                onChange={(val) => {
+                  if (val) setEsParaMina(val === "mina");
                 }}
-              />
+                variant="pills"
+                color="indigo"
+                radius="md"
+              >
+                <Tabs.List className="bg-zinc-900/50 border border-zinc-800 p-0.5 rounded-md">
+                  <Tabs.Tab
+                    value="mina"
+                    leftSection={<MapPinIcon className="w-4 h-4" />}
+                    className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
+                  >
+                    En Mina
+                  </Tabs.Tab>
+                  <Tabs.Tab
+                    value="terceros"
+                    leftSection={<BriefcaseIcon className="w-4 h-4" />}
+                    className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
+                  >
+                    Para Terceros
+                  </Tabs.Tab>
+                </Tabs.List>
+              </Tabs>
             </Group>
 
             <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="md">
@@ -903,9 +899,7 @@ export const EdicionControlUsoModal = ({
             <SimpleGrid cols={2} spacing="md">
               <div>
                 <TimeInput
-                  label={
-                    usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"
-                  }
+                  label={usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"}
                   placeholder="08:00"
                   value={horaInicioStr}
                   onChange={(event) =>
@@ -918,13 +912,7 @@ export const EdicionControlUsoModal = ({
                   disabled={!usarHoras}
                 />
                 {horaInicioStr && usarHoras && (
-                  <Text
-                    size="10px"
-                    c="blue.4"
-                    fw={700}
-                    mt={3}
-                    className="ml-1"
-                  >
+                  <Text size="10px" c="blue.4" fw={700} mt={3} className="ml-1">
                     ({dayjs(`2000-01-01 ${horaInicioStr}`).format("hh:mm A")})
                   </Text>
                 )}
@@ -945,13 +933,7 @@ export const EdicionControlUsoModal = ({
                   disabled={!usarHoras}
                 />
                 {horaFinStr && usarHoras && (
-                  <Text
-                    size="10px"
-                    c="blue.4"
-                    fw={700}
-                    mt={3}
-                    className="ml-1"
-                  >
+                  <Text size="10px" c="blue.4" fw={700} mt={3} className="ml-1">
                     ({dayjs(`2000-01-01 ${horaFinStr}`).format("hh:mm A")})
                     {horaInicioStr &&
                       horaFinStr &&
@@ -975,9 +957,7 @@ export const EdicionControlUsoModal = ({
                 { value: TipoTurno.Noche, label: "Noche" },
               ]}
               value={tipoTurno === "" ? null : tipoTurno}
-              onChange={(val) =>
-                setTipoTurno((val ?? "") as TipoTurno | "")
-              }
+              onChange={(val) => setTipoTurno((val ?? "") as TipoTurno | "")}
               clearable
               classNames={fieldClasses}
               radius="lg"
@@ -994,9 +974,7 @@ export const EdicionControlUsoModal = ({
                 }
                 placeholder="Ej: 1250.00"
                 value={horometroInicio}
-                onChange={(val) =>
-                  setHorometroInicio(val as number | "")
-                }
+                onChange={(val) => setHorometroInicio(val as number | "")}
                 min={0}
                 decimalScale={2}
                 fixedDecimalScale
@@ -1060,12 +1038,7 @@ export const EdicionControlUsoModal = ({
                   </Text>
                 </div>
               </Group>
-              <Group
-                gap={6}
-                align="center"
-                wrap="nowrap"
-                justify="flex-end"
-              >
+              <Group gap={6} align="center" wrap="nowrap" justify="flex-end">
                 <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
                 <div className="min-w-0 text-right">
                   <Text
@@ -1143,274 +1116,272 @@ export const EdicionControlUsoModal = ({
             el registro: Cabecera (Tarifa + Cantidad + Fecha), Fila 2 con
             Turno + Horometros + Cantidad de Sacos (si aplica), Observacion
             y Resumen Total Vueltas/Costo. */}
-        {esVueltas && (() => {
-          const tarifaItem = tarifas.find(
-            (t) => String(t.id) === idTarifa,
-          );
-          const esSacoItem = tarifaItem
-            ? (tarifaItem.tipo_material || "")
-                .toLowerCase()
-                .includes("saco")
-            : false;
-          return (
-            <Card
-              withBorder
-              padding="md"
-              radius="lg"
-              className="bg-zinc-950/40 border-zinc-800"
-            >
-              <Group justify="space-between" align="center" mb="sm" wrap="nowrap">
-                <Group gap="xs" wrap="nowrap">
-                  <Badge color="indigo" variant="light" size="sm" radius="sm">
-                    Bloque #1
-                  </Badge>
-                  <Text size="xs" c="zinc.500" fw={600}>
-                    Viaje independiente
-                  </Text>
+        {esVueltas &&
+          (() => {
+            const tarifaItem = tarifas.find((t) => String(t.id) === idTarifa);
+            const esSacoItem = tarifaItem
+              ? (tarifaItem.tipo_material || "").toLowerCase().includes("saco")
+              : false;
+            return (
+              <Card
+                withBorder
+                padding="md"
+                radius="lg"
+                className="bg-zinc-950/40 border-zinc-800"
+              >
+                <Group
+                  justify="space-between"
+                  align="center"
+                  mb="sm"
+                  wrap="nowrap"
+                >
+                  <Group gap="xs" wrap="nowrap">
+                    <Badge color="indigo" variant="light" size="sm" radius="sm">
+                      Bloque #1
+                    </Badge>
+                    <Text size="xs" c="zinc.500" fw={600}>
+                      Viaje independiente
+                    </Text>
+                  </Group>
                 </Group>
-              </Group>
 
-              {/* Fila 1: Tarifa de Uso | Cantidad de Vueltas | Fecha del Trabajo.
+                {/* Fila 1: Tarifa de Uso | Cantidad de Vueltas | Fecha del Trabajo.
                   Los tres al mismo ancho (Cantidad y Fecha ambos span=3)
                   para que se vean cuadrados. */}
-              <Grid align="flex-end" gutter="md">
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Group gap={6} align="flex-end" wrap="nowrap">
+                <Grid align="flex-end" gutter="md">
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
+                    <Group gap={6} align="flex-end" wrap="nowrap">
+                      <Select
+                        className="flex-1"
+                        label="Tarifa de Uso"
+                        placeholder="Seleccione tarifa..."
+                        data={tarifas
+                          .filter((t) => t.tipo_control === "vueltas")
+                          .map((t) => {
+                            const esSaco = (t.tipo_material || "")
+                              .toLowerCase()
+                              .includes("saco");
+                            const parts = [
+                              esSaco
+                                ? "Sin precio"
+                                : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
+                              t.distancia_metros
+                                ? `x ${t.distancia_metros}m`
+                                : null,
+                              t.tipo_material ? `x ${t.tipo_material}` : null,
+                            ].filter(Boolean);
+                            return {
+                              value: String(t.id),
+                              label: parts.join(" "),
+                            };
+                          })}
+                        value={idTarifa}
+                        onChange={setIdTarifa}
+                        searchable
+                        clearable
+                        classNames={fieldClasses}
+                        radius="lg"
+                        size="xs"
+                      />
+                      <Tooltip label="Historial de Tarifas">
+                        <ActionIcon
+                          onClick={() => setModalHistorialOpened(true)}
+                          variant="light"
+                          color="zinc.4"
+                          size={32}
+                          radius="lg"
+                          className="mb-0.75 border border-zinc-700/50"
+                        >
+                          <QueueListIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Nueva Tarifa">
+                        <ActionIcon
+                          onClick={() => setModalTarifaOpened(true)}
+                          variant="filled"
+                          color="indigo.6"
+                          size={32}
+                          radius="lg"
+                          className="mb-0.75"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Grid.Col>
+
+                  {/* Cantidad de Vueltas: mismo ancho que Fecha del Trabajo
+                    (span=3) para que se vean cuadrados en la fila. */}
+                  <Grid.Col span={{ base: 6, sm: 3 }}>
+                    <NumberInput
+                      label="Cantidad de Vueltas"
+                      placeholder="Ej: 3"
+                      value={cantidadVueltas}
+                      onChange={(val) => setCantidadVueltas(val as number | "")}
+                      min={0}
+                      decimalScale={0}
+                      fixedDecimalScale
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                      required
+                    />
+                  </Grid.Col>
+
+                  {/* Fecha del Trabajo: al final del row, span=3. */}
+                  <Grid.Col span={{ base: 6, sm: 3 }}>
+                    <CustomDatePicker
+                      label="Fecha del Trabajo"
+                      placeholder="Seleccione fecha"
+                      value={fechaTrabajo}
+                      onChange={(val) => setFechaTrabajo(val)}
+                      classNames={fieldClasses}
+                      radius="lg"
+                      size="xs"
+                      required
+                    />
+                  </Grid.Col>
+                </Grid>
+
+                {/* Fila 2: Turno (opcional) | Horometro Inicial (Opc.) |
+                  Horometro Final (Opc.) | Cantidad de Sacos (solo si la
+                  tarifa es Saco, al lado de Horometro Final). */}
+                <Grid align="flex-end" gutter="md" mt="sm">
+                  <Grid.Col span={esSacoItem ? 3 : 4}>
                     <Select
-                      className="flex-1"
-                      label="Tarifa de Uso"
-                      placeholder="Seleccione tarifa..."
-                      data={tarifas
-                        .filter((t) => t.tipo_control === "vueltas")
-                        .map((t) => {
-                          const esSaco = (t.tipo_material || "")
-                            .toLowerCase()
-                            .includes("saco");
-                          const parts = [
-                            esSaco
-                              ? "Sin precio"
-                              : `S/. ${Number(t.precio_unitario).toFixed(2)}`,
-                            t.distancia_metros ? `x ${t.distancia_metros}m` : null,
-                            t.tipo_material ? `x ${t.tipo_material}` : null,
-                          ].filter(Boolean);
-                          return { value: String(t.id), label: parts.join(" ") };
-                        })}
-                      value={idTarifa}
-                      onChange={setIdTarifa}
-                      searchable
+                      label="Turno (opcional)"
+                      placeholder="Seleccione turno..."
+                      data={[
+                        { value: TipoTurno.Dia, label: "Día" },
+                        { value: TipoTurno.Noche, label: "Noche" },
+                      ]}
+                      value={tipoTurno === "" ? null : tipoTurno}
+                      onChange={(val) =>
+                        setTipoTurno((val ?? "") as TipoTurno | "")
+                      }
                       clearable
                       classNames={fieldClasses}
                       radius="lg"
                       size="xs"
                     />
-                    <Tooltip label="Historial de Tarifas">
-                      <ActionIcon
-                        onClick={() => setModalHistorialOpened(true)}
-                        variant="light"
-                        color="zinc.4"
-                        size={32}
-                        radius="lg"
-                        className="mb-[3px] border border-zinc-700/50"
-                      >
-                        <QueueListIcon className="w-4 h-4" />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Nueva Tarifa">
-                      <ActionIcon
-                        onClick={() => setModalTarifaOpened(true)}
-                        variant="filled"
-                        color="indigo.6"
-                        size={32}
-                        radius="lg"
-                        className="mb-[3px]"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                </Grid.Col>
-
-                {/* Cantidad de Vueltas: mismo ancho que Fecha del Trabajo
-                    (span=3) para que se vean cuadrados en la fila. */}
-                <Grid.Col span={{ base: 6, sm: 3 }}>
-                  <NumberInput
-                    label="Cantidad de Vueltas"
-                    placeholder="Ej: 3"
-                    value={cantidadVueltas}
-                    onChange={(val) =>
-                      setCantidadVueltas(val as number | "")
-                    }
-                    min={0}
-                    decimalScale={0}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                    required
-                  />
-                </Grid.Col>
-
-                {/* Fecha del Trabajo: al final del row, span=3. */}
-                <Grid.Col span={{ base: 6, sm: 3 }}>
-                  <CustomDatePicker
-                    label="Fecha del Trabajo"
-                    placeholder="Seleccione fecha"
-                    value={fechaTrabajo}
-                    onChange={(val) => setFechaTrabajo(val)}
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                    required
-                  />
-                </Grid.Col>
-              </Grid>
-
-              {/* Fila 2: Turno (opcional) | Horometro Inicial (Opc.) |
-                  Horometro Final (Opc.) | Cantidad de Sacos (solo si la
-                  tarifa es Saco, al lado de Horometro Final). */}
-              <Grid align="flex-end" gutter="md" mt="sm">
-                <Grid.Col span={esSacoItem ? 3 : 4}>
-                  <Select
-                    label="Turno (opcional)"
-                    placeholder="Seleccione turno..."
-                    data={[
-                      { value: TipoTurno.Dia, label: "Día" },
-                      { value: TipoTurno.Noche, label: "Noche" },
-                    ]}
-                    value={tipoTurno === "" ? null : tipoTurno}
-                    onChange={(val) =>
-                      setTipoTurno((val ?? "") as TipoTurno | "")
-                    }
-                    clearable
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                  />
-                </Grid.Col>
-                <Grid.Col span={esSacoItem ? 3 : 4}>
-                  <NumberInput
-                    label="Horometro Inicial (Opc.)"
-                    placeholder="Ej: 1250.00"
-                    value={horometroInicio}
-                    onChange={(val) =>
-                      setHorometroInicio(val as number | "")
-                    }
-                    min={0}
-                    decimalScale={2}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                  />
-                </Grid.Col>
-                <Grid.Col span={esSacoItem ? 3 : 4}>
-                  <NumberInput
-                    label="Horometro Final (Opc.)"
-                    placeholder="Ej: 1252.00"
-                    value={horometroFin}
-                    onChange={(val) =>
-                      setHorometroFin(val as number | "")
-                    }
-                    min={0}
-                    decimalScale={2}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                  />
-                </Grid.Col>
-                {esSacoItem && (
-                  <Grid.Col span={3}>
+                  </Grid.Col>
+                  <Grid.Col span={esSacoItem ? 3 : 4}>
                     <NumberInput
-                      label="Cantidad de Sacos"
-                      placeholder="Ej: 30"
-                      value={cantidadSacos}
-                      onChange={(val) =>
-                        setCantidadSacos(val as number | "")
-                      }
+                      label="Horometro Inicial (Opc.)"
+                      placeholder="Ej: 1250.00"
+                      value={horometroInicio}
+                      onChange={(val) => setHorometroInicio(val as number | "")}
                       min={0}
-                      decimalScale={0}
+                      decimalScale={2}
+                      fixedDecimalScale
                       classNames={fieldClasses}
                       size="xs"
                       radius="lg"
                     />
                   </Grid.Col>
-                )}
-              </Grid>
+                  <Grid.Col span={esSacoItem ? 3 : 4}>
+                    <NumberInput
+                      label="Horometro Final (Opc.)"
+                      placeholder="Ej: 1252.00"
+                      value={horometroFin}
+                      onChange={(val) => setHorometroFin(val as number | "")}
+                      min={0}
+                      decimalScale={2}
+                      fixedDecimalScale
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                    />
+                  </Grid.Col>
+                  {esSacoItem && (
+                    <Grid.Col span={3}>
+                      <NumberInput
+                        label="Cantidad de Sacos"
+                        placeholder="Ej: 30"
+                        value={cantidadSacos}
+                        onChange={(val) => setCantidadSacos(val as number | "")}
+                        min={0}
+                        decimalScale={0}
+                        classNames={fieldClasses}
+                        size="xs"
+                        radius="lg"
+                      />
+                    </Grid.Col>
+                  )}
+                </Grid>
 
-              <Textarea
-                label="Observacion"
-                placeholder="Notas u observaciones de este bloque (opcional)..."
-                value={observacion}
-                onChange={(e) => setObservacion(e.currentTarget.value)}
-                classNames={fieldClasses}
-                size="xs"
-                radius="lg"
-                minRows={2}
-                mt="sm"
-              />
+                <Textarea
+                  label="Observacion"
+                  placeholder="Notas u observaciones de este bloque (opcional)..."
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.currentTarget.value)}
+                  classNames={fieldClasses}
+                  size="xs"
+                  radius="lg"
+                  minRows={2}
+                  mt="sm"
+                />
 
-              {/* Resumen Total Vueltas + Costo (mismo patron que el
+                {/* Resumen Total Vueltas + Costo (mismo patron que el
                   registro). Si la tarifa es Saco, el Total Vueltas queda
                   en "-" (los sacos no son vueltas). */}
-              <SimpleGrid cols={2} spacing="md" mt="md">
-                <Group gap={6} align="center" wrap="nowrap">
-                  <ArrowPathRoundedSquareIcon className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <div className="min-w-0">
-                    <Text
-                      size="9px"
-                      c="zinc.500"
-                      fw={900}
-                      tt="uppercase"
-                      lts="0.08em"
-                    >
-                      Total Vueltas
-                    </Text>
-                    <Text size="md" fw={800} className="text-indigo-300">
-                      {esSacoItem
-                        ? "-"
-                        : `${formatNumber(Number(cantidadVueltas) || 0)} `}
-                      {!esSacoItem && (
-                        <span className="text-[10px] text-zinc-500 italic font-medium">
-                          vuelta(s)
-                        </span>
-                      )}
-                    </Text>
-                  </div>
-                </Group>
-                <Group
-                  gap={6}
-                  align="center"
-                  wrap="nowrap"
-                  justify="flex-end"
-                >
-                  <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <div className="min-w-0 text-right">
-                    <Text
-                      size="9px"
-                      c="zinc.500"
-                      fw={900}
-                      tt="uppercase"
-                      lts="0.08em"
-                    >
-                      Costo Operativo
-                    </Text>
-                    <Text size="md" fw={800} className="text-emerald-300">
-                      S/.{" "}
-                      {(
-                        (Number(cantidadVueltas) || 0) *
-                        (precioUnitario || 0)
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </Text>
-                  </div>
-                </Group>
-              </SimpleGrid>
-            </Card>
-          );
-        })()}
+                <SimpleGrid cols={2} spacing="md" mt="md">
+                  <Group gap={6} align="center" wrap="nowrap">
+                    <ArrowPathRoundedSquareIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <div className="min-w-0">
+                      <Text
+                        size="9px"
+                        c="zinc.500"
+                        fw={900}
+                        tt="uppercase"
+                        lts="0.08em"
+                      >
+                        Total Vueltas
+                      </Text>
+                      <Text size="md" fw={800} className="text-indigo-300">
+                        {esSacoItem
+                          ? "-"
+                          : `${formatNumber(Number(cantidadVueltas) || 0)} `}
+                        {!esSacoItem && (
+                          <span className="text-[10px] text-zinc-500 italic font-medium">
+                            vuelta(s)
+                          </span>
+                        )}
+                      </Text>
+                    </div>
+                  </Group>
+                  <Group
+                    gap={6}
+                    align="center"
+                    wrap="nowrap"
+                    justify="flex-end"
+                  >
+                    <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div className="min-w-0 text-right">
+                      <Text
+                        size="9px"
+                        c="zinc.500"
+                        fw={900}
+                        tt="uppercase"
+                        lts="0.08em"
+                      >
+                        Costo Operativo
+                      </Text>
+                      <Text size="md" fw={800} className="text-emerald-300">
+                        S/.{" "}
+                        {(
+                          (Number(cantidadVueltas) || 0) * (precioUnitario || 0)
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </Text>
+                    </div>
+                  </Group>
+                </SimpleGrid>
+              </Card>
+            );
+          })()}
 
         <Group justify="flex-end" gap="sm" mt="sm">
           <Button
@@ -1486,7 +1457,7 @@ export const EdicionControlUsoModal = ({
           }`}
           size="xl"
         >
-          <div className="mt-2 h-[350px]">
+          <div className="mt-2 h-87.5">
             <DataTableEstandar
               idAccessor="id"
               loading={false}
@@ -1516,7 +1487,12 @@ export const EdicionControlUsoModal = ({
                       );
                     }
                     return (
-                      <Badge color="violet" variant="filled" size="sm" radius="sm">
+                      <Badge
+                        color="violet"
+                        variant="filled"
+                        size="sm"
+                        radius="sm"
+                      >
                         S/. {Number(record.precio_unitario).toFixed(2)}
                       </Badge>
                     );
@@ -1534,7 +1510,9 @@ export const EdicionControlUsoModal = ({
                               {record.distancia_metros} m.
                             </Badge>
                           ) : (
-                            <span className="text-zinc-600 text-xs italic">-</span>
+                            <span className="text-zinc-600 text-xs italic">
+                              -
+                            </span>
                           ),
                       },
                     ]
@@ -1551,7 +1529,9 @@ export const EdicionControlUsoModal = ({
                               {record.tipo_material}
                             </Badge>
                           ) : (
-                            <span className="text-zinc-600 text-xs italic">-</span>
+                            <span className="text-zinc-600 text-xs italic">
+                              -
+                            </span>
                           ),
                       },
                     ]

@@ -9,7 +9,7 @@ import {
   Table,
   ActionIcon,
   Tooltip,
-  SegmentedControl,
+  Tabs,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
 import type { DateValue } from "@mantine/dates";
@@ -279,21 +279,20 @@ export const RegistroMantenimiento = ({
           <label className="text-zinc-300 mb-1.5 font-semibold text-xs ml-0.5">
             Tipo Ejecutor
           </label>
-          <SegmentedControl
+          <Tabs
             value={tipoEjecutor}
-            onChange={(val) => setTipoEjecutor(val as "interno" | "externo")}
-            data={[
-              { label: "Interno", value: "interno" },
-              { label: "Externo", value: "externo" },
-            ]}
-            radius="md"
-            classNames={{
-              root: "bg-zinc-950 border border-zinc-800 p-0.5",
-              indicator: "bg-indigo-600",
-              control:
-                "text-zinc-300 data-[active]:text-white font-semibold text-[11px] px-2.5 h-7",
+            onChange={(val) => {
+              if (val) setTipoEjecutor(val as "interno" | "externo");
             }}
-          />
+            variant="pills"
+            color="teal"
+            radius="md"
+          >
+            <Tabs.List>
+              <Tabs.Tab value="interno" h={24}>Interno</Tabs.Tab>
+              <Tabs.Tab value="externo" h={24}>Externo</Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
         </div>
 
         {tipoEjecutor === "interno" ? (

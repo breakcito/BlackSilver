@@ -10,7 +10,7 @@ import {
   TextInput,
   Tooltip,
   ActionIcon,
-  SegmentedControl,
+  Tabs,
 } from "@mantine/core";
 import {
   IdentificationIcon,
@@ -261,25 +261,37 @@ export const EdicionCotizacionCabecera = ({
               {/* Incluye IGV */}
               <Grid.Col span={{ base: 6, sm: 3 }}>
                 <Stack gap={2} pt={8.5}>
-                  <Text size="xs" fw={500} className="text-zinc-300">
+                  <Text size="xs" fw={500} c="zinc.3">
                     Incluye IGV
                   </Text>
-                  <SegmentedControl
-                    size="xs"
-                    radius="lg"
-                    data={[
-                      { label: "SÍ", value: "true" },
-                      { label: "NO", value: "false" },
-                    ]}
+                  <Tabs
                     value={String(cotizacion.incluye_igv)}
-                    onChange={(val) =>
-                      onUpdateHeader(0, "incluye_igv", val === "true")
-                    }
-                    color="teal"
-                    classNames={{
-                      root: "bg-zinc-900 border border-zinc-800 h-[32px] align-middle",
+                    onChange={(val) => {
+                      if (val) onUpdateHeader(0, "incluye_igv", val === "true");
                     }}
-                  />
+                    variant="pills"
+                    color="teal"
+                    radius="lg"
+                  >
+                    <Tabs.List
+                      grow
+                      bg="var(--mantine-color-dark-8)"
+                      bd="1px solid var(--mantine-color-dark-5)"
+                      p={2}
+                      h={32}
+                      style={{
+                        borderRadius: "var(--mantine-radius-lg)",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Tabs.Tab value="true" fw={600} fz="xs" h={26}>
+                        SÍ
+                      </Tabs.Tab>
+                      <Tabs.Tab value="false" fw={600} fz="xs" h={26}>
+                        NO
+                      </Tabs.Tab>
+                    </Tabs.List>
+                  </Tabs>
                 </Stack>
               </Grid.Col>
 
