@@ -162,6 +162,16 @@ export const RegistroUso = ({
   const [lotesModal, setLotesModal] = useState<RES_LoteDisponible[]>([]);
   const [loadingLotesModal, setLoadingLotesModal] = useState(false);
 
+  // Loading flags individuales por catalogo, para que cada Select muestre
+  // su propio Loader + placeholder "Cargando..." mientras llega su data.
+  const [loadingTarifas, setLoadingTarifas] = useState(false);
+  const [loadingMinas, setLoadingMinas] = useState(false);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [loadingLotesMineral, setLoadingLotesMineral] = useState(false);
+  const [loadingProductos, setLoadingProductos] = useState(false);
+  const [loadingAlmacenesConsumo, setLoadingAlmacenesConsumo] = useState(false);
+  const [loadingUnidadesMedida, setLoadingUnidadesMedida] = useState(false);
+
   const [loadingLabores, setLoadingLabores] = useState(false);
 
   const [esParaMina, setEsParaMina] = useState<boolean>(true);
@@ -284,132 +294,192 @@ export const RegistroUso = ({
     ? (selectedTarifa.tipo_material || "").toLowerCase().includes("saco")
     : false;
 
-  // Load initial data: cabecera + datos especificos segun tipoControl
+  // Load initial data: cabecera + datos especificos segun tipoControl.
+  // Todas las requests SIN dependencia entre si se disparan en paralelo
+  // (Promise.all). Las dependencias (labores / almacenes / lotes-mineral
+  // dependen de la mina seleccionada) se manejan en sus propios useEffect
+  // mas abajo.
   useEffect(() => {
     if (!idActivoFijo) return;
 
     const fetchData = async () => {
       setLoadingData(true);
-      try {
-        // Tarifas
-        const respTarifas = await ControlUsoService.getTarifas(idActivoFijo);
-        if (respTarifas.success) {
-          setTarifas(respTarifas.data);
 
-          const tarifasDeTipo = respTarifas.data.filter(
-            (t) => t.tipo_control === tipoControl,
-          );
-          if (tarifasDeTipo.length > 0) {
-            const lastTarifa = tarifasDeTipo.reduce((prev, current) =>
-              prev.id > current.id ? prev : current,
-            );
-            setIdTarifa(lastTarifa.id.toString());
-          } else {
-            setIdTarifa(null);
-          }
-        }
-
-        // Minas
-        const respMinas = await AuxService.get_minas();
-        if (respMinas.success) {
-          setMinas(
-            respMinas.data.map(
-              (m: { id_mina: string | number; nombre: string }) => ({
-                value: m.id_mina.toString(),
-                label: m.nombre,
-              }),
-            ),
-          );
-        }
-
-        // Clientes
-        const respClientes = await ClientesService.getClientes();
-        if (Array.isArray(respClientes)) {
-          setClientes(
-            respClientes.map(
-              (c: { id_cliente: string | number; razon_social: string }) => ({
-                value: c.id_cliente.toString(),
-                label: c.razon_social,
-              }),
-            ),
-          );
-        }
-
-        // Lotes Mineral
-        const respLotes = await AuxService.get_lotes_mineral();
-        if (respLotes.success) {
-          setLotesMineral(respLotes.data);
-        }
-
-        // Catálogos para consumos directos (solo se usan si tipoControl = horometro)
-        if (tipoControl === "horometro") {
-          const [respProductos, respAlmacenes, respUnidades] =
-            await Promise.all([
-              AuxService.get_productos(),
-              AuxService.get_almacenes(),
-              // `incluir_conversiones: true` para que cada unidad_medida
-              // traiga su array `conversiones` y podamos autocompletar
-              // `contenido_por_presentacion` cuando la unidad solicitada
-              // difiera de la base del producto.
-              AuxService.get_unidades_medida({ incluir_conversiones: true }),
-            ]);
-          if (respProductos.success) {
-            setProductos(respProductos.data);
-          }
-          if (respAlmacenes.success) {
-            setAlmacenesConsumo(
-              respAlmacenes.data.map((a) => ({
-                value: String(a.id_almacen),
-                label: a.nombre,
-              })),
-            );
-          }
-          if (respUnidades.success) {
-            setUnidadesMedida(respUnidades.data);
-          }
-        }
-
-        // Pre-fill no bloqueante de la última lectura (horometro / odometro).
-        // El primer bloque ya está creado por useState initializer, así que la
-        // llegada de la API solo rellenará el campo si el usuario no ha escrito
-        // nada en él (no pisa edición manual).
-        if (tipoControl === "horometro") {
-          ControlUsoService.getUltimoHorometro(idActivoFijo)
-            .then((resp) => {
-              if (!resp.success) return;
-              const raw = resp.data.ultimo_horometro;
-              const sugerido = typeof raw === "number" ? raw : null;
-              if (sugerido === null || sugerido === 0) return;
-              setItems((prev) => {
-                if (prev.length === 0) return prev;
-                if (prev[0].lecturaInicio !== "") return prev;
-                return [
-                  { ...prev[0], lecturaInicio: sugerido },
-                  ...prev.slice(1),
-                ];
-              });
-            })
-            .catch(() => undefined);
-        } else if (tipoControl === "odometro") {
-          ControlUsoService.getUltimoOdometro(idActivoFijo)
-            .then((resp) => {
-              if (!resp.success) return;
-              const v = resp.data.ultimo_odometro;
-              setLecturaInicio((curr) => (curr === 0 ? v : curr));
-              setLecturaFin((curr) => (curr === 0 ? 0 : curr));
-            })
-            .catch(() => undefined);
-        }
-      } catch (err) {
-        console.error(err);
-        notifyError("Error cargando datos iniciales");
-      } finally {
-        setLoadingData(false);
+      // Marcamos loading individual para que el circulito de cada Select
+      // aparezca apenas se inicia la request que le corresponde.
+      setLoadingTarifas(true);
+      setLoadingMinas(true);
+      setLoadingClientes(true);
+      if (tipoControl === "horometro") {
+        setLoadingProductos(true);
+        setLoadingAlmacenesConsumo(true);
+        setLoadingUnidadesMedida(true);
       }
+
+      // Disparamos todas las requests SIN dependencia entre si en paralelo.
+      const [
+        respTarifas,
+        respMinas,
+        respClientes,
+        respProductos,
+        respAlmacenes,
+        respUnidades,
+      ] = await Promise.all([
+        ControlUsoService.getTarifas(idActivoFijo),
+        AuxService.get_minas(),
+        ClientesService.getClientes(),
+        tipoControl === "horometro"
+          ? AuxService.get_productos()
+          : Promise.resolve(null),
+        tipoControl === "horometro"
+          ? AuxService.get_almacenes()
+          : Promise.resolve(null),
+        // `incluir_conversiones: true` para que cada unidad_medida
+        // traiga su array `conversiones` y podamos autocompletar
+        // `contenido_por_presentacion` cuando la unidad solicitada
+        // difiera de la base del producto.
+        tipoControl === "horometro"
+          ? AuxService.get_unidades_medida({ incluir_conversiones: true })
+          : Promise.resolve(null),
+      ]);
+
+      // Tarifas
+      if (respTarifas.success) {
+        setTarifas(respTarifas.data);
+        const tarifasDeTipo = respTarifas.data.filter(
+          (t) => t.tipo_control === tipoControl,
+        );
+        if (tarifasDeTipo.length > 0) {
+          const lastTarifa = tarifasDeTipo.reduce((prev, current) =>
+            prev.id > current.id ? prev : current,
+          );
+          setIdTarifa(lastTarifa.id.toString());
+        } else {
+          setIdTarifa(null);
+        }
+      }
+      setLoadingTarifas(false);
+
+      // Minas
+      if (respMinas.success) {
+        setMinas(
+          respMinas.data.map(
+            (m: { id_mina: string | number; nombre: string }) => ({
+              value: m.id_mina.toString(),
+              label: m.nombre,
+            }),
+          ),
+        );
+      }
+      setLoadingMinas(false);
+
+      // Clientes
+      if (Array.isArray(respClientes)) {
+        setClientes(
+          respClientes.map(
+            (c: { id_cliente: string | number; razon_social: string }) => ({
+              value: c.id_cliente.toString(),
+              label: c.razon_social,
+            }),
+          ),
+        );
+      }
+      setLoadingClientes(false);
+
+      // Catalogos para consumos directos (solo horometro).
+      if (tipoControl === "horometro") {
+        if (respProductos?.success) {
+          setProductos(respProductos.data);
+        }
+        setLoadingProductos(false);
+
+        if (respAlmacenes?.success) {
+          setAlmacenesConsumo(
+            respAlmacenes.data.map((a) => ({
+              value: String(a.id_almacen),
+              label: a.nombre,
+            })),
+          );
+        }
+        setLoadingAlmacenesConsumo(false);
+
+        if (respUnidades?.success) {
+          setUnidadesMedida(respUnidades.data);
+        }
+        setLoadingUnidadesMedida(false);
+      }
+
+      // Pre-fill no bloqueante de la ultima lectura (horometro / odometro).
+      // La primera lectura en despachar es independiente del bloque principal;
+      // se inicia con .then().catch() sin await para no bloquear el resto.
+      if (tipoControl === "horometro") {
+        ControlUsoService.getUltimoHorometro(idActivoFijo)
+          .then((resp) => {
+            if (!resp.success) return;
+            const raw = resp.data.ultimo_horometro;
+            const sugerido = typeof raw === "number" ? raw : null;
+            if (sugerido === null || sugerido === 0) return;
+            setItems((prev) => {
+              if (prev.length === 0) return prev;
+              if (prev[0].lecturaInicio !== "") return prev;
+              return [
+                { ...prev[0], lecturaInicio: sugerido },
+                ...prev.slice(1),
+              ];
+            });
+          })
+          .catch(() => undefined);
+      } else if (tipoControl === "odometro") {
+        ControlUsoService.getUltimoOdometro(idActivoFijo)
+          .then((resp) => {
+            if (!resp.success) return;
+            const v = resp.data.ultimo_odometro;
+            setLecturaInicio((curr) => (curr === 0 ? v : curr));
+            setLecturaFin((curr) => (curr === 0 ? 0 : curr));
+          })
+          .catch(() => undefined);
+      }
+
+      // El flag global queda activo mientras AL MENOS un catalogo siga
+      // cargando. Asi el spinner global del modal persiste hasta que
+      // absolutamente todo termino.
+      setLoadingData(false);
     };
 
     fetchData();
   }, [idActivoFijo, tipoControl, notifyError]);
+
+  // Cuando cambia la mina, cargar lotes de mineral (con lock "cargando..."
+  // hasta que llegue la respuesta). Es DEPENDIENTE de la mina por diseno:
+  // el listado se filtra server-side para no traer lotes de otras minas.
+  // Usa cancelacion para evitar race conditions si el usuario cambia de
+  // mina rapido. Si NO hay mina seleccionada, vaciamos la lista (el
+  // Select ya esta disabled en ese caso).
+  useEffect(() => {
+    if (!idMina) {
+      setLotesMineral([]);
+      setIdLoteMineral(null);
+      setLoadingLotesMineral(false);
+      return;
+    }
+    let cancelado = false;
+    setLoadingLotesMineral(true);
+    setLotesMineral([]);
+    AuxService.get_lotes_mineral({ id_mina: Number(idMina) })
+      .then((resp) => {
+        if (cancelado || !resp.success) return;
+        setLotesMineral(resp.data);
+      })
+      .catch((e) => {
+        if (!cancelado) console.error(e);
+      })
+      .finally(() => {
+        if (!cancelado) setLoadingLotesMineral(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [idMina]);
 
   // Cuando cambia la mina, cargar labores (con lock "cargando..." hasta que llegue la respuesta).
   // Usa cancelacion para evitar race conditions si el usuario cambia de mina rapido.
@@ -711,9 +781,11 @@ export const RegistroUso = ({
     if (tipoControl !== "horometro") return;
     if (!idMina) {
       setAlmacenesConsumo([]);
+      setLoadingAlmacenesConsumo(false);
       return;
     }
     let cancelado = false;
+    setLoadingAlmacenesConsumo(true);
     AuxService.get_almacenes({ id_mina: Number(idMina) })
       .then((resp) => {
         if (cancelado || !resp.success) return;
@@ -732,7 +804,10 @@ export const RegistroUso = ({
           );
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelado) setLoadingAlmacenesConsumo(false);
+      });
     return () => {
       cancelado = true;
     };
@@ -1459,7 +1534,9 @@ export const RegistroUso = ({
             <Select
               className="flex-1"
               label="Tarifa de Uso"
-              placeholder="Seleccione tarifa..."
+              placeholder={
+                loadingTarifas ? "Cargando tarifas..." : "Seleccione tarifa..."
+              }
               data={tarifas
                 .filter((t) => t.tipo_control === tipoControl)
                 .map((t) => {
@@ -1484,6 +1561,9 @@ export const RegistroUso = ({
               clearable
               radius="lg"
               size="xs"
+              rightSection={
+                loadingTarifas ? <Loader size={12} color="indigo" /> : null
+              }
             />
             <Tooltip label="Historial de Tarifas">
               <ActionIcon
@@ -1548,7 +1628,9 @@ export const RegistroUso = ({
               <SimpleGrid cols={2} spacing="md">
                 <Select
                   label="Mina"
-                  placeholder="Seleccione mina"
+                  placeholder={
+                    loadingMinas ? "Cargando minas..." : "Seleccione mina"
+                  }
                   data={minas}
                   value={idMina}
                   onChange={setIdMina}
@@ -1557,10 +1639,17 @@ export const RegistroUso = ({
                   classNames={fieldClasses}
                   radius="lg"
                   size="xs"
+                  rightSection={
+                    loadingMinas ? <Loader size={12} color="indigo" /> : null
+                  }
                 />
                 <Select
                   label="Labor (Opcional)"
-                  placeholder="Seleccione labor (opcional)"
+                  placeholder={
+                    loadingLabores
+                      ? "Cargando labores..."
+                      : "Seleccione labor (opcional)"
+                  }
                   data={labores}
                   value={idLabor}
                   onChange={setIdLabor}
@@ -1570,17 +1659,22 @@ export const RegistroUso = ({
                   classNames={fieldClasses}
                   radius="lg"
                   size="xs"
+                  rightSection={
+                    loadingLabores ? <Loader size={12} color="indigo" /> : null
+                  }
                 />
               </SimpleGrid>
               <Select
                 mt="md"
                 label="Lote de Mineral (Opcional)"
                 placeholder={
-                  idLabor
-                    ? "Seleccione lote de la labor (opcional)..."
-                    : idMina
-                      ? "Seleccione lote de la mina (opcional)..."
-                      : "Seleccione primero una mina"
+                  !idMina
+                    ? "Seleccione primero una mina"
+                    : loadingLotesMineral
+                      ? "Cargando lotes de mineral..."
+                      : idLabor
+                        ? "Seleccione lote de la labor (opcional)..."
+                        : "Seleccione lote de la mina (opcional)..."
                 }
                 data={lotesFiltrados.map((lm) => ({
                   value: String(lm.id_lote_mineral),
@@ -1594,6 +1688,11 @@ export const RegistroUso = ({
                 classNames={fieldClasses}
                 radius="lg"
                 size="xs"
+                rightSection={
+                  loadingLotesMineral ? (
+                    <Loader size={12} color="indigo" />
+                  ) : null
+                }
               />
             </Card>
           );
@@ -1606,18 +1705,30 @@ export const RegistroUso = ({
           <SimpleGrid cols={2} spacing="md">
             <Select
               label="Lote Mineral (Opc.)"
-              placeholder="Seleccione lote de mineral..."
-              data={lotesMineral.map((lm) => ({
-                value: String(lm.id_lote_mineral),
-                label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-              }))}
+              placeholder={
+                !idMina
+                  ? "Seleccione primero una mina"
+                  : loadingLotesMineral
+                    ? "Cargando lotes de mineral..."
+                    : "Seleccione lote de la mina (opcional)..."
+              }
+              data={lotesMineral
+                .filter((lm) => (idMina ? lm.id_mina === Number(idMina) : true))
+                .map((lm) => ({
+                  value: String(lm.id_lote_mineral),
+                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
+                }))}
               value={idLoteMineral}
               onChange={setIdLoteMineral}
               searchable
               clearable
+              disabled={!idMina}
               classNames={fieldClasses}
               radius="lg"
               size="xs"
+              rightSection={
+                loadingLotesMineral ? <Loader size={12} color="indigo" /> : null
+              }
             />
             <Select
               label="Tipo de Carga (Opc.)"
@@ -1676,7 +1787,11 @@ export const RegistroUso = ({
                 <>
                   <Select
                     label="Mina"
-                    placeholder="Seleccione mina"
+                    placeholder={
+                      loadingMinas
+                        ? "Cargando minas..."
+                        : "Seleccione mina"
+                    }
                     data={minas}
                     value={idMina}
                     onChange={setIdMina}
@@ -1685,6 +1800,11 @@ export const RegistroUso = ({
                     classNames={fieldClasses}
                     radius="lg"
                     size="xs"
+                    rightSection={
+                      loadingMinas ? (
+                        <Loader size={12} color="indigo" />
+                      ) : null
+                    }
                   />
                   <Select
                     label="Labor (Opcional)"
@@ -1712,7 +1832,11 @@ export const RegistroUso = ({
               ) : (
                 <Select
                   label="Cliente"
-                  placeholder="Seleccione cliente"
+                  placeholder={
+                    loadingClientes
+                      ? "Cargando clientes..."
+                      : "Seleccione cliente"
+                  }
                   data={clientes}
                   value={idCliente}
                   onChange={setIdCliente}
@@ -1721,6 +1845,9 @@ export const RegistroUso = ({
                   classNames={fieldClasses}
                   radius="lg"
                   size="xs"
+                  rightSection={
+                    loadingClientes ? <Loader size={12} color="indigo" /> : null
+                  }
                 />
               )}
             </SimpleGrid>
@@ -2411,7 +2538,11 @@ export const RegistroUso = ({
                       <Group gap={6} align="flex-end" wrap="nowrap">
                         <Select
                           label="Tarifa de Uso"
-                          placeholder="Seleccione tarifa..."
+                          placeholder={
+                            loadingTarifas
+                              ? "Cargando tarifas..."
+                              : "Seleccione tarifa..."
+                          }
                           data={tarifas
                             .filter((t) => t.tipo_control === "vueltas")
                             .map((t) => {
@@ -2447,6 +2578,11 @@ export const RegistroUso = ({
                           classNames={fieldClasses}
                           radius="lg"
                           size="xs"
+                          rightSection={
+                            loadingTarifas ? (
+                              <Loader size={12} color="indigo" />
+                            ) : null
+                          }
                         />
                         <Tooltip label="Historial de Tarifas">
                           <ActionIcon
@@ -3014,7 +3150,11 @@ export const RegistroUso = ({
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
             <Select
               label="Almacén"
-              placeholder="Seleccione almacen"
+              placeholder={
+                loadingAlmacenesConsumo
+                  ? "Cargando almacenes..."
+                  : "Seleccione almacen"
+              }
               data={almacenesConsumo}
               value={consumoForm.idAlmacen}
               onChange={(val) =>
@@ -3029,6 +3169,11 @@ export const RegistroUso = ({
               classNames={fieldClasses}
               radius="lg"
               size="sm"
+              rightSection={
+                loadingAlmacenesConsumo ? (
+                  <Loader size={12} color="indigo" />
+                ) : null
+              }
               comboboxProps={{
                 withinPortal: true,
                 zIndex: 9999,
@@ -3038,7 +3183,9 @@ export const RegistroUso = ({
 
             <Select
               label="Producto"
-              placeholder="Seleccione producto"
+              placeholder={
+                loadingProductos ? "Cargando productos..." : "Seleccione producto"
+              }
               data={productos.map((p) => ({
                 value: String(p.id_producto),
                 label: p.nombre,
@@ -3056,6 +3203,9 @@ export const RegistroUso = ({
               classNames={fieldClasses}
               radius="lg"
               size="sm"
+              rightSection={
+                loadingProductos ? <Loader size={12} color="indigo" /> : null
+              }
               comboboxProps={{
                 withinPortal: true,
                 zIndex: 9999,
@@ -3164,7 +3314,11 @@ export const RegistroUso = ({
 
             <Select
               label="Unidad de Medida"
-              placeholder="Seleccione unidad"
+              placeholder={
+                loadingUnidadesMedida
+                  ? "Cargando unidades..."
+                  : "Seleccione unidad"
+              }
               data={unidadesMedida.map((u) => ({
                 value: String(u.id_unidad_medida),
                 label: `${u.nombre} (${u.abreviatura})`,
@@ -3181,6 +3335,11 @@ export const RegistroUso = ({
               classNames={fieldClasses}
               radius="lg"
               size="sm"
+              rightSection={
+                loadingUnidadesMedida ? (
+                  <Loader size={12} color="indigo" />
+                ) : null
+              }
               comboboxProps={{
                 withinPortal: true,
                 zIndex: 9999,
