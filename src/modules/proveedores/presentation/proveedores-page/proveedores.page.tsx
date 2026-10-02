@@ -465,6 +465,7 @@ export const ProveedoresPage = () => {
         close={() => setOpenRegistro(false)}
         title={modoCarbon ? "Nuevo Proveedor de Carbon" : "Nuevo Proveedor"}
         size="lg"
+        validateClose
       >
         {modoCarbon ? (
           <RegistroProveedorCarbon
@@ -488,6 +489,7 @@ export const ProveedoresPage = () => {
       {/* Modal: Edición de Proveedor */}
       <ModalEstandar
         opened={!!proveedorEnEdicion}
+        validateClose
         close={() => setProveedorEnEdicion(null)}
         title={
           proveedorEnEdicion

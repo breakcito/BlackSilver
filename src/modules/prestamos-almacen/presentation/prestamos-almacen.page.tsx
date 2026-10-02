@@ -436,6 +436,7 @@ export const PrestamosAlmacenPage = () => {
         opened={openedRepo}
         close={closeReposicion}
         title="Registro de Reposición"
+        validateClose
         size="80%"
       >
         {selectedPrestamoId && (

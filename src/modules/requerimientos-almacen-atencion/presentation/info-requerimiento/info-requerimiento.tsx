@@ -168,8 +168,8 @@ export const InfoRequerimiento = ({
         opened={openedEditar}
         close={() => setOpenedEditar(false)}
         title={`Editar Requerimiento ${requerimiento.correlativo}`}
-        size="65%"
         validateClose
+        size="65%"
       >
         <RegistroRequerimiento
           modo="editar"
@@ -188,8 +188,8 @@ export const InfoRequerimiento = ({
         opened={openedEntregaBatch}
         close={closeEntregaBatch}
         title={`Registrar Entrega · ${requerimiento.correlativo}`}
-        size="75rem"
         validateClose
+        size="75rem"
       >
         {idAlmacen !== undefined && (
           <RegistrarEntrega

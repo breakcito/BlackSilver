@@ -140,6 +140,7 @@ export const CotizacionesPage = () => {
         opened={openedCreate}
         close={closeCreate}
         title="Nueva Cotización"
+        validateClose
         size="100%"
         stylesBody="bg-zinc-950 p-0 "
         rightSection={

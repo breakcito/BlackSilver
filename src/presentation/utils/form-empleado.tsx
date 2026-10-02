@@ -17,6 +17,7 @@ export const FormEmpleado = ({
     <ModalEstandar
       opened={opened}
       close={onClose}
+      validateClose
       title="Registrar Empleado"
       size="xl"
       zIndex={10001}

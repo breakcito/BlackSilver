@@ -56,6 +56,7 @@ export const DetalleTransferencia = ({
         opened={modalRecepcionAbierto}
         close={() => setModalRecepcionAbierto(false)}
         title="Registrar Recepción"
+        validateClose
         size="70%"
       >
         <RegistrarRecepcionTransferencia

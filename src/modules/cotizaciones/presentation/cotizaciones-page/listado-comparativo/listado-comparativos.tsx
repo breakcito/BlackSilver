@@ -240,6 +240,7 @@ export const ListadoComparativos = ({
         onClose={() => setModalComparativoOpened(false)}
         close={() => setModalComparativoOpened(false)}
         title="Comparativo de Cotizaciones"
+        validateClose
         size="95%"
         rightSection={
           <Group gap="xs" mr="xl">
@@ -334,6 +335,7 @@ export const ListadoComparativos = ({
         onClose={() => setModalEditarOpened(false)}
         close={() => setModalEditarOpened(false)}
         title="Editar Cotización"
+        validateClose
         size="64%"
       >
         {selectedCotParaEditar && (

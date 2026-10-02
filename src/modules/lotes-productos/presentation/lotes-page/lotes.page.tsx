@@ -211,6 +211,7 @@ export const LotesPage = () => {
         close={closeCreate}
         title="Ingreso de Stock"
         size="lg"
+        validateClose
       >
         <RegistroLote
           initialAlmacenId={idAlmacen ? Number(idAlmacen) : null}
@@ -228,6 +229,7 @@ export const LotesPage = () => {
         opened={openedAjuste}
         close={closeAjuste}
         title="Corrección de Inventario"
+        validateClose
         size="lg"
       >
         {loteParaAjustar && (
@@ -244,6 +246,7 @@ export const LotesPage = () => {
 
       <ModalEstandar
         opened={openedEdicion}
+        validateClose
         close={handleCloseEdit}
         title={
           loteParaEditar

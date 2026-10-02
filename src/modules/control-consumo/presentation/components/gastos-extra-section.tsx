@@ -311,6 +311,7 @@ export const GastosExtraSection = ({
         opened={modalOpen}
         close={handleCloseModal}
         title="Registrar Gasto Extra"
+        validateClose
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -401,7 +401,7 @@ export const RegistroLote = ({
         close={closeAddProducto}
         title="Nuevo Producto"
         size="lg"
-        zIndex={10001}
+        validateClose
       >
         <RegistroProducto
           productosExistentes={catalogs.productos.map((p) => ({

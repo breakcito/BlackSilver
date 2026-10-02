@@ -306,6 +306,7 @@ export const AtencionPrestamosPage = () => {
           setTimeout(() => setSelectedId(null), 300);
         }}
         title="Atención de Préstamos"
+        validateClose
         size="80%"
       >
         {selectedId && selectedPrestamo && (

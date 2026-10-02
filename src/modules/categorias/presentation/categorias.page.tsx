@@ -329,6 +329,7 @@ export const CategoriasPage = () => {
       <ModalEstandar
         opened={openedCreate}
         close={closeCreate}
+        validateClose
         title="Nueva Categoría"
         size="md"
       >
@@ -345,6 +346,7 @@ export const CategoriasPage = () => {
       {/* MODAL EDITAR CATEGORÍA */}
       <ModalEstandar
         opened={openedEdit}
+        validateClose
         close={cerrarModalEdicion}
         title={
           categoriaEnEdicion

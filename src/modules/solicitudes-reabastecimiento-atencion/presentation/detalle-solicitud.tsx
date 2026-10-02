@@ -443,274 +443,278 @@ export const DetalleSolicitud = ({
                   typeof item.valor_magnitud === "number" &&
                   typeof item.valor_magnitud_base === "number";
                 return (
-                <tr
-                  key={item.id_solicitud_detalle}
-                  className="hover:bg-zinc-900/40 transition-colors group"
-                >
-                  <td className="px-6 py-4 text-center text-xs font-mono text-zinc-500">
-                    {idx + 1}
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    {(item.estado === Estado_SolicitudDetalle.Aprobado ||
-                      item.estado === Estado_SolicitudDetalle.EnDespacho ||
-                      item.estado ===
-                        Estado_SolicitudDetalle.SolicitandoPrestamo) &&
-                    item.pendiente_base > 0 ? (
-                      <Checkbox
-                        checked={selectedItemsIds.includes(
-                          item.id_solicitud_detalle,
-                        )}
-                        onChange={() =>
-                          toggleItemSelection(item.id_solicitud_detalle)
-                        }
-                        color="indigo"
-                        size="sm"
-                      />
-                    ) : (
-                      <div className="flex justify-center">
-                        <NoSymbolIcon className="w-5 h-5 text-gray-500" />
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Stack gap={4}>
-                      <Text
-                        size="sm"
-                        fw={800}
-                        className="text-zinc-100 group-hover:text-indigo-400 transition-colors tracking-tight"
-                      >
-                        {item.producto}
-                      </Text>
-                      {(() => {
-                        const stock = Number(item.stock_disponible_base || 0);
-                        const pendiente = item.pendiente_base;
-
-                        return (
-                          <Group gap={4}>
-                            <Badge
-                              variant="light"
-                              color={
-                                stock <= 0
-                                  ? "red"
-                                  : stock < pendiente
-                                    ? "orange"
-                                    : "green"
-                              }
-                              size="xs"
-                              radius="sm"
-                            >
-                              Stock: {formatNumber(stock)}{" "}
-                              {item.unidad_medida_base_abv}
-                            </Badge>
-                            {item.cantidad_prestada_total_base > 0 && (
-                              <Tooltip label="Cantidad total prestada desde otros almacenes">
-                                <Badge
-                                  variant="filled"
-                                  color="orange"
-                                  size="xs"
-                                  radius="sm"
-                                >
-                                  Prestado:{" "}
-                                  {formatNumber(
-                                    item.cantidad_prestada_total_base,
-                                  )}
-                                </Badge>
-                              </Tooltip>
-                            )}
-                          </Group>
-                        );
-                      })()}
-                    </Stack>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <Group justify="center" gap={4}>
-                      {usaMagnitud ? (
-                        // Modelo "magnitud por item": mostramos
-                        // "items x unidad/ítem = total base".
-                        <>
-                          <Badge
-                            variant="filled"
-                            color="cyan"
-                            radius="sm"
-                            className="font-bold shadow-xs whitespace-nowrap"
-                          >
-                            {formatNumber(item.cantidad_items ?? 0)}
-                          </Badge>
-                          <Badge
-                            variant="filled"
-                            color="zinc"
-                            radius="sm"
-                            size="sm"
-                            className="font-black px-4"
-                          >
-                            × {formatNumber(item.valor_magnitud ?? 0)}{" "}
-                            {item.unidad_medida_sol_abv}
-                          </Badge>
-                          <Badge
-                            variant="filled"
-                            color="pink"
-                            radius="sm"
-                            className="font-bold shadow-xs whitespace-nowrap"
-                          >
-                            = {formatNumber(item.valor_magnitud_base ?? 0)}{" "}
-                            {item.unidad_medida_base_abv}
-                          </Badge>
-                        </>
+                  <tr
+                    key={item.id_solicitud_detalle}
+                    className="hover:bg-zinc-900/40 transition-colors group"
+                  >
+                    <td className="px-6 py-4 text-center text-xs font-mono text-zinc-500">
+                      {idx + 1}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      {(item.estado === Estado_SolicitudDetalle.Aprobado ||
+                        item.estado === Estado_SolicitudDetalle.EnDespacho ||
+                        item.estado ===
+                          Estado_SolicitudDetalle.SolicitandoPrestamo) &&
+                      item.pendiente_base > 0 ? (
+                        <Checkbox
+                          checked={selectedItemsIds.includes(
+                            item.id_solicitud_detalle,
+                          )}
+                          onChange={() =>
+                            toggleItemSelection(item.id_solicitud_detalle)
+                          }
+                          color="indigo"
+                          size="sm"
+                        />
                       ) : (
-                        // Modelo clasico: "cantidad en unidad detalle x factor".
-                        <>
-                          <Badge
-                            variant="filled"
-                            color="cyan"
-                            radius="sm"
-                            className="font-bold shadow-xs whitespace-nowrap"
-                          >
-                            {formatNumber(item.cantidad_solicitada)}{" "}
-                            {item.unidad_medida_sol_abv}
-                          </Badge>{" "}
-                          {item.unidad_medida_base_abv !==
-                            item.unidad_medida_sol_abv && (
-                            <>
+                        <div className="flex justify-center">
+                          <NoSymbolIcon className="w-5 h-5 text-gray-500" />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Stack gap={4}>
+                        <Text
+                          size="sm"
+                          fw={800}
+                          className="text-zinc-100 group-hover:text-indigo-400 transition-colors tracking-tight"
+                        >
+                          {item.producto}
+                        </Text>
+                        {(() => {
+                          const stock = Number(item.stock_disponible_base || 0);
+                          const pendiente = item.pendiente_base;
+
+                          return (
+                            <Group gap={4}>
                               <Badge
-                                variant="filled"
-                                color="zinc"
+                                variant="light"
+                                color={
+                                  stock <= 0
+                                    ? "red"
+                                    : stock < pendiente
+                                      ? "orange"
+                                      : "green"
+                                }
+                                size="xs"
                                 radius="sm"
-                                size="sm"
-                                className="font-black px-4"
                               >
-                                {formatNumber(item.contenido_por_presentacion)}{" "}
-                                {item.unidad_medida_base_abv}{" "}
-                                <span className="lowercase">x</span>{" "}
-                                {item.unidad_medida_sol_abv}
-                              </Badge>
-                              <Badge
-                                variant="filled"
-                                color="pink"
-                                radius="sm"
-                                className="font-bold shadow-xs whitespace-nowrap"
-                              >
-                                {formatNumber(item.cantidad_solicitada_base)}{" "}
+                                Stock: {formatNumber(stock)}{" "}
                                 {item.unidad_medida_base_abv}
                               </Badge>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Group>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex flex-col gap-1.5 w-full">
-                      <div className="flex justify-between items-center px-1">
-                        <Text size="10px" fw={800} c="zinc.5">
-                          Entregado: {formatNumber(item.cantidad_entregada)}{" "}
-                          {item.unidad_medida_sol_abv}
-                        </Text>
-                        <Text size="10px" fw={900} c="indigo.4">
-                          {item.porcentaje_progreso}%
-                        </Text>
-                      </div>
-                      <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-indigo-500 transition-all duration-700"
-                          style={{ width: `${item.porcentaje_progreso}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <Stack gap={4} align="center">
-                      <Badge
-                        variant="light"
-                        color={getStatusColor(item.estado)}
-                        radius="md"
-                        size="sm"
-                        className="font-bold uppercase"
-                      >
-                        {item.estado}
-                      </Badge>
-                      {item.comentario_decision && (
-                        <Tooltip label={item.comentario_decision} withArrow>
-                          <Text
-                            size="10px"
-                            fw={700}
-                            c="orange.4"
-                            className="max-w-32 truncate"
-                          >
-                            {item.comentario_decision}
-                          </Text>
-                        </Tooltip>
-                      )}
-                    </Stack>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Group gap={8} justify="center" wrap="nowrap">
-                      <Tooltip label="Seguimiento">
-                        <ActionIcon
-                          variant="subtle"
-                          color="zinc"
-                          onClick={() => {
-                            setSelectedItemId(item.id_solicitud_detalle);
-                            setSelectedItemName(item.producto);
-                            openTrace();
-                          }}
-                        >
-                          <ClockIcon className="w-4 h-4" />
-                        </ActionIcon>
-                      </Tooltip>
-                      {item.estado ===
-                        Estado_SolicitudDetalle.EsperandoAprobacion && (
-                        <>
-                          <Tooltip label="Aprobar">
-                            <ActionIcon
-                              variant="filled"
-                              color="green"
-                              onClick={() => {
-                                setSelectedItemId(item.id_solicitud_detalle);
-                                openAprobar();
-                              }}
-                              disabled={
-                                !!isProcessing &&
-                                isProcessing === item.id_solicitud_detalle
-                              }
-                            >
-                              <CheckCircleIcon className="w-5 h-5" />
-                            </ActionIcon>
-                          </Tooltip>
-                          <Tooltip label="Rechazar">
-                            <ActionIcon
-                              variant="filled"
-                              color="red"
-                              onClick={() => {
-                                setSelectedItemId(item.id_solicitud_detalle);
-                                openRechazo();
-                              }}
-                              disabled={
-                                !!isProcessing &&
-                                isProcessing === item.id_solicitud_detalle
-                              }
-                            >
-                              <XCircleIcon className="w-5 h-5" />
-                            </ActionIcon>
-                          </Tooltip>
-
-                          <Tooltip label="Acción masiva">
-                            <Checkbox
-                              size="xs"
-                              color="indigo"
-                              checked={idsParaAccionMasiva.includes(
-                                item.id_solicitud_detalle,
+                              {item.cantidad_prestada_total_base > 0 && (
+                                <Tooltip label="Cantidad total prestada desde otros almacenes">
+                                  <Badge
+                                    variant="filled"
+                                    color="orange"
+                                    size="xs"
+                                    radius="sm"
+                                  >
+                                    Prestado:{" "}
+                                    {formatNumber(
+                                      item.cantidad_prestada_total_base,
+                                    )}
+                                  </Badge>
+                                </Tooltip>
                               )}
-                              onChange={() =>
-                                toggleSeleccionMasiva(item.id_solicitud_detalle)
-                              }
-                              className="ml-1"
-                            />
+                            </Group>
+                          );
+                        })()}
+                      </Stack>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Group justify="center" gap={4}>
+                        {usaMagnitud ? (
+                          // Modelo "magnitud por item": mostramos
+                          // "items x unidad/ítem = total base".
+                          <>
+                            <Badge
+                              variant="filled"
+                              color="cyan"
+                              radius="sm"
+                              className="font-bold shadow-xs whitespace-nowrap"
+                            >
+                              {formatNumber(item.cantidad_items ?? 0)}
+                            </Badge>
+                            <Badge
+                              variant="filled"
+                              color="zinc"
+                              radius="sm"
+                              size="sm"
+                              className="font-black px-4"
+                            >
+                              × {formatNumber(item.valor_magnitud ?? 0)}{" "}
+                              {item.unidad_medida_sol_abv}
+                            </Badge>
+                            <Badge
+                              variant="filled"
+                              color="pink"
+                              radius="sm"
+                              className="font-bold shadow-xs whitespace-nowrap"
+                            >
+                              = {formatNumber(item.valor_magnitud_base ?? 0)}{" "}
+                              {item.unidad_medida_base_abv}
+                            </Badge>
+                          </>
+                        ) : (
+                          // Modelo clasico: "cantidad en unidad detalle x factor".
+                          <>
+                            <Badge
+                              variant="filled"
+                              color="cyan"
+                              radius="sm"
+                              className="font-bold shadow-xs whitespace-nowrap"
+                            >
+                              {formatNumber(item.cantidad_solicitada)}{" "}
+                              {item.unidad_medida_sol_abv}
+                            </Badge>{" "}
+                            {item.unidad_medida_base_abv !==
+                              item.unidad_medida_sol_abv && (
+                              <>
+                                <Badge
+                                  variant="filled"
+                                  color="zinc"
+                                  radius="sm"
+                                  size="sm"
+                                  className="font-black px-4"
+                                >
+                                  {formatNumber(
+                                    item.contenido_por_presentacion,
+                                  )}{" "}
+                                  {item.unidad_medida_base_abv}{" "}
+                                  <span className="lowercase">x</span>{" "}
+                                  {item.unidad_medida_sol_abv}
+                                </Badge>
+                                <Badge
+                                  variant="filled"
+                                  color="pink"
+                                  radius="sm"
+                                  className="font-bold shadow-xs whitespace-nowrap"
+                                >
+                                  {formatNumber(item.cantidad_solicitada_base)}{" "}
+                                  {item.unidad_medida_base_abv}
+                                </Badge>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </Group>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-col gap-1.5 w-full">
+                        <div className="flex justify-between items-center px-1">
+                          <Text size="10px" fw={800} c="zinc.5">
+                            Entregado: {formatNumber(item.cantidad_entregada)}{" "}
+                            {item.unidad_medida_sol_abv}
+                          </Text>
+                          <Text size="10px" fw={900} c="indigo.4">
+                            {item.porcentaje_progreso}%
+                          </Text>
+                        </div>
+                        <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 transition-all duration-700"
+                            style={{ width: `${item.porcentaje_progreso}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Stack gap={4} align="center">
+                        <Badge
+                          variant="light"
+                          color={getStatusColor(item.estado)}
+                          radius="md"
+                          size="sm"
+                          className="font-bold uppercase"
+                        >
+                          {item.estado}
+                        </Badge>
+                        {item.comentario_decision && (
+                          <Tooltip label={item.comentario_decision} withArrow>
+                            <Text
+                              size="10px"
+                              fw={700}
+                              c="orange.4"
+                              className="max-w-32 truncate"
+                            >
+                              {item.comentario_decision}
+                            </Text>
                           </Tooltip>
-                        </>
-                      )}
-                    </Group>
-                  </td>
-                </tr>
+                        )}
+                      </Stack>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Group gap={8} justify="center" wrap="nowrap">
+                        <Tooltip label="Seguimiento">
+                          <ActionIcon
+                            variant="subtle"
+                            color="zinc"
+                            onClick={() => {
+                              setSelectedItemId(item.id_solicitud_detalle);
+                              setSelectedItemName(item.producto);
+                              openTrace();
+                            }}
+                          >
+                            <ClockIcon className="w-4 h-4" />
+                          </ActionIcon>
+                        </Tooltip>
+                        {item.estado ===
+                          Estado_SolicitudDetalle.EsperandoAprobacion && (
+                          <>
+                            <Tooltip label="Aprobar">
+                              <ActionIcon
+                                variant="filled"
+                                color="green"
+                                onClick={() => {
+                                  setSelectedItemId(item.id_solicitud_detalle);
+                                  openAprobar();
+                                }}
+                                disabled={
+                                  !!isProcessing &&
+                                  isProcessing === item.id_solicitud_detalle
+                                }
+                              >
+                                <CheckCircleIcon className="w-5 h-5" />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Rechazar">
+                              <ActionIcon
+                                variant="filled"
+                                color="red"
+                                onClick={() => {
+                                  setSelectedItemId(item.id_solicitud_detalle);
+                                  openRechazo();
+                                }}
+                                disabled={
+                                  !!isProcessing &&
+                                  isProcessing === item.id_solicitud_detalle
+                                }
+                              >
+                                <XCircleIcon className="w-5 h-5" />
+                              </ActionIcon>
+                            </Tooltip>
+
+                            <Tooltip label="Acción masiva">
+                              <Checkbox
+                                size="xs"
+                                color="indigo"
+                                checked={idsParaAccionMasiva.includes(
+                                  item.id_solicitud_detalle,
+                                )}
+                                onChange={() =>
+                                  toggleSeleccionMasiva(
+                                    item.id_solicitud_detalle,
+                                  )
+                                }
+                                className="ml-1"
+                              />
+                            </Tooltip>
+                          </>
+                        )}
+                      </Group>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -817,6 +821,7 @@ export const DetalleSolicitud = ({
         opened={openedEntrega}
         close={closeEntrega}
         title="Registrar Entrega"
+        validateClose
         size="65%"
       >
         <RegistroEntrega
@@ -847,6 +852,7 @@ export const DetalleSolicitud = ({
         opened={openedPrestamo}
         close={closePrestamo}
         title="Solicitar un Préstamo"
+        validateClose
         size="75%"
       >
         <RegistrarPrestamoAlmacen

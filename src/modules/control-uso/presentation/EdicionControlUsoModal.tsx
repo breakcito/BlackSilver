@@ -507,6 +507,7 @@ export const EdicionControlUsoModal = ({
   return (
     <ModalEstandar
       opened={opened}
+      validateClose
       close={() => {
         if (!saving) close();
       }}

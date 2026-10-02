@@ -462,6 +462,7 @@ export const FormProducto = ({ onSuccess, onCancel }: FormProductoProps) => {
         close={() => setOpenedAddCat(false)}
         title="Nueva Categoría"
         size="md"
+        validateClose
         zIndex={1001}
       >
         <FormCategoria
@@ -480,6 +481,7 @@ export const FormProducto = ({ onSuccess, onCancel }: FormProductoProps) => {
         title="Nueva Unidad de Medida"
         size="sm"
         zIndex={1001}
+        validateClose
       >
         <FormUnidadMedida
           onSuccess={async (nuevaUnidad) => {

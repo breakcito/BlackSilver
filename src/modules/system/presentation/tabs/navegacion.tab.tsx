@@ -198,100 +198,204 @@ export const NavegacionTab = () => {
           return (
             <div key={key}>
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all group">
-                <ActionIcon variant="subtle" color="zinc" onClick={() => toggle(key)}>
-                  {isOpen ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
+                <ActionIcon
+                  variant="subtle"
+                  color="zinc"
+                  onClick={() => toggle(key)}
+                >
+                  {isOpen ? (
+                    <ChevronDownIcon className="w-4 h-4" />
+                  ) : (
+                    <ChevronRightIcon className="w-4 h-4" />
+                  )}
                 </ActionIcon>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-white">{menu.nombre}</span>
+                    <span className="font-semibold text-sm text-white">
+                      {menu.nombre}
+                    </span>
                     <span className="text-xs text-zinc-500">/{menu.path}</span>
                     {menu.es_desplegable ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">CONT</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                        CONT
+                      </span>
                     ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">VISTA</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        VISTA
+                      </span>
                     )}
                   </div>
                 </div>
                 <Group gap={4}>
-                  <ActionIcon variant="subtle" color="indigo" onClick={() => setEditTarget({ tipo: "menu", id: menu.id, nombre: menu.nombre, path: menu.path, numero_orden: menu.numero_orden, es_desplegable: menu.es_desplegable })}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="indigo"
+                    onClick={() =>
+                      setEditTarget({
+                        tipo: "menu",
+                        id: menu.id,
+                        nombre: menu.nombre,
+                        path: menu.path,
+                        numero_orden: menu.numero_orden,
+                        es_desplegable: menu.es_desplegable,
+                      })
+                    }
+                  >
                     <PencilSquareIcon className="w-4 h-4" />
                   </ActionIcon>
-                  <ActionIcon variant="subtle" color="indigo" onClick={() => setCreateTarget({ tipo: "submenu", id_menu: menu.id })}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="indigo"
+                    onClick={() =>
+                      setCreateTarget({ tipo: "submenu", id_menu: menu.id })
+                    }
+                  >
                     <PlusIcon className="w-4 h-4" />
                   </ActionIcon>
-                  <ActionIcon variant="subtle" color="red" onClick={() => handleDelete("menu", menu.id, menu.nombre)}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    onClick={() => handleDelete("menu", menu.id, menu.nombre)}
+                  >
                     <TrashIcon className="w-4 h-4" />
                   </ActionIcon>
                 </Group>
               </div>
-              {isOpen && menu.submenus.map((sub: RES_SubmenuMenu) => {
-                const skey = `s-${sub.id}`;
-                const sOpen = expanded[skey];
-                const esDirecto = !sub.es_desplegable && !!sub.path;
-                return (
-                  <div key={skey} className="ml-6 mt-1">
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all group">
-                      <ActionIcon
-                        variant="subtle"
-                        color="zinc"
-                        size="sm"
-                        onClick={esDirecto ? undefined : () => toggle(skey)}
-                        style={esDirecto ? { cursor: "default" } : undefined}
-                      >
-                        {esDirecto ? (
-                          <ArrowRightEndOnRectangleIcon className="w-3 h-3" />
-                        ) : sOpen ? (
-                          <ChevronDownIcon className="w-3 h-3" />
-                        ) : (
-                          <ChevronRightIcon className="w-3 h-3" />
-                        )}
-                      </ActionIcon>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-zinc-200">{sub.nombre}</span>
-                          <span className="text-xs text-zinc-500">/{sub.path}</span>
-                          {sub.es_desplegable ? (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">CONT</span>
+              {isOpen &&
+                menu.submenus.map((sub: RES_SubmenuMenu) => {
+                  const skey = `s-${sub.id}`;
+                  const sOpen = expanded[skey];
+                  const esDirecto = !sub.es_desplegable && !!sub.path;
+                  return (
+                    <div key={skey} className="ml-6 mt-1">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all group">
+                        <ActionIcon
+                          variant="subtle"
+                          color="zinc"
+                          size="sm"
+                          onClick={esDirecto ? undefined : () => toggle(skey)}
+                          style={esDirecto ? { cursor: "default" } : undefined}
+                        >
+                          {esDirecto ? (
+                            <ArrowRightEndOnRectangleIcon className="w-3 h-3" />
+                          ) : sOpen ? (
+                            <ChevronDownIcon className="w-3 h-3" />
                           ) : (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">VISTA</span>
+                            <ChevronRightIcon className="w-3 h-3" />
                           )}
+                        </ActionIcon>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-zinc-200">
+                              {sub.nombre}
+                            </span>
+                            <span className="text-xs text-zinc-500">
+                              /{sub.path}
+                            </span>
+                            {sub.es_desplegable ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                                CONT
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                VISTA
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <Group gap={4}>
+                          <ActionIcon
+                            variant="subtle"
+                            color="indigo"
+                            size="sm"
+                            onClick={() =>
+                              setEditTarget({
+                                tipo: "submenu",
+                                id: sub.id,
+                                id_menu: sub.id_menu,
+                                nombre: sub.nombre,
+                                path: sub.path,
+                                numero_orden: sub.numero_orden,
+                                es_desplegable: sub.es_desplegable,
+                              })
+                            }
+                          >
+                            <PencilSquareIcon className="w-3.5 h-3.5" />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="indigo"
+                            size="sm"
+                            onClick={() =>
+                              setCreateTarget({
+                                tipo: "modulo",
+                                id_submenu: sub.id,
+                              })
+                            }
+                          >
+                            <PlusIcon className="w-3.5 h-3.5" />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            size="sm"
+                            onClick={() =>
+                              handleDelete("submenu", sub.id, sub.nombre)
+                            }
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </ActionIcon>
+                        </Group>
                       </div>
-                      <Group gap={4}>
-                        <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => setEditTarget({ tipo: "submenu", id: sub.id, id_menu: sub.id_menu, nombre: sub.nombre, path: sub.path, numero_orden: sub.numero_orden, es_desplegable: sub.es_desplegable })}>
-                          <PencilSquareIcon className="w-3.5 h-3.5" />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => setCreateTarget({ tipo: "modulo", id_submenu: sub.id })}>
-                          <PlusIcon className="w-3.5 h-3.5" />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDelete("submenu", sub.id, sub.nombre)}>
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </ActionIcon>
-                      </Group>
-                    </div>
-                    {sOpen && sub.modulos.map((mod: RES_ModuloMenu) => (
-                      <div key={`md-${mod.id}`} className="ml-8 mt-1">
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-zinc-300">{mod.nombre}</span>
-                              <span className="text-xs text-zinc-500">/{mod.path}</span>
+                      {sOpen &&
+                        sub.modulos.map((mod: RES_ModuloMenu) => (
+                          <div key={`md-${mod.id}`} className="ml-8 mt-1">
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-zinc-300">
+                                    {mod.nombre}
+                                  </span>
+                                  <span className="text-xs text-zinc-500">
+                                    /{mod.path}
+                                  </span>
+                                </div>
+                              </div>
+                              <Group gap={4}>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="indigo"
+                                  size="sm"
+                                  onClick={() =>
+                                    setEditTarget({
+                                      tipo: "modulo",
+                                      id: mod.id,
+                                      id_submenu: mod.id_submenu,
+                                      nombre: mod.nombre,
+                                      path: mod.path,
+                                      numero_orden: mod.numero_orden,
+                                    })
+                                  }
+                                >
+                                  <PencilSquareIcon className="w-3.5 h-3.5" />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="red"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDelete("modulo", mod.id, mod.nombre)
+                                  }
+                                >
+                                  <TrashIcon className="w-3.5 h-3.5" />
+                                </ActionIcon>
+                              </Group>
                             </div>
                           </div>
-                          <Group gap={4}>
-                            <ActionIcon variant="subtle" color="indigo" size="sm" onClick={() => setEditTarget({ tipo: "modulo", id: mod.id, id_submenu: mod.id_submenu, nombre: mod.nombre, path: mod.path, numero_orden: mod.numero_orden })}>
-                              <PencilSquareIcon className="w-3.5 h-3.5" />
-                            </ActionIcon>
-                            <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDelete("modulo", mod.id, mod.nombre)}>
-                              <TrashIcon className="w-3.5 h-3.5" />
-                            </ActionIcon>
-                          </Group>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
+                        ))}
+                    </div>
+                  );
+                })}
             </div>
           );
         })}
@@ -300,10 +404,13 @@ export const NavegacionTab = () => {
       <ModalEstandar
         opened={createTarget !== null}
         close={() => setCreateTarget(null)}
+        validateClose
         title={
-          createTarget?.tipo === "menu" ? "Nuevo Menú"
-            : createTarget?.tipo === "submenu" ? "Nuevo Submenú"
-            : "Nuevo Módulo"
+          createTarget?.tipo === "menu"
+            ? "Nuevo Menú"
+            : createTarget?.tipo === "submenu"
+              ? "Nuevo Submenú"
+              : "Nuevo Módulo"
         }
         size="sm"
       >
@@ -321,10 +428,13 @@ export const NavegacionTab = () => {
       <ModalEstandar
         opened={editTarget !== null}
         close={() => setEditTarget(null)}
+        validateClose
         title={
-          editTarget?.tipo === "menu" ? "Editar Menú"
-            : editTarget?.tipo === "submenu" ? "Editar Submenú"
-            : "Editar Módulo"
+          editTarget?.tipo === "menu"
+            ? "Editar Menú"
+            : editTarget?.tipo === "submenu"
+              ? "Editar Submenú"
+              : "Editar Módulo"
         }
         size="sm"
       >
@@ -334,7 +444,9 @@ export const NavegacionTab = () => {
             initialNombre={editTarget.nombre}
             initialPath={editTarget.path}
             initialNumero={editTarget.numero_orden}
-            initialDesplegable={"es_desplegable" in editTarget ? editTarget.es_desplegable : true}
+            initialDesplegable={
+              "es_desplegable" in editTarget ? editTarget.es_desplegable : true
+            }
             showDesplegable={editTarget.tipo !== "modulo"}
             onSubmit={handleEdit}
             onCancel={() => setEditTarget(null)}

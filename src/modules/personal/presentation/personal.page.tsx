@@ -386,6 +386,7 @@ export const PersonalPage = () => {
         opened={openedRegEmp}
         close={closeRegEmp}
         title="Registrar Empleado"
+        validateClose
         size="lg"
       >
         <RegistroEmpleado
@@ -401,6 +402,7 @@ export const PersonalPage = () => {
         opened={openedRegCon}
         close={closeRegCon}
         title="Registrar Contratista"
+        validateClose
         size="lg"
       >
         <RegistroContratista
@@ -416,6 +418,7 @@ export const PersonalPage = () => {
         opened={asignacionCtrl.opened}
         close={asignacionCtrl.cerrar}
         title="Asignación de Labores"
+        validateClose
         size="sm"
       >
         {asignacionCtrl.contratista && (

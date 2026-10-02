@@ -685,6 +685,7 @@ export const RequerimientosAlmacenAtencionPage = () => {
         }}
         title={`Atender Requerimiento de Almacén`}
         size="80rem"
+        validateClose
       >
         {selectedRequerimiento && (
           <InfoRequerimiento
@@ -721,9 +722,9 @@ export const RequerimientosAlmacenAtencionPage = () => {
             classNames={{ message: "text-zinc-200 text-sm leading-relaxed" }}
           >
             Esta accion cambiara el estado del requerimiento a{" "}
-            <strong>Anulado</strong>. Si ya tiene entregas iniciadas, el stock de
-            lotes sera reingresado, los activos fijos seran devueltos al almacen
-            de origen y los consumos asociados seran eliminados.
+            <strong>Anulado</strong>. Si ya tiene entregas iniciadas, el stock
+            de lotes sera reingresado, los activos fijos seran devueltos al
+            almacen de origen y los consumos asociados seran eliminados.
           </Alert>
           <Text size="sm" className="text-zinc-300">
             Requerimiento a anular:{" "}
@@ -754,7 +755,8 @@ export const RequerimientosAlmacenAtencionPage = () => {
                 if (!anularId) return;
                 setAnulando(true);
                 try {
-                  const res = await AtencionService.anularRequerimiento(anularId);
+                  const res =
+                    await AtencionService.anularRequerimiento(anularId);
                   if (res.success) {
                     notifySuccess(
                       res.message ?? "Requerimiento anulado correctamente",

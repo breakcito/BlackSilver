@@ -254,6 +254,7 @@ export const ClientesPage = () => {
       <ModalEstandar
         opened={openRegistro}
         close={() => setOpenRegistro(false)}
+        validateClose
         title={modoCarbon ? "Nuevo Cliente de Carbón" : "Nuevo Cliente"}
         size="lg"
       >
@@ -280,6 +281,7 @@ export const ClientesPage = () => {
       {/* Modal: Editar Cliente */}
       <ModalEstandar
         opened={openedEdicion}
+        validateClose
         close={handleCloseEdit}
         title={
           clienteParaEditar

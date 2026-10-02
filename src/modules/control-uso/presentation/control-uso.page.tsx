@@ -949,6 +949,7 @@ export const ControlUsoPage = () => {
       <ModalEstandar
         opened={opened}
         close={close}
+        validateClose
         title={`Registrar Control por ${tipoControl === "horometro" ? "Horómetro" : tipoControl === "odometro" ? "Odómetro" : "Vueltas"}`}
         size="xl"
       >
@@ -1009,6 +1010,7 @@ export const ControlUsoPage = () => {
 
       {/* Anular Control de Uso Modal */}
       <ModalEstandar
+        validateClose
         opened={anularOpened}
         close={() => {
           if (!anulando) {

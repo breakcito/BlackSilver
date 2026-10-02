@@ -119,6 +119,7 @@ export const CompraCarbonPage = () => {
       <ModalEstandar
         opened={openRegistro}
         close={() => setOpenRegistro(false)}
+        validateClose
         title="Nueva Compra de Carbon"
         size="55rem"
         rightSection={

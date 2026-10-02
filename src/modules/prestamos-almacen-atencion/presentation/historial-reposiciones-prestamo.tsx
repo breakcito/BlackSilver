@@ -798,6 +798,7 @@ export const HistorialReposicionesPrestamo = ({
         opened={openedRecepcion}
         close={() => setOpenedRecepcion(false)}
         title="Registrar Recepción"
+        validateClose
         rightSection={
           <Badge
             variant="light"

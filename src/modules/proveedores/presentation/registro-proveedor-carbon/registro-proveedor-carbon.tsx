@@ -749,6 +749,7 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         opened={modalNuevoLugarAbierto}
         close={() => setModalNuevoLugarAbierto(false)}
         title="Nuevo lugar de extracción"
+        validateClose
         size="lg"
       >
         <FormLugarExtraccion
@@ -761,6 +762,7 @@ export const RegistroProveedorCarbon = ({ onCancel, onSuccess }: Props) => {
         opened={modalAlmacenAbierto}
         close={cerrarModalAlmacen}
         title={almacenEnEdicion ? "Editar almacén" : "Añadir almacén"}
+        validateClose
         size="md"
       >
         <FormAlmacenCarbon<CrearAlmacenCarbonRequest>

@@ -299,6 +299,7 @@ export const CuentasPage = () => {
         opened={openedCreate}
         close={closeCreate}
         title={selectedCuenta ? "Cambiar Contraseña" : "Registrar Nueva Cuenta"}
+        validateClose
         size="lg"
       >
         <RegistroCuenta

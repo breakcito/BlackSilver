@@ -84,6 +84,7 @@ export const ActivoMantenimientoModal = ({ opened, close, activo, tipoControl, o
     <ModalEstandar
       opened={opened}
       close={close}
+      validateClose
       title="Resolver Alerta de Mantenimiento"
       size="md"
     >

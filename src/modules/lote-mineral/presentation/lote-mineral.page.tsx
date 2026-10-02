@@ -241,6 +241,7 @@ export const LoteMineralPage = () => {
         opened={openedCreate}
         close={closeCreate}
         title="Nuevo Lote de Mineral"
+        validateClose
         size="lg"
       >
         <RegistroLoteMineral

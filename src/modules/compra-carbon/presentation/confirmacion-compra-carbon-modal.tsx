@@ -1607,6 +1607,7 @@ export const ConfirmacionCompraCarbonModal = ({
           setOpenNuevaTarifa(false);
           setTargetTarifaIdx(null);
         }}
+        validateClose
         title="Nueva Tarifa de Carbón"
         size="md"
       >

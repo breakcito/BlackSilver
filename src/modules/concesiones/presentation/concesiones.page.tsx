@@ -155,6 +155,7 @@ export const ConcesionesPage = () => {
       <ModalEstandar
         opened={openedRegistro}
         close={closeRegistro}
+        validateClose
         title="Registrar Concesión"
         size="md"
       >

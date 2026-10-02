@@ -437,6 +437,7 @@ export const ProduccionMineralPage = () => {
         close={() => setRegisterModalOpen(false)}
         title="Nuevo Lote de Mineral"
         size="lg"
+        validateClose
       >
         <RegistroLoteMineral
           isFromProduccion={true}

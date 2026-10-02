@@ -134,6 +134,7 @@ export const AjustarTotalesModal = ({
       close={close}
       title={TITULO_POR_TIPO[tipo]}
       size="md"
+      validateClose
     >
       <Stack gap="md">
         {/* Contexto del activo */}

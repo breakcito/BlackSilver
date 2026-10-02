@@ -336,6 +336,7 @@ export const GestionLabores = ({
         opened={openedCreate}
         close={closeCreate}
         title="Registrar Labor"
+        validateClose
         size="lg"
       >
         <RegistroLabor

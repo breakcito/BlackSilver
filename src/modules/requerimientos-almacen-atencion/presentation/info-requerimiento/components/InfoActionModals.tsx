@@ -186,6 +186,7 @@ export const InfoActionModals = ({
         opened={logistica.opened}
         close={logistica.close}
         title="Consultar con Logística"
+        validateClose
         size="90%"
       >
         <RegistrarSolicitudLogistica

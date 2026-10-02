@@ -248,6 +248,7 @@ export const ModalSeleccionProductos = ({
       <ModalEstandar
         opened={opened}
         close={onClose}
+        validateClose
         title="Añadir Productos"
         size="xl"
         rightSection={
@@ -469,6 +470,7 @@ export const ModalSeleccionProductos = ({
         opened={openedAddProducto}
         close={() => setOpenedAddProducto(false)}
         title="Registrar Producto"
+        validateClose
         size="lg"
       >
         <RegistroProducto

@@ -253,6 +253,7 @@ export const RegistroCuenta = forwardRef<RegistroCuentaRef, Props>(
           opened={openBanco}
           close={() => setOpenBanco(false)}
           title="Registrar Nuevo Banco"
+          validateClose
           size="sm"
         >
           <RegistroBanco

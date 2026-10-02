@@ -317,6 +317,7 @@ export const MinasPage = () => {
         opened={openedCreate}
         close={closeCreate}
         title="Registrar Mina"
+        validateClose
         size="md"
       >
         <RegistroMina

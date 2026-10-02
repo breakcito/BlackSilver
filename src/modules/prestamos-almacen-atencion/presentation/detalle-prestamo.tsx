@@ -771,6 +771,7 @@ export const DetallePrestamo = ({
         opened={openedNuevaEntrega}
         close={closeNuevaEntrega}
         title="Nueva Entrega"
+        validateClose
         size="80%"
       >
         <RegistrarEntregaModal

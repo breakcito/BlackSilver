@@ -505,6 +505,7 @@ export const ModalAdendaContrato = ({
         opened={opened}
         close={close}
         title="Registrar Adenda"
+        validateClose
         size="lg"
       >
         <Stack gap="md">
@@ -986,6 +987,7 @@ export const ModalAdendaContrato = ({
           opened={openedAddArea}
           close={() => setOpenedAddArea(false)}
           title="Agregar Área"
+          validateClose
           size="md"
         >
           <RegistroArea
@@ -1008,6 +1010,7 @@ export const ModalAdendaContrato = ({
           opened={openedAddCargo}
           close={() => setOpenedAddCargo(false)}
           title="Agregar Cargo"
+          validateClose
           size="md"
         >
           <RegistroCargo

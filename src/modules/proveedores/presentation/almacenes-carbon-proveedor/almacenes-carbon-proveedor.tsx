@@ -178,8 +178,8 @@ export const AlmacenesCarbonProveedor = ({
           {proveedor.razon_social}
         </Text>
         <Text size="xs" className="text-zinc-400">
-          Almacenes propios donde este proveedor guarda carbon. Cada
-          registro vive bajo este proveedor.
+          Almacenes propios donde este proveedor guarda carbon. Cada registro
+          vive bajo este proveedor.
         </Text>
       </div>
 
@@ -287,6 +287,7 @@ export const AlmacenesCarbonProveedor = ({
         opened={modalAbierto}
         close={cerrarModal}
         title={enEdicion ? "Editar almacén" : "Añadir almacén"}
+        validateClose
         size="md"
       >
         <FormAlmacenCarbon<CrearAlmacenCarbonRequest>

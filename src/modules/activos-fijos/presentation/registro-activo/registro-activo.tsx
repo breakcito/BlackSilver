@@ -839,6 +839,7 @@ export const RegistroActivo = ({ onSuccess, onCancel }: Props) => {
 
       {/* Modal para Crear Marca */}
       <ModalEstandar
+        validateClose
         opened={openedMarca}
         close={closeMarca}
         title="Registrar Nueva Marca"

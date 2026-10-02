@@ -90,6 +90,7 @@ export const NuevaCotizacionDesdeSolicitud = ({
       close={onClose}
       title="Nueva Cotización desde Solicitud de Reabastecimiento"
       size="95%"
+      validateClose
       rightSection={headerActions}
     >
       <RegistroCotizacion

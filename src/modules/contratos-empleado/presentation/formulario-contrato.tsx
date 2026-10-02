@@ -816,6 +816,7 @@ export const FormularioContratoEmpleado = ({
         opened={openedAddArea}
         close={() => setOpenedAddArea(false)}
         title="Registrar Nueva Área"
+        validateClose
         size="md"
       >
         <RegistroArea
@@ -837,6 +838,7 @@ export const FormularioContratoEmpleado = ({
         opened={openedAddCargo}
         close={() => setOpenedAddCargo(false)}
         title="Registrar Nuevo Cargo"
+        validateClose
         size="md"
       >
         <RegistroCargo

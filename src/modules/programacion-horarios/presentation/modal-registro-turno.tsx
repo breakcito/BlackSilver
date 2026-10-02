@@ -82,6 +82,7 @@ export const ModalRegistroTurno = ({
       title={turnoEditar ? "Editar Horario" : "Registrar Horario"}
       size="md"
       zIndex={zIndex}
+      validateClose
     >
       <Stack gap="md">
         <Select
@@ -89,7 +90,9 @@ export const ModalRegistroTurno = ({
           placeholder="Seleccione"
           data={TIPOS_TURNO_OPTIONS}
           value={form.tipo_turno}
-          onChange={(val) => setField("tipo_turno", (val as TipoTurno) ?? TipoTurno.Dia)}
+          onChange={(val) =>
+            setField("tipo_turno", (val as TipoTurno) ?? TipoTurno.Dia)
+          }
           leftSection={
             form.tipo_turno === "Noche" ? (
               <MoonIcon className="w-4 h-4 text-zinc-500" />
@@ -162,7 +165,7 @@ export const ModalRegistroTurno = ({
                 {form.hora_ingreso &&
                   form.hora_salida &&
                   dayjs(`2000-01-01 ${form.hora_salida}`).isBefore(
-                    dayjs(`2000-01-01 ${form.hora_ingreso}`)
+                    dayjs(`2000-01-01 ${form.hora_ingreso}`),
                   ) && (
                     <span className="text-amber-400 font-bold ml-1">
                       (Día siguiente)
@@ -216,12 +219,10 @@ export const ModalRegistroTurno = ({
             icon={<ExclamationCircleIcon className="w-4 h-4" />}
             styles={{ message: { fontSize: "12px" } }}
           >
-            Los turnos <strong>Noche</strong> cruzan medianoche: la hora de salida
-            corresponde al día siguiente.
+            Los turnos <strong>Noche</strong> cruzan medianoche: la hora de
+            salida corresponde al día siguiente.
           </Alert>
         )}
-
-
 
         <Group justify="flex-end" mt="md" gap="md">
           <Button

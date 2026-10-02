@@ -206,7 +206,11 @@ export const LugaresExtraccionProveedor = ({
                   <Text size="xs" c="dimmed" className="leading-tight">
                     {geo || "—"}
                   </Text>
-                  <Text size="sm" fw={500} className="text-zinc-100 leading-tight">
+                  <Text
+                    size="sm"
+                    fw={500}
+                    className="text-zinc-100 leading-tight"
+                  >
                     {o.direccion}
                   </Text>
                 </div>
@@ -257,6 +261,7 @@ export const LugaresExtraccionProveedor = ({
         opened={modalCatalogoAbierto}
         close={() => setModalCatalogoAbierto(false)}
         title="Nuevo lugar de extraccion"
+        validateClose
         size="lg"
       >
         <FormLugarExtraccion

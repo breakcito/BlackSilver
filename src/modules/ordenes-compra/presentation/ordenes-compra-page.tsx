@@ -95,6 +95,7 @@ export const OrdenesCompraPage = () => {
         opened={openedRegistroComprobante}
         close={handleCerrarRegistroComprobante}
         title="Registrar Nuevo Comprobante"
+        validateClose
         size="60%"
       >
         {selectedOrdenForComprobante && (

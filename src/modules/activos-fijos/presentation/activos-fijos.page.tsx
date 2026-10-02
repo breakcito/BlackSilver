@@ -272,6 +272,7 @@ export const ActivosFijosPage = () => {
         close={closeCreate}
         title="Nuevo Activo"
         size="lg"
+        validateClose
       >
         <RegistroActivo
           onSuccess={(nuevoActivo) => {
@@ -288,6 +289,7 @@ export const ActivosFijosPage = () => {
           closeEdit();
           setSelectedActivo(null);
         }}
+        validateClose
         title="Editar Activo"
         size="lg"
       >
@@ -313,6 +315,7 @@ export const ActivosFijosPage = () => {
           closeUbicacion();
           setSelectedActivo(null);
         }}
+        validateClose
         title={`Mover Activo: ${selectedActivo?.producto}`}
         size="md"
       >

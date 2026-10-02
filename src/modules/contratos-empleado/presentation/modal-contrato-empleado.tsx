@@ -49,6 +49,7 @@ export const ModalContratoEmpleado = ({
     <ModalEstandar
       opened={opened}
       close={close}
+      validateClose
       title="Registrar Contrato de Trabajo"
       size="lg"
     >

@@ -521,6 +521,7 @@ export const RegistrarConsumoModal = ({
     <ModalEstandar
       opened={opened}
       close={close}
+      validateClose
       title="Registrar Consumo"
       size="xl"
     >

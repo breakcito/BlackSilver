@@ -288,6 +288,7 @@ export const AlmacenesCarbonCliente = ({
 
       <ModalEstandar
         opened={modalAbierto}
+        validateClose
         close={cerrarModal}
         title={enEdicion ? "Editar almacén" : "Añadir almacén"}
         size="md"

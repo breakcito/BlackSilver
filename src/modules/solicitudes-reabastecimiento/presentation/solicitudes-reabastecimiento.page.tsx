@@ -331,6 +331,7 @@ export const SolicitudesReabastecimientoPage = () => {
         opened={openedRegistro}
         close={closeReg}
         title="Nueva Solicitud de Reabastecimiento"
+        validateClose
         size="75rem"
       >
         <RegistroSolicitud

@@ -966,6 +966,7 @@ export const CompraCarbonListado = ({
       {modalEditar && (
         <ModalEstandar
           opened
+          validateClose
           close={() => {
             setModalEditar(null);
             setProgresoEditar(null);

@@ -330,6 +330,7 @@ export const HistorialRecepcionesOC = ({
       <ModalEstandar
         opened={openedTransferencia}
         close={closeTransferencia}
+        validateClose
         title={`Transferir a ${tipoDestinoParaTransferir === "mina" ? `Mina: ${selectedMinaDestinoNombre || ""}` : `Almacén: ${selectedAlmacenDestinoNombre || ""}`}`}
         size="75%"
         rightSection={

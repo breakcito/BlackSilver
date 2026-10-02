@@ -347,6 +347,7 @@ export const TipoCarbonTab = () => {
       <ModalEstandar
         opened={modal !== null}
         close={closeEdit}
+        validateClose
         title={
           modal === "edit" && editTipo
             ? `Editar: ${editTipo.nombre}`

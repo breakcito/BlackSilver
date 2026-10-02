@@ -192,6 +192,7 @@ export const DetalleOrdenCompra = ({
         opened={openedRecepcion}
         close={() => setOpenedRecepcion(false)}
         title="Nueva Recepción de Mercancía"
+        validateClose
         size="65%"
         rightSection={
           <Switch
@@ -279,6 +280,7 @@ export const DetalleOrdenCompra = ({
         opened={openedRegistroComprobante}
         close={() => setOpenedRegistroComprobante(false)}
         title="Registrar Nuevo Comprobante"
+        validateClose
         size="60%"
       >
         <RegistroComprobante

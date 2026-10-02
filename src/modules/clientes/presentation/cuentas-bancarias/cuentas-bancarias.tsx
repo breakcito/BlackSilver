@@ -116,6 +116,7 @@ export const CuentasBancarias = ({
         opened={openEdit}
         close={handleCloseEdit}
         title="Editar Cuenta Bancaria"
+        variant=""
         size="md"
         validateClose
         closeConfirmationMessage="Vas a descartar los cambios no guardados de esta cuenta bancaria."

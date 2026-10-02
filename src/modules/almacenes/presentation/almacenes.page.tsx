@@ -419,6 +419,7 @@ export const AlmacenesPage = () => {
       <ModalEstandar
         opened={openedCreate}
         close={closeCreate}
+        validateClose
         title={paraCarbon ? "Nuevo Almacén de Carbón" : "Nuevo Almacén"}
         size="lg"
       >

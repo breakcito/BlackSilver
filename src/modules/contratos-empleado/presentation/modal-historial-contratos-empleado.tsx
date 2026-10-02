@@ -729,6 +729,7 @@ export const ModalHistorialContratosEmpleado = ({
       <ModalEstandar
         opened={modalFinalizarAbierto}
         close={() => setModalFinalizarAbierto(false)}
+        validateClose
         title="Finalizar Contrato Anticipadamente"
         size="md"
       >

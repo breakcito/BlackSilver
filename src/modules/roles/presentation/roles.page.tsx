@@ -174,6 +174,7 @@ export const RolesPage = () => {
       <ModalEstandar
         opened={openedCreate}
         close={closeCreate}
+        validateClose
         title={
           selectedRol ? `Editar Permisos: ${selectedRol.nombre}` : "Crear Rol"
         }

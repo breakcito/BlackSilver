@@ -960,6 +960,7 @@ export const CabeceraCotizacion = ({
       <ModalEstandar
         opened={openedAddProveedor}
         close={() => setOpenedAddProveedor(false)}
+        validateClose
         title="Nuevo Proveedor"
         size="lg"
       >

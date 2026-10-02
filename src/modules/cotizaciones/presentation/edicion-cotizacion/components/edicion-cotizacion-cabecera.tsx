@@ -423,6 +423,7 @@ export const EdicionCotizacionCabecera = ({
       <ModalEstandar
         opened={openedAddProveedor}
         close={() => setOpenedAddProveedor(false)}
+        validateClose
         title="Agregar Nuevo Proveedor"
         size="md"
       >

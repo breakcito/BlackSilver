@@ -212,6 +212,7 @@ export const EmpresasPage = () => {
         opened={openedCreate}
         close={closeCreate}
         title="Registrar Empresa"
+        validateClose
         size="sm"
       >
         <RegistroEmpresa
@@ -242,6 +243,7 @@ export const EmpresasPage = () => {
         opened={openedOficina}
         close={closeOficinaModal}
         title="Registrar Oficina"
+        validateClose
         size="md"
       >
         {empresaParaOficina && (

@@ -86,6 +86,7 @@ export const ActivoConfigAlertasModal = ({ opened, close, activo, onSuccess }: P
       close={close}
       title="Configurar Alertas de Mantenimiento"
       size="md"
+      validateClose
     >
       <Stack gap="md">
         <Text size="sm" c="zinc.4">

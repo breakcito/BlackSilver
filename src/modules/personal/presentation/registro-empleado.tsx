@@ -505,6 +505,7 @@ export const RegistroEmpleado = ({
         close={cerrarModalContrato}
         title="Añadir Contrato de Trabajo"
         size="xl"
+        validateClose
       >
         <FormularioContratoEmpleado
           idEmpleado={0}
@@ -527,6 +528,7 @@ export const RegistroEmpleado = ({
         opened={openedAddArea}
         close={() => setOpenedAddArea(false)}
         title="Registrar Nueva Área"
+        validateClose
         size="md"
       >
         <RegistroArea
@@ -548,6 +550,7 @@ export const RegistroEmpleado = ({
         opened={openedAddCargo}
         close={() => setOpenedAddCargo(false)}
         title="Registrar Nuevo Cargo"
+        validateClose
         size="md"
       >
         <RegistroCargo

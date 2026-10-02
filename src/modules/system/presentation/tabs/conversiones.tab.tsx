@@ -158,27 +158,40 @@ export const ConversionesTab = () => {
           {
             accessor: "a",
             title: "Unidad A",
-            render: (item: RES_Conversion) => `${item.nombre_a} (${item.abreviatura_a})`,
+            render: (item: RES_Conversion) =>
+              `${item.nombre_a} (${item.abreviatura_a})`,
           },
           {
             accessor: "b",
             title: "Unidad B",
-            render: (item: RES_Conversion) => `${item.nombre_b} (${item.abreviatura_b})`,
+            render: (item: RES_Conversion) =>
+              `${item.nombre_b} (${item.abreviatura_b})`,
           },
           {
             accessor: "factor",
             title: "Factor",
-            render: (item: RES_Conversion) => formatNumber(item.factor_conversion),
+            render: (item: RES_Conversion) =>
+              formatNumber(item.factor_conversion),
           },
           {
             accessor: "actions",
             title: "Acciones",
             render: (item: RES_Conversion) => (
               <div className="flex gap-2">
-                <Button size="xs" variant="subtle" color="indigo" onClick={() => openEdit(item)}>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="indigo"
+                  onClick={() => openEdit(item)}
+                >
                   Editar
                 </Button>
-                <Button size="xs" variant="subtle" color="red" onClick={() => handleDelete(item)}>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="red"
+                  onClick={() => handleDelete(item)}
+                >
                   Eliminar
                 </Button>
               </div>
@@ -190,6 +203,7 @@ export const ConversionesTab = () => {
       <ModalEstandar
         opened={modal !== null}
         close={close}
+        validateClose
         title={modal === "edit" ? "Editar Conversión" : "Nueva Conversión"}
         size="sm"
       >

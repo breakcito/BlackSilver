@@ -340,6 +340,7 @@ export const RegistroClienteCarbon = ({ onCancel, onSuccess }: Props) => {
       <ModalEstandar
         opened={modalAlmacenAbierto}
         close={cerrarModalAlmacen}
+        validateClose
         title={almacenEnEdicion ? "Editar almacén" : "Añadir almacén"}
         size="md"
       >

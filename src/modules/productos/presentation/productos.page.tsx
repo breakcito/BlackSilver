@@ -507,6 +507,7 @@ export const ProductosPage = () => {
         close={closeRegistro}
         title="Registrar Producto"
         size="36rem"
+        validateClose
       >
         <RegistroProducto
           productosExistentes={productos}
@@ -521,6 +522,7 @@ export const ProductosPage = () => {
       <ModalEstandar
         opened={openedEdicion}
         close={handleCloseEdicion}
+        validateClose
         title={
           productoEnEdicion
             ? `Editar: ${productoEnEdicion.nombre}`

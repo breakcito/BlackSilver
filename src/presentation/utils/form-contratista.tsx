@@ -20,6 +20,7 @@ export const FormContratista = ({
       opened={opened}
       close={onClose}
       title="Registrar Contratista"
+      validateClose
       size="lg"
       zIndex={10001}
     >

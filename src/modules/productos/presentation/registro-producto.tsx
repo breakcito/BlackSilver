@@ -563,6 +563,7 @@ export const RegistroProducto = ({
           close={closeAddCat}
           title="Nueva Categoría"
           size="md"
+          validateClose
           zIndex={1001} // Para que se vea por encima del modal de producto
         >
           <FormCategoria
@@ -580,6 +581,7 @@ export const RegistroProducto = ({
           opened={openedAddUnidad}
           close={closeAddUnidad}
           title="Nueva Unidad de Medida"
+          validateClose
           size="sm"
           zIndex={1001}
         >

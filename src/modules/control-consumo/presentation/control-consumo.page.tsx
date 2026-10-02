@@ -227,6 +227,7 @@ export const ControlConsumoPage = () => {
       <ModalEstandar
         opened={modalOpen}
         close={handleCloseModal}
+        validateClose
         title={`Registrar Consumo`}
         size="lg"
       >

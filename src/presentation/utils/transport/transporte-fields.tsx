@@ -387,6 +387,7 @@ export const TransporteFields = ({
         close={() => setNewAgenciaModal(false)}
         title="Nueva Agencia"
         size="sm"
+        validateClose
       >
         <FormAgencia
           onSuccess={(agencia) => {
@@ -403,6 +404,7 @@ export const TransporteFields = ({
         opened={newProveedorModal}
         close={() => setNewProveedorModal(false)}
         title="Nuevo Proveedor de Transporte"
+        validateClose
         size="md"
       >
         <FormProveedor

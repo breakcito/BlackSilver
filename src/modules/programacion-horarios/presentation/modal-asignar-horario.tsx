@@ -270,6 +270,7 @@ export const ModalAsignarHorario = ({
       opened={opened}
       close={close}
       title="Asignar Horario"
+      validateClose
       size="xl"
     >
       <Stack gap="md">
@@ -304,7 +305,9 @@ export const ModalAsignarHorario = ({
                 value: String(t.id),
                 label: `${t.tipo_turno} · ${format12h(t.hora_ingreso)} - ${format12h(t.hora_salida)}`,
               }))}
-              value={form.id_turno_laboral > 0 ? String(form.id_turno_laboral) : null}
+              value={
+                form.id_turno_laboral > 0 ? String(form.id_turno_laboral) : null
+              }
               onChange={(v) => setField("id_turno_laboral", v ? Number(v) : 0)}
               leftSection={<ClockIcon className="w-4 h-4 text-zinc-500" />}
               classNames={fieldClasses}
@@ -387,7 +390,9 @@ export const ModalAsignarHorario = ({
             }
             value={lugarIdActual ? String(lugarIdActual) : null}
             onChange={(val) => setLugarId(val ? Number(val) : null)}
-            leftSection={<BuildingOfficeIcon className="w-4 h-4 text-zinc-500" />}
+            leftSection={
+              <BuildingOfficeIcon className="w-4 h-4 text-zinc-500" />
+            }
             classNames={fieldClasses}
             radius="lg"
             size="xs"
@@ -423,7 +428,9 @@ export const ModalAsignarHorario = ({
             }
           />
           <div className="flex flex-col gap-1.5 h-full justify-end">
-            <span className="text-[11px] text-transparent select-none font-medium leading-normal">Spacer</span>
+            <span className="text-[11px] text-transparent select-none font-medium leading-normal">
+              Spacer
+            </span>
             <div className="flex items-center h-[30px]">
               <Switch
                 label="Por tiempo indefinido"
@@ -495,7 +502,10 @@ export const ModalAsignarHorario = ({
                         </Text>
                       )}
                       {!opt.puedeCubrir && opt.fechaFinContrato && (
-                        <Text size="10px" className="text-amber-500 font-medium">
+                        <Text
+                          size="10px"
+                          className="text-amber-500 font-medium"
+                        >
                           • Culmina el {formatDMY(opt.fechaFinContrato)}
                         </Text>
                       )}
@@ -506,13 +516,21 @@ export const ModalAsignarHorario = ({
                       Fuera de rango
                     </Badge>
                   )}
-                  {checked && <Badge color="indigo" variant="filled" size="xs">OK</Badge>}
+                  {checked && (
+                    <Badge color="indigo" variant="filled" size="xs">
+                      OK
+                    </Badge>
+                  )}
                 </Group>
               );
               return node;
             }}
           />
-          <Text size="11px" className="pl-1 text-rose-400/90 font-medium" mt={4}>
+          <Text
+            size="11px"
+            className="pl-1 text-rose-400/90 font-medium"
+            mt={4}
+          >
             Solo aparecen empleados con contrato vigente Activo.
           </Text>
         </div>
@@ -520,15 +538,25 @@ export const ModalAsignarHorario = ({
         <Divider
           label={
             <Group gap={4}>
-              <Text size="xs" fw={500}>Días Laborables (Domingo a Sábado)</Text>
-              <Text size="xs" c="red" fw={700}>*</Text>
+              <Text size="xs" fw={500}>
+                Días Laborables (Domingo a Sábado)
+              </Text>
+              <Text size="xs" c="red" fw={700}>
+                *
+              </Text>
             </Group>
           }
           labelPosition="left"
         />
 
-        <Group gap="xs" wrap="wrap" className="bg-zinc-900/30 p-2.5 rounded-xl border border-zinc-800/80">
-          <Text size="xs" fw={600} className="text-zinc-400 mr-1">Selección rápida:</Text>
+        <Group
+          gap="xs"
+          wrap="wrap"
+          className="bg-zinc-900/30 p-2.5 rounded-xl border border-zinc-800/80"
+        >
+          <Text size="xs" fw={600} className="text-zinc-400 mr-1">
+            Selección rápida:
+          </Text>
           <Button
             size="xs"
             variant="light"
@@ -635,12 +663,16 @@ export const ModalAsignarHorario = ({
                           size="xs"
                           radius="lg"
                           classNames={fieldClasses}
-                          leftSection={<ClockIcon className="w-3.5 h-3.5 text-zinc-500" />}
+                          leftSection={
+                            <ClockIcon className="w-3.5 h-3.5 text-zinc-500" />
+                          }
                           data={turnos.map((t) => ({
                             value: String(t.id),
                             label: `${t.tipo_turno} (${format12h(t.hora_ingreso)} - ${format12h(t.hora_salida)})`,
                           }))}
-                          value={String(idTurnoAplicable > 0 ? idTurnoAplicable : "")}
+                          value={String(
+                            idTurnoAplicable > 0 ? idTurnoAplicable : "",
+                          )}
                           onChange={(val) => {
                             if (!val) return;
                             const numVal = Number(val);
@@ -696,7 +728,9 @@ export const ModalAsignarHorario = ({
                     size="8px"
                     fw={500}
                     className={`truncate max-w-full font-mono ${
-                      esEspecial ? "text-amber-400/90 font-semibold" : "text-zinc-400"
+                      esEspecial
+                        ? "text-amber-400/90 font-semibold"
+                        : "text-zinc-400"
                     }`}
                   >
                     {turnoObj

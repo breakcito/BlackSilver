@@ -2859,6 +2859,7 @@ export const RegistroUso = ({
 
       {/* Modal tarifas (intacto) */}
       <ModalEstandar
+        validateClose
         opened={modalTarifaOpened}
         close={() => setModalTarifaOpened(false)}
         title={`Tarifas por uso - ${tipoControl.charAt(0).toUpperCase() + tipoControl.slice(1)}`}
@@ -3004,6 +3005,7 @@ export const RegistroUso = ({
       <ModalEstandar
         opened={consumoModalOpen}
         close={() => setConsumoModalOpen(false)}
+        validateClose
         title={consumoEditId ? "Editar Consumo" : "Registrar Consumo"}
         size="xl"
       >

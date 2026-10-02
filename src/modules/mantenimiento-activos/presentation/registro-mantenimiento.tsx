@@ -1022,6 +1022,7 @@ export const RegistroMantenimiento = ({
         opened={proveedorModalOpen}
         close={() => setProveedorModalOpen(false)}
         title="Nuevo Proveedor"
+        validateClose
         size="md"
       >
         <FormProveedor
@@ -1038,6 +1039,7 @@ export const RegistroMantenimiento = ({
         opened={personalExternoModalOpen}
         close={() => setPersonalExternoModalOpen(false)}
         title="Nuevo Personal Externo"
+        validateClose
         size="md"
       >
         <FormPersonalExterno

@@ -136,6 +136,7 @@ export const UnidadesMedidaTab = () => {
       <ModalEstandar
         opened={modal !== null}
         close={close}
+        validateClose
         title={modal === "edit" ? "Editar Unidad" : "Nueva Unidad"}
         size="sm"
       >
@@ -153,7 +154,9 @@ export const UnidadesMedidaTab = () => {
             label="Abreviatura"
             placeholder="Ej: MT"
             value={abreviatura}
-            onChange={(e) => setAbreviatura(e.currentTarget.value.toUpperCase())}
+            onChange={(e) =>
+              setAbreviatura(e.currentTarget.value.toUpperCase())
+            }
             required
             classNames={fieldClasses}
             radius="lg"
