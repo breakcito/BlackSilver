@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon,
   Badge,
@@ -150,7 +150,6 @@ export const AnticiposProveedor = ({
         await ProveedoresService.getAnticiposPorProveedor(idProveedor);
       if (resp.success && Array.isArray(resp.data)) {
         setAnticipos(resp.data);
-        onChanged?.(resp.data);
       } else {
         notifyError(resp.message || "No se pudieron cargar los anticipos");
       }
@@ -162,10 +161,55 @@ export const AnticiposProveedor = ({
     }
   };
 
+  /**
+   * Alta local sin refetch: el POST de registro ya devuelve la fila creada
+   * y el backend la hidrata con el mismo SELECT que el listado
+   * (`SELECT_ANTICIPO` en `AnticiposProveedorData`), asi que no hay nada
+   * que volver a pedir. Se antepone porque el listado ordena por
+   * `created_at DESC, id DESC`.
+   *
+   * El `filter` por `id_anticipo` evita duplicar la fila si el id ya
+   * estuviera en la lista.
+   */
+  const agregarAnticipo = (anticipo: AnticipoProveedorResponse) => {
+    setAnticipos((prev) => [
+      anticipo,
+      ...prev.filter((a) => a.id_anticipo !== anticipo.id_anticipo),
+    ]);
+  };
+
   useEffect(() => {
     void cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idProveedor]);
+
+  /**
+   * Propaga la lista al padre (badge de cantidad y saldo en la card).
+   *
+   * Vive en un efecto y no dentro de `cargar` ni de `agregarAnticipo`
+   * para no disparar un side effect desde un updater de `setState`, que
+   * React vuelve a invocar en StrictMode. El primer render se salta: la
+   * lista arranca vacia y notificar ahi pondria el badge en 0 antes de que
+   * `cargar` responda.
+   *
+   * `onChanged` va por ref y no en las deps a proposito: el padre lo pasa
+   * como arrow inline, asi que su identidad cambia en cada render suyo.
+   * Como el efecto termina llamando a `updateProveedor` -> `setProveedores`,
+   * depender de esa prop cerraria un loop de renders infinito.
+   */
+  const onChangedRef = useRef(onChanged);
+  useEffect(() => {
+    onChangedRef.current = onChanged;
+  });
+
+  const listaNotificada = useRef(false);
+  useEffect(() => {
+    if (!listaNotificada.current) {
+      listaNotificada.current = true;
+      return;
+    }
+    onChangedRef.current?.(anticipos);
+  }, [anticipos]);
 
   // --- Derivados ---------------------------------------------------------
 
@@ -590,7 +634,7 @@ export const AnticiposProveedor = ({
         close={() => setOpenRegistro(false)}
         title="Registrar anticipo"
         size="xl"
-        zIndex={10001}
+        validateClose
         rightSection={
           <Switch
             checked={pagoATerceros}
@@ -615,7 +659,7 @@ export const AnticiposProveedor = ({
           cuentasProveedor={cuentasProveedor}
           pagoATerceros={pagoATerceros}
           service={ProveedoresService}
-          onRegistrado={cargar}
+          onRegistrado={agregarAnticipo}
           onCancel={() => setOpenRegistro(false)}
         />
       </ModalEstandar>

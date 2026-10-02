@@ -12,7 +12,7 @@ import {
   Textarea,
   TextInput,
 } from "@mantine/core";
-import { TimeInput } from "@mantine/dates";
+import { TimePicker } from "@mantine/dates";
 import {
   IconAlertTriangle,
   IconBuildingBank,
@@ -36,7 +36,10 @@ import {
   Schema_RegistrarAnticipo,
   type RegistrarAnticipoRequest,
 } from "../../../service/proveedores.requests";
-import type { CuentaBancariaResponse } from "../../../service/proveedores.responses";
+import type {
+  AnticipoProveedorResponse,
+  CuentaBancariaResponse,
+} from "../../../service/proveedores.responses";
 import type { ProveedoresService } from "../../../service/proveedores.service";
 
 dayjs.locale("es");
@@ -58,24 +61,17 @@ const DEFAULT_CUPPER_ID = 1;
 const MAX_OBSERVACION = 500;
 
 /**
- * Z-index de los dropdowns de este form.
- *
- * Este modal se monta con `zIndex={10001}` para quedar por encima del
- * modal de anticipos. El problema: Mantine v8 NO hereda el z-index del
- * modal hacia los popovers hijos. `Popover` usa un valor estatico
- * (`getDefaultZIndex("popover")` = 300) y se.portalea a `body`, asi que
- * un dropdown a 300 queda POR DEBAJO de un modal a 10001: se abre pero no
- * se ve, y el Select parece muerto.
- *
- * Hay que subirlo a mano. `comboboxProps` es el bag de props que
- * `Combobox` reenvia a su `Popover` interno, asi que ahi va el `zIndex`
- * (ver `node_modules/@mantine/core/esm/components/Combobox/Combobox.mjs`:
- * `<Popover {...others} />`, donde `others` viene de `comboboxProps`).
- *
- * El 10005 es el mismo margen que ya usa `registro-contratista.tsx` para
- * su modal anidado.
+ * `TimePicker` renderiza su raiz como `div`, asi que `autoComplete` y los
+ * atributos anti-LastPass tienen que viajar por `hoursInputProps` /
+ * `minutesInputProps`: en la raiz se ignorarian y el gestor de contrasenas
+ * meteria texto en los spin inputs de hora.
  */
-const Z_DROPDOWN = 10005;
+const INPUT_AUTOFILL = {
+  autoComplete: "off",
+  "data-form-type": "other",
+  "data-lpignore": "true",
+};
+
 
 interface Props {
   idProveedor: number;
@@ -87,8 +83,16 @@ interface Props {
    */
   pagoATerceros: boolean;
   service: typeof ProveedoresService;
-  /** Se dispara tras un registro exitoso para refrescar el listado. */
-  onRegistrado: () => Promise<void> | void;
+  /**
+   * Recibe el anticipo recien creado, ya hidratado por el backend con el
+   * mismo shape que devuelve el listado. El padre lo agrega a la lista en
+   * vez de volver a pedirla entera.
+   */
+  onRegistrado: (anticipo: AnticipoProveedorResponse) => void;
+  /**
+   * Cierra el modal. Lo invocan el boton "Cerrar" y el camino de exito del
+   * guardado, no solo un cancelamiento.
+   */
   onCancel: () => void;
 }
 
@@ -105,8 +109,10 @@ interface Props {
  * - "Pago a terceros" deshabilita la cuenta destino, que no aplica, en
  *   vez de dejar que se registre una cuenta que el usuario ya marco
  *   como irrelevante.
- * - Se preservan empresa, medio de pago y cuentas tras guardar: registrar
- *   varios anticipos del mismo pago es el caso tipico, no la excepcion.
+ * - Tras guardar, el modal se cierra y el listado de atrás queda
+ *   refrescado: si el operador tiene que registrar más anticipos vuelve a
+ *   abrirlo, y dejarlo abierto hacía dudar de si el registro se había
+ *   guardado o si faltaba confirmarlo.
  */
 export const RegistroAnticipo = ({
   idProveedor,
@@ -370,8 +376,15 @@ export const RegistroAnticipo = ({
       }
 
       notifySuccess("Anticipo registrado correctamente");
+      // `limpiarCampos` va antes del cierre a proposito: `Modal` no
+      // desmonta sus hijos al cerrarse, asi que sin esto los valores
+      // reaparecerian intactos la proxima vez que se abra el modal.
       limpiarCampos();
-      await onRegistrado();
+      onCancel();
+      // El POST ya devuelve la fila creada con el mismo SELECT que usa el
+      // listado, asi que se la pasa al padre en vez de pedirle la lista
+      // entera otra vez.
+      onRegistrado(resp.data);
     } catch (err) {
       console.error(err);
       // Un fallo de red con multipart suele ser el envio del archivo (por
@@ -407,7 +420,6 @@ export const RegistroAnticipo = ({
           searchable
           clearable
           placeholder={loadingEmpresas ? "Cargando..." : "Seleccione"}
-          comboboxProps={{ withinPortal: true, zIndex: Z_DROPDOWN }}
           data={
             loadingEmpresas
               ? []
@@ -441,7 +453,6 @@ export const RegistroAnticipo = ({
           radius="lg"
           size="xs"
           placeholder="Seleccione"
-          comboboxProps={{ withinPortal: true, zIndex: Z_DROPDOWN }}
           data={MEDIOS_PAGO}
           value={medioPago}
           onChange={(v) => {
@@ -502,7 +513,6 @@ export const RegistroAnticipo = ({
                   ? "Seleccione"
                   : "No aplica"
             }
-            comboboxProps={{ withinPortal: true, zIndex: Z_DROPDOWN }}
             data={
               loadingCuentas
                 ? []
@@ -535,7 +545,6 @@ export const RegistroAnticipo = ({
             searchable
             clearable
             placeholder={pagoATerceros ? "No aplica" : "Seleccione (opcional)"}
-            comboboxProps={{ withinPortal: true, zIndex: Z_DROPDOWN }}
             data={cuentasProveedorVisibles.map((c) => ({
               value: String(c.id_cuenta_bancaria),
               label: `${c.banco} · ${c.moneda} · ${c.numero_cuenta}${c.cci ? ` · CCI ${c.cci}` : ""}`,
@@ -569,7 +578,9 @@ export const RegistroAnticipo = ({
           size="xs"
           value={numeroOperacion}
           onChange={(e) => {
-            setNumeroOperacion(e.currentTarget.value.slice(0, 64));
+            setNumeroOperacion(
+              e.currentTarget.value.toUpperCase().slice(0, 64),
+            );
             limpiarError("numero_operacion");
           }}
           error={errores.numero_operacion}
@@ -588,29 +599,42 @@ export const RegistroAnticipo = ({
             setFechaPago(v);
             limpiarError("fecha_hora_pago");
           }}
-          popoverProps={{ zIndex: Z_DROPDOWN }}
           error={errores.fecha_hora_pago}
           classNames={fieldClasses}
           required={requiereBanco}
           radius="lg"
           size="xs"
         />
-        <TimeInput
-          label="Hora"
-          placeholder="HH:MM"
+        {/* `TimePicker` y no `TimeInput`: en Mantine v8 `TimeInput` quedo
+            como un input de texto plano (sus unicas props son `withSeconds`,
+            `minTime`, `maxTime`), sin lista de horas. Ahi el operador tiene
+            que teclear 24h a ciegas y escribir "8:14" thinking en 12h deja el
+            campo en blanco. `format="24h"` quita el AM/PM y `withDropdown`
+            muestra las columnas 00-23 y 00-59, de modo que la ambiguedad
+            desaparece en lugar de depender de que el operador la adivine.
+            El `onChange` emite `"HH:mm"`, el mismo formato que espera
+            `dayjs` en `handleGuardar`. */}
+        <TimePicker
+          label="Hora (24 h)"
+          format="24h"
+          withDropdown
           radius="lg"
           size="xs"
           value={horaPago}
-          onChange={(e) => {
-            const match = /^(\d{2}):(\d{2})/.exec(e.currentTarget.value ?? "");
-            setHoraPago(match ? `${match[1]}:${match[2]}` : "");
+          onChange={(v) => {
+            setHoraPago(v);
+            limpiarError("horaPago");
           }}
           error={errores.horaPago}
-          classNames={fieldClasses}
+          classNames={{
+            ...fieldClasses,
+            fieldsGroup: "w-full justify-center",
+          }}
           name="anticipo_hora_pago"
-          autoComplete="off"
-          data-form-type="other"
-          data-lpignore="true"
+          hoursInputLabel="Hora"
+          minutesInputLabel="Minuto"
+          hoursInputProps={INPUT_AUTOFILL}
+          minutesInputProps={INPUT_AUTOFILL}
         />
       </Group>
 
@@ -630,7 +654,7 @@ export const RegistroAnticipo = ({
             size="xs"
             value={factura}
             onChange={(e) => {
-              setFactura(e.currentTarget.value.slice(0, 64));
+              setFactura(e.currentTarget.value.toUpperCase().slice(0, 64));
               limpiarError("codigo_comprobante");
             }}
             error={errores.codigo_comprobante}
