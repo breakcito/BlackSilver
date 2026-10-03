@@ -34,6 +34,7 @@ import type {
   RES_Provincia,
 } from "./responses/ubicacion";
 import type { RES_Transportista } from "./responses/transportista";
+import type { RES_CuentaTransportista } from "./responses/cuenta-transportista";
 import type { RES_TarifaCarbon } from "./responses/tarifa-carbon";
 import type { RES_LugarExtraccionCarbon } from "./responses/lugar-extraccion-carbon";
 
@@ -315,6 +316,53 @@ export const AuxService = {
         cci: nuevaCuenta.cci,
         es_para_detraccion: nuevaCuenta.es_para_detraccion,
       },
+    );
+    return data;
+  },
+
+  /**
+   * Cuentas bancarias de los transportistas (catálogo de Compra de Carbón).
+   */
+  get_cuentas_transportista: async (filters?: {
+    id_transportista?: number | number[];
+    id_cuenta_bancaria?: number | number[];
+    estado?: EstadoBase;
+  }): Promise<IRespuesta<RES_CuentaTransportista[]>> => {
+    const { data } = await api.get<IRespuesta<RES_CuentaTransportista[]>>(
+      `${path}/cuentas-transportista`,
+      { params: filters },
+    );
+    return data;
+  },
+
+  crear_cuenta_transportista: async (nuevaCuenta: {
+    id_transportista: number;
+    id_banco: number;
+    moneda: Moneda;
+    numero_cuenta: string;
+    cci: string | null;
+    es_para_detraccion: boolean;
+  }): Promise<IRespuesta<RES_CuentaTransportista>> => {
+    const { data } = await api.post<IRespuesta<RES_CuentaTransportista>>(
+      `${path}/cuentas-transportista`,
+      nuevaCuenta,
+    );
+    return data;
+  },
+
+  actualizar_cuenta_transportista: async (
+    idCuentaBancaria: number,
+    cambios: {
+      id_banco: number;
+      moneda: Moneda;
+      numero_cuenta: string;
+      cci: string | null;
+      es_para_detraccion: boolean;
+    },
+  ): Promise<IRespuesta<RES_CuentaTransportista>> => {
+    const { data } = await api.put<IRespuesta<RES_CuentaTransportista>>(
+      `${path}/cuentas-transportista/${idCuentaBancaria}`,
+      cambios,
     );
     return data;
   },

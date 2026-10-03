@@ -1,4 +1,5 @@
 import type { IArchivo } from "../../../shared/interfaces/archivo";
+import type { MedioPago } from "../../../shared/enums/compra-carbon/medio-pago";
 
 export interface CrearCompraCarbonDetalle {
   id_detalle_compra_carbon?: number;
@@ -90,6 +91,65 @@ export interface VerificarDocumentosDuplicadosRequest {
   guias_remitente?: string[];
   guias_transportista?: string[];
   id_compra_carbon?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Comprobantes
+// ---------------------------------------------------------------------------
+
+/**
+ * Comprobante del proveedor. El `total` NO se envía: el backend lo toma del
+ * `total_con_descuento` de la compra. Los adjuntos viajan como `evidencias[]`
+ * en el multipart y la API genera su metadata al persistirlos.
+ */
+export interface RegistrarComprobanteProveedorRequest {
+  codigo_comprobante: string;
+  fecha_emision: string;
+  observacion?: string | null;
+  con_detraccion: boolean;
+  porcentaje_detraccion: number;
+}
+
+/**
+ * Comprobante de flete de un transportista. El `total` tampoco se envía: el
+ * backend lo calcula sumando el `descuento_flete` de las cargas indicadas.
+ */
+export interface RegistrarComprobanteTransporteRequest
+  extends RegistrarComprobanteProveedorRequest {
+  id_transportista: number;
+  ids_detalle_carga: number[];
+}
+
+// ---------------------------------------------------------------------------
+// Pagos
+// ---------------------------------------------------------------------------
+
+/**
+ * Pago al proveedor. Si la compra aplica IGV queda enlazado a su comprobante;
+ * si no, el pago es íntegro y cuelga solo de la compra.
+ */
+export interface RegistrarPagoProveedorRequest {
+  id_cuenta_bancaria_empresa: number;
+  id_cuenta_bancaria_proveedor: number;
+  medio_pago: MedioPago;
+  numero_operacion?: string | null;
+  fecha_hora_pago: string;
+  es_para_detraccion: boolean;
+  monto_pagado: number;
+  observacion?: string | null;
+}
+
+/** Pago al transportista, siempre contra su comprobante de flete. */
+export interface RegistrarPagoTransporteRequest {
+  id_comprobante_transporte_carbon: number;
+  id_cuenta_bancaria_empresa: number;
+  id_cuenta_bancaria_transportista: number;
+  medio_pago: MedioPago;
+  numero_operacion?: string | null;
+  fecha_hora_pago: string;
+  es_para_detraccion: boolean;
+  monto_pagado: number;
+  observacion?: string | null;
 }
 
 // Mantener compatibilidad con nombre previo

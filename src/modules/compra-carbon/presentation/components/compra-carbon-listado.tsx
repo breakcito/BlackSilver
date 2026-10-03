@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import {
+  BanknotesIcon,
   CheckBadgeIcon,
   ClockIcon,
   DocumentArrowDownIcon,
@@ -36,6 +37,7 @@ import {
   type ProgresoCompraCarbon,
 } from "../confirmacion-compra-carbon-modal";
 import { AprobarLiquidacionModal } from "../aprobar-liquidacion-modal";
+import { PagosCompraCarbonModal } from "../pagos-compra-carbon-modal";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoCompraCarbon } from "../../../../shared/enums/compra-carbon/estado-compra-carbon";
 import type {
@@ -77,17 +79,32 @@ const formatDateTime = (iso: string | null | undefined): string => {
   return dayjs(d).format("DD/MM/YYYY HH:mm");
 };
 
+/**
+ * Los seis estados de `EstadoCompraCarbon`.
+ *
+ * La escala de color va de gris (aún no empezó) a verde (cerrado): el usuario
+ * debe poder escanear la columna y ver de un vistazo cuanto proceso le falta.
+ */
 const estadoBadge = (
   estado: string | null,
 ): { color: string; label: string } => {
   const e = (estado ?? "").toString();
-  if (e === EstadoCompraCarbon.Preliminar)
-    return { color: "yellow", label: "Preliminar" };
-  if (e === EstadoCompraCarbon.Confirmado)
-    return { color: "teal", label: "Confirmado" };
-  if (e === EstadoCompraCarbon.Anulado)
-    return { color: "red", label: "Anulado" };
-  return { color: "gray", label: e || "—" };
+  switch (e) {
+    case EstadoCompraCarbon.Preliminar:
+      return { color: "gray", label: "Preliminar" };
+    case EstadoCompraCarbon.Confirmado:
+      return { color: "blue", label: "Confirmado" };
+    case EstadoCompraCarbon.LiquidacionAprobada:
+      return { color: "teal", label: "Liquidación aprobada" };
+    case EstadoCompraCarbon.EnProcesoPago:
+      return { color: "yellow", label: "En proceso de pago" };
+    case EstadoCompraCarbon.Pagado:
+      return { color: "emerald", label: "Pagado" };
+    case EstadoCompraCarbon.Anulado:
+      return { color: "red", label: "Anulado" };
+    default:
+      return { color: "gray", label: e || "—" };
+  }
 };
 
 const lugarLabel = (d: CompraCarbonDetalleItem): string => {
@@ -124,8 +141,16 @@ export const CompraCarbonListado = ({
   );
   const [progresoEditar, setProgresoEditar] =
     useState<ProgresoCompraCarbon | null>(null);
-  const [modalLiquidar, setModalLiquidar] =
-    useState<CompraCarbonResumen | null>(null);
+  const [modalLiquidar, setModalLiquidar] = useState<{
+    compra: CompraCarbonResumen;
+    detalle: CompraCarbonDetalleResponse;
+  } | null>(null);
+  const [cargandoLiquidar, setCargandoLiquidar] = useState<number | null>(null);
+  const [modalPagos, setModalPagos] = useState<{
+    compra: CompraCarbonResumen;
+    detalles: CompraCarbonDetalleItem[];
+  } | null>(null);
+  const [cargandoPagos, setCargandoPagos] = useState<number | null>(null);
   const [modalHistorial, setModalHistorial] = useState<{
     correlativo: string;
     log: unknown;
@@ -174,6 +199,60 @@ export const CompraCarbonListado = ({
       evidencias: result.cabecera.evidencias ?? [],
     });
     setOpenAnularModal(null);
+  };
+
+  /**
+   * El modal de pagos tambien registra los comprobantes pendientes, y armarlos
+   * por transportista exige conocer las cargas con flete de la compra.
+   */
+  const abrirPagos = async (compra: CompraCarbonResumen) => {
+    setCargandoPagos(compra.id_compra_carbon);
+    try {
+      const resp = await CompraCarbonService.getCompraConDetalles(
+        compra.id_compra_carbon,
+      );
+      if (!resp.success || !resp.data) {
+        notifyError(resp.message || "No se pudo cargar el detalle de la compra");
+        return;
+      }
+      setModalPagos({
+        compra: { ...compra, ...resp.data.cabecera },
+        detalles: resp.data.detalles,
+      });
+    } catch (e) {
+      console.error(e);
+      notifyError("Error al cargar el detalle de la compra");
+    } finally {
+      setCargandoPagos(null);
+    }
+  };
+
+
+  /**
+   * El modal de aprobacion necesita los detalles de la compra para poder
+   * agrupar las cargas con flete por transportista, asi que se cargan antes
+   * de abrirlo en vez de traveling solo la cabecera del listado.
+   */
+  const abrirAprobarLiquidacion = async (compra: CompraCarbonResumen) => {
+    setCargandoLiquidar(compra.id_compra_carbon);
+    try {
+      const resp = await CompraCarbonService.getCompraConDetalles(
+        compra.id_compra_carbon,
+      );
+      if (!resp.success || !resp.data) {
+        notifyError(resp.message || "No se pudo cargar el detalle de la compra");
+        return;
+      }
+      setModalLiquidar({
+        compra: { ...compra, ...resp.data.cabecera },
+        detalle: resp.data,
+      });
+    } catch (e) {
+      console.error(e);
+      notifyError("Error al cargar el detalle de la compra");
+    } finally {
+      setCargandoLiquidar(null);
+    }
   };
 
   const handleVerDetalles = async (compra: CompraCarbonResumen) => {
@@ -444,25 +523,25 @@ export const CompraCarbonListado = ({
         </div>
       ),
     },
-    {
-      accessor: "registrado_por",
-      title: "Registrado por",
-      width: 160,
-      render: (r: CompraCarbonResumen) => (
-        <Stack gap={0}>
-          <Text size="xs" className="text-zinc-200 truncate">
-            {r.empleado_registro}
-          </Text>
-          <Text size="11px" c="gray.5" className="font-mono">
-            {formatDateTime(r.created_at)}
-          </Text>
-        </Stack>
-      ),
-    },
+    // {
+    //   accessor: "registrado_por",
+    //   title: "Registrado por",
+    //   width: 160,
+    //   render: (r: CompraCarbonResumen) => (
+    //     <Stack gap={0}>
+    //       <Text size="xs" className="text-zinc-200 truncate">
+    //         {r.empleado_registro}
+    //       </Text>
+    //       <Text size="11px" c="gray.5" className="font-mono">
+    //         {formatDateTime(r.created_at)}
+    //       </Text>
+    //     </Stack>
+    //   ),
+    // },
     {
       accessor: "estado",
       title: "Estado",
-      width: 120,
+      width: 180,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const b = estadoBadge(r.estado);
@@ -476,13 +555,18 @@ export const CompraCarbonListado = ({
     {
       accessor: "acciones",
       title: "Acciones",
-      width: 220,
+      width: 180,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const esPreliminar = r.estado === EstadoCompraCarbon.Preliminar;
         const esConfirmado = r.estado === EstadoCompraCarbon.Confirmado;
         const puedeEditar = esConfirmado;
         const puedeAnular = esPreliminar || esConfirmado;
+        // Los comprobantes y pagos solo existen despues de aprobada la
+        // liquidacion. Una compra ya pagada no admite mas movimientos.
+        const puedePagar =
+          r.estado === EstadoCompraCarbon.LiquidacionAprobada ||
+          r.estado === EstadoCompraCarbon.EnProcesoPago;
         const isPrinting = printingId === r.id_compra_carbon;
         const cantEvidencias = (r.evidencias ?? []).length;
         const tieneCambios =
@@ -511,7 +595,7 @@ export const CompraCarbonListado = ({
               </Tooltip>
             )}
 
-            {/* 2. Aprobar Liquidacion con anticipos (Confirmado -> Liquidacion Aprobada) */}
+            {/* 2. Aprobar Liquidacion: comprobantes + anticipos (Confirmado -> Liquidacion Aprobada) */}
             {esConfirmado && (
               <Tooltip label="Aprobar liquidación" withArrow position="top">
                 <ActionIcon
@@ -519,9 +603,10 @@ export const CompraCarbonListado = ({
                   color="teal"
                   radius="xl"
                   size="md"
+                  loading={cargandoLiquidar === r.id_compra_carbon}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setModalLiquidar(r);
+                    void abrirAprobarLiquidacion(r);
                   }}
                 >
                   <CheckBadgeIcon className="w-4 h-4 text-white" />
@@ -529,7 +614,26 @@ export const CompraCarbonListado = ({
               </Tooltip>
             )}
 
-            {/* 3. Editar compra (Preliminar o Confirmado) */}
+            {/* 3. Registrar pagos al proveedor y a los transportistas */}
+            {puedePagar && (
+              <Tooltip label="Registrar pagos" withArrow position="top">
+                <ActionIcon
+                  variant="filled"
+                  color="indigo"
+                  radius="xl"
+                  size="md"
+                  loading={cargandoPagos === r.id_compra_carbon}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void abrirPagos(r);
+                  }}
+                >
+                  <BanknotesIcon className="w-4 h-4 text-white" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* 4. Editar compra (Preliminar o Confirmado) */}
             {puedeEditar && (
               <Tooltip label="Editar compra" withArrow position="top">
                 <ActionIcon
@@ -656,9 +760,9 @@ export const CompraCarbonListado = ({
         records={ordenadas}
         loading={false}
         initialPageSize={15}
-        onRowClick={({ record }: { record: CompraCarbonResumen }) =>
-          handleVerDetalles(record)
-        }
+        // onRowClick={({ record }: { record: CompraCarbonResumen }) =>
+        //   handleVerDetalles(record)
+        // }
       />
 
       {/* Modal de detalle (al click en fila o en el ojo) */}
@@ -1046,26 +1150,47 @@ export const CompraCarbonListado = ({
         </ModalEstandar>
       )}
 
-      {/* Modal Aprobar Liquidación */}
+      {/* Modal Aprobar Liquidación: comprobante proveedor + fletes + anticipos */}
       {modalLiquidar && (
         <ModalEstandar
           opened
           close={() => setModalLiquidar(null)}
-          title={`Aprobar Liquidación — ${modalLiquidar.correlativo}`}
-          size="55rem"
+          title={`Aprobar Liquidación — ${modalLiquidar.compra.correlativo}`}
+          size="62rem"
+          validateClose
         >
           <AprobarLiquidacionModal
-            compra={modalLiquidar}
+            compra={modalLiquidar.compra}
+            detalles={modalLiquidar.detalle.detalles}
             onCancel={() => setModalLiquidar(null)}
             onSuccess={(data) => {
               onAprobada?.({
-                ...modalLiquidar,
+                ...modalLiquidar.compra,
                 ...data.cabecera,
               });
               setModalLiquidar(null);
             }}
           />
         </ModalEstandar>
+      )}
+
+      {/* Pagos: comprobantes y pagos, con su propio ModalEstandar */}
+      {modalPagos && (
+        <PagosCompraCarbonModal
+          idCompraCarbon={modalPagos.compra.id_compra_carbon}
+          idEmpresa={modalPagos.compra.id_empresa}
+          idProveedor={modalPagos.compra.id_proveedor}
+          proveedor={modalPagos.compra.proveedor}
+          correlativo={modalPagos.compra.correlativo}
+          detalles={modalPagos.detalles}
+          onCerrar={() => setModalPagos(null)}
+          onPagoRegistrado={(saldos) => {
+            onAprobada?.({
+              ...modalPagos.compra,
+              ...saldos,
+            });
+          }}
+        />
       )}
 
       {/* Modal Historial de Cambios */}

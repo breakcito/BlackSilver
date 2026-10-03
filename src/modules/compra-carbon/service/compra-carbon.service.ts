@@ -7,12 +7,20 @@ import type {
   ConfirmarCompraCarbonRequest,
   CrearCompraCarbonPreliminarRequest,
   CrearCompraCarbonRequest,
+  RegistrarComprobanteProveedorRequest,
+  RegistrarComprobanteTransporteRequest,
+  RegistrarPagoProveedorRequest,
+  RegistrarPagoTransporteRequest,
   VerificarDocumentosDuplicadosRequest,
 } from "./compra-carbon.requests";
 import type {
+  ComprobanteCompraCarbonResponse,
+  ComprobanteTransporteCarbonResponse,
   CompraCarbonDetalleResponse,
   CompraCarbonResumen,
   DocumentoDuplicadoItem,
+  GrupoFleteTransportista,
+  PagosCompraCarbonResponse,
 } from "./compra-carbon.responses";
 
 const path = "/compras-carbon";
@@ -202,5 +210,139 @@ export const CompraCarbonService = {
       payload,
     );
     return data;
+  },
+
+  // =========================================================================
+  // Comprobantes
+  // =========================================================================
+
+  getComprobanteProveedor: async (
+    idCompraCarbon: number,
+  ): Promise<IRespuesta<ComprobanteCompraCarbonResponse | null>> => {
+    const { data } = await api.get<
+      IRespuesta<ComprobanteCompraCarbonResponse | null>
+    >(`${path}/${idCompraCarbon}/comprobante-proveedor`);
+    return data;
+  },
+
+  registrarComprobanteProveedor: async (
+    idCompraCarbon: number,
+    payload: RegistrarComprobanteProveedorRequest,
+    archivos: File[] = [],
+  ): Promise<IRespuesta<ComprobanteCompraCarbonResponse>> => {
+    const { data } = await api.post<
+      IRespuesta<ComprobanteCompraCarbonResponse>
+    >(
+      `${path}/${idCompraCarbon}/comprobante-proveedor`,
+      CompraCarbonService.buildFormEvidencias(payload, archivos),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  getGruposFlete: async (
+    idCompraCarbon: number,
+  ): Promise<IRespuesta<GrupoFleteTransportista[]>> => {
+    const { data } = await api.get<IRespuesta<GrupoFleteTransportista[]>>(
+      `${path}/${idCompraCarbon}/grupos-flete`,
+    );
+    return data;
+  },
+
+  getComprobanteTransporte: async (
+    idCompraCarbon: number,
+    idComprobante: number,
+  ): Promise<IRespuesta<ComprobanteTransporteCarbonResponse>> => {
+    const { data } = await api.get<
+      IRespuesta<ComprobanteTransporteCarbonResponse>
+    >(
+      `${path}/${idCompraCarbon}/comprobantes-transporte/${idComprobante}`,
+    );
+    return data;
+  },
+
+  registrarComprobanteTransporte: async (
+    idCompraCarbon: number,
+    payload: RegistrarComprobanteTransporteRequest,
+    archivos: File[] = [],
+  ): Promise<IRespuesta<ComprobanteTransporteCarbonResponse>> => {
+    const form = CompraCarbonService.buildFormEvidencias(payload, archivos);
+    form.append("ids_detalle_carga", JSON.stringify(payload.ids_detalle_carga));
+
+    const { data } = await api.post<
+      IRespuesta<ComprobanteTransporteCarbonResponse>
+    >(
+      `${path}/${idCompraCarbon}/comprobantes-transporte`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  // =========================================================================
+  // Pagos
+  // =========================================================================
+
+  getPagos: async (
+    idCompraCarbon: number,
+  ): Promise<IRespuesta<PagosCompraCarbonResponse>> => {
+    const { data } = await api.get<IRespuesta<PagosCompraCarbonResponse>>(
+      `${path}/${idCompraCarbon}/pagos`,
+    );
+    return data;
+  },
+
+  registrarPagoProveedor: async (
+    idCompraCarbon: number,
+    payload: RegistrarPagoProveedorRequest,
+    archivos: File[] = [],
+  ): Promise<IRespuesta<PagosCompraCarbonResponse>> => {
+    const { data } = await api.post<IRespuesta<PagosCompraCarbonResponse>>(
+      `${path}/${idCompraCarbon}/pagos-proveedor`,
+      CompraCarbonService.buildFormEvidencias(payload, archivos),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  registrarPagoTransporte: async (
+    idCompraCarbon: number,
+    payload: RegistrarPagoTransporteRequest,
+    archivos: File[] = [],
+  ): Promise<IRespuesta<PagosCompraCarbonResponse>> => {
+    const { data } = await api.post<IRespuesta<PagosCompraCarbonResponse>>(
+      `${path}/${idCompraCarbon}/pagos-transporte`,
+      CompraCarbonService.buildFormEvidencias(payload, archivos),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  /**
+   * Arma un multipart genérico de comprobantes y pagos.
+   *
+   * Los booleanos viajan como "1"/"0" porque en multipart todo llega como
+   * texto y un `false` en PHP seria truthy. Los archivos van como
+   * `evidencias[]`: la API los persiste con su ArchivoHelper y devuelve la
+   * metadata final, nunca se acepta una URL inventada por el cliente.
+   */
+  buildFormEvidencias: (
+    payload: object,
+    archivos: File[] = [],
+  ): FormData => {
+    const form = new FormData();
+
+    Object.entries(payload as Record<string, unknown>).forEach(([key, value]) => {
+      if (value === null || value === undefined) return;
+      if (typeof value === "boolean") {
+        form.append(key, value ? "1" : "0");
+        return;
+      }
+      form.append(key, String(value));
+    });
+
+    archivos.forEach((file) => form.append("evidencias[]", file));
+
+    return form;
   },
 };
