@@ -7,7 +7,7 @@ import {
   SegmentedControl,
   Text,
 } from "@mantine/core";
-import { IconCoin, IconTruckDelivery } from "@tabler/icons-react";
+import { IconCoin } from "@tabler/icons-react";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { usePagosCompraCarbon } from "../hooks/usePagosCompraCarbon";
 import { ModalRegistroPago } from "./modal-registro-pago";
