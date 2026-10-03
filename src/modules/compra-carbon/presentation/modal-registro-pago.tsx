@@ -13,9 +13,14 @@ import type { MedioPago } from "../../../shared/enums/compra-carbon/medio-pago";
 interface Props {
   destino: "proveedor" | "transportista";
   nombreTercero: string;
-  comprobante: ComprobanteCompraCarbonResponse | ComprobanteTransporteCarbonResponse;
-  /** `true` si el comprobante tiene detraccion habilitada. */
-  permiteDetraccion: boolean;
+  /**
+   * Comprobante que se esta pagando. Es `null` cuando la compra no aplica
+   * IGV: en ese caso el pago es integro y no hay documento que lo respalde,
+   * pero el usuario igual debe poder registrarlo.
+   */
+  comprobante: ComprobanteCompraCarbonResponse | ComprobanteTransporteCarbonResponse | null;
+  /** Saldo de cabecera cuando no hay comprobante que lo detalle. */
+  saldoSinComprobante: number;
   idEmpresa: number;
   idEntidadDestino: number;
   cuentasEmpresa: CuentaOparable[];
@@ -53,7 +58,7 @@ export const ModalRegistroPago = ({
   destino,
   nombreTercero,
   comprobante,
-  permiteDetraccion,
+  saldoSinComprobante,
   idEmpresa,
   idEntidadDestino,
   cuentasEmpresa,
@@ -66,12 +71,13 @@ export const ModalRegistroPago = ({
 
   // El bucket cambia al alternar: el saldo y las cuentas son distintos.
   const saldo = useMemo(() => {
+    if (!comprobante) return saldoSinComprobante;
     const neto = round2(comprobante.total_neto - comprobante.avance_pago_neto);
     const det = round2(
       comprobante.monto_detraccion - comprobante.avance_pago_detraccion_total,
     );
     return esDetraccion ? det : neto;
-  }, [comprobante, esDetraccion]);
+  }, [comprobante, esDetraccion, saldoSinComprobante]);
 
   const cuentas = useMemo(
     () => cuentasDestino(esDetraccion, idEntidadDestino),
@@ -81,6 +87,9 @@ export const ModalRegistroPago = ({
   useEffect(() => {
     setEsDetraccion(false);
   }, [comprobante]);
+
+  // Sin comprobante no hay detraccion que aplicar.
+  const permiteDetraccion = comprobante?.con_detraccion ?? false;
 
   return (
     <ModalEstandar

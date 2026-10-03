@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Badge,
+  Button,
   Group,
   Paper,
   ScrollArea,
@@ -339,15 +340,19 @@ export const PagosCompraCarbonModal = ({
                     Esta compra no aplica IGV, por lo que no tiene comprobante.
                   </Text>
                   {saldos.saldoCarbon > 0.01 && (
-                    <button
-                      type="button"
-                      onClick={() => alternarBucket({ tipo: "carbon" })}
-                      className="text-indigo-300 hover:text-indigo-200 text-xs font-semibold"
-                    >
-                      {esBucket({ tipo: "carbon" })
-                        ? "Cerrar"
-                        : `Registrar pago · ${formatPEN(saldos.saldoCarbon)}`}
-                    </button>
+                    <Group justify="flex-end">
+                      <Button
+                        variant="subtle"
+                        color="indigo"
+                        size="compact-xs"
+                        radius="lg"
+                        onClick={() => alternarBucket({ tipo: "carbon" })}
+                      >
+                        {esBucket({ tipo: "carbon" })
+                          ? "Cerrar"
+                          : `Registrar pago · ${formatPEN(saldos.saldoCarbon)}`}
+                      </Button>
+                    </Group>
                   )}
 
                   <PagosDelComprobante
@@ -418,7 +423,7 @@ export const PagosCompraCarbonModal = ({
       </ScrollArea.Autosize>
 
       {/* El form de pago vive en un modal propio: el comprobante queda intacto. */}
-      {comprobanteDelBucket && (
+      {(bucketAbierto?.tipo === "carbon" || comprobanteDelBucket) && (
         <ModalRegistroPago
           destino={
             bucketAbierto?.tipo === "flete" ? "transportista" : "proveedor"
@@ -430,7 +435,7 @@ export const PagosCompraCarbonModal = ({
               : proveedor
           }
           comprobante={comprobanteDelBucket}
-          permiteDetraccion={comprobanteDelBucket.con_detraccion}
+          saldoSinComprobante={saldos.saldoCarbon}
           idEmpresa={idEmpresa}
           idEntidadDestino={
             bucketAbierto?.tipo === "flete"
@@ -475,6 +480,8 @@ export const PagosCompraCarbonModal = ({
               return;
             }
 
+            // Compra sin IGV: el backend deja el pago sin comprobante porque
+            // no hay documento que lo respalde.
             void registrarProveedor(
               {
                 id_cuenta_bancaria_empresa: pl.id_cuenta_bancaria_empresa,
