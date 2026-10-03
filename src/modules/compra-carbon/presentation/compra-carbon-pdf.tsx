@@ -7,18 +7,15 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import dayjs from "dayjs";
+import "dayjs/locale/es";
 import { formatNumber } from "../../../shared/functions/formatNumber";
+import { numeroALetras } from "../../../shared/functions/numero-a-letras";
 import type {
   CompraCarbonCabeceraDetalle,
   CompraCarbonDetalleItem,
 } from "../service/compra-carbon.responses";
 import type { RES_Empresa } from "../../../service/responses/empresa";
 import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
-import {
-  darkenHex,
-  getPdfAccent,
-  lightenHex,
-} from "../../../presentation/utils/pdf/pdf-theme";
 
 interface CompraCarbonPDFProps {
   compra: {
@@ -33,536 +30,476 @@ interface CompraCarbonPDFProps {
 
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
 
-/**
- * Estilos dedicados para el bloque de Observaciones. Mantenemos una paleta
- * zinc/gris independiente del accent corporativo porque es un bloque
- * semantico legal/advertencia y debe distinguirse del resto.
- */
-const observacionesStyles = StyleSheet.create({
-  observaciones: {
-    marginTop: 12,
-    padding: 10,
-    backgroundColor: "#f4f4f5",
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: "#a1a1aa",
-  },
-  observacionesTitle: {
-    fontSize: 8,
-    fontWeight: 700,
-    color: "#52525b",
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  observacionesText: {
-    fontSize: 7,
-    color: "#3f3f46",
-    lineHeight: 1.5,
-  },
-});
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const TIPO_DESPACHO_RECOJO = "recojo";
+
+/** Token unico para los datos que aun no tienen valor disponible. */
+const SIN_DATO = "—";
 
 /**
- * Bloque de observaciones: combina texto fijo con variables dinamicas que
- * dependen de la empresa seleccionada al crear la compra de carbon.
- *
- * - `direccionFiscal`: si no existe, se renderiza como "-" en el punto 1.
- * - `nombreEmpresa`: se usa en el punto 1 (deposito de) y en el punto 2.
+ * Bloque OBSERVACIONES de la OC. El punto 1 declara el precio "puesto en"
+ * el destino real de la carga (el almacen de la empresa o el del cliente),
+ * no en el domicilio fiscal de la empresa.
  */
 const ObservacionesBlock = ({
   nombreEmpresa,
-  direccionFiscal,
+  deposito,
 }: {
   nombreEmpresa: string;
-  direccionFiscal: string;
-}) => {
-  const direccionTexto = direccionFiscal?.trim() ? direccionFiscal : "-";
+  deposito: string;
+}) => (
+  <View style={STYLES.observaciones}>
+    <Text style={STYLES.observacionesTitulo}>OBSERVACIONES:</Text>
+    <Text style={STYLES.observacionesTexto}>
+      {`1. El precio de la orden de compra es puesto en Mina y/o ${deposito}, deposito de ${nombreEmpresa}.\n`}
+      {`1.1. La unidad de transporte debe llegar totalmente encarpado con lona, para evitar la contaminación ambiental durante el trayecto del despacho.\n`}
+      {`1.2. La fecha de recepción de unidades de transporte es en horario de Lunes a domingo de 7 am a 5 pm. En caso de requerir entregar cargas fuera de horario, debe ser coordinado previamente con el personal de planta.\n`}
+      {`1.3. El material transportado debe cumplir con todos los documentos legales de procedencia. La aceptación de esta orden de compra cuenta como una declaración jurada de que el material entregado es de legal procedencia.\n`}
+      {`1.4. El material no será de Uso Energético.\n`}
+      {`2. ${nombreEmpresa} dejará constancia de la recepción del material a través de sello y VoBo de la gerencia en la guía de Remisión Remitente proporcionada por el proveedor, una vez sea verificado el correcto llenado de todos los datos de conformidad con la exigencia de La factura debe ser electrónica y debe ser enviada vía email junto al archivo XML. En caso aplique la entrega de guías de remisión y transportista, estos documentos son indispensables para poder emitir el pago.\n`}
+      {`2.1. La presente orden de compra tiene una tolerancia de +/- 10%.`}
+    </Text>
+  </View>
+);
 
-  return (
-    <View style={observacionesStyles.observaciones}>
-      <Text style={observacionesStyles.observacionesTitle}>Observaciones</Text>
-      <Text style={observacionesStyles.observacionesText}>
-        {`1. El precio de la orden de compra es puesto en Mina y/o Parque Industrial del Carbon ${direccionTexto}, deposito de ${nombreEmpresa}.\n`}
-        {`1.1. La unidad de transporte debe llegar totalmente encarpado con lona, para evitar la contaminacion ambiental durante el trayecto del despacho.\n`}
-        {`1.2. La fecha de recepcion de unidades de transporte es en horario de Lunes a domingo de 7 am a 5 pm. En caso de requerir entregar cargas fuera de horario, debe ser coordinado previamente con el personal de planta.\n`}
-        {`1.3. El material transportado debe cumplir con todos los documentos legales de procedencia. La aceptacion de esta orden de compra cuenta como una declaracion jurada de que el material entregado es de legal procedencia.\n`}
-        {`1.4. El material no sera de Uso Energetico.\n`}
-        {`2. ${nombreEmpresa} dejara constancia de la recepcion del material a traves de sello y V°B° de la gerencia en la guia de Remision Remitente proporcionada por el proveedor, una vez sea verificado el correcto llenado de todos los datos de conformidad con la exigencia de La factura debe ser electronica y debe ser enviada via email junto al archivo XML. En caso aplique la entrega de guias de remision y transportista, estos documentos son indispensables para poder emitir el pago.\n`}
-        {`2.1. La presente orden de compra tiene una tolerancia de +/- 10%.`}
-      </Text>
-    </View>
-  );
-};
+const STYLES = StyleSheet.create({
+  page: {
+    paddingTop: 22,
+    paddingBottom: 26,
+    paddingHorizontal: 28,
+    fontSize: 9,
+    color: "#18181b",
+    fontFamily: "Helvetica",
+  },
+
+  // ── Cabecera ─────────────────────────────────────────────────────────────
+  cabecera: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginBottom: 14,
+  },
+  logoCol: { width: 148, justifyContent: "center", paddingRight: 10 },
+  logo: { width: 148, height: 66, objectFit: "contain" },
+  fiscalCol: { flex: 1, justifyContent: "center", paddingRight: 10 },
+  fiscalLinea: { fontSize: 7.5, lineHeight: 1.45, color: "#27272a" },
+  fiscalLabel: { fontSize: 7.5, fontWeight: 700, color: "#18181b" },
+  emisorBox: {
+    width: 186,
+    borderWidth: 1,
+    borderColor: "#18181b",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+  },
+  emisorRazon: { fontSize: 10, fontWeight: 700, lineHeight: 1.2 },
+  emisorLinea: { fontSize: 8, textAlign: "center", lineHeight: 1.35 },
+  emisorDoc: { fontSize: 9, fontWeight: 700, textAlign: "center" },
+  emisorCorrelativo: { fontSize: 9, fontWeight: 700, textAlign: "center" },
+
+  // ── Proveedor ────────────────────────────────────────────────────────────
+  etiqueta: { fontSize: 8, fontWeight: 700, color: "#18181b" },
+  dato: { fontSize: 8, color: "#27272a" },
+  filaDato: {
+    flexDirection: "row",
+    marginBottom: 4,
+    alignItems: "flex-start",
+  },
+
+  // ── Tabla de items ───────────────────────────────────────────────────────
+  tabla: { borderWidth: 1, borderColor: "#18181b" },
+  tablaHeader: {
+    flexDirection: "row",
+    backgroundColor: "#e4e4e7",
+    borderBottomWidth: 1,
+    borderBottomColor: "#18181b",
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+  },
+  th: { fontSize: 7.5, fontWeight: 700, textAlign: "center" },
+  tablaFila: {
+    flexDirection: "row",
+    paddingVertical: 5,
+    paddingHorizontal: 5,
+    alignItems: "center",
+  },
+  celdaCant: {
+    width: "13%",
+    textAlign: "center",
+    paddingRight: 6,
+    fontSize: 8,
+  },
+  celdaUm: { width: "7%", textAlign: "center", fontSize: 8 },
+  celdaCodigo: { width: "16%", textAlign: "center", paddingHorizontal: 4 },
+  celdaFicha: {
+    width: "34%",
+    textAlign: "center",
+    paddingHorizontal: 4,
+    fontSize: 6.5,
+    lineHeight: 1.35,
+    color: "#3f3f46",
+  },
+  celdaPrecio: {
+    width: "15%",
+    textAlign: "center",
+    paddingHorizontal: 6,
+    fontSize: 8,
+  },
+  celdaImporte: { width: "15%", textAlign: "center", fontSize: 8 },
+  celdaCodigoValor: { fontSize: 8, fontWeight: 700, textAlign: "center" },
+  celdaCodigoNombre: {
+    fontSize: 6,
+    textAlign: "center",
+    color: "#52525b",
+    marginTop: 1,
+  },
+  celdaVacia: { width: "100%" },
+  tablaEspacio: { flexGrow: 1, minHeight: 74 },
+
+  // ── Importe en letras + resumen ──────────────────────────────────────────
+  cierreRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 10 },
+  letrasCol: { flex: 1, paddingRight: 12 },
+  letrasLabel: { fontSize: 8, fontWeight: 700 },
+  letrasValor: {
+    fontSize: 7.5,
+    color: "#27272a",
+    marginTop: 2,
+    lineHeight: 1.35,
+  },
+  resumenCol: { width: 196 },
+  resumenFila: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 1.5,
+  },
+  resumenLabel: { fontSize: 8, color: "#27272a" },
+  resumenValor: { fontSize: 8 },
+  resumenTotalLabel: { fontSize: 8.5, fontWeight: 700 },
+  resumenTotalValor: { fontSize: 8.5, fontWeight: 700 },
+  dobleLinea: {
+    marginTop: 3,
+    borderTopWidth: 1,
+    borderTopColor: "#18181b",
+    paddingTop: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: "#18181b",
+    height: 4,
+  },
+
+  // ── Observaciones ────────────────────────────────────────────────────────
+  observaciones: { marginTop: 14 },
+  observacionesTitulo: {
+    fontSize: 8,
+    fontWeight: 700,
+    marginBottom: 3,
+  },
+  observacionesTexto: { fontSize: 7, lineHeight: 1.5, color: "#27272a" },
+
+  // ── Firmas ───────────────────────────────────────────────────────────────
+  firmasMeta: { flexDirection: "row", marginTop: 14 },
+  firmasMetaCol: { flex: 1 },
+  firmasMetaColDer: { flex: 1, paddingLeft: 28 },
+  firmasMetaLinea: { fontSize: 8, marginBottom: 8 },
+  firmasCajas: { flexDirection: "row", gap: 14, marginTop: 6 },
+  firmaCaja: {
+    flex: 1,
+    height: 92,
+    borderWidth: 1,
+    borderColor: "#18181b",
+  },
+  firmaPie: {
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 3,
+  },
+  firmaPieCol: { flex: 1, textAlign: "center" },
+  firmaPieTexto: { fontSize: 8, color: "#27272a" },
+  firmaPieEstado: {
+    fontSize: 8,
+    fontWeight: 700,
+    textAlign: "center",
+    marginTop: 3,
+  },
+});
 
 export const CompraCarbonPDF = ({
   compra,
   empresa,
   proveedor,
   urlLogoEmpresa,
-  colorPredominante,
 }: CompraCarbonPDFProps) => {
   const { cabecera, detalles } = compra;
-  const totalAntesDescuento = Number(cabecera.total_antes_descuento);
-  const descuentoFleteTotal = Number(cabecera.descuento_flete);
-  const totalConDescuento = Number(cabecera.total_con_descuento);
+
+  // ── Montos ───────────────────────────────────────────────────────────────
+  // `total_con_descuento` ya viene con el IGV contenido: la linea de IGV es
+  // solo disclosure, nunca se suma. El total a pagar descuenta los anticipos.
+  const descuentoFlete = Number(cabecera.descuento_flete);
+  const gravada = Number(cabecera.total_con_descuento);
   const aplicaIgv = Boolean(cabecera.aplica_igv);
   const igvPct = Number(cabecera.porcentaje_igv);
-  const igvMonto = Number(cabecera.monto_igv);
-  // Requerimiento: El total de egreso debe ser el neto (total_con_descuento)
-  const totalEgreso = totalConDescuento;
+  const igvMonto = aplicaIgv ? Number(cabecera.monto_igv) : 0;
+  const anticipos = Number(cabecera.monto_pagado_anticipos ?? 0);
+  /** Lo que efectivamente se le paga al proveedor con esta OC. */
+  const totalPagar = gravada - anticipos;
+
+  // ── Destino de la carga (deposito) ───────────────────────────────────────
+  const esDestinoCliente = Boolean(cabecera.id_almacen_cliente);
+  const depositoNombre = esDestinoCliente
+    ? cabecera.cliente_destino?.trim() || null
+    : cabecera.almacen?.trim() || null;
+  const depositoDireccion = esDestinoCliente
+    ? cabecera.almacen_cliente_direccion?.trim() || null
+    : cabecera.almacen_direccion?.trim() || null;
+  const deposito =
+    [depositoNombre, depositoDireccion].filter(Boolean).join(" - ") || SIN_DATO;
+
+  // ── Proveedor ────────────────────────────────────────────────────────────
+  const esProveedorNatural =
+    (proveedor?.tipo_entidad ?? cabecera.proveedor_tipo_entidad) === "Natural";
+  const proveedorNombre =
+    proveedor?.razon_social?.trim() || cabecera.proveedor || SIN_DATO;
+  const proveedorDocumento = esProveedorNatural
+    ? (proveedor?.dni ?? cabecera.proveedor_dni)
+    : (proveedor?.ruc ?? cabecera.proveedor_ruc);
+
+  // Direccion de la carga: si es recojo, el almacen del proveedor; si es
+  // envio, la direccion fiscal del proveedor.
+  const direccionProveedor =
+    (cabecera.tipo_despacho === TIPO_DESPACHO_RECOJO
+      ? cabecera.almacen_proveedor_direccion?.trim() ||
+        proveedor?.direccion?.trim()
+      : proveedor?.direccion?.trim()) || SIN_DATO;
+
   const esPreliminar = (cabecera.estado ?? "") === "Preliminar";
 
-  // Datos del proveedor: priorizamos el record completo (incluye
-  // direccion + ubigeo), fallback a lo que ya viaja en cabecera.
-  const proveedorNombre =
-    proveedor?.razon_social?.trim() || cabecera.proveedor || "—";
-  const proveedorDocumento = proveedor
-    ? proveedor.tipo_entidad === "Natural"
-      ? proveedor.dni
-      : proveedor.ruc
-    : cabecera.proveedor_tipo_entidad === "Natural"
-      ? cabecera.proveedor_dni
-      : cabecera.proveedor_ruc;
-
-  const accent = getPdfAccent(colorPredominante);
-  const accentDark = darkenHex(accent, 0.3);
-  const accentVeryDark = darkenHex(accent, 0.45);
-  const accentSoft = lightenHex(accent, 0.55);
-
-  const styles = StyleSheet.create({
-    page: {
-      paddingTop: 20,
-      paddingBottom: 40,
-      paddingHorizontal: 30,
-      fontSize: 9,
-      color: "#27272a",
-      fontFamily: "Helvetica",
-    },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: accentSoft,
-      paddingBottom: 8,
-    },
-    companyName: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: "#18181b",
-    },
-    companyAddress: {
-      fontSize: 8,
-      color: accentDark,
-      marginTop: 2,
-    },
-    documentType: {
-      fontSize: 16,
-      fontWeight: 700,
-      color: accent,
-      textAlign: "right",
-    },
-    documentNumber: {
-      fontSize: 12,
-      fontWeight: 700,
-      textAlign: "right",
-      marginTop: 2,
-    },
-    section: { marginBottom: 12 },
-    sectionTitle: {
-      fontSize: 8,
-      fontWeight: 700,
-      color: accentVeryDark,
-      textTransform: "uppercase",
-      letterSpacing: 1,
-      borderLeftWidth: 3,
-      borderLeftColor: accent,
-      paddingLeft: 6,
-      marginBottom: 4,
-      marginTop: 6,
-    },
-    infoBox: {
-      backgroundColor: accentSoft,
-      padding: 8,
-      borderRadius: 4,
-      marginBottom: 8,
-    },
-    infoBoxLabel: { fontSize: 7, color: accentDark },
-    infoBoxValue: { fontSize: 9, fontWeight: 700, color: "#18181b" },
-    tableHeader: {
-      backgroundColor: accentVeryDark,
-      color: "#ffffff",
-      fontWeight: 700,
-      fontSize: 8,
-      paddingVertical: 5,
-      paddingHorizontal: 6,
-      flexDirection: "row",
-    },
-    tableRow: {
-      flexDirection: "row",
-      borderBottomWidth: 1,
-      borderBottomColor: accentSoft,
-      paddingVertical: 5,
-      paddingHorizontal: 6,
-    },
-    // Tabla detalle: # | Cantidad | UM (hardcoded "TON") | Tipo de Carbon |
-    //                Descripcion (slot vacio por ahora) | Precio Unit. | Importe
-    col0: { width: "4%", textAlign: "center" },
-    colCant: { width: "12%", textAlign: "right", paddingRight: 6 },
-    colUm: { width: "6%", textAlign: "center" },
-    colTipo: { width: "33%", textAlign: "left", paddingLeft: 8 },
-    colDesc: { width: "14%", textAlign: "left", paddingLeft: 8 },
-    colPrecio: { width: "14%", textAlign: "right", paddingRight: 6 },
-    colImporte: { width: "17%", textAlign: "right", paddingRight: 4 },
-    totalsContainer: {
-      marginTop: 10,
-      alignSelf: "flex-end",
-      width: "40%",
-      backgroundColor: accentSoft,
-      padding: 10,
-      borderRadius: 4,
-    },
-    totalRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      paddingVertical: 2,
-    },
-    totalLabel: { fontWeight: 700, color: accentDark, fontSize: 9 },
-    totalValue: { fontWeight: 700, fontSize: 9 },
-    grandTotal: {
-      marginTop: 6,
-      borderTopWidth: 1,
-      borderTopColor: accent,
-      paddingTop: 6,
-      fontSize: 11,
-      color: accentVeryDark,
-      fontWeight: 700,
-    },
-    footer: {
-      position: "absolute",
-      bottom: 20,
-      left: 30,
-      right: 30,
-      textAlign: "center",
-      color: accentDark,
-      fontSize: 7,
-      borderTopWidth: 1,
-      borderTopColor: accentSoft,
-      paddingTop: 8,
-    },
-  });
-
-  const isCupper =
-    empresa.razon_social.toUpperCase().includes("CUPPER") ||
-    empresa.razon_social.toUpperCase().includes("HANNIA");
+  const fIngreso = dayjs(cabecera.fecha_hora_ingreso).locale("es");
+  const fechaIngreso = `${cap(fIngreso.format("dddd"))}, ${fIngreso.date()} de ${cap(
+    fIngreso.format("MMMM"),
+  )} de ${fIngreso.year()}`;
 
   return (
-    <Document title={`Compra de Carbon - ${cabecera.correlativo}`}>
-      <Page size="A4" style={styles.page}>
-        {/* Cabecera: logo (izq) | domicilio fiscal (centro) | ORDEN DE COMPRA + datos (der) */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            borderBottomWidth: 1,
-            borderBottomColor: accentSoft,
-            paddingBottom: 8,
-            marginBottom: 12,
-          }}
-        >
-          {/* LEFT: logo */}
-          <View style={{ width: 150, marginRight: 20, paddingTop: 6 }}>
-            {urlLogoEmpresa && (
-              <Image
-                src={urlLogoEmpresa}
-                style={
-                  isCupper
-                    ? { width: 80, height: 80, objectFit: "contain" }
-                    : { width: 130, height: 50, objectFit: "contain" }
-                }
-              />
-            )}
+    <Document title={`Orden de Compra - ${cabecera.correlativo}`}>
+      <Page size="A4" style={STYLES.page}>
+        {/* ── Cabecera: logo | domicilio fiscal + deposito | emisor ── */}
+        <View style={STYLES.cabecera}>
+          <View style={STYLES.logoCol}>
+            {urlLogoEmpresa ? (
+              <Image src={urlLogoEmpresa} style={STYLES.logo} />
+            ) : null}
           </View>
 
-          {/* CENTER: domicilio fiscal */}
-          <View style={{ flex: 1, paddingHorizontal: 8, paddingTop: 6 }}>
-            {empresa.domicilio_fiscal && (
-              <Text
-                style={{
-                  fontSize: 8,
-                  color: accentDark,
-                  lineHeight: 1.4,
-                }}
-              >
+          <View style={STYLES.fiscalCol}>
+            {empresa.domicilio_fiscal?.trim() ? (
+              <Text style={STYLES.fiscalLinea}>
+                <Text style={STYLES.fiscalLabel}>DOMICILIO FISCAL: </Text>
                 {empresa.domicilio_fiscal}
               </Text>
-            )}
+            ) : null}
+            <Text style={STYLES.fiscalLinea}>
+              <Text style={STYLES.fiscalLabel}>DEPOSITO: </Text>
+              {deposito}
+            </Text>
           </View>
 
-          {/* RIGHT: ORDEN DE COMPRA + datos del receptor */}
-          <View style={{ alignItems: "flex-end", minWidth: 220 }}>
-            <Text style={styles.documentType}>
-              {esPreliminar ? "ORDEN DE COMPRA (PRELIMINAR)" : "ORDEN DE COMPRA"}
-            </Text>
-            <Text
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                textAlign: "right",
-                color: "#18181b",
-                marginTop: 6,
-                maxWidth: 220,
-              }}
-            >
+          <View style={STYLES.emisorBox}>
+            <Text style={STYLES.emisorRazon}>
               {empresa.razon_social.toUpperCase()}
             </Text>
-            <Text style={{ fontSize: 9, color: accentDark, marginTop: 2 }}>
-              {`RUC: ${empresa.ruc}`}
+            <Text style={STYLES.emisorLinea}>{`RUC: ${empresa.ruc}`}</Text>
+            <Text style={STYLES.emisorDoc}>
+              {esPreliminar
+                ? "ORDEN DE COMPRA (PRELIMINAR)"
+                : "ORDEN DE COMPRA"}
             </Text>
-            <Text style={styles.documentNumber}>N° {cabecera.correlativo}</Text>
+            <Text style={STYLES.emisorCorrelativo}>
+              {`N° ${cabecera.correlativo}`}
+            </Text>
           </View>
         </View>
 
-        {/* Proveedor */}
-        <View style={[styles.infoBox, { marginBottom: 12 }]}>
-          <Text style={styles.sectionTitle}>PROVEEDOR</Text>
-          <Text style={styles.infoBoxValue}>{proveedorNombre}</Text>
-          {proveedorDocumento && (
-            <Text style={{ fontSize: 8, color: accentDark, marginTop: 2 }}>
-              {cabecera.proveedor_tipo_entidad === "Natural" ||
-              proveedor?.tipo_entidad === "Natural"
-                ? `DNI: ${proveedorDocumento}`
-                : `RUC: ${proveedorDocumento}`}
+        {/* ── Proveedor ── */}
+        <View style={{ marginBottom: 12 }}>
+          <View style={STYLES.filaDato}>
+            <Text style={[STYLES.etiqueta, { width: 82 }]}>PROVEEDOR:</Text>
+            <Text style={[STYLES.dato, { flex: 1 }]}>{proveedorNombre}</Text>
+          </View>
+          <View style={STYLES.filaDato}>
+            <Text style={[STYLES.etiqueta, { width: 82 }]}>RUC:</Text>
+            <Text style={[STYLES.dato, { flex: 1 }]}>
+              {proveedorDocumento || SIN_DATO}
             </Text>
-          )}
-          {/*
-            Slot "Atención:" dejado vacio a proposito. Cuando se defina el
-            dato en cabecera o proveedor, basta con bindearlo aqui (no
-            requiere tocar el resto del PDF).
-          */}
-          <Text style={{ fontSize: 8, color: accentDark, marginTop: 2 }}>
-            {"Atención:"}
-          </Text>
+          </View>
+          <View style={STYLES.filaDato}>
+            <Text style={[STYLES.etiqueta, { width: 82 }]}>DIRECCIÓN:</Text>
+            <Text style={[STYLES.dato, { flex: 1 }]}>{direccionProveedor}</Text>
+          </View>
+          {/* Slot "ATENCIÓN" reservado: se completa con el contacto del
+              proveedor cuando exista ese dato en el catalogo. */}
+          <View style={STYLES.filaDato}>
+            <Text style={[STYLES.etiqueta, { width: 82 }]}>ATENCIÓN:</Text>
+            <Text style={[STYLES.dato, { flex: 1 }]}> </Text>
+          </View>
         </View>
 
-        {/* Tabla de items */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detalle de la Compra</Text>
-          <View style={styles.tableHeader}>
-            <Text style={styles.col0}>#</Text>
-            <Text style={styles.colCant}>Cantidad</Text>
-            <Text style={styles.colUm}>UM</Text>
-            <Text style={styles.colTipo}>Tipo de Carbon / Placa / Ticket</Text>
-            <Text style={styles.colDesc}>Origen / Transportista</Text>
-            <Text style={styles.colPrecio}>Precio Unit.</Text>
-            <Text style={styles.colImporte}>Importe</Text>
+        {/* ── Detalle de la carga ── */}
+        <View style={STYLES.tabla}>
+          <View style={STYLES.tablaHeader}>
+            <Text style={[STYLES.th, { width: "13%" }]}>CANTIDAD</Text>
+            <Text style={[STYLES.th, { width: "7%" }]}>UM</Text>
+            <Text style={[STYLES.th, { width: "16%" }]}>CÓDIGO</Text>
+            <Text style={[STYLES.th, { width: "34%" }]}>FICHA TÉCNICA</Text>
+            <Text style={[STYLES.th, { width: "15%" }]}>P/U</Text>
+            <Text style={[STYLES.th, { width: "15%" }]}>IMPORTE</Text>
           </View>
-          {detalles.map((d, i) => {
-            const origen =
-              [d.lugar_departamento, d.lugar_provincia, d.lugar_distrito]
-                .filter(Boolean)
-                .join(" / ") +
-              (d.lugar_direccion ? ` · ${d.lugar_direccion}` : "");
-            return (
-              <View key={d.id_detalle_compra_carbon} style={styles.tableRow}>
-                <Text style={styles.col0}>{i + 1}</Text>
-                <Text style={styles.colCant}>
-                  {formatNumber(Number(d.cantidad))}
+
+          {detalles.length === 0 ? (
+            <View style={STYLES.tablaFila}>
+              <Text style={STYLES.celdaVacia}> </Text>
+            </View>
+          ) : (
+            detalles.map((d) => (
+              <View key={d.id_detalle_compra_carbon} style={STYLES.tablaFila}>
+                <Text style={STYLES.celdaCant}>
+                  {formatNumber(Number(d.cantidad), 3)}
                 </Text>
-                <Text style={styles.colUm}>TON</Text>
-                <View style={styles.colTipo}>
-                  <Text style={{ fontWeight: 700, fontSize: 8 }}>
-                    {d.tipo_carbon_nombre}
-                    {d.tipo_carbon_codigo ? ` (${d.tipo_carbon_codigo})` : ""}
+                <Text style={STYLES.celdaUm}>TMS</Text>
+                <View style={STYLES.celdaCodigo}>
+                  <Text style={STYLES.celdaCodigoValor}>
+                    {d.tipo_carbon_codigo?.trim() || SIN_DATO}
                   </Text>
-                  {d.placa && (
-                    <Text style={{ fontSize: 7, color: accentDark }}>
-                      Placa: {d.placa}
-                    </Text>
-                  )}
-                  {d.codigo_ticket_balanza && (
-                    <Text style={{ fontSize: 7, color: accentDark }}>
-                      Ticket: {d.codigo_ticket_balanza}
-                    </Text>
-                  )}
-                  {d.guia_remitente && (
-                    <Text style={{ fontSize: 7, color: accentDark }}>
-                      GR: {d.guia_remitente}
-                      {d.guia_transportista
-                        ? ` · GT: ${d.guia_transportista}`
-                        : ""}
-                    </Text>
-                  )}
-                  {(Number(d.porcentaje_ceniza) > 0 ||
-                    Number(d.porcentaje_humedad) > 0) && (
-                    <Text style={{ fontSize: 7, color: accentDark }}>
-                      Ceniza: {formatNumber(Number(d.porcentaje_ceniza))}% ·
-                      Humedad: {formatNumber(Number(d.porcentaje_humedad))}%
-                    </Text>
-                  )}
+                  <Text style={STYLES.celdaCodigoNombre}>
+                    {d.tipo_carbon_nombre}
+                  </Text>
+                </View>
+                <Text style={STYLES.celdaFicha}>
                   {Array.isArray(d.tipo_carbon_ficha_tecnica) &&
-                    d.tipo_carbon_ficha_tecnica.length > 0 && (
-                      <View style={{ marginTop: 2, paddingTop: 2, borderTopWidth: 0.5, borderTopColor: accentSoft }}>
-                        <Text style={{ fontSize: 6.5, fontWeight: 700, color: accentDark }}>
-                          Ficha Técnica:
-                        </Text>
-                        {d.tipo_carbon_ficha_tecnica.map((ft, ftIdx) => (
-                          <Text key={ftIdx} style={{ fontSize: 6, color: "#52525b" }}>
-                            • {String(ft)}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
-                </View>
-                <View style={styles.colDesc}>
-                  {origen ? (
-                    <Text style={{ fontSize: 7 }}>{origen}</Text>
-                  ) : (
-                    <Text style={{ fontSize: 7 }}> </Text>
-                  )}
-                  {d.transportista_razon_social && (
-                    <Text style={{ fontSize: 7, color: accentDark }}>
-                      Transp: {d.transportista_razon_social}
-                    </Text>
-                  )}
-                  {Number(d.descuento_flete) > 0 && (
-                    <Text style={{ fontSize: 7, color: accentDark }}>
-                      Flete: -{formatPEN(Number(d.descuento_flete))}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.colPrecio}>
+                  d.tipo_carbon_ficha_tecnica.length > 0
+                    ? d.tipo_carbon_ficha_tecnica
+                        .map((ficha) => String(ficha).trim())
+                        .filter(Boolean)
+                        .join(" · ")
+                    : SIN_DATO}
+                </Text>
+                <Text style={STYLES.celdaPrecio}>
                   {formatPEN(Number(d.precio_unitario))}
                 </Text>
-                <Text style={styles.colImporte}>
+                <Text style={STYLES.celdaImporte}>
                   {formatPEN(Number(d.subtotal_con_descuento))}
                 </Text>
               </View>
-            );
-          })}
+            ))
+          )}
+
+          {/* Espacio en blanco para el llenado manual de cargas adicionales. */}
+          <View style={STYLES.tablaEspacio} />
         </View>
 
-        {/* Totales */}
-        <View style={styles.totalsContainer}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total antes descuento</Text>
-            <Text style={styles.totalValue}>
-              {formatPEN(totalAntesDescuento)}
+        {/* ── Importe en letras + resumen ── */}
+        <View style={STYLES.cierreRow}>
+          <View style={STYLES.letrasCol}>
+            <Text style={STYLES.letrasLabel}>IMPORTE EN LETRAS:</Text>
+            <Text style={STYLES.letrasValor}>
+              {`${numeroALetras(totalPagar)} ${totalPagar === 1 ? "SOL" : "SOLES"}`}
             </Text>
           </View>
-          {descuentoFleteTotal > 0 && (
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>(-) Descuento flete</Text>
-              <Text style={styles.totalValue}>
-                - {formatPEN(descuentoFleteTotal)}
+
+          <View style={STYLES.resumenCol}>
+            <View style={STYLES.resumenFila}>
+              <Text style={STYLES.resumenLabel}>INAFECTA</Text>
+              <Text style={STYLES.resumenValor} />
+            </View>
+            {descuentoFlete > 0 && (
+              <View style={STYLES.resumenFila}>
+                <Text style={STYLES.resumenLabel}>{`(-) DESCUENTO FLETE`}</Text>
+                <Text style={STYLES.resumenValor}>
+                  {`-${formatPEN(descuentoFlete)}`}
+                </Text>
+              </View>
+            )}
+            <View style={STYLES.resumenFila}>
+              <Text style={STYLES.resumenLabel}>GRAVADA</Text>
+              <Text style={STYLES.resumenValor}>{formatPEN(gravada)}</Text>
+            </View>
+            <View style={STYLES.resumenFila}>
+              <Text style={STYLES.resumenLabel}>
+                {aplicaIgv ? `IGV ${formatNumber(igvPct)}%` : "IGV"}
+              </Text>
+              <Text style={STYLES.resumenValor}>
+                {aplicaIgv ? formatPEN(igvMonto) : "No aplica"}
               </Text>
             </View>
-          )}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Pago al proveedor</Text>
-            <Text style={styles.totalValue}>
-              {formatPEN(totalConDescuento)}
-            </Text>
-          </View>
-          {aplicaIgv && (
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>IGV {igvPct.toFixed(2)}%</Text>
-              <Text style={styles.totalValue}>{formatPEN(igvMonto)}</Text>
+            {anticipos > 0 && (
+              <View style={STYLES.resumenFila}>
+                <Text style={STYLES.resumenLabel}>{`(-) ANTICIPOS`}</Text>
+                <Text style={STYLES.resumenValor}>
+                  {`-${formatPEN(anticipos)}`}
+                </Text>
+              </View>
+            )}
+            <View style={STYLES.resumenFila}>
+              <Text style={STYLES.resumenTotalLabel}>TOTAL</Text>
+              <Text style={STYLES.resumenTotalValor}>
+                {formatPEN(totalPagar)}
+              </Text>
             </View>
-          )}
-          {!aplicaIgv && (
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>IGV</Text>
-              <Text style={styles.totalValue}>No aplica (pago neto)</Text>
-            </View>
-          )}
-          <View style={[styles.totalRow, styles.grandTotal]}>
-            <Text style={styles.totalLabel}>TOTAL EGRESO</Text>
-            <Text style={styles.totalValue}>{formatPEN(totalEgreso)}</Text>
+            <View style={STYLES.dobleLinea} />
           </View>
         </View>
 
-        {/* Observaciones dinamicas */}
+        {/* ── Observaciones ── */}
         <ObservacionesBlock
           nombreEmpresa={empresa.razon_social}
-          direccionFiscal={empresa.domicilio_fiscal ?? ""}
+          deposito={deposito}
         />
 
-        {/* Metadata del documento (izquierda) + slots vacios (derecha) */}
-        <View
-          style={{
-            flexDirection: "row",
-            marginTop: 12,
-            marginBottom: 12,
-          }}
-        >
-          {/* LEFT: Por / Creado / Aprobado / Fechas */}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 8 }}>
+        {/* ── Firmas: datos de emision (izq) + slots del proveedor (der) ── */}
+        <View style={STYLES.firmasMeta}>
+          <View style={STYLES.firmasMetaCol}>
+            <Text style={STYLES.firmasMetaLinea}>
               {`Por: ${empresa.razon_social}`}
             </Text>
-            <Text style={{ fontSize: 8, marginTop: 4 }}>
-              {`Creado por: ${cabecera.empleado_registro}`}
+            <Text style={STYLES.firmasMetaLinea}>
+              {`Creado por: ${cabecera.empleado_registro || SIN_DATO}`}
             </Text>
-            <Text style={{ fontSize: 8, marginTop: 4 }}>
-              {`Aprobado por: ${cabecera.empleado_aprueba ?? "—"}`}
+            <Text style={STYLES.firmasMetaLinea}>
+              {`Aprobado por: ${
+                cabecera.empleado_aprueba_liquidacion?.trim() ||
+                cabecera.empleado_aprueba?.trim() ||
+                SIN_DATO
+              }`}
             </Text>
-            <Text style={{ fontSize: 8, marginTop: 4 }}>
-              {`Fecha de Ingreso: ${dayjs(cabecera.fecha_hora_ingreso).format(
-                "DD/MM/YYYY HH:mm",
-              )}`}
+            <Text style={STYLES.firmasMetaLinea}>
+              {`Fecha: ${fechaIngreso}`}
             </Text>
-            {cabecera.fecha_hora_confirmacion && (
-              <Text style={{ fontSize: 8, marginTop: 4 }}>
-                {`Fecha de aprobacion: ${dayjs(
-                  cabecera.fecha_hora_confirmacion,
-                ).format("DD/MM/YYYY HH:mm")}`}
-              </Text>
-            )}
           </View>
 
-          {/* RIGHT: 4 labels sin valor (slots reservados para uso futuro) */}
-          <View style={{ flex: 1, paddingLeft: 24 }}>
-            <Text style={{ fontSize: 8 }}>{"Proveedor:"}</Text>
-            <Text style={{ fontSize: 8, marginTop: 10 }}>
-              {"Nombre y apellido:"}
-            </Text>
-            <Text style={{ fontSize: 8, marginTop: 10 }}>{"DNI:"}</Text>
-            <Text style={{ fontSize: 8, marginTop: 10 }}>{"Fecha:"}</Text>
+          {/* Slots sin valor: los completa a mano el proveedor al aceptar. */}
+          <View style={STYLES.firmasMetaColDer}>
+            <Text style={STYLES.firmasMetaLinea}>Proveedor:</Text>
+            <Text style={STYLES.firmasMetaLinea}>Nombre y Apellido:</Text>
+            <Text style={STYLES.firmasMetaLinea}>D.N.I:</Text>
+            <Text style={STYLES.firmasMetaLinea}>Fecha:</Text>
           </View>
         </View>
 
-        {/* Doble caja de firma + sello */}
-        <View style={{ flexDirection: "row", gap: 16 }}>
-          {[0, 1].map((idx) => (
-            <View
-              key={idx}
-              style={{
-                flex: 1,
-                borderWidth: 1,
-                borderColor: accentSoft,
-                minHeight: 120,
-                padding: 8,
-                justifyContent: "flex-start",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 8,
-                  color: accentDark,
-                  textAlign: "center",
-                  fontStyle: "italic",
-                }}
-              >
-                {"Firma y Sello"}
-              </Text>
-            </View>
-          ))}
+        <View style={STYLES.firmasCajas}>
+          <View style={STYLES.firmaCaja} />
+          <View style={STYLES.firmaCaja} />
         </View>
-
-        {/* Footer */}
-        <Text style={styles.footer} fixed>
-          {`Documento generado automaticamente por el sistema ${empresa.razon_social}`}
-        </Text>
+        <View style={STYLES.firmaPie}>
+          <View style={STYLES.firmaPieCol}>
+            <Text style={STYLES.firmaPieTexto}>Firma y Sello</Text>
+            <Text style={STYLES.firmaPieEstado}>APROBADO</Text>
+          </View>
+          <View style={STYLES.firmaPieCol}>
+            <Text style={STYLES.firmaPieTexto}>Firma y Sello</Text>
+            <Text style={STYLES.firmaPieEstado}>ACEPTADA</Text>
+          </View>
+        </View>
+        {/* 
+        <Text style={[STYLES.pie, { color: pieColor }]}>
+          {`Documento generado automáticamente por el sistema ${empresa.razon_social} · ${cabecera.correlativo}`}
+        </Text> */}
       </Page>
     </Document>
   );
