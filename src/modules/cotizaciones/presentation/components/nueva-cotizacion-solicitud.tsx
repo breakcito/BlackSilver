@@ -88,7 +88,7 @@ export const NuevaCotizacionDesdeSolicitud = ({
     <ModalEstandar
       opened={opened}
       close={onClose}
-      title="Nueva Cotización desde Solicitud de Reabastecimiento"
+      title="Nueva Cotización"
       size="95%"
       validateClose
       rightSection={headerActions}

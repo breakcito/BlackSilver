@@ -243,15 +243,16 @@ export const CompraCarbonPDF = ({
   const totalPagar = gravada - anticipos;
 
   // ── Destino de la carga (deposito) ───────────────────────────────────────
+  // Almacen propio de la empresa: basta la direccion (`almacen.direccion`).
+  // Almacen de carbon de un cliente: se antepone la razon social del cliente
+  // (`cliente.razon_social` via `almacen_carbon_cliente.id_cliente`) porque
+  // la direccion sola no identifica al destinatario.
   const esDestinoCliente = Boolean(cabecera.id_almacen_cliente);
-  const depositoNombre = esDestinoCliente
-    ? cabecera.cliente_destino?.trim() || null
-    : cabecera.almacen?.trim() || null;
-  const depositoDireccion = esDestinoCliente
-    ? cabecera.almacen_cliente_direccion?.trim() || null
-    : cabecera.almacen_direccion?.trim() || null;
-  const deposito =
-    [depositoNombre, depositoDireccion].filter(Boolean).join(" - ") || SIN_DATO;
+  const deposito = esDestinoCliente
+    ? [cabecera.cliente_destino?.trim(), cabecera.almacen_cliente_direccion?.trim()]
+        .filter(Boolean)
+        .join(" - ") || SIN_DATO
+    : cabecera.almacen_direccion?.trim() || cabecera.almacen?.trim() || SIN_DATO;
 
   // ── Proveedor ────────────────────────────────────────────────────────────
   const esProveedorNatural =

@@ -502,6 +502,16 @@ export const DetalleSolicitud = ({
                                 Stock: {formatNumber(stock)}{" "}
                                 {item.unidad_medida_base_abv}
                               </Badge>
+                              {item.en_orden_compra == 1 && (
+                                <Badge
+                                  variant="light"
+                                  color={"teal"}
+                                  size="xs"
+                                  radius="sm"
+                                >
+                                  En Orden de Compra
+                                </Badge>
+                              )}
                               {item.cantidad_prestada_total_base > 0 && (
                                 <Tooltip label="Cantidad total prestada desde otros almacenes">
                                   <Badge

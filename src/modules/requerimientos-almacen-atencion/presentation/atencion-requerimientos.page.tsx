@@ -683,9 +683,8 @@ export const RequerimientosAlmacenAtencionPage = () => {
           closeGestion();
           setSelectedRequerimiento(null);
         }}
-        title={`Atender Requerimiento de Almacén`}
+        title={`Atender Requerimiento`}
         size="80rem"
-        validateClose
       >
         {selectedRequerimiento && (
           <InfoRequerimiento

@@ -74,4 +74,5 @@ export interface RES_SolicitudDetalle {
   cantidad_items?: number | null;
   valor_magnitud?: number | null;
   valor_magnitud_base?: number | null;
+  en_orden_compra?: number | null;
 }
