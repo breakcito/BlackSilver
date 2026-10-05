@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Stack,
   Text,
@@ -7,8 +7,13 @@ import {
   Select,
   Badge,
   NumberInput,
+  Textarea,
 } from "@mantine/core";
-import { CheckBadgeIcon, ShoppingCartIcon } from "@heroicons/react/24/solid";
+import {
+  CheckBadgeIcon,
+  ShoppingCartIcon,
+  ChatBubbleLeftRightIcon,
+} from "@heroicons/react/24/solid";
 import { ModalEstandar } from "../../../../../presentation/utils/modal-estandar";
 import { CotizacionesService } from "../../../service/cotizaciones.service";
 import { useNotify } from "../../../../../hooks/useNotify";
@@ -48,6 +53,24 @@ export const ModalAprobarCotizacion = ({
 }: ModalAprobarCotizacionProps) => {
   const { notifySuccess, notifyError } = useNotify();
   const [loading, setLoading] = useState(false);
+  // Observación de la OC (cabecera) — se prellena con la de la cotización
+  const [observacionOC, setObservacionOC] = useState("");
+  // Comentario por cada detalle aprobado — prellenado con el de la cotización
+  const [comentariosPorDetalle, setComentariosPorDetalle] = useState<
+    Record<number, string>
+  >({});
+
+  // Cuando se abre el modal, prellenar con los valores actuales de la cotizacion/detalles
+  useEffect(() => {
+    if (opened && cotizacion) {
+      setObservacionOC(cotizacion.observacion ?? "");
+      const map: Record<number, string> = {};
+      detalles.forEach((d) => {
+        if (d.comentario) map[d.id_cotizacion_detalle] = d.comentario;
+      });
+      setComentariosPorDetalle(map);
+    }
+  }, [opened, cotizacion?.id_cotizacion]);
 
   // ─── Hook centralizado de aprobación ────────────────────────────────────────
   const aprobacion = useAprobacionCotizacion({
@@ -75,6 +98,10 @@ export const ModalAprobarCotizacion = ({
     tipoCambioAplicado,
   } = aprobacion;
 
+  const setComentarioDet = (key: number, val: string) => {
+    setComentariosPorDetalle((prev) => ({ ...prev, [key]: val }));
+  };
+
   const handleConfirm = async () => {
     if (!cotizacion) return;
     const error = validate();
@@ -89,8 +116,10 @@ export const ModalAprobarCotizacion = ({
           detalles_aprobados: state.selectedKeys.map((id) => ({
             id,
             precio_confirmado: Number(state.preciosOC[id] ?? 0),
+            comentario: comentariosPorDetalle[id] ?? "",
           })),
           tipo_cambio_aplicado: tipoCambioAplicado,
+          observacion: observacionOC,
         },
       );
 
@@ -199,6 +228,25 @@ export const ModalAprobarCotizacion = ({
               </Stack>
             )}
           </div>
+
+          {/* Observaciones de la OC (cabecera) */}
+          <Textarea
+            label="Observaciones (Opcional)"
+            placeholder="Ej: Entrega urgente en almacén principal..."
+            value={observacionOC}
+            onChange={(e) => setObservacionOC(e.currentTarget.value)}
+            radius="lg"
+            size="sm"
+            minRows={2}
+            maxRows={4}
+            autosize
+            classNames={{
+              input:
+                "bg-zinc-900/50 border-zinc-800 text-white text-xs placeholder:text-zinc-600",
+              label: "text-zinc-400 text-xs font-semibold mb-1",
+              description: "text-zinc-500 text-[10px] mt-0.5",
+            }}
+          />
         </div>
 
         {/* ── Productos (scrollable) ── */}
@@ -301,6 +349,32 @@ export const ModalAprobarCotizacion = ({
                       </Badge>
                     </div>
                   </div>
+
+                  {/* Comentario por producto (solo si está aprobado) */}
+                  {isChecked && (
+                    <div className="mt-2 pl-7">
+                      <Textarea
+                        placeholder="Comentario opcional para este producto en la OC..."
+                        value={comentariosPorDetalle[key] ?? ""}
+                        onChange={(e) =>
+                          setComentarioDet(key, e.currentTarget.value)
+                        }
+                        radius="lg"
+                        size="xs"
+                        minRows={1}
+                        maxRows={3}
+                        autosize
+                        leftSection={
+                          <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+                        }
+                        classNames={{
+                          input:
+                            "bg-zinc-900/30 border-zinc-800/60 text-white text-[11px] placeholder:text-zinc-600 pl-7",
+                          section: "left-2",
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

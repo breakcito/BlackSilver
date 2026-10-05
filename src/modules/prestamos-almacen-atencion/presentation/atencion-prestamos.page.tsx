@@ -307,7 +307,7 @@ export const AtencionPrestamosPage = () => {
         }}
         title="Atención de Préstamos"
         validateClose
-        size="80%"
+        size="75rem"
       >
         {selectedId && selectedPrestamo && (
           <DetallePrestamo

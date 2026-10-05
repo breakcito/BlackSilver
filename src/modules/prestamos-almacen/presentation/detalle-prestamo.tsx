@@ -360,6 +360,7 @@ export const DetallePrestamo = ({
                 <th className="px-6 py-4 text-left">Producto</th>
                 <th className="px-6 py-4 text-center">Cantidad Solicitada</th>
                 <th className="px-6 py-4 text-center w-44">Progreso</th>
+                <th className="px-6 py-4 text-left">Comentario</th>
                 <th className="px-6 py-4 text-center">Estado</th>
                 <th className="px-6 py-4 text-center w-20">Acciones</th>
               </tr>
@@ -436,6 +437,17 @@ export const DetallePrestamo = ({
                           />
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Text
+                        size="xs"
+                        c="zinc.5"
+                        className="italic leading-tight whitespace-pre-wrap"
+                      >
+                        {item.comentario || (
+                          <span className="text-zinc-500">Sin comentarios</span>
+                        )}
+                      </Text>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <Badge

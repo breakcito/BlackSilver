@@ -132,6 +132,11 @@ export const useSolicitudesPage = () => {
       addRecord: (record: RES_Solicitud) => {
         setSolicitudes((prev) => [record, ...prev]);
       },
+      updateRecord: (id: number, data: Partial<RES_Solicitud>) => {
+        setSolicitudes((prev) =>
+          prev.map((s) => (s.id_solicitud === id ? { ...s, ...data } : s)),
+        );
+      },
       verDetalles,
       verTrazabilidad,
     },
@@ -139,6 +144,7 @@ export const useSolicitudesPage = () => {
       selectedReq,
       setSelectedReq,
       detalles: detallesFiltrados,
+      setDetalles,
       loadingDetalle,
       selectedDetalle,
       setSelectedDetalle,

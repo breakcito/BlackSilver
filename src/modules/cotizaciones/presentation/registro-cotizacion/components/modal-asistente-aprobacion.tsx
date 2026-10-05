@@ -9,8 +9,13 @@ import {
   Badge,
   Stepper,
   NumberInput,
+  Textarea,
 } from "@mantine/core";
-import { CheckBadgeIcon, DocumentCheckIcon } from "@heroicons/react/24/solid";
+import {
+  CheckBadgeIcon,
+  DocumentCheckIcon,
+  ChatBubbleLeftRightIcon,
+} from "@heroicons/react/24/solid";
 import { ModalEstandar } from "../../../../../presentation/utils/modal-estandar";
 import type {
   DTO_RegistrarComparativo,
@@ -47,6 +52,10 @@ interface WizardAprobacionState {
   originalIndex: number;
   cotizacion: DTO_CotizacionRequest;
   aprobacion: AprobacionState; // estado centralizado del hook
+  /** Observación de la OC (cabecera) — prellenada con la de la cotización */
+  observacion: string;
+  /** Comentario por cada detalle aprobado — prellenado con el de la cotización */
+  comentariosPorDetalle: Record<number, string>;
 }
 
 interface ModalAsistenteAprobacionProps {
@@ -86,6 +95,11 @@ export const ModalAsistenteAprobacion = ({
       const steps: WizardAprobacionState[] = [];
       todasLasCotizaciones.forEach((cot, index) => {
         if (cot.estado === "Aprobada") {
+          // Prellenar comentarios por detalle desde la cotización
+          const comentariosPorDetalle: Record<number, string> = {};
+          cot.detalles.forEach((d, dIdx) => {
+            if (d.comentario) comentariosPorDetalle[dIdx] = d.comentario;
+          });
           steps.push({
             originalIndex: index,
             cotizacion: cot,
@@ -100,6 +114,8 @@ export const ModalAsistenteAprobacion = ({
                 : null,
               cot.tipo_cambio_venta_referencial || "",
             ),
+            observacion: cot.observacion ?? "",
+            comentariosPorDetalle,
           });
         }
       });
@@ -148,6 +164,28 @@ export const ModalAsistenteAprobacion = ({
     }));
   };
 
+  const setObservacionStep = (val: string) => {
+    setWizardSteps((prev) => {
+      const copy = [...prev];
+      copy[activeStep] = { ...copy[activeStep], observacion: val };
+      return copy;
+    });
+  };
+
+  const setComentarioDetStep = (rowIndex: number, val: string) => {
+    setWizardSteps((prev) => {
+      const copy = [...prev];
+      copy[activeStep] = {
+        ...copy[activeStep],
+        comentariosPorDetalle: {
+          ...copy[activeStep].comentariosPorDetalle,
+          [rowIndex]: val,
+        },
+      };
+      return copy;
+    });
+  };
+
   const currentStepData = wizardSteps[activeStep] || null;
 
   // Lista de empresas para el select basadas en los IDs configurados
@@ -171,13 +209,10 @@ export const ModalAsistenteAprobacion = ({
     // Construir mapa: originalIndex → config
     const wizardMap = new Map<
       number,
-      { aprobacion: AprobacionState; cotizacion: DTO_CotizacionRequest }
+      WizardAprobacionState
     >();
     for (const step of wizardSteps) {
-      wizardMap.set(step.originalIndex, {
-        aprobacion: step.aprobacion,
-        cotizacion: step.cotizacion,
-      });
+      wizardMap.set(step.originalIndex, step);
     }
 
     // Construir el payload UNIFICADO con estados finales reales
@@ -187,22 +222,34 @@ export const ModalAsistenteAprobacion = ({
         const wizardConfig = wizardMap.get(idx);
 
         if (wizardConfig) {
-          const { aprobacion: ap, cotizacion: cot } = wizardConfig;
+          const { aprobacion: ap, cotizacion: cot, observacion, comentariosPorDetalle } =
+            wizardConfig;
           const tcOC = getTipoCambioAplicado(ap, cot.moneda);
           return {
             ...c,
             estado: Estado_Cotizacion.Aprobada,
             id_empresa_compradora: Number(ap.selectedEmpresaId),
             tipo_cambio_aplicado_oc: tcOC,
-            detalles: c.detalles.map((d, dIdx) => ({
-              ...d,
-              estado: ap.selectedKeys.includes(dIdx)
-                ? Estado_Cotizacion_Detalle.Aprobado
-                : Estado_Cotizacion_Detalle.Rechazado,
-              precio_confirmado_oc: ap.selectedKeys.includes(dIdx)
-                ? Number(ap.preciosOC[dIdx] ?? d.precio_unitario ?? 0)
-                : undefined,
-            })),
+            // Propagar observacion al DTO de cotizacion para que persista en OC
+            observacion: observacion ?? null,
+            detalles: c.detalles.map((d, dIdx) => {
+              const comentarioAprobacion = comentariosPorDetalle?.[dIdx];
+              return {
+                ...d,
+                estado: ap.selectedKeys.includes(dIdx)
+                  ? Estado_Cotizacion_Detalle.Aprobado
+                  : Estado_Cotizacion_Detalle.Rechazado,
+                precio_confirmado_oc: ap.selectedKeys.includes(dIdx)
+                  ? Number(ap.preciosOC[dIdx] ?? d.precio_unitario ?? 0)
+                  : undefined,
+                // Si el usuario escribio un comentario en la aprobacion, ese gana;
+                // si no, mantener el que ya tenia la cotizacion.
+                comentario:
+                  comentarioAprobacion !== undefined
+                    ? comentarioAprobacion
+                    : d.comentario,
+              };
+            }),
           };
         }
 
@@ -385,6 +432,25 @@ export const ModalAsistenteAprobacion = ({
               </Stack>
             )}
 
+            {/* Observaciones de la OC (cabecera) — por step */}
+            <Textarea
+              label="Observaciones (Opcional)"
+              placeholder="Ej: Entrega urgente en almacén principal..."
+              value={currentStepData?.observacion ?? ""}
+              onChange={(e) => setObservacionStep(e.currentTarget.value)}
+              radius="lg"
+              size="sm"
+              minRows={2}
+              maxRows={4}
+              autosize
+              classNames={{
+                input:
+                  "bg-zinc-900/50 border-zinc-800 text-white text-xs placeholder:text-zinc-600",
+                label: "text-zinc-200 text-xs font-bold mb-1",
+                description: "text-zinc-500 text-[10px] mt-0.5",
+              }}
+            />
+
             {/* Selección de Productos */}
             {(() => {
               const ap = currentStepData?.aprobacion;
@@ -563,6 +629,39 @@ export const ModalAsistenteAprobacion = ({
                               </Badge>
                             </div>
                           </div>
+
+                          {/* Comentario por producto (solo si está aprobado) */}
+                          {isChecked && (
+                            <div className="mt-2 pl-7">
+                              <Textarea
+                                placeholder="Comentario opcional para este producto en la OC..."
+                                value={
+                                  currentStepData?.comentariosPorDetalle?.[
+                                    dIdx
+                                  ] ?? ""
+                                }
+                                onChange={(e) =>
+                                  setComentarioDetStep(
+                                    dIdx,
+                                    e.currentTarget.value,
+                                  )
+                                }
+                                radius="lg"
+                                size="xs"
+                                minRows={1}
+                                maxRows={3}
+                                autosize
+                                leftSection={
+                                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+                                }
+                                classNames={{
+                                  input:
+                                    "bg-zinc-900/30 border-zinc-800/60 text-white text-[11px] placeholder:text-zinc-600 pl-7",
+                                  section: "left-2",
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}

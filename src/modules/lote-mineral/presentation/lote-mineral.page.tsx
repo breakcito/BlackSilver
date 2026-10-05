@@ -1,10 +1,11 @@
-import { Button, TextInput, Skeleton, Badge } from "@mantine/core";
+import { Button, TextInput, Skeleton, Badge, Stack, Text, Divider, Group, Loader } from "@mantine/core";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
   Squares2X2Icon,
   UserIcon,
   CalendarDaysIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { RegistroLoteMineral } from "./registro-lote-mineral";
@@ -23,7 +24,28 @@ export const LoteMineralPage = () => {
     useDisclosure(false);
   const [busqueda, setBusqueda] = useState("");
 
-  const { data: response, isLoading, refetch, addLote } = useLotesMineral();
+  const {
+    data: response,
+    isLoading,
+    refetch,
+    addLote,
+    finalizarLote,
+    submitting,
+  } = useLotesMineral();
+
+  // Modal: Confirmar Finalizacion de Lote
+  const [finalizarModalOpen, setFinalizarModalOpen] = useState(false);
+  const [loteAFinalizar, setLoteAFinalizar] =
+    useState<LoteMineralResumen | null>(null);
+
+  const handleConfirmarFinalizar = async () => {
+    if (!loteAFinalizar) return;
+    const success = await finalizarLote(loteAFinalizar.id_lote_mineral);
+    if (success) {
+      setFinalizarModalOpen(false);
+      setLoteAFinalizar(null);
+    }
+  };
 
   const lotesFiltrados = useMemo(() => {
     const lotesData = response?.data || [];
@@ -231,6 +253,26 @@ export const LoteMineralPage = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Accion: Finalizar (mismo patron que Produccion de Mineral) */}
+              <div className="px-1 flex justify-end">
+                {lote.estado === EstadoLoteMineral.EnProduccion && (
+                  <Button
+                    leftSection={<CheckCircleIcon className="size-3" />}
+                    size="compact-xs"
+                    radius="md"
+                    variant="light"
+                    color="green"
+                    className="font-semibold h-6 px-2.5 border border-green-500/20 hover:bg-green-500/20"
+                    onClick={() => {
+                      setLoteAFinalizar(lote);
+                      setFinalizarModalOpen(true);
+                    }}
+                  >
+                    Finalizar
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -255,6 +297,100 @@ export const LoteMineralPage = () => {
           }}
           onCancel={closeCreate}
         />
+      </ModalEstandar>
+
+      {/* MODAL: CONFIRMAR FINALIZACION DE LOTE */}
+      <ModalEstandar
+        opened={finalizarModalOpen}
+        close={() => !submitting && setFinalizarModalOpen(false)}
+        title="Confirmar Finalización de Lote"
+        size="md"
+      >
+        <Stack gap="lg">
+          <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center size-10 rounded-lg bg-amber-500/10 border border-amber-500/20 shrink-0 mt-0.5">
+                <CheckCircleIcon className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <Text size="sm" fw={700} className="text-white mb-1">
+                  ¿Finalizar este lote?
+                </Text>
+                <Text size="xs" c="dimmed" className="leading-relaxed">
+                  Esta acción marcará el lote como finalizado. Podrás verlo en
+                  el historial.
+                </Text>
+              </div>
+            </div>
+
+            <Divider className="my-2 border-zinc-800" />
+
+            {loteAFinalizar && (
+              <div className="space-y-2">
+                <div className="flex justify-between items-start gap-2">
+                  <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                    Código
+                  </Text>
+                  <Badge color="indigo" variant="light" size="sm">
+                    {loteAFinalizar.codigo}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-start gap-2">
+                  <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                    Contratista
+                  </Text>
+                  <Text size="xs" fw={600} className="text-zinc-200">
+                    {loteAFinalizar.contratista}
+                  </Text>
+                </div>
+                <div className="flex justify-between items-start gap-2">
+                  <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                    Mina
+                  </Text>
+                  <Text size="xs" fw={600} className="text-emerald-400">
+                    {loteAFinalizar.mina}
+                  </Text>
+                </div>
+                {loteAFinalizar.labor && (
+                  <div className="flex justify-between items-start gap-2">
+                    <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                      Labor
+                    </Text>
+                    <Text size="xs" fw={600} className="text-violet-300">
+                      {loteAFinalizar.labor}
+                    </Text>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Group grow>
+            <Button
+              variant="light"
+              onClick={() => setFinalizarModalOpen(false)}
+              disabled={submitting}
+              radius="lg"
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="green"
+              onClick={handleConfirmarFinalizar}
+              loading={submitting}
+              leftSection={
+                submitting ? (
+                  <Loader size="xs" />
+                ) : (
+                  <CheckCircleIcon className="w-4 h-4" />
+                )
+              }
+              radius="lg"
+            >
+              Finalizar
+            </Button>
+          </Group>
+        </Stack>
       </ModalEstandar>
     </div>
   );

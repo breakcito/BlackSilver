@@ -16,12 +16,19 @@ interface InfoRequerimientoProps {
   requerimiento: RES_RequerimientoAlmacen;
   idAlmacen?: number;
   onSuccess: (ids?: number[]) => void;
+  /**
+   * Notifica al page que la cabecera del requerimiento fue actualizada
+   * (p. ej. al editar la observacion) para que sincronice el listar y
+   * el `selectedRequerimiento` sin recargar la pantalla.
+   */
+  onRequerimientoActualizado?: (updated: RES_RequerimientoAlmacen) => void;
 }
 
 export const InfoRequerimiento = ({
   requerimiento,
   idAlmacen,
   onSuccess,
+  onRequerimientoActualizado,
 }: InfoRequerimientoProps) => {
   const {
     loading,
@@ -178,7 +185,7 @@ export const InfoRequerimiento = ({
           onSuccess={(updated) => {
             setOpenedEditar(false);
             loadData(true);
-            onSuccess([updated.id_requerimiento]);
+            onRequerimientoActualizado?.(updated);
           }}
           onCancel={() => setOpenedEditar(false)}
         />

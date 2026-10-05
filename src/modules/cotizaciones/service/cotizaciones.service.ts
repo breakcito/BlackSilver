@@ -64,8 +64,13 @@ export const CotizacionesService = {
     id_cotizacion: number,
     payload: {
       id_empresa_compradora: number;
-      detalles_aprobados: { id: number; precio_confirmado: number }[];
+      detalles_aprobados: {
+        id: number;
+        precio_confirmado: number;
+        comentario?: string;
+      }[];
       tipo_cambio_aplicado?: number;
+      observacion?: string;
     },
   ): Promise<IRespuesta<{ id_orden_compra: number; correlativo: string }>> => {
     // Retorna un objeto con id_orden_compra y correlativo de la OC generada

@@ -26,6 +26,7 @@ import {
   DocumentArrowDownIcon,
   NoSymbolIcon,
   ExclamationTriangleIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { type DataTableColumn } from "mantine-datatable";
@@ -53,6 +54,42 @@ import { BotonRecargar } from "../../../presentation/utils/boton-recargar.tsx";
 import { useExcel } from "../../../hooks/useExcel.ts";
 import { useRequerimientosExcel } from "./excel-requerimientos.ts";
 import { useAuditoriaStore } from "../../../stores/auditoria.store.ts";
+
+/**
+ * Sub-fila que muestra la observacion general opcional de un requerimiento.
+ * Se renderiza como contenido expandido dentro de la fila correspondiente
+ * del DataTable; aparece solo si el requerimiento tiene observacion.
+ */
+const ObservacionRequerimiento = ({
+  observacion,
+}: {
+  observacion: string;
+}) => {
+  return (
+    <div className="flex items-start gap-2 px-4 py-2 bg-zinc-950/60 border-t border-zinc-800/60">
+      <div className="shrink-0 p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+        <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+      </div>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <Text
+          size="9px"
+          fw={800}
+          c="zinc.5"
+          className="uppercase tracking-[0.18em] leading-none"
+        >
+          Observaciones Generales
+        </Text>
+        <Text
+          size="xs"
+          c="zinc.2"
+          className="leading-snug break-words whitespace-pre-wrap"
+        >
+          {observacion}
+        </Text>
+      </div>
+    </div>
+  );
+};
 
 export const RequerimientosAlmacenAtencionPage = () => {
   useTitlePage("Atención de Requerimientos");
@@ -585,6 +622,17 @@ export const RequerimientosAlmacenAtencionPage = () => {
           columns={columns}
           records={filteredRecords}
           loading={loading}
+          rowExpansion={{
+            trigger: "always",
+            expandable: ({ record }: { record: RES_RequerimientoAlmacen }) =>
+              Boolean(
+                record.observacion && record.observacion.trim().length > 0,
+              ),
+            content: ({ record }: { record: RES_RequerimientoAlmacen }) =>
+              record.observacion && record.observacion.trim().length > 0 ? (
+                <ObservacionRequerimiento observacion={record.observacion} />
+              ) : null,
+          }}
         />
       )}
 
@@ -695,6 +743,10 @@ export const RequerimientosAlmacenAtencionPage = () => {
               updateRequirementLocal(selectedRequerimiento.id_requerimiento, {
                 estado: Estado_Requerimiento.EnDespacho,
               });
+            }}
+            onRequerimientoActualizado={(updated) => {
+              updateRequirementLocal(updated.id_requerimiento, updated);
+              setSelectedRequerimiento(updated);
             }}
           />
         )}

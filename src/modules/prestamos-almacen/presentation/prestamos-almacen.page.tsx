@@ -413,7 +413,7 @@ export const PrestamosAlmacenPage = () => {
         opened={openedDetail}
         close={closeDetail}
         title="Detalle del Préstamo"
-        size="95%"
+        size="75rem"
       >
         {selectedPrestamo && (
           <DetallePrestamo

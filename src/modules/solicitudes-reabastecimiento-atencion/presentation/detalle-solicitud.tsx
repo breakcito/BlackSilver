@@ -22,6 +22,7 @@ import {
   CheckBadgeIcon,
   ExclamationTriangleIcon,
   NoSymbolIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 
@@ -235,6 +236,35 @@ export const DetalleSolicitud = ({
             />
           )}
         </div>
+
+        {solicitud.observacion &&
+          solicitud.observacion.trim().length > 0 && (
+            <div className="mt-5 pt-5 border-t border-zinc-800/60">
+              <div className="flex items-center gap-1.5 font-bold mb-2">
+                <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <Text
+                  size="xs"
+                  c="zinc.5"
+                  fw={800}
+                  className="uppercase tracking-widest"
+                >
+                  Observaciones Generales
+                </Text>
+              </div>
+              <div className="flex items-start gap-2 px-3 py-2.5 bg-zinc-900/40 border border-zinc-800/60 rounded-lg">
+                <div className="shrink-0 p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+                </div>
+                <Text
+                  size="sm"
+                  c="zinc.2"
+                  className="leading-snug break-words whitespace-pre-wrap"
+                >
+                  {solicitud.observacion}
+                </Text>
+              </div>
+            </div>
+          )}
       </Paper>
 
       <Paper
@@ -409,6 +439,7 @@ export const DetalleSolicitud = ({
                 <th className="px-6 py-4 text-left">Producto</th>
                 <th className="px-6 py-4 text-center">Cantidad Solicitada</th>
                 <th className="px-6 py-4 text-center w-44">Progreso</th>
+                <th className="px-6 py-4 text-left">Comentario</th>
                 <th className="px-6 py-4 text-center">Estado</th>
                 <th className="px-6 py-4 text-center w-36">
                   <Group gap={4} justify="center">
@@ -628,6 +659,17 @@ export const DetalleSolicitud = ({
                           />
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Text
+                        size="xs"
+                        c="zinc.5"
+                        className="italic leading-tight whitespace-pre-wrap"
+                      >
+                        {item.comentario || (
+                          <span className="text-zinc-500">Sin comentarios</span>
+                        )}
+                      </Text>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <Stack gap={4} align="center">

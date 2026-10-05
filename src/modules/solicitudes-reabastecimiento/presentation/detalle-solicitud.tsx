@@ -20,6 +20,7 @@ import {
   ListBulletIcon,
   CubeIcon,
   PencilSquareIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { HistorialEntregas } from "./historial-entregas";
@@ -39,6 +40,12 @@ interface DetalleSolicitudProps {
   loading: boolean;
   progresoGeneral: number;
   onOpenTrazabilidad: (detalle: RES_SolicitudDetalle) => void;
+  /**
+   * Notifica al page que la cabecera de la solicitud fue actualizada
+   * (p. ej. al editar la observacion) para que sincronice el listar y
+   * el `selectedReq` sin recargar la pantalla.
+   */
+  onRequerimientoActualizado?: (updated: RES_Solicitud) => void;
 }
 
 const getStatusColor = (status: string) => {
@@ -68,6 +75,7 @@ export const DetalleSolicitud = ({
   loading,
   progresoGeneral,
   onOpenTrazabilidad,
+  onRequerimientoActualizado,
 }: DetalleSolicitudProps) => {
   const [openedHistorial, setOpenedHistorial] = useState(false);
   const [openedEditar, setOpenedEditar] = useState(false);
@@ -275,6 +283,35 @@ export const DetalleSolicitud = ({
             </Text>
           </Stack>
         </div>
+
+        {headerData.observacion &&
+          headerData.observacion.trim().length > 0 && (
+            <div className="mt-5 pt-5 border-t border-zinc-800/60">
+              <div className="flex items-center gap-1.5 font-bold mb-2">
+                <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <Text
+                  size="xs"
+                  c="zinc.5"
+                  fw={800}
+                  className="uppercase tracking-widest"
+                >
+                  Observaciones Generales
+                </Text>
+              </div>
+              <div className="flex items-start gap-2 px-3 py-2.5 bg-zinc-900/40 border border-zinc-800/60 rounded-lg">
+                <div className="shrink-0 p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+                </div>
+                <Text
+                  size="sm"
+                  c="zinc.2"
+                  className="leading-snug break-words whitespace-pre-wrap"
+                >
+                  {headerData.observacion}
+                </Text>
+              </div>
+            </div>
+          )}
       </Paper>
 
       {/* Barra de Progreso General */}
@@ -358,6 +395,7 @@ export const DetalleSolicitud = ({
                 <th className="px-6 py-4 text-left">Producto</th>
                 <th className="px-6 py-4 text-center">Cant. Solicitada</th>
                 <th className="px-6 py-4 text-center w-44">Progreso</th>
+                <th className="px-6 py-4 text-left">Comentario</th>
                 <th className="px-6 py-4 text-center">Estado</th>
                 <th className="px-6 py-4 text-center w-20">Acciones</th>
               </tr>
@@ -459,6 +497,17 @@ export const DetalleSolicitud = ({
                           </div>
                         </div>
                       </td>
+                      <td className="px-6 py-4">
+                        <Text
+                          size="xs"
+                          c="zinc.5"
+                          className="italic leading-tight whitespace-pre-wrap"
+                        >
+                          {det.comentario || (
+                            <span className="text-zinc-500">Sin comentarios</span>
+                          )}
+                        </Text>
+                      </td>
                       <td className="px-6 py-4 text-center">
                         <Stack gap={4} align="center">
                           <Badge
@@ -536,7 +585,10 @@ export const DetalleSolicitud = ({
           modo="editar"
           solicitudInicial={headerData}
           detallesIniciales={detalles}
-          onSuccess={() => setOpenedEditar(false)}
+          onSuccess={(updated) => {
+            setOpenedEditar(false);
+            onRequerimientoActualizado?.(updated);
+          }}
           onCancel={() => setOpenedEditar(false)}
         />
       </ModalEstandar>

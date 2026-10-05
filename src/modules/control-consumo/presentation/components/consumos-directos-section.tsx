@@ -18,6 +18,7 @@ import {
   UserIcon,
   PencilSquareIcon,
   CogIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
@@ -34,6 +35,40 @@ interface ConsumosDirectosSectionProps {
   ) => Promise<void>;
   loading?: boolean;
 }
+
+/**
+ * Sub-fila que muestra el comentario opcional de un consumo directo.
+ * Mismo patron visual que `DescripcionLote` en el modulo de Lotes
+ * (`product-group-card.tsx`): se renderiza como contenido expandido
+ * dentro de la fila correspondiente del DataTable. Aparece solo
+ * si el consumo tiene comentario.
+ */
+const ComentarioDirecto = ({ comentario }: { comentario: string }) => {
+  return (
+    <div className="flex items-start gap-2 px-4 py-2 bg-zinc-950/60 border-t border-zinc-800/60">
+      <div className="shrink-0 p-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/30">
+        <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-400" />
+      </div>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <Text
+          size="9px"
+          fw={800}
+          c="zinc.5"
+          className="uppercase tracking-[0.18em] leading-none"
+        >
+          Comentario
+        </Text>
+        <Text
+          size="xs"
+          c="zinc.2"
+          className="leading-snug break-words whitespace-pre-wrap"
+        >
+          {comentario}
+        </Text>
+      </div>
+    </div>
+  );
+};
 
 export const ConsumosDirectosSection = ({
   consumos,
@@ -346,6 +381,19 @@ export const ConsumosDirectosSection = ({
         records={consumos}
         loading={loading}
         minHeight={0}
+        rowExpansion={{
+          trigger: "always",
+          expandable: ({ record }: { record: RES_ConsumoDirecto }) =>
+            Boolean(
+              record.comentario_consumo &&
+                record.comentario_consumo.trim().length > 0,
+            ),
+          content: ({ record }: { record: RES_ConsumoDirecto }) =>
+            record.comentario_consumo &&
+            record.comentario_consumo.trim().length > 0 ? (
+              <ComentarioDirecto comentario={record.comentario_consumo} />
+            ) : null,
+        }}
       />
     </Card>
   );

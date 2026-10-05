@@ -1,4 +1,6 @@
 import { type DataTableColumn } from "mantine-datatable";
+import { Text } from "@mantine/core";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 import { DataTableEstandar } from "../../../../../presentation/utils/datatable-estandar";
 import type { RES_Lote } from "../../../service/lotes.responses";
 import { useProductGroupSelection } from "../../../hooks/useProductGroupSelection";
@@ -32,6 +34,38 @@ interface ProductGroupCardProps {
   };
 }
 
+/**
+ * Sub-fila que muestra la descripcion o referencia opcional de un lote.
+ * Se renderiza como contenido expandido dentro de la fila correspondiente
+ * del DataTable; aparece solo si el lote tiene descripcion.
+ */
+const DescripcionLote = ({ descripcion }: { descripcion: string }) => {
+  return (
+    <div className="flex items-start gap-2 px-4 py-2 bg-zinc-950/60 border-t border-zinc-800/60">
+      <div className="shrink-0 p-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/30">
+        <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-400" />
+      </div>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <Text
+          size="9px"
+          fw={800}
+          c="zinc.5"
+          className="uppercase tracking-[0.18em] leading-none"
+        >
+          Descripción o referencia
+        </Text>
+        <Text
+          size="xs"
+          c="zinc.2"
+          className="leading-snug break-words whitespace-pre-wrap"
+        >
+          {descripcion}
+        </Text>
+      </div>
+    </div>
+  );
+};
+
 export const ProductGroupCard = ({
   product,
   columns,
@@ -58,6 +92,17 @@ export const ProductGroupCard = ({
           loading={loading}
           initialPageSize={5}
           minHeight={0}
+          rowExpansion={{
+            trigger: "always",
+            expandable: ({ record }: { record: RES_Lote }) =>
+              Boolean(
+                record.descripcion && record.descripcion.trim().length > 0,
+              ),
+            content: ({ record }: { record: RES_Lote }) =>
+              record.descripcion && record.descripcion.trim().length > 0 ? (
+                <DescripcionLote descripcion={record.descripcion} />
+              ) : null,
+          }}
         />
       </div>
     </div>

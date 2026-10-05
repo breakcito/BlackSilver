@@ -3146,7 +3146,7 @@ export const RegistroUso = ({
         size="xl"
       >
         <Stack gap="md">
-          {/* Fila 1: Almacén | Producto | Cantidad */}
+          {/* Fila 1: Almacén | Producto | Lote */}
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
             <Select
               label="Almacén"
@@ -3213,6 +3213,108 @@ export const RegistroUso = ({
               }}
             />
 
+            {/* Lote */}
+            {(() => {
+              const hayLotes = lotesModal.length > 0;
+              const placeholderLote = !consumoForm.idAlmacen
+                ? "Seleccione almacen"
+                : !consumoForm.idProducto
+                  ? "Seleccione producto"
+                  : loadingLotesModal
+                    ? "Cargando lotes..."
+                    : hayLotes
+                      ? "Seleccione lote"
+                      : "No disponible en almacen";
+              return (
+                <Stack gap={4}>
+                  <Select
+                    label="Lote (Producto)"
+                    placeholder={placeholderLote}
+                    data={lotesModal.map((l) => ({
+                      value: String(l.id_lote),
+                      label: `${l.correlativo} - stock: ${l.stock_actual_base}`,
+                    }))}
+                    value={consumoForm.idLoteProducto}
+                    onChange={(val) =>
+                      setConsumoForm((prev) => ({
+                        ...prev,
+                        idLoteProducto: val ?? null,
+                      }))
+                    }
+                    searchable
+                    disabled={
+                      !consumoForm.idAlmacen ||
+                      !consumoForm.idProducto ||
+                      !consumoForm.idUnidadMedida ||
+                      !hayLotes ||
+                      loadingLotesModal
+                    }
+                    required
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="sm"
+                    comboboxProps={{
+                      withinPortal: true,
+                      zIndex: 9999,
+                      transitionProps: { transition: "pop", duration: 200 },
+                    }}
+                  />
+                  {!hayLotes &&
+                    consumoForm.idAlmacen &&
+                    consumoForm.idProducto &&
+                    !loadingLotesModal && (
+                      <Text
+                        size="11px"
+                        c="amber.4"
+                        fw={700}
+                        className="uppercase tracking-wider"
+                      >
+                        No hay lotes disponibles para este producto en el
+                        almacén seleccionado.
+                      </Text>
+                    )}
+                </Stack>
+              );
+            })()}
+          </SimpleGrid>
+
+          {/* Fila 2: Unidad de Medida | Cantidad | (Conversión) */}
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
+            <Select
+              label="Unidad de Medida"
+              placeholder={
+                loadingUnidadesMedida
+                  ? "Cargando unidades..."
+                  : "Seleccione unidad"
+              }
+              data={unidadesMedida.map((u) => ({
+                value: String(u.id_unidad_medida),
+                label: `${u.nombre} (${u.abreviatura})`,
+              }))}
+              value={consumoForm.idUnidadMedida}
+              onChange={(val) =>
+                setConsumoForm((prev) => ({
+                  ...prev,
+                  idUnidadMedida: val ?? null,
+                }))
+              }
+              searchable
+              required
+              classNames={fieldClasses}
+              radius="lg"
+              size="sm"
+              rightSection={
+                loadingUnidadesMedida ? (
+                  <Loader size={12} color="indigo" />
+                ) : null
+              }
+              comboboxProps={{
+                withinPortal: true,
+                zIndex: 9999,
+                transitionProps: { transition: "pop", duration: 200 },
+              }}
+            />
+
             <NumberInput
               label="Cantidad"
               placeholder="Ej: 5.5"
@@ -3230,15 +3332,12 @@ export const RegistroUso = ({
               radius="lg"
               size="sm"
             />
-          </SimpleGrid>
 
-          {/* Fila 2: (UND x UND) | Unidad de Medida */}
-          {/* El primer input muestra solo las abreviaturas de las unidades
-              (base x seleccionada) y se bloquea segun la conversion:
-              - Si la unidad seleccionada es la base => factor = 1.
-              - Si difiere y EXISTE conversion automatica => factor.
-              - Si difiere y NO hay conversion => queda editable. */}
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
+            {/* El primer input muestra solo las abreviaturas de las unidades
+                (base x seleccionada) y se bloquea segun la conversion:
+                - Si la unidad seleccionada es la base => factor = 1.
+                - Si difiere y EXISTE conversion automatica => factor.
+                - Si difiere y NO hay conversion => queda editable. */}
             {(() => {
               const prodSel = productos.find(
                 (p) => String(p.id_producto) === String(consumoForm.idProducto),
@@ -3311,109 +3410,10 @@ export const RegistroUso = ({
                 />
               );
             })()}
-
-            <Select
-              label="Unidad de Medida"
-              placeholder={
-                loadingUnidadesMedida
-                  ? "Cargando unidades..."
-                  : "Seleccione unidad"
-              }
-              data={unidadesMedida.map((u) => ({
-                value: String(u.id_unidad_medida),
-                label: `${u.nombre} (${u.abreviatura})`,
-              }))}
-              value={consumoForm.idUnidadMedida}
-              onChange={(val) =>
-                setConsumoForm((prev) => ({
-                  ...prev,
-                  idUnidadMedida: val ?? null,
-                }))
-              }
-              searchable
-              required
-              classNames={fieldClasses}
-              radius="lg"
-              size="sm"
-              rightSection={
-                loadingUnidadesMedida ? (
-                  <Loader size={12} color="indigo" />
-                ) : null
-              }
-              comboboxProps={{
-                withinPortal: true,
-                zIndex: 9999,
-                transitionProps: { transition: "pop", duration: 200 },
-              }}
-            />
           </SimpleGrid>
 
-          {/* Fila 3: Lote (izquierda) | Resumen del consumo (derecha) */}
+          {/* Fila 3: Resumen del consumo (izquierda) | Comentario (derecha) */}
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
-            {/* Lote */}
-            {(() => {
-              const hayLotes = lotesModal.length > 0;
-              const placeholderLote = !consumoForm.idAlmacen
-                ? "Seleccione almacen"
-                : !consumoForm.idProducto
-                  ? "Seleccione producto"
-                  : loadingLotesModal
-                    ? "Cargando lotes..."
-                    : hayLotes
-                      ? "Seleccione lote"
-                      : "No disponible en almacen";
-              return (
-                <Stack gap={4}>
-                  <Select
-                    label="Lote (Producto)"
-                    placeholder={placeholderLote}
-                    data={lotesModal.map((l) => ({
-                      value: String(l.id_lote),
-                      label: `${l.correlativo} - stock: ${l.stock_actual_base}`,
-                    }))}
-                    value={consumoForm.idLoteProducto}
-                    onChange={(val) =>
-                      setConsumoForm((prev) => ({
-                        ...prev,
-                        idLoteProducto: val ?? null,
-                      }))
-                    }
-                    searchable
-                    disabled={
-                      !consumoForm.idAlmacen ||
-                      !consumoForm.idProducto ||
-                      !consumoForm.idUnidadMedida ||
-                      !hayLotes ||
-                      loadingLotesModal
-                    }
-                    required
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="sm"
-                    comboboxProps={{
-                      withinPortal: true,
-                      zIndex: 9999,
-                      transitionProps: { transition: "pop", duration: 200 },
-                    }}
-                  />
-                  {!hayLotes &&
-                    consumoForm.idAlmacen &&
-                    consumoForm.idProducto &&
-                    !loadingLotesModal && (
-                      <Text
-                        size="11px"
-                        c="amber.4"
-                        fw={700}
-                        className="uppercase tracking-wider"
-                      >
-                        No hay lotes disponibles para este producto en el
-                        almacén seleccionado.
-                      </Text>
-                    )}
-                </Stack>
-              );
-            })()}
-
             {/* Resumen del consumo */}
             {(() => {
               const prodSelResumen = productos.find(
@@ -3551,24 +3551,24 @@ export const RegistroUso = ({
                 </Card>
               );
             })()}
-          </SimpleGrid>
 
-          {/* Fila 4: Comentario (full width) */}
-          <Textarea
-            label="Comentario (opcional)"
-            placeholder="Notas del consumo..."
-            value={consumoForm.comentario}
-            onChange={(e) =>
-              setConsumoForm((prev) => ({
-                ...prev,
-                comentario: e.currentTarget.value,
-              }))
-            }
-            classNames={fieldClasses}
-            radius="lg"
-            size="sm"
-            minRows={2}
-          />
+            {/* Comentario (opcional) */}
+            <Textarea
+              label="Comentario (opcional)"
+              placeholder="Notas del consumo..."
+              value={consumoForm.comentario}
+              onChange={(e) =>
+                setConsumoForm((prev) => ({
+                  ...prev,
+                  comentario: e.currentTarget.value,
+                }))
+              }
+              classNames={fieldClasses}
+              radius="lg"
+              size="sm"
+              minRows={2}
+            />
+          </SimpleGrid>
 
           <Group justify="flex-end" gap="sm" mt="sm">
             <Button

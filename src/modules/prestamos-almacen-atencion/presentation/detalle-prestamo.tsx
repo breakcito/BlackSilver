@@ -391,6 +391,7 @@ export const DetallePrestamo = ({
                 <th className="px-6 py-4 text-left">Producto</th>
                 <th className="px-6 py-4 text-center">Cantidad solicitada</th>
                 <th className="px-6 py-4 text-center w-44">Progreso</th>
+                <th className="px-6 py-4 text-left">Comentario</th>
                 <th className="px-6 py-4 text-center">Estado</th>
                 <th className="px-6 py-4 text-center">
                   <Group gap={4} justify="center">
@@ -465,27 +466,14 @@ export const DetallePrestamo = ({
                         >
                           {d.producto}
                         </Text>
-                        <Group gap={4}>
-                          <Text
-                            size="9px"
-                            fw={800}
-                            c="zinc.5"
-                            className="uppercase tracking-wider"
-                          >
-                            {d.unidad_medida_base_abv}
-                          </Text>
-                          {d.comentario && (
-                            <Tooltip label={d.comentario}>
-                              <ActionIcon
-                                size="xs"
-                                variant="transparent"
-                                color="yellow"
-                              >
-                                <ClockIcon className="w-3 h-3" />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
-                        </Group>
+                        <Text
+                          size="9px"
+                          fw={800}
+                          c="zinc.5"
+                          className="uppercase tracking-wider"
+                        >
+                          {d.unidad_medida_base_abv}
+                        </Text>
                       </Stack>
                     </td>
                     <td className="px-6 py-4 text-center flex flex-row gap-0.5 justify-center items-center">
@@ -553,6 +541,17 @@ export const DetallePrestamo = ({
                           />
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Text
+                        size="xs"
+                        c="zinc.5"
+                        className="italic leading-tight whitespace-pre-wrap"
+                      >
+                        {d.comentario || (
+                          <span className="text-zinc-500">Sin comentarios</span>
+                        )}
+                      </Text>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <PrestamoStatusBadge estado={d.estado} />

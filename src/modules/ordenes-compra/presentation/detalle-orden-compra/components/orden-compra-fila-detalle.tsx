@@ -1,5 +1,10 @@
-import { ActionIcon, Badge, Checkbox, Group, Stack, Text } from "@mantine/core";
-import { ClockIcon, CubeIcon, CpuChipIcon } from "@heroicons/react/24/outline";
+import { ActionIcon, Badge, Checkbox, Group, Stack, Text, Tooltip } from "@mantine/core";
+import {
+  ClockIcon,
+  CubeIcon,
+  CpuChipIcon,
+  ChatBubbleLeftRightIcon,
+} from "@heroicons/react/24/outline";
 import { formatNumber } from "../../../../../shared/functions/formatNumber";
 import { getNombrePeriodo } from "../../../../../shared/functions/get-nombre-periodo.ts";
 import { Estado_OrdenCompraDetalle } from "../../../../../shared/enums/orden-compra/orden-compra.ts";
@@ -76,6 +81,17 @@ export const OrdenCompraFilaDetalle = ({
             <Text size="sm" fw={800} className="text-zinc-100 tracking-tight">
               {det.producto}
             </Text>
+            {det.comentario && (
+              <Tooltip
+                label={det.comentario}
+                position="top"
+                withArrow
+                multiline
+                w={280}
+              >
+                <ChatBubbleLeftRightIcon className="w-4 h-4 text-cyan-400 cursor-help" />
+              </Tooltip>
+            )}
           </Group>
           <Group gap={4}>
             {isAsset && (

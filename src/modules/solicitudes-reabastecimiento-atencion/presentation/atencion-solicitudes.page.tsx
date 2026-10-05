@@ -19,6 +19,7 @@ import {
   PlayCircleIcon,
   CheckBadgeIcon,
   DocumentArrowDownIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { type DataTableColumn } from "mantine-datatable";
@@ -36,6 +37,42 @@ import { BotonRecargar } from "../../../presentation/utils/boton-recargar.tsx";
 import { useExcel } from "../../../hooks/useExcel.ts";
 import { useSolicitudesExcel } from "./excel-solicitudes.ts";
 import { useAuditoriaStore } from "../../../stores/auditoria.store.ts";
+
+/**
+ * Sub-fila que muestra la observacion general opcional de una solicitud.
+ * Se renderiza como contenido expandido dentro de la fila correspondiente
+ * del DataTable; aparece solo si la solicitud tiene observacion.
+ */
+const ObservacionSolicitud = ({
+  observacion,
+}: {
+  observacion: string;
+}) => {
+  return (
+    <div className="flex items-start gap-2 px-4 py-2 bg-zinc-950/60 border-t border-zinc-800/60">
+      <div className="shrink-0 p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+        <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-cyan-400" />
+      </div>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <Text
+          size="9px"
+          fw={800}
+          c="zinc.5"
+          className="uppercase tracking-[0.18em] leading-none"
+        >
+          Observaciones Generales
+        </Text>
+        <Text
+          size="xs"
+          c="zinc.2"
+          className="leading-snug break-words whitespace-pre-wrap"
+        >
+          {observacion}
+        </Text>
+      </div>
+    </div>
+  );
+};
 
 export const SolicitudesReabastecimientoAtencionPage = () => {
   const setTitle = useUIStore((state) => state.setTitle);
@@ -375,6 +412,17 @@ export const SolicitudesReabastecimientoAtencionPage = () => {
           columns={columns}
           records={solicitudes}
           loading={loading}
+          rowExpansion={{
+            trigger: "always",
+            expandable: ({ record }: { record: RES_Solicitud }) =>
+              Boolean(
+                record.observacion && record.observacion.trim().length > 0,
+              ),
+            content: ({ record }: { record: RES_Solicitud }) =>
+              record.observacion && record.observacion.trim().length > 0 ? (
+                <ObservacionSolicitud observacion={record.observacion} />
+              ) : null,
+          }}
         />
       )}
 

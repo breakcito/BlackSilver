@@ -526,7 +526,7 @@ export const RegistrarConsumoModal = ({
       size="xl"
     >
       <Stack gap="md">
-        {/* Fila 1: Almacén | Producto | Cantidad */}
+        {/* Fila 1: Almacén | Producto | Lote */}
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
           <Select
             label="Almacén"
@@ -581,85 +581,6 @@ export const RegistrarConsumoModal = ({
             }}
           />
 
-          <NumberInput
-            label="Cantidad"
-            placeholder="Ej: 5.5"
-            value={form.cantidadConsumo}
-            onChange={(val) =>
-              setForm((prev) => ({
-                ...prev,
-                cantidadConsumo: val as number | "",
-              }))
-            }
-            min={0}
-            decimalScale={6}
-            required
-            classNames={fieldClasses}
-            radius="lg"
-            size="sm"
-          />
-        </SimpleGrid>
-
-        {/* Fila 2: Contenido por presentación | Unidad de Medida */}
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
-          <NumberInput
-            label={`(${baseAbbr} x ${selAbbr})`}
-            placeholder={
-              unidadesIdenticas
-                ? "1"
-                : !form.idUnidadMedida
-                  ? "--x--"
-                  : conversionAutomatica !== null
-                    ? ""
-                    : "Sin conversión automática - ingrese factor"
-            }
-            value={form.contenidoPorPresentacion}
-            onChange={(val) =>
-              setForm((prev) => ({
-                ...prev,
-                contenidoPorPresentacion: val as number | "",
-              }))
-            }
-            min={0}
-            decimalScale={6}
-            required
-            disabled={inputBloqueado}
-            classNames={fieldClasses}
-            radius="lg"
-            size="sm"
-          />
-
-          <Select
-            label="Unidad de Medida"
-            placeholder="Seleccione unidad"
-            data={unidadesMedida.map((u) => ({
-              value: String(u.id_unidad_medida),
-              label: `${u.nombre} (${u.abreviatura})`,
-            }))}
-            value={form.idUnidadMedida}
-            onChange={(val) =>
-              setForm((prev) => ({
-                ...prev,
-                idUnidadMedida: val ?? null,
-              }))
-            }
-            searchable
-            required
-            disabled={loadingCatalogs}
-            classNames={fieldClasses}
-            radius="lg"
-            size="sm"
-            comboboxProps={{
-              withinPortal: true,
-              zIndex: 9999,
-              transitionProps: { transition: "pop", duration: 200 },
-            }}
-          />
-        </SimpleGrid>
-
-        {/* Fila 3: Lote | Resumen */}
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
-          {/* Lote */}
           <Stack gap={4}>
             <Select
               label="Lote (Producto)"
@@ -718,7 +639,85 @@ export const RegistrarConsumoModal = ({
                 </Text>
               )}
           </Stack>
+        </SimpleGrid>
 
+        {/* Fila 2: Unidad de Medida | Cantidad | (Conversión) */}
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
+          <Select
+            label="Unidad de Medida"
+            placeholder="Seleccione unidad"
+            data={unidadesMedida.map((u) => ({
+              value: String(u.id_unidad_medida),
+              label: `${u.nombre} (${u.abreviatura})`,
+            }))}
+            value={form.idUnidadMedida}
+            onChange={(val) =>
+              setForm((prev) => ({
+                ...prev,
+                idUnidadMedida: val ?? null,
+              }))
+            }
+            searchable
+            required
+            disabled={loadingCatalogs}
+            classNames={fieldClasses}
+            radius="lg"
+            size="sm"
+            comboboxProps={{
+              withinPortal: true,
+              zIndex: 9999,
+              transitionProps: { transition: "pop", duration: 200 },
+            }}
+          />
+
+          <NumberInput
+            label="Cantidad"
+            placeholder="Ej: 5.5"
+            value={form.cantidadConsumo}
+            onChange={(val) =>
+              setForm((prev) => ({
+                ...prev,
+                cantidadConsumo: val as number | "",
+              }))
+            }
+            min={0}
+            decimalScale={6}
+            required
+            classNames={fieldClasses}
+            radius="lg"
+            size="sm"
+          />
+
+          <NumberInput
+            label={`(${baseAbbr} x ${selAbbr})`}
+            placeholder={
+              unidadesIdenticas
+                ? "1"
+                : !form.idUnidadMedida
+                  ? "--x--"
+                  : conversionAutomatica !== null
+                    ? ""
+                    : "Sin conversión automática - ingrese factor"
+            }
+            value={form.contenidoPorPresentacion}
+            onChange={(val) =>
+              setForm((prev) => ({
+                ...prev,
+                contenidoPorPresentacion: val as number | "",
+              }))
+            }
+            min={0}
+            decimalScale={6}
+            required
+            disabled={inputBloqueado}
+            classNames={fieldClasses}
+            radius="lg"
+            size="sm"
+          />
+        </SimpleGrid>
+
+        {/* Fila 3: Resumen del consumo | Comentario */}
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
           {/* Resumen del consumo */}
           <Card
             withBorder
@@ -818,24 +817,24 @@ export const RegistrarConsumoModal = ({
                 : "Complete cantidad y contenido para ver la equivalencia."}
             </Text>
           </Card>
-        </SimpleGrid>
 
-        {/* Comentario */}
-        <Textarea
-          label="Comentario (opcional)"
-          placeholder="Notas del consumo..."
-          value={form.comentario}
-          onChange={(e) =>
-            setForm((prev) => ({
-              ...prev,
-              comentario: e.currentTarget.value,
-            }))
-          }
-          classNames={fieldClasses}
-          radius="lg"
-          size="sm"
-          minRows={2}
-        />
+          {/* Comentario (opcional) */}
+          <Textarea
+            label="Comentario (opcional)"
+            placeholder="Notas del consumo..."
+            value={form.comentario}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                comentario: e.currentTarget.value,
+              }))
+            }
+            classNames={fieldClasses}
+            radius="lg"
+            size="sm"
+            minRows={2}
+          />
+        </SimpleGrid>
 
         <Group justify="flex-end" gap="sm" mt="sm">
           <Button
