@@ -33,6 +33,20 @@ export const Schema_CrearLote = z.object({
 
 export type DTO_CrearLote = z.infer<typeof Schema_CrearLote>;
 
+export const Schema_ItemLoteMasivo = Schema_CrearLote.omit({
+  id_almacen: true,
+});
+
+export const Schema_RegistrarLotesMasivo = z.object({
+  id_almacen: z.coerce.number().min(1, "Seleccione un almacén"),
+  lotes: z
+    .array(Schema_ItemLoteMasivo)
+    .min(1, "Debe agregar al menos un lote al registro"),
+});
+
+export type DTO_ItemLoteMasivo = z.infer<typeof Schema_ItemLoteMasivo>;
+export type DTO_RegistrarLotesMasivo = z.infer<typeof Schema_RegistrarLotesMasivo>;
+
 export const Schema_AjustarStock = z.object({
   id_lote: z.number().min(1, "Lote requerido"),
   nuevo_stock: z.number().min(0, "El stock no puede ser negativo"),

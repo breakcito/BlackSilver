@@ -216,10 +216,10 @@ export const LotesPage = () => {
         <RegistroLote
           initialAlmacenId={idAlmacen ? Number(idAlmacen) : null}
           almacenes={almacenes}
-          onSuccess={(nuevoLote) => {
+          onSuccess={(nuevosLotes) => {
             closeCreate();
-            addLote(nuevoLote);
-            handlePrint(nuevoLote);
+            nuevosLotes.forEach((l) => addLote(l));
+            handlePrint(nuevosLotes);
           }}
           onCancel={closeCreate}
         />

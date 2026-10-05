@@ -5,6 +5,7 @@ import type {
   DTO_ActualizarLote,
   DTO_AjustarStock,
   DTO_CrearLote,
+  DTO_RegistrarLotesMasivo,
 } from "./lotes.requests";
 import type { RES_Lote } from "./lotes.responses";
 import dayjs from "dayjs";
@@ -39,6 +40,42 @@ export class LotesService {
 
     const response = await api.post<IRespuesta<RES_Lote>>(
       `${this.PATH}`,
+      payload,
+    );
+    return response.data;
+  }
+
+  /**
+   * Registrar varios lotes independientes en una sola operacion contra el
+   * mismo almacen. Si uno falla, el backend hace rollback de toda la
+   * operacion y se devuelve un error.
+   */
+  static async crearMasivo(dto: DTO_RegistrarLotesMasivo) {
+    const payload = {
+      id_almacen: dto.id_almacen,
+      lotes: dto.lotes.map((lote) => ({
+        id_producto: lote.id_producto,
+        id_unidad_medida: lote.id_unidad_medida,
+        stock_inicial: lote.stock_inicial,
+        contenido_por_presentacion: lote.contenido_por_presentacion,
+        fecha_hora_ingreso: dayjs(lote.fecha_hora_ingreso).format(
+          "YYYY-MM-DD HH:mm:ss",
+        ),
+        fecha_vencimiento: lote.fecha_vencimiento
+          ? dayjs(lote.fecha_vencimiento).format("YYYY-MM-DD")
+          : null,
+        descripcion: lote.descripcion || null,
+        serie_factura_compra: lote.serie_factura_compra || null,
+        numero_factura_compra: lote.numero_factura_compra || null,
+        costo_por_unidad:
+          lote.costo_por_unidad !== null && lote.costo_por_unidad !== undefined
+            ? lote.costo_por_unidad
+            : null,
+      })),
+    };
+
+    const response = await api.post<IRespuesta<RES_Lote[]>>(
+      `${this.PATH}/masivo`,
       payload,
     );
     return response.data;

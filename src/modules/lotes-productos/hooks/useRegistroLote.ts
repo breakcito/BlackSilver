@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNotify } from "../../../hooks/useNotify";
 import { LotesService } from "../service/lotes.service";
-import { Schema_CrearLote } from "../service/lotes.requests";
+import {
+  Schema_CrearLote,
+  Schema_RegistrarLotesMasivo,
+} from "../service/lotes.requests";
 import type { RES_Lote } from "../service/lotes.responses";
 import type { RES_UnidadMedida } from "../../../service/responses/unidad-medida";
 import type { RES_Almacen } from "../../../service/responses/almacen";
@@ -9,10 +12,40 @@ import type { RES_Producto } from "../../../service/responses/producto";
 import { AuxService } from "../../../service/auxiliar.service";
 import { TipoBien } from "../../../shared/enums/_generic/tipo-bien";
 
+/**
+ * Estado de una fila del registro masivo. Cada fila representa un lote
+ * independiente que se enviara en la misma operacion.
+ */
+export interface LoteFila {
+  id_producto: number;
+  id_unidad_medida: number;
+  stock_inicial: number;
+  contenido_por_presentacion: number;
+  fecha_hora_ingreso: Date | null;
+  fecha_vencimiento: Date | null;
+  descripcion: string;
+  serie_factura_compra: string;
+  numero_factura_compra: string;
+  costo_por_unidad: number | null;
+}
+
+const filaVacia = (): LoteFila => ({
+  id_producto: 0,
+  id_unidad_medida: 0,
+  stock_inicial: 0,
+  contenido_por_presentacion: 1,
+  fecha_hora_ingreso: new Date(),
+  fecha_vencimiento: null,
+  descripcion: "",
+  serie_factura_compra: "",
+  numero_factura_compra: "",
+  costo_por_unidad: null,
+});
+
 interface UseRegistroLoteProps {
   initialAlmacenId?: number | null;
   almacenes: RES_Almacen[];
-  onSuccess: (lote: RES_Lote) => void;
+  onSuccess: (lotes: RES_Lote[]) => void;
 }
 
 export const useRegistroLote = ({
@@ -30,21 +63,11 @@ export const useRegistroLote = ({
   const [productos, setProductos] = useState<RES_Producto[]>([]);
   const [unidades, setUnidades] = useState<RES_UnidadMedida[]>([]);
 
-  // Form State
+  // Cabecera unica: solo el almacen.
   const [idAlmacen, setIdAlmacen] = useState<number>(initialAlmacenId || 0);
-  const [idProducto, setIdProducto] = useState<number>(0);
-  const [idUnidadMedida, setIdUnidadMedida] = useState<number>(0);
-  const [stockInicial, setStockInicial] = useState<number>(0);
-  const [contenidoPorPresentacion, setContenidoPorPresentacion] =
-    useState<number>(1);
-  const [fechaHoraIngreso, setFechaHoraIngreso] = useState<Date | null>(
-    new Date(),
-  );
-  const [fechaVencimiento, setFechaVencimiento] = useState<Date | null>(null);
-  const [descripcion, setDescripcion] = useState("");
-  const [serieFacturaCompra, setSerieFacturaCompra] = useState("");
-  const [numeroFacturaCompra, setNumeroFacturaCompra] = useState("");
-  const [costoPorUnidad, setCostoPorUnidad] = useState<number | null>(null);
+
+  // Detalle: array de filas (lotes) que se enviaran juntos.
+  const [filas, setFilas] = useState<LoteFila[]>(() => [filaVacia()]);
 
   const loadProductos = async () => {
     setLoadingProductos(true);
@@ -78,129 +101,150 @@ export const useRegistroLote = ({
     loadUnidades();
   }, []);
 
-  // Auto-set unit of measure when product changes
-  useEffect(() => {
-    if (idProducto && !loadingUnidades && productos.length > 0) {
-      const prod = productos.find((p) => p.id_producto === idProducto);
-      if (prod) {
-        setIdUnidadMedida(prod.id_unidad_medida_base);
-      }
-    }
-  }, [idProducto, loadingUnidades, productos]);
-
-  // Derived state
-  const productoSeleccionado = productos.find(
-    (p) => p.id_producto === idProducto,
-  );
-
-  const unidadSeleccionada = unidades.find(
-    (u) => u.id_unidad_medida === idUnidadMedida,
-  );
-
-  const stockTotalBase = Number(
-    ((stockInicial || 0) * (contenidoPorPresentacion || 1)).toFixed(2),
-  );
-
-  const sonUnidadesIdenticas =
-    productoSeleccionado &&
-    unidadSeleccionada &&
-    productoSeleccionado.id_unidad_medida_base ===
-      unidadSeleccionada.id_unidad_medida;
-
   /**
-   * Factor de conversión auto-completado desde la tabla de conversiones.
-   * - Si las unidades son idénticas: retorna 1 (implícito, no requiere lookup).
-   * - Si las unidades son diferentes y existe la conversión: retorna
-   *   "cuántas unidades base hay en 1 unidad de detalle" (p. ej. 1 Metro
-   *   = 100 Centímetros).
-   * - Si no existe conversión: retorna `null` (el usuario debe tipear el
-   *   factor manualmente).
-   *
-   * La API modela la conversión como "1 destino = factor origens". En la
-   * respuesta, la unidad consultada aparece como `id_unidad_origen` y la
-   * relacionada como `id_unidad_destino`. Como el formulario necesita
-   * "1 detalle = X base", hay que invertir el factor cuando la unidad del
-   * detalle es el origen y la base es el destino.
+   * Resolver producto y unidad de una fila. Si el producto existe y la unidad
+   * del detalle es la misma que la base, fuerza id_unidad_medida = base.
    */
-  const conversionAutomatica = useMemo<number | null>(() => {
-    if (!productoSeleccionado || !idUnidadMedida) return null;
-    if (sonUnidadesIdenticas) return 1;
-
-    const unidadDetalle = unidades.find(
-      (u) => u.id_unidad_medida === idUnidadMedida,
-    );
-    if (!unidadDetalle?.conversiones) return null;
-
-    const conv = unidadDetalle.conversiones.find(
-      (c) => c.id_unidad_destino === productoSeleccionado.id_unidad_medida_base,
-    );
-    if (!conv) return null;
-
-    const factorOrigenesPorDestino = Number(conv.factor_conversion);
-    if (!factorOrigenesPorDestino || factorOrigenesPorDestino <= 0) return null;
-
-    return 1 / factorOrigenesPorDestino;
-  }, [idUnidadMedida, productoSeleccionado, unidades, sonUnidadesIdenticas]);
+  const resolverProductoUnidad = useCallback(
+    (fila: LoteFila): LoteFila => {
+      if (!fila.id_producto || loadingUnidades) return fila;
+      const prod = productos.find((p) => p.id_producto === fila.id_producto);
+      if (!prod) return fila;
+      return { ...fila, id_unidad_medida: prod.id_unidad_medida_base };
+    },
+    [productos, loadingUnidades],
+  );
 
   /**
-   * El input de `contenido_por_presentacion` debe estar bloqueado cuando el
-   * sistema ya conoce el factor (unidades idénticas o conversión registrada).
-   * En esos casos no debe permitirse al usuario manipular el factor a mano.
-   * Cuando NO existe conversión, el usuario puede tipearlo manualmente.
-   */
-  const contenidoBloqueado =
-    sonUnidadesIdenticas ||
-    (Boolean(productoSeleccionado) && conversionAutomatica !== null);
-
-  /**
-   * Auto-completar `contenido_por_presentacion` cuando cambia el producto o
-   * la unidad del detalle:
-   * - Unidades idénticas → 1.
-   * - Unidades diferentes con conversión registrada → factor de conversión.
-   * - Unidades diferentes sin conversión → no se toca (el usuario tipea).
-   *
-   * `conversionAutomatica` se lee intencionalmente fuera de las deps: añadirla
-   * provocaría que al auto-setear se sobreescriba el valor que el usuario
-   * tipeó manualmente en el caso sin conversión.
+   * Al cambiar el producto de una fila, sincronizar la unidad con la base del
+   * producto. Es el mismo patron que el registro simple.
    */
   useEffect(() => {
-    if (!idProducto || !idUnidadMedida) return;
-
-    if (sonUnidadesIdenticas) {
-      setContenidoPorPresentacion(1);
-      return;
-    }
-
-    if (conversionAutomatica !== null) {
-      setContenidoPorPresentacion(conversionAutomatica);
-    }
+    setFilas((prev) => prev.map(resolverProductoUnidad));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idProducto, idUnidadMedida, sonUnidadesIdenticas]);
+  }, [filas.map((f) => f.id_producto).join("|")]);
 
-  // Auto-calculate costoPorUnidad based on selected product and unit/content
+  /**
+   * Calcular conversion automatica (cuantas unidades base hay en 1 unidad del
+   * detalle). Misma logica que el registro simple, parametrizada por fila.
+   */
+  const calcularConversionAutomatica = useCallback(
+    (fila: LoteFila): number | null => {
+      if (!fila.id_producto || !fila.id_unidad_medida) return null;
+      const prod = productos.find((p) => p.id_producto === fila.id_producto);
+      const sonIdenticas =
+        prod && prod.id_unidad_medida_base === fila.id_unidad_medida;
+      if (sonIdenticas) return 1;
+
+      const unidadDetalle = unidades.find(
+        (u) => u.id_unidad_medida === fila.id_unidad_medida,
+      );
+      if (!unidadDetalle?.conversiones) return null;
+      if (!prod) return null;
+
+      const conv = unidadDetalle.conversiones.find(
+        (c) => c.id_unidad_destino === prod.id_unidad_medida_base,
+      );
+      if (!conv) return null;
+
+      const factorOrigenesPorDestino = Number(conv.factor_conversion);
+      if (!factorOrigenesPorDestino || factorOrigenesPorDestino <= 0) return null;
+
+      return 1 / factorOrigenesPorDestino;
+    },
+    [productos, unidades],
+  );
+
+  /**
+   * Auto-setear `contenido_por_presentacion` cuando hay conversion conocida.
+   * Si no hay conversion, no se toca (el usuario tipea).
+   */
   useEffect(() => {
-    if (idProducto && productos.length > 0) {
-      const prod = productos.find((p) => p.id_producto === idProducto);
-      if (prod) {
-        const baseCost = prod.costo_promedio_base || 0;
-        if (sonUnidadesIdenticas) {
-          setCostoPorUnidad(baseCost);
-        } else {
-          setCostoPorUnidad(
-            Number((baseCost * (contenidoPorPresentacion || 1)).toFixed(2)),
-          );
+    setFilas((prev) =>
+      prev.map((fila) => {
+        if (!fila.id_producto || !fila.id_unidad_medida) return fila;
+        const conversion = calcularConversionAutomatica(fila);
+        if (conversion === null) return fila;
+        if (conversion === 1) {
+          return { ...fila, contenido_por_presentacion: 1 };
         }
-      }
-    } else {
-      setCostoPorUnidad(null);
-    }
+        return { ...fila, contenido_por_presentacion: conversion };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filas.map((f) => `${f.id_producto}-${f.id_unidad_medida}`).join("|")]);
+
+  /**
+   * Auto-calcular costo x unidad a partir del costo promedio del producto.
+   * Si las unidades son identicas, costo = base. Si no, costo = base * contenido.
+   */
+  useEffect(() => {
+    setFilas((prev) =>
+      prev.map((fila) => {
+        if (!fila.id_producto) {
+          return { ...fila, costo_por_unidad: null };
+        }
+        const prod = productos.find((p) => p.id_producto === fila.id_producto);
+        if (!prod) return fila;
+        const baseCost = prod.costo_promedio_base || 0;
+        const sonIdenticas =
+          prod.id_unidad_medida_base === fila.id_unidad_medida;
+        if (sonIdenticas) {
+          return { ...fila, costo_por_unidad: baseCost };
+        }
+        return {
+          ...fila,
+          costo_por_unidad: Number(
+            (baseCost * (fila.contenido_por_presentacion || 1)).toFixed(2),
+          ),
+        };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    idProducto,
-    idUnidadMedida,
-    sonUnidadesIdenticas,
-    contenidoPorPresentacion,
-    productos,
+    filas.map((f) => `${f.id_producto}-${f.id_unidad_medida}`).join("|"),
   ]);
+
+  /**
+   * Pre-rellenar una nueva fila con los valores que se repiten del ultimo
+   * lote (producto, unidad, contenido, costo, serie, numero, descripcion).
+   * NO se pre-rellenan: stock, fecha de ingreso (puede ser retroactiva),
+   * fecha de vencimiento.
+   */
+  const construirFilaClonada = useCallback((referencia: LoteFila): LoteFila => {
+    return {
+      id_producto: referencia.id_producto,
+      id_unidad_medida: referencia.id_unidad_medida,
+      stock_inicial: 0,
+      contenido_por_presentacion: referencia.contenido_por_presentacion,
+      fecha_hora_ingreso: new Date(),
+      fecha_vencimiento: null,
+      descripcion: referencia.descripcion,
+      serie_factura_compra: referencia.serie_factura_compra,
+      numero_factura_compra: referencia.numero_factura_compra,
+      costo_por_unidad: referencia.costo_por_unidad,
+    };
+  }, []);
+
+  const anadirFila = useCallback(() => {
+    setFilas((prev) => {
+      const ultima = prev[prev.length - 1] ?? filaVacia();
+      return [...prev, construirFilaClonada(ultima)];
+    });
+  }, [construirFilaClonada]);
+
+  const eliminarFila = useCallback((index: number) => {
+    setFilas((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  }, []);
+
+  const actualizarFila = useCallback(
+    (index: number, partial: Partial<LoteFila>) => {
+      setFilas((prev) =>
+        prev.map((f, i) => (i === index ? { ...f, ...partial } : f)),
+      );
+    },
+    [],
+  );
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) {
@@ -210,32 +254,64 @@ export const useRegistroLote = ({
     setSubmitting(true);
     setError(null);
 
-    const values = {
-      id_producto: idProducto,
-      id_unidad_medida: idUnidadMedida,
+    if (filas.length === 0) {
+      setError("Debe agregar al menos un lote");
+      setSubmitting(false);
+      return;
+    }
+
+    // Validar cabecera + cada fila con el mismo Zod original
+    for (let i = 0; i < filas.length; i++) {
+      const f = filas[i];
+      const candidate = {
+        id_producto: f.id_producto,
+        id_unidad_medida: f.id_unidad_medida,
+        id_almacen: idAlmacen,
+        descripcion: f.descripcion,
+        stock_inicial: f.stock_inicial,
+        contenido_por_presentacion: f.contenido_por_presentacion,
+        fecha_hora_ingreso: f.fecha_hora_ingreso,
+        fecha_vencimiento: f.fecha_vencimiento,
+        serie_factura_compra: f.serie_factura_compra || null,
+        numero_factura_compra: f.numero_factura_compra || null,
+        costo_por_unidad: f.costo_por_unidad,
+      };
+      const validation = Schema_CrearLote.safeParse(candidate);
+      if (!validation.success) {
+        setError(`Lote #${i + 1}: ${validation.error.issues[0].message}`);
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Validacion final del payload masivo
+    const payload = {
       id_almacen: idAlmacen,
-      descripcion,
-      stock_inicial: stockInicial,
-      contenido_por_presentacion: contenidoPorPresentacion,
-      fecha_hora_ingreso: fechaHoraIngreso || new Date(),
-      fecha_vencimiento: fechaVencimiento,
-      serie_factura_compra: serieFacturaCompra || null,
-      numero_factura_compra: numeroFacturaCompra || null,
-      costo_por_unidad: costoPorUnidad,
+      lotes: filas.map((f) => ({
+        id_producto: f.id_producto,
+        id_unidad_medida: f.id_unidad_medida,
+        stock_inicial: f.stock_inicial,
+        contenido_por_presentacion: f.contenido_por_presentacion,
+        fecha_hora_ingreso: f.fecha_hora_ingreso || new Date(),
+        fecha_vencimiento: f.fecha_vencimiento,
+        descripcion: f.descripcion,
+        serie_factura_compra: f.serie_factura_compra || null,
+        numero_factura_compra: f.numero_factura_compra || null,
+        costo_por_unidad: f.costo_por_unidad,
+      })),
     };
 
-    // Validation using Zod
-    const validation = Schema_CrearLote.safeParse(values);
-    if (!validation.success) {
-      setError(validation.error.issues[0].message);
+    const finalValidation = Schema_RegistrarLotesMasivo.safeParse(payload);
+    if (!finalValidation.success) {
+      setError(finalValidation.error.issues[0].message);
       setSubmitting(false);
       return;
     }
 
     try {
-      const result = await LotesService.crear(values);
+      const result = await LotesService.crearMasivo(finalValidation.data);
       if (result.success) {
-        notifySuccess("El nuevo lote ha sido incorporado al inventario.");
+        notifySuccess(result.message);
         onSuccess(result.data);
       } else {
         setError(result.message);
@@ -247,34 +323,51 @@ export const useRegistroLote = ({
     }
   };
 
-  const unidadBase = unidades.find(
-    (u) => u.id_unidad_medida === productoSeleccionado?.id_unidad_medida_base,
-  );
+  // Derivados por fila (memoizados) - expone al componente para renderizar
+  // el resumen de conversion de cada fila sin recalcular en cada paint.
+  const derivadosPorFila = useMemo(() => {
+    return filas.map((fila) => {
+      const producto = productos.find(
+        (p) => p.id_producto === fila.id_producto,
+      );
+      const unidadSeleccionada = unidades.find(
+        (u) => u.id_unidad_medida === fila.id_unidad_medida,
+      );
+      const unidadBase = unidades.find(
+        (u) => u.id_unidad_medida === producto?.id_unidad_medida_base,
+      );
+      const sonIdenticas =
+        producto && unidadSeleccionada
+          ? producto.id_unidad_medida_base === unidadSeleccionada.id_unidad_medida
+          : false;
+      const conversion = calcularConversionAutomatica(fila);
+      const contenidoBloqueado =
+        sonIdenticas || (Boolean(producto) && conversion !== null);
+      const stockTotalBase = Number(
+        ((fila.stock_inicial || 0) * (fila.contenido_por_presentacion || 1)).toFixed(2),
+      );
+      return {
+        productoSeleccionado: producto,
+        unidadSeleccionada,
+        unidadBase,
+        sonIdenticas,
+        conversionAutomatica: conversion,
+        contenidoBloqueado,
+        stockTotalBase,
+      };
+    });
+  }, [filas, productos, unidades, calcularConversionAutomatica]);
 
   return {
-    // Form State & Setters
+    // Cabecera
     idAlmacen,
     setIdAlmacen,
-    idProducto,
-    setIdProducto,
-    idUnidadMedida,
-    setIdUnidadMedida,
-    stockInicial,
-    setStockInicial,
-    contenidoPorPresentacion,
-    setContenidoPorPresentacion,
-    fechaHoraIngreso,
-    setFechaHoraIngreso,
-    fechaVencimiento,
-    setFechaVencimiento,
-    descripcion,
-    setDescripcion,
-    serieFacturaCompra,
-    setSerieFacturaCompra,
-    numeroFacturaCompra,
-    setNumeroFacturaCompra,
-    costoPorUnidad,
-    setCostoPorUnidad,
+
+    // Filas
+    filas,
+    anadirFila,
+    eliminarFila,
+    actualizarFila,
 
     // Status
     loadingProductos,
@@ -289,16 +382,8 @@ export const useRegistroLote = ({
       almacenes,
     },
 
-    // Derived
-    derived: {
-      productoSeleccionado,
-      unidadSeleccionada,
-      unidadBase,
-      stockTotalBase,
-      sonUnidadesIdenticas,
-      conversionAutomatica,
-      contenidoBloqueado,
-    },
+    // Derivados por fila
+    derivadosPorFila,
 
     handleSubmit,
     recargarProductos: loadProductos,
