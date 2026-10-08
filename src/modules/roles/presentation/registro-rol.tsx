@@ -30,10 +30,7 @@ interface RegistroRolProps {
   descripcion: string;
   setDescripcion: (val: string) => void;
   isChecked: (tipo: string, id: number) => boolean;
-  onTogglePermiso: (
-    tipo: "menu" | "submenu" | "modulo",
-    id: number,
-  ) => void;
+  onTogglePermiso: (tipo: "menu" | "submenu" | "modulo", id: number) => void;
   onToggleSubmenu: (modulos: RES_Modulo[], checked: boolean) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -65,44 +62,44 @@ export const RegistroRol = ({
 
   return (
     <Stack gap="md">
-      <TextInput
-        label="Nombre del Rol"
-        placeholder="Ej: Administrador de Almacén"
-        value={nombre}
-        onChange={(e) => setNombre(e.currentTarget.value)}
-        required
-        withAsterisk
-        radius="lg"
-        disabled={isEdit}
-        leftSection={<ShieldCheckIcon className="w-4 h-4 text-zinc-500" />}
-        classNames={fieldClasses}
-      />
+      <Group grow>
+        <TextInput
+          label="Nombre del Rol"
+          placeholder="Ej: Administrador de Almacén"
+          value={nombre}
+          onChange={(e) => setNombre(e.currentTarget.value)}
+          required
+          withAsterisk
+          radius="lg"
+          disabled={isEdit}
+          leftSection={<ShieldCheckIcon className="w-4 h-4 text-zinc-500" />}
+          classNames={fieldClasses}
+        />
 
-      <Textarea
-        label="Descripción (Opcional)"
-        placeholder="Breve descripción de las responsabilidades..."
-        value={descripcion}
-        onChange={(e) => setDescripcion(e.currentTarget.value)}
-        radius="lg"
-        rows={2}
-        disabled={isEdit}
-        leftSection={<DocumentTextIcon className="w-4 h-4 text-zinc-500" />}
-        classNames={fieldClasses}
-      />
-
+        <Textarea
+          label="Descripción (opcional)"
+          placeholder="Breve descripción de las responsabilidades..."
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.currentTarget.value)}
+          radius="lg"
+          rows={2}
+          disabled={isEdit}
+          leftSection={<DocumentTextIcon className="w-4 h-4 text-zinc-500" />}
+          classNames={fieldClasses}
+        />
+      </Group>
       <div className="mt-2 space-y-1 px-1">
         <Text fw={800} size="sm" className="text-white flex items-center gap-2">
           <CheckBadgeIcon className="w-5 h-5 text-indigo-500" />
           Configuración de Permisos
         </Text>
-        <Text size="xs" c="dimmed">
+        <Text size="xs" c="gray">
           Selecciona los menús, submenús y módulos a los que este rol tendrá
           acceso.
         </Text>
       </div>
-
       <div className="relative">
-        {(loadingEstructura || loadingPermisos) ? (
+        {loadingEstructura || loadingPermisos ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <div className="w-8 h-8 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
             <Text size="xs" fw={500} color="dimmed">
@@ -317,7 +314,6 @@ export const RegistroRol = ({
           </Accordion>
         )}
       </div>
-
       <Group justify="flex-end" gap="md" mt="xl">
         <Button
           variant="subtle"
