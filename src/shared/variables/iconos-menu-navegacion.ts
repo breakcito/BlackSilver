@@ -48,6 +48,7 @@ export const iconos_menu_navegacion: IconoMenuEntrada[] = [
   { path: "configuracion", icono: Cog6ToothIcon },
   { path: "logistica", icono: TruckIcon },
   { path: "operaciones", icono: WrenchIcon },
+  { path: "carbon", icono: FireIcon },
 
   // ----- Submenus contenedores (slug del nombre) -----
   { path: "empresa", icono: BuildingOffice2Icon },
@@ -64,8 +65,10 @@ export const iconos_menu_navegacion: IconoMenuEntrada[] = [
   { path: "produccion", icono: CubeIcon },
 
   // ----- Nodos cliqueables (path real devuelto por el backend) -----
-  // Menu (hoja directa)
+  // Carbón
   { path: "compra-carbon", icono: FireIcon },
+  { path: "tamizaje-carbon", icono: FireIcon },
+  { path: "kardex-carbon", icono: ClipboardDocumentListIcon },
 
   // Configuracion / Empresa
   { path: "empresas", icono: BuildingOffice2Icon },
