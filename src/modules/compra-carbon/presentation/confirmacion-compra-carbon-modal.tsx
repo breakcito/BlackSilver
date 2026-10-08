@@ -71,7 +71,7 @@ interface Props {
 }
 
 interface LineaDetalleForm {
-  id_detalle_compra_carbon?: number;
+  id_carga_compra_carbon?: number;
   id_tipo_carbon: number | null;
   id_tarifa_carbon: number | null;
   cantidad: number;
@@ -185,7 +185,7 @@ export const ConfirmacionCompraCarbonModal = ({
   );
   const [porcentajeIgv, setPorcentajeIgv] = useState<number | string>(
     compra.porcentaje_igv !== undefined && compra.porcentaje_igv !== null
-      ? (Number(compra.porcentaje_igv) || 18)
+      ? Number(compra.porcentaje_igv) || 18
       : 18,
   );
   const [fechaHoraIngreso, setFechaHoraIngreso] = useState<Date | null>(
@@ -364,7 +364,7 @@ export const ConfirmacionCompraCarbonModal = ({
           if (dets && dets.length > 0) {
             setDetalles(
               dets.map((d) => ({
-                id_detalle_compra_carbon: d.id_detalle_compra_carbon,
+                id_carga_compra_carbon: d.id_carga_compra_carbon,
                 id_tipo_carbon: d.id_tipo_carbon,
                 id_tarifa_carbon: d.id_tarifa_carbon,
                 cantidad: Number(d.cantidad) || 0,
@@ -723,7 +723,7 @@ export const ConfirmacionCompraCarbonModal = ({
         porcentaje_igv: aplicaIgv ? Number(porcentajeIgv) : 0,
         fecha_hora_ingreso: toBackendDateTime(fechaHoraIngreso),
         detalles: detalles.map((d) => ({
-          id_detalle_compra_carbon: d.id_detalle_compra_carbon,
+          id_carga_compra_carbon: d.id_carga_compra_carbon,
           id_tipo_carbon: Number(d.id_tipo_carbon),
           id_lugar_extraccion: d.id_lugar_extraccion
             ? Number(d.id_lugar_extraccion)

@@ -2,7 +2,7 @@ import type { IArchivo } from "../../../shared/interfaces/archivo";
 import type { MedioPago } from "../../../shared/enums/compra-carbon/medio-pago";
 
 export interface CrearCompraCarbonDetalle {
-  id_detalle_compra_carbon?: number;
+  id_carga_compra_carbon?: number;
   id_tipo_carbon: number;
   id_transportista?: number | null;
   id_lugar_extraccion?: number | null;
@@ -114,8 +114,7 @@ export interface RegistrarComprobanteProveedorRequest {
  * Comprobante de flete de un transportista. El `total` tampoco se envía: el
  * backend lo calcula sumando el `descuento_flete` de las cargas indicadas.
  */
-export interface RegistrarComprobanteTransporteRequest
-  extends RegistrarComprobanteProveedorRequest {
+export interface RegistrarComprobanteTransporteRequest extends RegistrarComprobanteProveedorRequest {
   id_transportista: number;
   ids_detalle_carga: number[];
 }

@@ -249,10 +249,15 @@ export const CompraCarbonPDF = ({
   // la direccion sola no identifica al destinatario.
   const esDestinoCliente = Boolean(cabecera.id_almacen_cliente);
   const deposito = esDestinoCliente
-    ? [cabecera.cliente_destino?.trim(), cabecera.almacen_cliente_direccion?.trim()]
+    ? [
+        cabecera.cliente_destino?.trim(),
+        cabecera.almacen_cliente_direccion?.trim(),
+      ]
         .filter(Boolean)
         .join(" - ") || SIN_DATO
-    : cabecera.almacen_direccion?.trim() || cabecera.almacen?.trim() || SIN_DATO;
+    : cabecera.almacen_direccion?.trim() ||
+      cabecera.almacen?.trim() ||
+      SIN_DATO;
 
   // ── Proveedor ────────────────────────────────────────────────────────────
   const esProveedorNatural =
@@ -359,7 +364,7 @@ export const CompraCarbonPDF = ({
             </View>
           ) : (
             detalles.map((d) => (
-              <View key={d.id_detalle_compra_carbon} style={STYLES.tablaFila}>
+              <View key={d.id_carga_compra_carbon} style={STYLES.tablaFila}>
                 <Text style={STYLES.celdaCant}>
                   {formatNumber(Number(d.cantidad), 3)}
                 </Text>

@@ -212,7 +212,9 @@ export const CompraCarbonListado = ({
         compra.id_compra_carbon,
       );
       if (!resp.success || !resp.data) {
-        notifyError(resp.message || "No se pudo cargar el detalle de la compra");
+        notifyError(
+          resp.message || "No se pudo cargar el detalle de la compra",
+        );
         return;
       }
       setModalPagos({
@@ -227,7 +229,6 @@ export const CompraCarbonListado = ({
     }
   };
 
-
   /**
    * El modal de aprobacion necesita los detalles de la compra para poder
    * agrupar las cargas con flete por transportista, asi que se cargan antes
@@ -240,7 +241,9 @@ export const CompraCarbonListado = ({
         compra.id_compra_carbon,
       );
       if (!resp.success || !resp.data) {
-        notifyError(resp.message || "No se pudo cargar el detalle de la compra");
+        notifyError(
+          resp.message || "No se pudo cargar el detalle de la compra",
+        );
         return;
       }
       setModalLiquidar({
@@ -898,7 +901,7 @@ export const CompraCarbonListado = ({
                         const lugar = lugarLabel(d);
                         return (
                           <tr
-                            key={d.id_detalle_compra_carbon}
+                            key={d.id_carga_compra_carbon}
                             className="hover:bg-white/5 transition-colors"
                           >
                             <td className="px-3 py-2 text-center text-zinc-500">

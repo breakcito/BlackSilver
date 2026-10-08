@@ -57,7 +57,7 @@ export interface CompraCarbonResumen {
 }
 
 export interface CompraCarbonDetalleItem {
-  id_detalle_compra_carbon: number;
+  id_carga_compra_carbon: number;
   id_tipo_carbon: number;
   tipo_carbon_nombre: string;
   tipo_carbon_codigo: string | null;
@@ -108,7 +108,7 @@ export interface CompraCarbonAnticipoUtilizado {
 }
 
 export interface DocumentoDuplicadoItem {
-  id_detalle_compra_carbon: number;
+  id_carga_compra_carbon: number;
   codigo_ticket_balanza: string | null;
   guia_remitente: string | null;
   guia_transportista: string | null;
@@ -155,7 +155,7 @@ export interface ComprobanteCompraCarbonResponse extends ComprobanteCarbonBase {
 
 /** Carga (detalle de la compra) que compone un comprobante de flete. */
 export interface CargaComprobanteFlete {
-  id_detalle_compra_carbon: number;
+  id_carga_compra_carbon: number;
   id_tipo_carbon: number;
   tipo_carbon_nombre: string;
   placa: string | null;

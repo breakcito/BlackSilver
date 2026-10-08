@@ -82,7 +82,9 @@ export const ComprobanteTransporteCard = ({
   const yaRegistrado = comprobante !== null;
 
   const [codigo, setCodigo] = useState("");
-  const [fechaEmision, setFechaEmision] = useState<Date | string | null>(new Date());
+  const [fechaEmision, setFechaEmision] = useState<Date | string | null>(
+    new Date(),
+  );
   const [conDetraccion, setConDetraccion] = useState(false);
   const [porcentaje, setPorcentaje] = useState(DETRACCION_TRANSPORTE_DEFECTO);
   const [evidencias, setEvidencias] = useState<File[]>([]);
@@ -262,7 +264,7 @@ export const ComprobanteTransporteCard = ({
                 {
                   id_transportista: idTransportista,
                   ids_detalle_carga: cargas.map(
-                    (c) => c.id_detalle_compra_carbon,
+                    (c) => c.id_carga_compra_carbon,
                   ),
                   codigo_comprobante: codigo.trim(),
                   fecha_emision: aFechaISO(fechaEmision),
