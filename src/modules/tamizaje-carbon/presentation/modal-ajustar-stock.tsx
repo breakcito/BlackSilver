@@ -1,7 +1,6 @@
 import {
   Button,
   Group,
-  Modal,
   NumberInput,
   Stack,
   Text,
@@ -14,6 +13,7 @@ import { CheckIcon, XMarkIcon, ScaleIcon } from "@heroicons/react/24/outline";
 import { useNotify } from "../../../hooks/useNotify";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { TamizajeCarbonService } from "../service/tamizaje-carbon.service";
+import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import type { StockCarbonItem } from "../service/tamizaje-carbon.responses";
 
 interface Props {
@@ -22,6 +22,12 @@ interface Props {
   stockItem: StockCarbonItem;
   onGuardado: () => void;
 }
+
+const estilitos = {
+  input:
+    "bg-zinc-900/50 border-zinc-800 focus:border-zinc-300 text-white placeholder:text-zinc-500",
+  label: "text-zinc-400 text-xs font-semibold mb-1 ml-1",
+};
 
 export const ModalAjustarStock = ({
   opened,
@@ -76,26 +82,20 @@ export const ModalAjustarStock = ({
   };
 
   return (
-    <Modal
+    <ModalEstandar
       opened={opened}
-      onClose={onClose}
+      close={onClose}
       title={
         <Group gap="xs">
           <ScaleIcon className="w-5 h-5 text-indigo-400" />
-          <Text fw={700} size="md" className="text-white">
-            Ajuste Manual de Stock
-          </Text>
+          <span>Ajuste Manual de Stock</span>
         </Group>
       }
-      centered
       size="md"
-      classNames={{
-        content: "bg-zinc-950 border border-zinc-800",
-        header: "bg-zinc-950 border-b border-zinc-800 text-white",
-      }}
+      validateClose
     >
-      <Stack gap="md" pt="xs">
-        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-lg">
+      <Stack gap="md">
+        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-xl">
           <Group justify="space-between" mb="xs">
             <Text size="xs" c="dimmed">
               Almacén:
@@ -116,7 +116,7 @@ export const ModalAjustarStock = ({
             <Text size="xs" c="dimmed">
               Stock actual en sistema:
             </Text>
-            <Text size="sm" fw={700} className="text-zinc-200">
+            <Text size="sm" fw={700} className="text-zinc-200 font-mono">
               {formatNumber(stockActualNum)} TN
             </Text>
           </Group>
@@ -132,8 +132,9 @@ export const ModalAjustarStock = ({
           decimalScale={4}
           fixedDecimalScale={false}
           required
-          radius="md"
-          size="sm"
+          radius="lg"
+          size="xs"
+          classNames={estilitos}
         />
 
         {diferencia !== 0 && (
@@ -158,8 +159,9 @@ export const ModalAjustarStock = ({
           onChange={(e) => setMotivo(e.currentTarget.value)}
           minRows={3}
           required
-          radius="md"
-          size="sm"
+          radius="lg"
+          size="xs"
+          classNames={estilitos}
         />
 
         <Group justify="flex-end" gap="xs" mt="sm">
@@ -168,7 +170,7 @@ export const ModalAjustarStock = ({
             onClick={onClose}
             disabled={submitting}
             leftSection={<XMarkIcon className="w-4 h-4" />}
-            radius="md"
+            radius="lg"
             size="xs"
           >
             Cancelar
@@ -178,13 +180,14 @@ export const ModalAjustarStock = ({
             onClick={handleSubmit}
             loading={submitting}
             leftSection={<CheckIcon className="w-4 h-4" />}
-            radius="md"
+            radius="lg"
             size="xs"
+            className="font-semibold shadow-md shadow-indigo-950/40"
           >
             Guardar Ajuste
           </Button>
         </Group>
       </Stack>
-    </Modal>
+    </ModalEstandar>
   );
 };

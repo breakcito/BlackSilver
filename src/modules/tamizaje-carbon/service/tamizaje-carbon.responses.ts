@@ -14,6 +14,7 @@ export interface StockCarbonItem {
   id_tipo_carbon: number;
   tipo_carbon_nombre: string;
   tipo_carbon_codigo?: string;
+  tipo_carbon_para_compra: boolean | number;
   stock_actual: number;
   cambios_log?: StockCarbonLogEntry[] | null;
 }
@@ -50,4 +51,19 @@ export interface TamizajeCarbonItem {
   evidencias?: Array<{ url: string; nombre_original?: string; extension?: string }> | null;
   created_at?: string;
   variantes?: VarianteTamizajeItem[];
+}
+
+export interface CargaCarbonPendienteItem {
+  id_carga_compra_carbon: number;
+  id_compra_carbon: number;
+  compra_correlativo: string;
+  id_tipo_carbon: number;
+  tipo_carbon_nombre: string;
+  tipo_carbon_codigo?: string | null;
+  id_almacen: number;
+  almacen_nombre: string;
+  codigo_ticket_balanza?: string | null;
+  placa?: string | null;
+  cantidad: number;
+  fecha_hora_ingreso: string;
 }

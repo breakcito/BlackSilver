@@ -5,6 +5,7 @@ import type {
   RegistrarTamizajeRequest,
 } from "./tamizaje-carbon.requests";
 import type {
+  CargaCarbonPendienteItem,
   StockCarbonItem,
   TamizajeCarbonItem,
 } from "./tamizaje-carbon.responses";
@@ -47,9 +48,19 @@ export const TamizajeCarbonService = {
     return data;
   },
 
+  getCargasPendientes: async (filters?: {
+    id_almacen?: number;
+  }): Promise<IRespuesta<CargaCarbonPendienteItem[]>> => {
+    const { data } = await api.get<IRespuesta<CargaCarbonPendienteItem[]>>(
+      `${PATH}/cargas-pendientes`,
+      { params: filters },
+    );
+    return data;
+  },
+
   registrarTamizaje: async (
     payload: RegistrarTamizajeRequest,
-  ): Promise<IRespuesta<{ id_tamizaje_carbon: number }>> => {
+  ): Promise<IRespuesta<TamizajeCarbonItem>> => {
     const formData = new FormData();
 
     if (payload.id_almacen) formData.append("id_almacen", String(payload.id_almacen));
@@ -69,7 +80,7 @@ export const TamizajeCarbonService = {
       payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
     }
 
-    const { data } = await api.post<IRespuesta<{ id_tamizaje_carbon: number }>>(
+    const { data } = await api.post<IRespuesta<TamizajeCarbonItem>>(
       PATH,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },

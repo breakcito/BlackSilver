@@ -4,10 +4,7 @@ import {
   TextInput,
   Select,
   Group,
-  Stack,
   Paper,
-  SimpleGrid,
-  ThemeIcon,
 } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
@@ -16,7 +13,6 @@ import {
   ArrowUpTrayIcon,
   MagnifyingGlassIcon,
   BuildingStorefrontIcon,
-  TruckIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 
@@ -126,29 +122,6 @@ export const KardexCarbonPage = () => {
     );
   }, [movimientos, tipoMovimiento]);
 
-  // KPIs
-  const stats = useMemo(() => {
-    let ingresosTN = 0;
-    let salidasTN = 0;
-    let totalCostoIngresos = 0;
-
-    for (const m of movimientosFiltrados) {
-      const cant = Number(m.cantidad_movimiento) || 0;
-      if (m.tipo_movimiento.toLowerCase() === "ingreso") {
-        ingresosTN += cant;
-        totalCostoIngresos += Number(m.costo_total) || 0;
-      } else if (m.tipo_movimiento.toLowerCase() === "salida") {
-        salidasTN += cant;
-      }
-    }
-
-    return {
-      ingresosTN,
-      salidasTN,
-      totalCostoIngresos,
-      totalRegistros: movimientosFiltrados.length,
-    };
-  }, [movimientosFiltrados]);
 
   // Table Columns
   const columns: DataTableColumn<MovimientoKardexCarbonItem>[] = useMemo(

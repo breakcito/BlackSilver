@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import {
+  ArrowDownTrayIcon,
   BanknotesIcon,
   ClockIcon,
   DocumentArrowDownIcon,
@@ -30,6 +31,7 @@ import { usePrint } from "../../../../hooks/usePrint";
 import { useAnularCompraCarbon } from "../../hooks/useAnularCompraCarbon";
 import { ModalRegistroCargas } from "../modal-registro-cargas";
 import { ModalLiquidacionPagos } from "../modal-liquidacion-pagos";
+import { exportarLiquidacionExcel } from "../excel/exportar-liquidacion-excel";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoCompraCarbon } from "../../../../shared/enums/compra-carbon/estado-compra-carbon";
 import type {
@@ -81,13 +83,6 @@ const estadoBadge = (
   }
 };
 
-const lugarLabel = (d: CargaCompraCarbonItem): string => {
-  return (
-    [d.lugar_extraccion_nombre, d.lugar_extraccion_direccion]
-      .filter(Boolean)
-      .join(" · ") || "—"
-  );
-};
 
 export const CompraCarbonListado = ({
   compras,
@@ -132,6 +127,23 @@ export const CompraCarbonListado = ({
   } | null>(null);
   const [motivoAnular, setMotivoAnular] = useState("");
   const [printingId, setPrintingId] = useState<number | null>(null);
+  const [exportingId, setExportingId] = useState<number | null>(null);
+
+  const handleExportarExcel = async (r: CompraCarbonResumen) => {
+    try {
+      setExportingId(r.id_compra_carbon);
+      const res = await CompraCarbonService.getCompraConDetalles(
+        r.id_compra_carbon,
+      );
+      if (res.data) {
+        await exportarLiquidacionExcel(res.data);
+      }
+    } catch (err: unknown) {
+      notifyError(err instanceof Error ? err.message : "Error al exportar");
+    } finally {
+      setExportingId(null);
+    }
+  };
 
   const handleCerrarCompra = async (id: number) => {
     try {
@@ -547,6 +559,25 @@ export const CompraCarbonListado = ({
                   }}
                 >
                   <BanknotesIcon className="w-4 h-4 text-white" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* Exportar Liquidación (Excel) */}
+            {totalCargas > 0 && (
+              <Tooltip label="Exportar Liquidación (Excel)" withArrow position="top">
+                <ActionIcon
+                  variant="light"
+                  color="teal"
+                  radius="xl"
+                  size="md"
+                  loading={exportingId === r.id_compra_carbon}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleExportarExcel(r);
+                  }}
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4" />
                 </ActionIcon>
               </Tooltip>
             )}

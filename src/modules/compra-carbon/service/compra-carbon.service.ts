@@ -11,6 +11,10 @@ import type {
 import type {
   CompraCarbonResumen,
   CompraCarbonDetalleResponse,
+  RespuestaRegistrarComprobanteProveedor,
+  RespuestaRegistrarPagoProveedor,
+  RespuestaRegistrarComprobanteTransporte,
+  RespuestaRegistrarPagoTransporte,
 } from "./compra-carbon.responses";
 
 const PATH = "/compras-carbon";
@@ -93,7 +97,7 @@ export const CompraCarbonService = {
   registrarComprobanteProveedor: async (
     idCompraCarbon: number,
     payload: RegistrarComprobanteProveedorPayload,
-  ): Promise<IRespuesta<{ id_comprobante_compra_carbon: number }>> => {
+  ): Promise<IRespuesta<RespuestaRegistrarComprobanteProveedor>> => {
     const formData = new FormData();
     formData.append("codigo_comprobante", payload.codigo_comprobante);
     formData.append("fecha_emision", payload.fecha_emision);
@@ -110,7 +114,7 @@ export const CompraCarbonService = {
       payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
     }
 
-    const { data } = await api.post<IRespuesta<{ id_comprobante_compra_carbon: number }>>(
+    const { data } = await api.post<IRespuesta<RespuestaRegistrarComprobanteProveedor>>(
       `${PATH}/${idCompraCarbon}/comprobantes-proveedor`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
@@ -121,7 +125,7 @@ export const CompraCarbonService = {
   registrarPagoProveedor: async (
     idCompraCarbon: number,
     payload: RegistrarPagoProveedorPayload,
-  ): Promise<IRespuesta<{ id_pago_compra_carbon: number }>> => {
+  ): Promise<IRespuesta<RespuestaRegistrarPagoProveedor>> => {
     const formData = new FormData();
     if (payload.id_comprobante_compra_carbon) {
       formData.append("id_comprobante_compra_carbon", String(payload.id_comprobante_compra_carbon));
@@ -146,7 +150,7 @@ export const CompraCarbonService = {
       payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
     }
 
-    const { data } = await api.post<IRespuesta<{ id_pago_compra_carbon: number }>>(
+    const { data } = await api.post<IRespuesta<RespuestaRegistrarPagoProveedor>>(
       `${PATH}/${idCompraCarbon}/pagos-proveedor`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
@@ -157,7 +161,7 @@ export const CompraCarbonService = {
   registrarComprobanteTransporte: async (
     idCompraCarbon: number,
     payload: RegistrarComprobanteTransportePayload,
-  ): Promise<IRespuesta<{ id_comprobante_transporte_carbon: number }>> => {
+  ): Promise<IRespuesta<RespuestaRegistrarComprobanteTransporte>> => {
     const formData = new FormData();
     formData.append("id_transportista", String(payload.id_transportista));
     formData.append("codigo_comprobante", payload.codigo_comprobante);
@@ -172,7 +176,7 @@ export const CompraCarbonService = {
       payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
     }
 
-    const { data } = await api.post<IRespuesta<{ id_comprobante_transporte_carbon: number }>>(
+    const { data } = await api.post<IRespuesta<RespuestaRegistrarComprobanteTransporte>>(
       `${PATH}/${idCompraCarbon}/comprobantes-transporte`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
@@ -183,7 +187,7 @@ export const CompraCarbonService = {
   registrarPagoTransporte: async (
     idCompraCarbon: number,
     payload: RegistrarPagoTransportePayload,
-  ): Promise<IRespuesta<{ id_pago_transporte_carbon: number }>> => {
+  ): Promise<IRespuesta<RespuestaRegistrarPagoTransporte>> => {
     const formData = new FormData();
     formData.append("id_comprobante_transporte_carbon", String(payload.id_comprobante_transporte_carbon));
     formData.append("id_cuenta_bancaria_empresa", String(payload.id_cuenta_bancaria_empresa));
@@ -200,7 +204,7 @@ export const CompraCarbonService = {
       payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
     }
 
-    const { data } = await api.post<IRespuesta<{ id_pago_transporte_carbon: number }>>(
+    const { data } = await api.post<IRespuesta<RespuestaRegistrarPagoTransporte>>(
       `${PATH}/${idCompraCarbon}/pagos-transporte`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },

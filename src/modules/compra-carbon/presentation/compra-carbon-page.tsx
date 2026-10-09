@@ -24,6 +24,7 @@ export const CompraCarbonPage = () => {
     anio,
     cambiarPeriodo,
     recargar,
+    recargarSilencioso,
     insertCompra,
     updateCompraLocal,
   } = useCompraCarbon();
@@ -53,7 +54,7 @@ export const CompraCarbonPage = () => {
         loading={loading}
       />
 
-      {loading ? (
+      {loading && compras.length === 0 ? (
         <Stack align="center" gap="md" py={100}>
           <div className="relative">
             <div className="w-16 h-16 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
@@ -78,7 +79,7 @@ export const CompraCarbonPage = () => {
           onReimprimir={(compra) => setAutoPrint(compra)}
           autoPrint={autoPrint}
           onAutoPrintConsumido={() => setAutoPrint(null)}
-          onRefresh={recargar}
+          onRefresh={recargarSilencioso}
         />
       )}
 

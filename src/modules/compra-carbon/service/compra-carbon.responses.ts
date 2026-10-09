@@ -207,3 +207,28 @@ export interface CompraCarbonDetalleResponse {
   comprobantes_transporte: ComprobanteTransporteItem[];
   anticipos_utilizados: TransaccionAnticipoItem[];
 }
+
+export interface RespuestaRegistrarComprobanteProveedor {
+  id_comprobante_compra_carbon: number;
+  comprobante: ComprobanteCompraCarbonItem;
+  ids_cargas: number[];
+}
+
+export interface RespuestaRegistrarPagoProveedor {
+  id_pago_compra_carbon: number;
+  pago: PagoCompraItem;
+  comprobante: ComprobanteCompraCarbonItem | null;
+  ids_cargas_pagadas: number[];
+}
+
+export interface RespuestaRegistrarComprobanteTransporte {
+  id_comprobante_transporte_carbon: number;
+  comprobante: ComprobanteTransporteItem;
+  ids_cargas: number[];
+}
+
+export interface RespuestaRegistrarPagoTransporte {
+  id_pago_transporte_carbon: number;
+  pago: PagoTransporteItem;
+  comprobante: ComprobanteTransporteItem;
+}

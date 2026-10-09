@@ -14,23 +14,26 @@ export const useCompraCarbon = () => {
   const [anio, setAnio] = useState<number>(ANIO_ACTUAL);
   const { notifyError } = useNotify();
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    try {
-      const resp = await CompraCarbonService.getCompras({
-        filtros: busqueda.trim() || undefined,
-        mes,
-        anio,
-      });
-      if (resp.success) setCompras(resp.data);
-      else notifyError(resp.message || "No se pudieron cargar las compras");
-    } catch (e) {
-      console.error(e);
-      notifyError("Ocurrio un error al cargar las compras de carbon");
-    } finally {
-      setLoading(false);
-    }
-  }, [busqueda, mes, anio, notifyError]);
+  const fetch = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const resp = await CompraCarbonService.getCompras({
+          filtros: busqueda.trim() || undefined,
+          mes,
+          anio,
+        });
+        if (resp.success) setCompras(resp.data);
+        else notifyError(resp.message || "No se pudieron cargar las compras");
+      } catch (e) {
+        console.error(e);
+        notifyError("Ocurrio un error al cargar las compras de carbon");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [busqueda, mes, anio, notifyError],
+  );
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -56,6 +59,8 @@ export const useCompraCarbon = () => {
     );
   };
 
+  const recargarSilencioso = useCallback(() => fetch(true), [fetch]);
+
   return {
     compras,
     loading,
@@ -65,6 +70,7 @@ export const useCompraCarbon = () => {
     anio,
     cambiarPeriodo,
     recargar: fetch,
+    recargarSilencioso,
     insertCompra,
     updateCompraLocal,
   };
