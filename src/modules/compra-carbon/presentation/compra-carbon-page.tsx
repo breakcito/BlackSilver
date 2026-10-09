@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {  Badge, Group, Stack, Text } from "@mantine/core";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 import { useTitlePage } from "../../../hooks/useTitlePage";
 import { useCompraCarbon } from "../hooks/useCompraCarbon";
-import { AuxService } from "../../../service/auxiliar.service";
-import type { RES_Empresa } from "../../../service/responses/empresa";
-import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
-import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import { RegistroCompraCarbon } from "./registro-compra-carbon";
 import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
@@ -32,12 +28,6 @@ export const CompraCarbonPage = () => {
     updateCompraLocal,
   } = useCompraCarbon();
 
-  const [empresasById, setEmpresasById] = useState<Record<number, RES_Empresa>>(
-    {},
-  );
-  const [proveedoresById, setProveedoresById] = useState<
-    Record<number, ProveedorResponse>
-  >([]);
   const [openRegistro, setOpenRegistro] = useState(false);
   /**
    * Cuando se registra una compra, el listado imprime automaticamente su PDF.
@@ -47,32 +37,6 @@ export const CompraCarbonPage = () => {
   const [autoPrint, setAutoPrint] = useState<CompraCarbonResumen | null>(
     null,
   );
-
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      const [empresasRes, proveedoresArr] = await Promise.all([
-        AuxService.get_empresas(),
-        ProveedoresService.getProveedores({ para_carbon: true }),
-      ]);
-      if (cancel) return;
-      if (empresasRes.success) {
-        const map: Record<number, RES_Empresa> = {};
-        for (const e of empresasRes.data) {
-          map[e.id_empresa] = e;
-        }
-        setEmpresasById(map);
-      }
-      const provMap: Record<number, ProveedorResponse> = {};
-      for (const p of proveedoresArr ?? []) {
-        provMap[p.id_proveedor] = p;
-      }
-      setProveedoresById(provMap);
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, []);
 
   const mostrarEmpty = !loading && compras.length === 0 && !busqueda;
 
@@ -109,8 +73,6 @@ export const CompraCarbonPage = () => {
         <CompraCarbonListado
           compras={compras}
           busqueda={busqueda}
-          empresasById={empresasById}
-          proveedoresById={proveedoresById}
           onAprobada={updateCompraLocal}
           onAnulada={updateCompraLocal}
           onReimprimir={(compra) => setAutoPrint(compra)}

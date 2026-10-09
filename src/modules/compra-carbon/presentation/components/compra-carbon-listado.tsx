@@ -15,14 +15,15 @@ import {
   ClockIcon,
   DocumentArrowDownIcon,
   EyeIcon,
+  LockClosedIcon,
   TruckIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
-import dayjs from "dayjs";
 import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
 import type { DataTableColumn } from "mantine-datatable";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { CambiosLogHistorial } from "../../../../presentation/utils/cambios-log-historial";
+import { AuxService } from "../../../../service/auxiliar.service";
 import { CompraCarbonService } from "../../service/compra-carbon.service";
 import { useNotify } from "../../../../hooks/useNotify";
 import { usePrint } from "../../../../hooks/usePrint";
@@ -42,8 +43,8 @@ import type { ProveedorResponse } from "../../../../modules/proveedores/service/
 interface Props {
   compras: CompraCarbonResumen[];
   busqueda: string;
-  empresasById: Record<number, RES_Empresa>;
-  proveedoresById: Record<number, ProveedorResponse>;
+  empresasById?: Record<number, RES_Empresa>;
+  proveedoresById?: Record<number, ProveedorResponse>;
   onAprobada?: (cabecera: CompraCarbonResumen) => void;
   onAnulada?: (cabecera: CompraCarbonResumen) => void;
   /** Reimprime el PDF de la cotización preliminar. */
@@ -58,7 +59,7 @@ interface Props {
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
 
 /**
- * Los seis estados de `EstadoCompraCarbon`.
+ * Los cinco estados de `EstadoCompraCarbon`.
  */
 const estadoBadge = (
   estado: string | null,
@@ -67,12 +68,10 @@ const estadoBadge = (
   switch (e) {
     case EstadoCompraCarbon.Preliminar:
       return { color: "gray", label: "Preliminar" };
-    case EstadoCompraCarbon.Confirmado:
-      return { color: "blue", label: "Confirmado" };
-    case EstadoCompraCarbon.LiquidacionAprobada:
-      return { color: "teal", label: "Liquidación aprobada" };
-    case EstadoCompraCarbon.EnProcesoPago:
-      return { color: "yellow", label: "En proceso de pago" };
+    case EstadoCompraCarbon.EnLiquidacion:
+      return { color: "blue", label: "En Liquidación" };
+    case EstadoCompraCarbon.Cerrado:
+      return { color: "orange", label: "Cerrado" };
     case EstadoCompraCarbon.Pagado:
       return { color: "emerald", label: "Pagado" };
     case EstadoCompraCarbon.Anulado:
@@ -102,7 +101,7 @@ export const CompraCarbonListado = ({
   onAutoPrintConsumido,
   onRefresh,
 }: Props) => {
-  const { notifyError } = useNotify();
+  const { notifyError, notifySuccess } = useNotify();
   const { print, prepare } = usePrint();
   const { anular, loading: loadingAnular } = useAnularCompraCarbon();
 
@@ -121,6 +120,11 @@ export const CompraCarbonListado = ({
     id: number;
     correlativo: string;
   } | null>(null);
+  const [openCerrarModal, setOpenCerrarModal] = useState<{
+    id: number;
+    correlativo: string;
+  } | null>(null);
+  const [loadingCerrar, setLoadingCerrar] = useState(false);
   const [detallesModal, setDetallesModal] = useState<{
     compra: CompraCarbonResumen;
     data: CompraCarbonDetalleResponse | null;
@@ -128,6 +132,27 @@ export const CompraCarbonListado = ({
   } | null>(null);
   const [motivoAnular, setMotivoAnular] = useState("");
   const [printingId, setPrintingId] = useState<number | null>(null);
+
+  const handleCerrarCompra = async (id: number) => {
+    try {
+      setLoadingCerrar(true);
+      const res = await CompraCarbonService.cerrarCompra(id);
+      if (res.success) {
+        notifySuccess("Orden de compra de carbón cerrada satisfactoriamente");
+        setOpenCerrarModal(null);
+        if (detallesModal) {
+          setDetallesModal(null);
+        }
+        onRefresh?.();
+      } else {
+        notifyError(res.message || "Error al cerrar la compra");
+      }
+    } catch (err: unknown) {
+      notifyError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setLoadingCerrar(false);
+    }
+  };
 
   const ordenadas = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -185,8 +210,29 @@ export const CompraCarbonListado = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPrint]);
 
+  const [empresasCache, setEmpresasCache] = useState<
+    Record<number, RES_Empresa>
+  >({});
+
   const handlePrint = async (compra: CompraCarbonResumen) => {
-    const empresa = empresasById[compra.id_empresa];
+    let empresa =
+      (empresasById && empresasById[compra.id_empresa]) ||
+      empresasCache[compra.id_empresa];
+    if (!empresa) {
+      try {
+        const empRes = await AuxService.get_empresas();
+        if (empRes.success && empRes.data) {
+          const map: Record<number, RES_Empresa> = {};
+          for (const e of empRes.data) {
+            map[e.id_empresa] = e;
+          }
+          setEmpresasCache((prev) => ({ ...prev, ...map }));
+          empresa = map[compra.id_empresa];
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
     if (!empresa) {
       notifyError("No se encontró la empresa para generar el PDF");
       return;
@@ -201,7 +247,9 @@ export const CompraCarbonListado = ({
         <CompraCarbonPDF
           compra={{ cabecera: compra }}
           empresa={empresa}
-          proveedor={proveedoresById[compra.id_proveedor] ?? null}
+          proveedor={
+            proveedoresById ? proveedoresById[compra.id_proveedor] : null
+          }
           urlLogoEmpresa={empresa.url_logo ?? null}
           colorPredominante={empresa.color_predominante ?? null}
         />,
@@ -219,13 +267,13 @@ export const CompraCarbonListado = ({
     {
       accessor: "index",
       title: "#",
-      width: 60,
+      width: 50,
       textAlign: "center",
     },
     {
       accessor: "correlativo",
       title: "Correlativo",
-      width: 140,
+      width: 100,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text fw={800} size="xs" c="indigo.3" className="font-mono">
@@ -247,7 +295,7 @@ export const CompraCarbonListado = ({
     {
       accessor: "empresa",
       title: "Empresa",
-      width: 160,
+      width: 150,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Text size="xs" fw={700} className="text-white">
@@ -258,7 +306,7 @@ export const CompraCarbonListado = ({
     {
       accessor: "proveedor",
       title: "Proveedor",
-      width: 180,
+      width: 150,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const doc =
@@ -313,7 +361,7 @@ export const CompraCarbonListado = ({
     {
       accessor: "tipo_carbon_prometido",
       title: "Tipo Carbón",
-      width: 140,
+      width: 100,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Stack gap={2} align="center">
@@ -348,7 +396,7 @@ export const CompraCarbonListado = ({
     {
       accessor: "total_cotizado",
       title: "Cotizado",
-      width: 140,
+      width: 120,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Stack gap={2} align="center">
@@ -369,7 +417,7 @@ export const CompraCarbonListado = ({
     {
       accessor: "total_real_con_descuento",
       title: "Avance",
-      width: 140,
+      width: 120,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => (
         <Stack gap={2} align="center">
@@ -385,29 +433,52 @@ export const CompraCarbonListado = ({
     {
       accessor: "cargas",
       title: "Cargas",
-      width: 100,
+      width: 120,
       textAlign: "center",
-      render: (r: CompraCarbonResumen) => (
-        <div className="flex items-center justify-center gap-2">
-          <Badge variant="light" color="cyan" radius="md" size="md">
-            {r.cantidad_cargas ?? r.cantidad_items ?? 0}
-          </Badge>
-          <Tooltip label="Ver cargas" withArrow position="top">
-            <ActionIcon
-              variant="light"
-              color="cyan"
-              radius="xl"
-              size="md"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleVerDetalles(r);
-              }}
-            >
-              <EyeIcon className="w-4 h-4" />
-            </ActionIcon>
-          </Tooltip>
-        </div>
-      ),
+      render: (r: CompraCarbonResumen) => {
+        const esAnulado = r.estado === EstadoCompraCarbon.Anulado;
+        const esPagado = r.estado === EstadoCompraCarbon.Pagado;
+        const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
+        const puedeRegistrarCarga = !esAnulado && !esPagado && !esCerrado;
+        return (
+          <div className="flex items-center justify-center gap-2">
+            <Badge variant="light" color="cyan" radius="md" size="md">
+              {r.cantidad_cargas ?? r.cantidad_items ?? 0}
+            </Badge>
+            <Tooltip label="Ver cargas" withArrow position="top">
+              <ActionIcon
+                variant="light"
+                color="cyan"
+                radius="xl"
+                size="md"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleVerDetalles(r);
+                }}
+              >
+                <EyeIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
+            {/* 1. Registrar Carga */}
+            {puedeRegistrarCarga && (
+              <Tooltip label="Registrar carga" withArrow position="top">
+                <ActionIcon
+                  variant="filled"
+                  color="blue"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalCargas(r);
+                  }}
+                >
+                  <TruckIcon className="w-4 h-4 text-white" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
     // {
     //   accessor: "registrado_por",
@@ -427,7 +498,7 @@ export const CompraCarbonListado = ({
     {
       accessor: "estado",
       title: "Estado",
-      width: 180,
+      width: 120,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const b = estadoBadge(r.estado);
@@ -441,14 +512,18 @@ export const CompraCarbonListado = ({
     {
       accessor: "acciones",
       title: "Acciones",
-      width: 180,
+      width: 130,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const esAnulado = r.estado === EstadoCompraCarbon.Anulado;
         const esPagado = r.estado === EstadoCompraCarbon.Pagado;
-        const puedeRegistrarCarga = !esAnulado && !esPagado;
+        const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
+        const totalCargas = r.cantidad_cargas ?? r.cantidad_items ?? 0;
         const puedeLiquidar = !esAnulado;
-        const puedeAnular = !esAnulado && !esPagado && r.cantidad_items === 0;
+        const puedeCerrar =
+          !esAnulado && !esPagado && !esCerrado && totalCargas >= 1;
+        const puedeAnular =
+          !esAnulado && !esPagado && !esCerrado && totalCargas === 0;
         const isPrinting = printingId === r.id_compra_carbon;
         const tieneCambios =
           r.log_cambios &&
@@ -458,24 +533,6 @@ export const CompraCarbonListado = ({
 
         return (
           <Group gap={6} justify="center" wrap="nowrap">
-            {/* 1. Registrar Carga */}
-            {puedeRegistrarCarga && (
-              <Tooltip label="Registrar carga" withArrow position="top">
-                <ActionIcon
-                  variant="filled"
-                  color="blue"
-                  radius="xl"
-                  size="md"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setModalCargas(r);
-                  }}
-                >
-                  <TruckIcon className="w-4 h-4 text-white" />
-                </ActionIcon>
-              </Tooltip>
-            )}
-
             {/* 2. Liquidación y Pagos */}
             {puedeLiquidar && (
               <Tooltip label="Liquidación y Pagos" withArrow position="top">
@@ -494,6 +551,31 @@ export const CompraCarbonListado = ({
               </Tooltip>
             )}
 
+            {/* 3. Cerrar Compra (solo con >= 1 carga) */}
+            {puedeCerrar && (
+              <Tooltip
+                label="Cerrar orden (no admitir más cargas)"
+                withArrow
+                position="top"
+              >
+                <ActionIcon
+                  variant="light"
+                  color="orange"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenCerrarModal({
+                      id: r.id_compra_carbon,
+                      correlativo: r.correlativo,
+                    });
+                  }}
+                >
+                  <LockClosedIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
             {/* 4. PDF (Cotización preliminar) */}
             <Tooltip label="Ver documento (PDF)" withArrow position="top">
               <ActionIcon
@@ -502,7 +584,6 @@ export const CompraCarbonListado = ({
                 radius="xl"
                 size="md"
                 loading={isPrinting}
-                disabled={!empresasById[r.id_empresa]}
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrint(r);
@@ -593,7 +674,7 @@ export const CompraCarbonListado = ({
             ? `Cargas de ${detallesModal.compra.correlativo}`
             : "Cargas"
         }
-        size="90rem"
+        size="95rem"
       >
         {detallesModal && (
           <div className="space-y-4">
@@ -663,165 +744,309 @@ export const CompraCarbonListado = ({
 
             {!detallesModal.loading && detallesModal.data && (
               <div className="space-y-2">
-                <Group gap="xs" mb="xs">
-                  <Text
-                    size="xs"
-                    fw={800}
-                    c="zinc.4"
-                    className="uppercase tracking-widest"
-                  >
-                    Cargas Recibidas ({detallesModal.data.cargas.length})
-                  </Text>
+                <Group justify="space-between" align="center" mb="xs">
+                  <Group gap="xs">
+                    <Text
+                      size="xs"
+                      fw={800}
+                      c="zinc.4"
+                      className="uppercase tracking-widest"
+                    >
+                      Cargas Recibidas ({detallesModal.data.cargas.length})
+                    </Text>
+                    {detallesModal.compra.estado ===
+                      EstadoCompraCarbon.Cerrado && (
+                      <Badge
+                        color="orange"
+                        variant="light"
+                        size="xs"
+                        radius="sm"
+                      >
+                        Compra Cerrada
+                      </Badge>
+                    )}
+                  </Group>
+
+                  <Group gap="xs">
+                    {detallesModal.data.cargas.length >= 1 &&
+                      detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Anulado &&
+                      detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Pagado &&
+                      detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Cerrado && (
+                        <Button
+                          size="compact-xs"
+                          variant="light"
+                          color="orange"
+                          radius="md"
+                          leftSection={
+                            <LockClosedIcon className="w-3.5 h-3.5" />
+                          }
+                          onClick={() => {
+                            setOpenCerrarModal({
+                              id: detallesModal.compra.id_compra_carbon,
+                              correlativo: detallesModal.compra.correlativo,
+                            });
+                          }}
+                        >
+                          Cerrar compra
+                        </Button>
+                      )}
+
+                    {detallesModal.data.cargas.length > 0 &&
+                      detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Anulado &&
+                      detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Pagado &&
+                      detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Cerrado && (
+                        <Button
+                          size="compact-xs"
+                          variant="light"
+                          color="indigo"
+                          radius="md"
+                          leftSection={<TruckIcon className="w-3.5 h-3.5" />}
+                          onClick={() => {
+                            const comp = detallesModal.compra;
+                            setDetallesModal(null);
+                            setModalCargas(comp);
+                          }}
+                        >
+                          Añadir carga
+                        </Button>
+                      )}
+                  </Group>
                 </Group>
 
-                <div className="rounded-xl border border-zinc-800 overflow-hidden">
-                  <table className="w-full text-xs text-zinc-300">
-                    <thead className="bg-zinc-900 text-zinc.400 text-[11px] font-medium uppercase tracking-wider">
-                      <tr>
-                        <th className="px-3 py-2 text-center w-10">#</th>
-                        <th className="py-2 text-center w-30">Tipo</th>
-                        <th className="px-3 py-2 text-center w-20">Ceniza</th>
-                        <th className="px-3 py-2 text-center w-20">Humedad</th>
-                        <th className="px-3 py-2 text-center w-24">
-                          Toneladas
-                        </th>
-                        <th className="px-3 py-2 text-center w-28">
-                          Precio × TN
-                        </th>
-                        <th className="px-3 py-2 text-center w-44">Lugar</th>
-                        <th className="px-3 py-2 text-center w-28">Ticket</th>
-                        <th className="px-3 py-2 text-center w-28">GR / GT</th>
-                        <th className="px-3 py-2 text-center w-35">
-                          Transportista
-                        </th>
-                        <th className="px-3 py-2 text-center w-24">
-                          Flete × TN
-                        </th>
-                        <th className="px-3 py-2 text-center w-24">Subtotal</th>
-                        <th className="px-3 py-2 text-center w-24">
-                          (−) Flete
-                        </th>
-                        <th className="px-3 py-2 text-center w-28">Neto</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800 bg-zinc-900/40">
-                      {detallesModal.data.cargas.map(
-                        (d: CargaCompraCarbonItem, idx: number) => {
-                          const lugar = lugarLabel(d);
-                          return (
-                            <tr
-                              key={d.id_carga_compra_carbon}
-                              className="hover:bg-white/5 transition-colors"
-                            >
-                              <td className="px-3 py-2 text-center text-zinc-500">
-                                {idx + 1}
-                              </td>
-                              <td className="px-3 py-2 flex justify-center">
-                                <Stack gap={4} justify="center" align="center">
-                                  <Text fw={700} c="zinc.100" size="xs">
-                                    {d.tipo_carbon_nombre}
-                                  </Text>
-                                  {d.tipo_carbon_codigo && (
-                                    <Badge
-                                      size="xs"
-                                      color="cyan"
-                                      variant="filled"
-                                      radius="sm"
-                                    >
-                                      {d.tipo_carbon_codigo}
-                                    </Badge>
+                {detallesModal.data.cargas.length === 0 ? (
+                  <div className="border border-dashed border-zinc-800 rounded-2xl p-10 text-center bg-zinc-900/30">
+                    <Stack align="center" gap="sm">
+                      <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 text-indigo-400">
+                        <TruckIcon className="w-7 h-7" />
+                      </div>
+                      <Text size="sm" fw={700} c="zinc.100">
+                        Sin cargas registradas
+                      </Text>
+                      <Text size="xs" c="dimmed" maw={480}>
+                        Esta orden preliminar aún no tiene cargas o camiones
+                        despachados por el proveedor. Puedes registrar cada
+                        cargamento que vaya ingresando a planta con el botón
+                        inferior.
+                      </Text>
+                      {detallesModal.compra.estado !==
+                        EstadoCompraCarbon.Anulado &&
+                        detallesModal.compra.estado !==
+                          EstadoCompraCarbon.Pagado &&
+                        detallesModal.compra.estado !==
+                          EstadoCompraCarbon.Cerrado && (
+                          <Button
+                            size="xs"
+                            color="indigo"
+                            radius="lg"
+                            leftSection={<TruckIcon className="w-4 h-4" />}
+                            onClick={() => {
+                              const comp = detallesModal.compra;
+                              setDetallesModal(null);
+                              setModalCargas(comp);
+                            }}
+                            mt="xs"
+                          >
+                            Registrar primera carga
+                          </Button>
+                        )}
+                    </Stack>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-zinc-800 overflow-hidden">
+                    <table className="w-full text-xs text-zinc-300">
+                      <thead className="bg-zinc-900 text-zinc-400 text-[11px] font-medium uppercase tracking-wider">
+                        <tr>
+                          <th className="px-3 py-2 text-center w-8">#</th>
+                          <th className="py-2 text-center w-28">Tipo</th>
+                          <th className="px-3 py-2 text-center w-16">Ticket</th>
+                          <th className="px-3 py-2 text-center w-28">
+                            Lugar Ext.
+                          </th>
+                          <th className="px-3 py-2 text-center w-35">
+                            Transportista
+                          </th>
+                          <th className="px-3 py-2 text-center w-28">
+                            GR / GT
+                          </th>
+                          <th className="px-3 py-2 text-center w-24">Leyes</th>
+                          <th className="px-3 py-2 text-center w-28">
+                            Toneladas
+                          </th>
+                          <th className="px-3 py-2 text-center w-24">
+                            Subtotal
+                          </th>
+                          <th className="px-3 py-2 text-center w-24">
+                            (−) Flete
+                          </th>
+                          <th className="px-3 py-2 text-center w-28">Neto</th>
+                          <th className="px-3 py-2 text-center w-24">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800 bg-zinc-900/40">
+                        {detallesModal.data.cargas.map(
+                          (d: CargaCompraCarbonItem, idx: number) => {
+                            return (
+                              <tr
+                                key={d.id_carga_compra_carbon}
+                                className="hover:bg-white/5 transition-colors"
+                              >
+                                <td className="px-3 py-2 text-center text-zinc-500">
+                                  {idx + 1}
+                                </td>
+                                <td className="px-3 py-2 flex justify-center">
+                                  <Stack
+                                    gap={4}
+                                    justify="center"
+                                    align="center"
+                                  >
+                                    <Text fw={700} c="zinc.100" size="xs">
+                                      {d.tipo_carbon_nombre}
+                                    </Text>
+                                    {d.tipo_carbon_codigo && (
+                                      <Badge
+                                        size="xs"
+                                        color="cyan"
+                                        variant="filled"
+                                        radius="sm"
+                                      >
+                                        {d.tipo_carbon_codigo}
+                                      </Badge>
+                                    )}
+                                  </Stack>
+                                </td>
+                                <td className="px-3 py-2 font-mono text-zinc-300 text-center">
+                                  {d.codigo_ticket_balanza || (
+                                    <Text c="dimmed">—</Text>
                                   )}
-                                </Stack>
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                {d.porcentaje_ceniza > 0 ? (
-                                  <Badge
-                                    variant="light"
-                                    color="grape"
-                                    size="sm"
-                                    radius="md"
-                                  >
-                                    {formatNumber(Number(d.porcentaje_ceniza))}%
-                                  </Badge>
-                                ) : (
-                                  <Text c="dimmed">—</Text>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                {d.porcentaje_humedad > 0 ? (
-                                  <Badge
-                                    variant="light"
-                                    color="blue"
-                                    size="sm"
-                                    radius="md"
-                                  >
-                                    {formatNumber(Number(d.porcentaje_humedad))}
-                                    %
-                                  </Badge>
-                                ) : (
-                                  <Text c="dimmed">—</Text>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono font-bold text-white">
-                                {formatNumber(Number(d.cantidad))} TN
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono">
-                                {formatPEN(Number(d.precio_unitario))}
-                              </td>
-                              <td className="px-3 py-2 text-[11px] text-zinc-300">
-                                {lugar || <Text c="dimmed">—</Text>}
-                              </td>
-                              <td className="px-3 py-2 font-mono text-zinc-300 text-center">
-                                {d.codigo_ticket_balanza || (
-                                  <Text c="dimmed">—</Text>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 flex flex-row justify-center">
-                                <div>
-                                  <Text
-                                    className="font-mono text-zinc-300"
-                                    size="xs"
-                                  >
-                                    GR: {d.guia_remitente || "—"}
+                                </td>
+                                <td className="px-3 py-2 text-center text-zinc-300">
+                                  {d.lugar_extraccion_direccion || (
+                                    <Text c="dimmed">—</Text>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-zinc.100 text-center">
+                                  {d.transportista_razon_social || (
+                                    <Text c="dimmed">—</Text>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 flex flex-row justify-center">
+                                  <div className="flex flex-col items-start justify-center gap-1.5">
+                                    <Text
+                                      className="font-mono text-zinc-300"
+                                      size="xs"
+                                    >
+                                      GR: {d.guia_remitente || "—"}
+                                    </Text>
+                                    <Text
+                                      className="font-mono text-zinc-300"
+                                      size="xs"
+                                    >
+                                      GT: {d.guia_transportista || "—"}
+                                    </Text>
+                                  </div>
+                                </td>
+
+                                <td className="px-3 py-2 text-center">
+                                  <div className="flex flex-col gap-2 items-center justify-center">
+                                    {d.porcentaje_ceniza > 0 ? (
+                                      <Badge
+                                        variant="light"
+                                        color="grape"
+                                        size="sm"
+                                        radius="md"
+                                      >
+                                        {formatNumber(
+                                          Number(d.porcentaje_ceniza),
+                                        )}{" "}
+                                        %Ce
+                                      </Badge>
+                                    ) : (
+                                      <Text c="dimmed">—</Text>
+                                    )}
+                                    {d.porcentaje_humedad > 0 ? (
+                                      <Badge
+                                        variant="light"
+                                        color="blue"
+                                        size="sm"
+                                        radius="md"
+                                      >
+                                        {formatNumber(
+                                          Number(d.porcentaje_humedad),
+                                        )}{" "}
+                                        %H2O
+                                      </Badge>
+                                    ) : (
+                                      <Text c="dimmed">—</Text>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-center font-mono font-bold text-white">
+                                  <Text size="xs" c={"teal"} fw={800}>
+                                    {formatNumber(Number(d.cantidad))} TN
                                   </Text>
                                   <Text
-                                    className="font-mono text-zinc-300"
-                                    size="xs"
+                                    size="11px"
+                                    mt={5}
+                                    c={"yellow"}
+                                    fw={600}
                                   >
-                                    GT: {d.guia_transportista || "—"}
+                                    {formatPEN(Number(d.precio_unitario))} P/U
                                   </Text>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 text-zinc.100 text-center">
-                                {d.transportista_razon_social || (
-                                  <Text c="dimmed">—</Text>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono text-yellow-400 font-bold">
-                                {Number(d.costo_flete_por_tonelada) > 0
-                                  ? formatPEN(
-                                      Number(d.costo_flete_por_tonelada),
-                                    )
-                                  : "—"}
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono">
-                                {formatPEN(Number(d.subtotal_antes_descuento))}
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono text-yellow-400 font-bold">
-                                {Number(d.descuento_flete) > 0
-                                  ? `−${formatPEN(Number(d.descuento_flete))}`
-                                  : "—"}
-                              </td>
-                              <td className="px-3 py-2 text-center font-mono text-emerald-400 font-bold">
-                                {formatPEN(Number(d.subtotal_con_descuento))}
-                              </td>
-                            </tr>
-                          );
-                        },
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                                </td>
+
+                                <td className="px-3 py-2 text-center">
+                                  <Text size="xs" fw={800} c={"teal"}>
+                                    {formatPEN(
+                                      Number(d.subtotal_antes_descuento),
+                                    )}
+                                  </Text>
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <Text size="xs" fw={700} c={"red"}>
+                                    {Number(d.descuento_flete) > 0
+                                      ? `−${formatPEN(Number(d.descuento_flete))}`
+                                      : "—"}
+                                  </Text>
+                                  <Text size="11px" fw={600} c={""} mt={5}>
+                                    {Number(d.costo_flete_por_tonelada) > 0
+                                      ? formatPEN(
+                                          Number(d.costo_flete_por_tonelada),
+                                        ) + " x TN"
+                                      : "—"}
+                                  </Text>
+                                </td>
+                                <td className="px-3 py-2 text-center font-mono text-emerald-400 font-bold">
+                                  {formatPEN(Number(d.subtotal_con_descuento))}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <Badge
+                                    size="xs"
+                                    variant="light"
+                                    color={
+                                      d.estado === "Pagado"
+                                        ? "emerald"
+                                        : d.estado === "Anulado"
+                                          ? "red"
+                                          : "blue"
+                                    }
+                                  >
+                                    {d.estado || "En Liquidación"}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          },
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -941,6 +1166,70 @@ export const CompraCarbonListado = ({
               leftSection={<XCircleIcon className="w-4 h-4" />}
             >
               Si, anular
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal de confirmacion de cierre de compra */}
+      <Modal
+        opened={openCerrarModal !== null}
+        onClose={() => !loadingCerrar && setOpenCerrarModal(null)}
+        centered
+        radius="xl"
+        withCloseButton={false}
+        size="md"
+        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
+        classNames={{
+          content: "bg-zinc-950 border border-white/10 shadow-2xl shadow-black",
+        }}
+      >
+        <Stack gap="md" align="center" className="p-6">
+          <Badge color="orange" variant="light" size="lg" radius="xl">
+            <LockClosedIcon className="w-5 h-5" />
+          </Badge>
+          <Text fw={800} size="lg" c="white" ta="center">
+            Cerrar orden {openCerrarModal?.correlativo}
+          </Text>
+          <Text size="sm" c="zinc.4" ta="center">
+            Al cerrar esta orden de compra se establecerá el estado a{" "}
+            <Text component="span" fw={700} c="orange.4">
+              Cerrado
+            </Text>{" "}
+            y se registrará la fecha y usuario de cierre.
+            <br />
+            <br />
+            <Text component="span" fw={600} c="white">
+              Ya no se permitirá registrar nuevas cargas de carbón a esta orden.
+            </Text>{" "}
+            El proceso de liquidación y pagos continuará con las cargas
+            actuales.
+          </Text>
+          <Group justify="center" gap="sm" mt="xs" w="100%">
+            <Button
+              variant="subtle"
+              color="gray"
+              radius="xl"
+              onClick={() => setOpenCerrarModal(null)}
+              disabled={loadingCerrar}
+              fullWidth
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="filled"
+              color="orange"
+              radius="xl"
+              loading={loadingCerrar}
+              onClick={() => {
+                if (openCerrarModal) {
+                  handleCerrarCompra(openCerrarModal.id);
+                }
+              }}
+              fullWidth
+              leftSection={<LockClosedIcon className="w-4 h-4" />}
+            >
+              Sí, cerrar orden
             </Button>
           </Group>
         </Stack>

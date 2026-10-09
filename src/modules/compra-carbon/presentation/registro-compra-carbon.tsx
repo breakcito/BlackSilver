@@ -114,6 +114,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
       try {
         const provRes = await ProveedoresService.getProveedores({
           para_carbon: true,
+          sin_lugares: true,
         });
         if (cancel) return;
         if (provRes) {

@@ -71,6 +71,8 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
   const [modalPagoProv, setModalPagoProv] = useState<{ idComprobante: number | null } | null>(null);
   const [modalComprobanteTrans, setModalComprobanteTrans] = useState(false);
   const [modalPagoTrans, setModalPagoTrans] = useState<{ idComprobante: number } | null>(null);
+  const [openConfirmCerrar, setOpenConfirmCerrar] = useState(false);
+  const [loadingCerrar, setLoadingCerrar] = useState(false);
 
   // Form State Comprobante Proveedor
   const [compProvCodigo, setCompProvCodigo] = useState("");
@@ -406,9 +408,11 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
   // Cerrar compra
   const handleCerrarCompra = async () => {
     try {
+      setLoadingCerrar(true);
       const res = await CompraCarbonService.cerrarCompra(idCompraCarbon);
       if (res.success) {
         notifySuccess("Compra de carbón cerrada satisfactoriamente");
+        setOpenConfirmCerrar(false);
         cargarDetalle();
         onRefresh();
       } else {
@@ -416,6 +420,8 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
       }
     } catch (err: unknown) {
       notifyError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setLoadingCerrar(false);
     }
   };
 
@@ -429,7 +435,11 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
     );
   }
 
-  const estaCerrada = cabecera.estado === "Cerrado" || cabecera.estado === "Anulado";
+  const estaCerrada =
+    cabecera.estado === "Cerrado" ||
+    cabecera.estado === "Anulado" ||
+    cabecera.estado === "Pagado";
+  const puedeCerrar = !estaCerrada && detalle.cargas.length >= 1;
 
   return (
     <Stack gap="md">
@@ -448,7 +458,7 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
                     : cabecera.estado === "En Liquidación"
                       ? "indigo"
                       : cabecera.estado === "Cerrado"
-                        ? "gray"
+                        ? "orange"
                         : "yellow"
                 }
                 variant="light"
@@ -456,6 +466,11 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
               >
                 {cabecera.estado}
               </Badge>
+              {cabecera.estado === "Cerrado" && (
+                <Badge color="orange" variant="outline" size="sm">
+                  Orden Cerrada
+                </Badge>
+              )}
               <Badge color={cabecera.aplica_igv ? "indigo" : "gray"} variant="outline" size="sm">
                 {cabecera.aplica_igv ? `Aplica IGV (${cabecera.porcentaje_igv}%)` : "Sin IGV"}
               </Badge>
@@ -476,14 +491,14 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
             >
               Exportar Liquidación (Excel)
             </Button>
-            {!estaCerrada && (
+            {puedeCerrar && (
               <Button
                 size="xs"
                 radius="lg"
-                color="red"
-                variant="subtle"
+                color="orange"
+                variant="light"
                 leftSection={<IconLock size={15} />}
-                onClick={handleCerrarCompra}
+                onClick={() => setOpenConfirmCerrar(true)}
               >
                 Cerrar Compra
               </Button>
@@ -1568,6 +1583,65 @@ export const ModalLiquidacionPagos = ({ idCompraCarbon, onClose, onRefresh }: Pr
               onClick={handleGuardarPagoTrans}
             >
               Registrar Pago
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal Confirmación Cerrar Compra */}
+      <Modal
+        opened={openConfirmCerrar}
+        onClose={() => !loadingCerrar && setOpenConfirmCerrar(false)}
+        centered
+        radius="xl"
+        withCloseButton={false}
+        size="md"
+        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
+        classNames={{
+          content: "bg-zinc-950 border border-white/10 shadow-2xl shadow-black",
+        }}
+      >
+        <Stack gap="md" align="center" className="p-6">
+          <Badge color="orange" variant="light" size="lg" radius="xl">
+            <IconLock size={20} />
+          </Badge>
+          <Text fw={800} size="lg" c="white" ta="center">
+            Cerrar orden {cabecera?.correlativo}
+          </Text>
+          <Text size="sm" c="zinc.4" ta="center">
+            Al cerrar esta compra se establecerá el estado a{" "}
+            <Text component="span" fw={700} c="orange.4">
+              Cerrado
+            </Text>{" "}
+            y se registrará la fecha y usuario de cierre.
+            <br />
+            <br />
+            <Text component="span" fw={600} c="white">
+              Ya no se permitirá registrar nuevas cargas de carbón a esta orden.
+            </Text>{" "}
+            El proceso de liquidación, facturación y pagos continuará con las cargas actuales.
+          </Text>
+          <Group justify="center" gap="sm" mt="xs" w="100%">
+            <Button
+              variant="subtle"
+              color="gray"
+              radius="xl"
+              onClick={() => setOpenConfirmCerrar(false)}
+              disabled={loadingCerrar}
+              fullWidth
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="filled"
+              color="orange"
+              radius="xl"
+              loading={loadingCerrar}
+              onClick={handleCerrarCompra}
+              fullWidth
+              leftSection={<IconLock size={16} />}
+            >
+              Sí, cerrar orden
             </Button>
           </Group>
         </Stack>

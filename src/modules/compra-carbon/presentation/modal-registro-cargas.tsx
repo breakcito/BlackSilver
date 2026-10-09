@@ -6,8 +6,8 @@ import {
   Button,
   Checkbox,
   Divider,
-  FileInput,
   Group,
+  Loader,
   NumberInput,
   Paper,
   Select,
@@ -21,11 +21,13 @@ import {
   IconPlus,
   IconTrash,
   IconTruck,
-  IconUpload,
   IconMapPin,
   IconScale,
   IconReceipt,
   IconCoins,
+  IconTag,
+  IconAlertTriangle,
+  IconCirclePlus,
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
 
@@ -43,6 +45,9 @@ import type { RES_LugarExtraccionCarbon } from "../../../service/responses/lugar
 import type { RES_Transportista } from "../../../service/responses/transportista";
 import type { RES_TarifaCarbon } from "../../../service/responses/tarifa-carbon";
 import { formatNumber } from "../../../shared/functions/formatNumber";
+import { MultiFilePicker } from "../../../presentation/utils/archivo/multifile-picker";
+import { FormTarifaCarbon } from "../../../presentation/utils/form-tarifa-carbon";
+import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 
 interface Props {
   compra: CompraCarbonResumen;
@@ -80,6 +85,11 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
   >([]);
   const [transportistas, setTransportistas] = useState<RES_Transportista[]>([]);
 
+  const [loadingTipos, setLoadingTipos] = useState(true);
+  const [tarifas, setTarifas] = useState<RES_TarifaCarbon[]>([]);
+  const [openNuevaTarifa, setOpenNuevaTarifa] = useState(false);
+  const [targetTarifaIdx, setTargetTarifaIdx] = useState<number | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,17 +123,26 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
   // Carga de catálogos necesarios
   useEffect(() => {
     let cancel = false;
+    setLoadingTipos(true);
     (async () => {
       try {
-        const [tiposRes, almRes, lugRes, transRes] = await Promise.all([
-          TipoCarbonService.getTipos({ id_proveedor: compra.id_proveedor }),
-          AuxService.get_almacenes({ para_carbon: true }),
-          AuxService.get_lugares_extraccion_carbon(compra.id_proveedor),
-          AuxService.get_transportistas(),
-        ]);
+        const [tiposRes, almRes, lugRes, transRes, tarifasRes] =
+          await Promise.all([
+            TipoCarbonService.getTipos({ id_proveedor: compra.id_proveedor }),
+            AuxService.get_almacenes({ para_carbon: true }),
+            AuxService.get_lugares_extraccion_carbon(compra.id_proveedor),
+            AuxService.get_transportistas(),
+            AuxService.get_tarifas_carbon(),
+          ]);
         if (cancel) return;
 
         if (tiposRes.success && tiposRes.data) setTipos(tiposRes.data);
+        if (tarifasRes.success && tarifasRes.data) {
+          const tList: RES_TarifaCarbon[] = Array.isArray(tarifasRes.data)
+            ? tarifasRes.data
+            : [tarifasRes.data];
+          setTarifas(tList);
+        }
         if (almRes.success && almRes.data) {
           setAlmacenesEmpresa(almRes.data);
           // Si hay almacén empresa y primera carga no tiene, asignar el primero
@@ -183,6 +202,8 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
         }
       } catch (err) {
         console.error(err);
+      } finally {
+        if (!cancel) setLoadingTipos(false);
       }
     })();
 
@@ -190,6 +211,23 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
       cancel = true;
     };
   }, [compra.id_proveedor]);
+
+  // Obtener la tarifa correspondiente al tipo de carbón y % de ceniza
+  const tarifaPara = (
+    idTipo: number | null,
+    ceniza: number,
+  ): RES_TarifaCarbon | null => {
+    if (!idTipo || !ceniza || ceniza <= 0) return null;
+    return (
+      tarifas.find(
+        (t) =>
+          Number(t.id_tipo_carbon) === Number(idTipo) &&
+          (t.estado ?? "Activo") === "Activo" &&
+          ceniza >= Number(t.inicio_porcentaje_ceniza) &&
+          ceniza <= Number(t.fin_porcentaje_ceniza),
+      ) ?? null
+    );
+  };
 
   const handleAgregarCarga = () => {
     setCargas((prev) => [
@@ -235,7 +273,7 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
       const copia = [...prev];
       const actual = { ...copia[index], [field]: val };
 
-      // Si cambió porcentaje de ceniza o tipo de carbón, buscar tarifa
+      // Si cambió porcentaje de ceniza o tipo de carbón, autoseleccionar tarifa
       if (field === "porcentaje_ceniza" || field === "id_tipo_carbon") {
         const ceniza =
           field === "porcentaje_ceniza"
@@ -243,35 +281,19 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
             : Number(actual.porcentaje_ceniza);
         const tipoId =
           field === "id_tipo_carbon"
-            ? Number(val)
-            : Number(actual.id_tipo_carbon);
+            ? (val ? Number(val) : null)
+            : (actual.id_tipo_carbon ? Number(actual.id_tipo_carbon) : null);
 
-        if (tipoId > 0 && ceniza > 0) {
-          AuxService.get_tarifas_carbon({ id_tipo_carbon: tipoId }).then(
-            (res) => {
-              if (res.success && res.data) {
-                const list: RES_TarifaCarbon[] = Array.isArray(res.data)
-                  ? res.data
-                  : [res.data];
-                const tarifaValida = list.find(
-                  (t) =>
-                    ceniza >= Number(t.inicio_porcentaje_ceniza) &&
-                    ceniza <= Number(t.fin_porcentaje_ceniza),
-                );
-                if (tarifaValida) {
-                  setCargas((p2) => {
-                    const c2 = [...p2];
-                    c2[index] = {
-                      ...c2[index],
-                      id_tarifa_carbon: tarifaValida.id_tarifa_carbon,
-                      precio_unitario: Number(tarifaValida.precio_unitario),
-                    };
-                    return c2;
-                  });
-                }
-              }
-            },
-          );
+        if (tipoId && ceniza > 0) {
+          const tarifaCoincide = tarifaPara(tipoId, ceniza);
+          if (tarifaCoincide) {
+            actual.id_tarifa_carbon = tarifaCoincide.id_tarifa_carbon;
+            actual.precio_unitario = Number(tarifaCoincide.precio_unitario);
+          } else {
+            actual.id_tarifa_carbon = null;
+          }
+        } else {
+          actual.id_tarifa_carbon = null;
         }
       }
 
@@ -476,6 +498,17 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
               <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
                 <Select
                   label="Tipo de carbón"
+                  placeholder={
+                    loadingTipos
+                      ? "Cargando tipos de carbón..."
+                      : "Seleccione tipo de carbón"
+                  }
+                  disabled={loadingTipos}
+                  rightSection={
+                    loadingTipos ? (
+                      <Loader size="xs" color="indigo" />
+                    ) : undefined
+                  }
                   data={tipos.map((t) => ({
                     value: String(t.id_tipo_carbon),
                     label: `${t.nombre} ${t.codigo ? `(${t.codigo})` : ""}`,
@@ -484,7 +517,11 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                     carga.id_tipo_carbon ? String(carga.id_tipo_carbon) : null
                   }
                   onChange={(val) =>
-                    handleChangeCarga(index, "id_tipo_carbon", Number(val))
+                    handleChangeCarga(
+                      index,
+                      "id_tipo_carbon",
+                      val ? Number(val) : 0,
+                    )
                   }
                   classNames={inputClasses}
                   size="xs"
@@ -772,6 +809,67 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                 />
               </SimpleGrid>
 
+              {/* Indicador de Tarifa aplicada según % de ceniza */}
+              {carga.id_tipo_carbon && Number(carga.porcentaje_ceniza) > 0 && (
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {(() => {
+                    const tarifa = tarifaPara(
+                      Number(carga.id_tipo_carbon),
+                      Number(carga.porcentaje_ceniza),
+                    );
+                    if (tarifa) {
+                      return (
+                        <Badge
+                          color="teal"
+                          variant="light"
+                          size="sm"
+                          radius="md"
+                          leftSection={
+                            <IconTag size={12} className="text-teal-400" />
+                          }
+                        >
+                          {`Tarifa aplicada: ${tarifa.inicio_porcentaje_ceniza}% - ${tarifa.fin_porcentaje_ceniza}% ceniza · S/ ${formatNumber(
+                            Number(tarifa.precio_unitario),
+                          )}/TM`}
+                        </Badge>
+                      );
+                    }
+                    return (
+                      <>
+                        <Badge
+                          color="yellow"
+                          variant="light"
+                          size="sm"
+                          radius="md"
+                          leftSection={
+                            <IconAlertTriangle
+                              size={12}
+                              className="text-yellow-400"
+                            />
+                          }
+                        >
+                          {`Sin tarifa para ${formatNumber(Number(carga.porcentaje_ceniza))}% ceniza (precio editable)`}
+                        </Badge>
+                        <Button
+                          variant="subtle"
+                          color="indigo"
+                          size="compact-xs"
+                          radius="lg"
+                          leftSection={<IconCirclePlus size={14} />}
+                          onClick={() => {
+                            setTargetTarifaIdx(index);
+                            setOpenNuevaTarifa(true);
+                          }}
+                          className="font-semibold text-xs h-6"
+                        >
+                          Crear tarifa
+                        </Button>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
               {/* Flete */}
               <div className="mt-2 p-3 bg-zinc-950/40 rounded-xl border border-zinc-800/60 w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                 {/* Pregunta: ocupa 4 columnas de 12 (1/3 aprox) */}
@@ -855,7 +953,7 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                         handleChangeCarga(
                           index,
                           "guia_transportista",
-                          e.currentTarget.value,
+                          e.currentTarget.value.toUpperCase(),
                         )
                       }
                       classNames={inputClasses}
@@ -867,20 +965,15 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
               </div>
 
               {/* Evidencias de la carga */}
-              <FileInput
-                label="Evidencias / Fotos de la carga (balanza, guías, etc.)"
-                placeholder="Seleccionar archivos"
-                multiple
-                value={carga.archivos || []}
-                onChange={(files) =>
-                  handleChangeCarga(index, "archivos", files)
-                }
-                leftSection={<IconUpload size={16} />}
-                classNames={inputClasses}
-                size="xs"
-                radius="lg"
-                mt="sm"
-              />
+              <div className="mt-3">
+                <MultiFilePicker
+                  label="Evidencias / Fotos de la carga (balanza, guías, etc.)"
+                  files={carga.archivos || []}
+                  onFilesChange={(files) =>
+                    handleChangeCarga(index, "archivos", files)
+                  }
+                />
+              </div>
 
               {/* Subtotal de la carga */}
               <Group justify="flex-end" mt="md" gap="xl">
@@ -928,6 +1021,51 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
           Guardar e ingresar cargas ({cargas.length})
         </Button>
       </Group>
+
+      {/* Modal: Nueva tarifa de carbón */}
+      <ModalEstandar
+        opened={openNuevaTarifa}
+        close={() => {
+          setOpenNuevaTarifa(false);
+          setTargetTarifaIdx(null);
+        }}
+        validateClose
+        title="Nueva Tarifa de Carbón"
+        size="md"
+      >
+        <FormTarifaCarbon
+          idTipoCarbonInicial={
+            targetTarifaIdx !== null && cargas[targetTarifaIdx]?.id_tipo_carbon
+              ? Number(cargas[targetTarifaIdx].id_tipo_carbon)
+              : null
+          }
+          cenizaReferenciaInicial={
+            targetTarifaIdx !== null
+              ? Number(cargas[targetTarifaIdx]?.porcentaje_ceniza || 0)
+              : 0
+          }
+          onSuccess={(nueva) => {
+            setTarifas((prev) => [...prev, nueva]);
+            if (targetTarifaIdx !== null) {
+              setCargas((prev) => {
+                const copy = [...prev];
+                copy[targetTarifaIdx] = {
+                  ...copy[targetTarifaIdx],
+                  id_tarifa_carbon: nueva.id_tarifa_carbon,
+                  precio_unitario: Number(nueva.precio_unitario),
+                };
+                return copy;
+              });
+            }
+            setOpenNuevaTarifa(false);
+            setTargetTarifaIdx(null);
+          }}
+          onCancel={() => {
+            setOpenNuevaTarifa(false);
+            setTargetTarifaIdx(null);
+          }}
+        />
+      </ModalEstandar>
     </Stack>
   );
 };

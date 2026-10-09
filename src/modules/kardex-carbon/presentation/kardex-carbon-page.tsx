@@ -15,9 +15,7 @@ import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
   MagnifyingGlassIcon,
-  CalendarDaysIcon,
   BuildingStorefrontIcon,
-  CircleStackIcon,
   TruckIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
@@ -64,7 +62,9 @@ export const KardexCarbonPage = () => {
   const [busqueda, setBusqueda] = useState<string>("");
 
   // Data state
-  const [movimientos, setMovimientos] = useState<MovimientoKardexCarbonItem[]>([]);
+  const [movimientos, setMovimientos] = useState<MovimientoKardexCarbonItem[]>(
+    [],
+  );
   const [almacenes, setAlmacenes] = useState<RES_Almacen[]>([]);
   const [tiposCarbon, setTiposCarbon] = useState<RES_TipoCarbon[]>([]);
   const [loading, setLoading] = useState(false);
@@ -163,6 +163,7 @@ export const KardexCarbonPage = () => {
         accessor: "fecha_hora_movimiento",
         title: "Fecha y Hora",
         width: 140,
+        textAlign: "center",
         render: (r) => (
           <Text size="xs" fw={500} className="text-zinc-300">
             {formatDateTime(r.fecha_hora_movimiento)}
@@ -172,9 +173,10 @@ export const KardexCarbonPage = () => {
       {
         accessor: "almacen_nombre",
         title: "Almacén",
-        width: 150,
+        width: 280,
+        textAlign: "center",
         render: (r) => (
-          <Group gap={6} wrap="nowrap">
+          <Group gap={6} justify="center">
             <BuildingStorefrontIcon className="w-4 h-4 text-zinc-500 shrink-0" />
             <Text size="xs" fw={600} className="text-white truncate">
               {r.almacen_nombre}
@@ -185,17 +187,23 @@ export const KardexCarbonPage = () => {
       {
         accessor: "tipo_carbon_nombre",
         title: "Tipo de Carbón",
-        width: 160,
+        width: 140,
+        textAlign: "center",
         render: (r) => (
-          <Badge variant="light" color="indigo" radius="sm">
-            {r.tipo_carbon_nombre}
-          </Badge>
+          <div className="flex flex-col items-center justify-center gap-1.5">
+            <Text size="xs" fw={800}>
+              {r.tipo_carbon_nombre}
+            </Text>
+            <Badge variant="light" color="cyan" radius="sm">
+              {r.tipo_carbon_codigo}
+            </Badge>
+          </div>
         ),
       },
       {
         accessor: "tipo_movimiento",
         title: "Movimiento",
-        width: 120,
+        width: 150,
         textAlign: "center",
         render: (r) => {
           const esIngreso = r.tipo_movimiento.toLowerCase() === "ingreso";
@@ -218,10 +226,21 @@ export const KardexCarbonPage = () => {
         },
       },
       {
+        accessor: "stock_anterior",
+        title: "Stock Anterior",
+        width: 130,
+        textAlign: "center",
+        render: (r) => (
+          <Text size="xs" className="text-zinc-400">
+            {formatTN(r.stock_anterior)}
+          </Text>
+        ),
+      },
+      {
         accessor: "cantidad_movimiento",
         title: "Cantidad",
-        width: 110,
-        textAlign: "right",
+        width: 130,
+        textAlign: "center",
         render: (r) => {
           const esIngreso = r.tipo_movimiento.toLowerCase() === "ingreso";
           return (
@@ -237,21 +256,10 @@ export const KardexCarbonPage = () => {
         },
       },
       {
-        accessor: "stock_anterior",
-        title: "Stock Ant.",
-        width: 105,
-        textAlign: "right",
-        render: (r) => (
-          <Text size="xs" className="text-zinc-400">
-            {formatTN(r.stock_anterior)}
-          </Text>
-        ),
-      },
-      {
         accessor: "stock_resultante",
         title: "Stock Res.",
-        width: 110,
-        textAlign: "right",
+        width: 130,
+        textAlign: "center",
         render: (r) => (
           <Text size="xs" fw={600} className="text-white">
             {formatTN(r.stock_resultante)}
@@ -262,9 +270,9 @@ export const KardexCarbonPage = () => {
         accessor: "costo_total",
         title: "Costo Total",
         width: 120,
-        textAlign: "right",
+        textAlign: "center",
         render: (r) => (
-          <Text size="xs" fw={600} className="text-zinc-200">
+          <Text size="xs" fw={800} c={"lime"}>
             {formatPEN(r.costo_total)}
           </Text>
         ),
@@ -272,31 +280,37 @@ export const KardexCarbonPage = () => {
       {
         accessor: "referencia",
         title: "Referencia / Carga",
+        textAlign: "center",
+        width: 200,
         render: (r) => {
           if (!r.id_carga_compra_carbon && !r.compra_correlativo) {
-            return <Text size="xs" c="dimmed">—</Text>;
+            return (
+              <Text size="xs" c="dimmed">
+                —
+              </Text>
+            );
           }
           return (
-            <Stack gap={2}>
-              {r.compra_correlativo && (
-                <Text size="xs" fw={600} className="text-indigo-400">
-                  Orden: {r.compra_correlativo}
-                </Text>
-              )}
-              {r.codigo_ticket_balanza && (
-                <Group gap={4} wrap="nowrap">
-                  <TruckIcon className="w-3.5 h-3.5 text-zinc-500" />
-                  <Text size="xs" className="text-zinc-300">
-                    Ticket: {r.codigo_ticket_balanza} {r.placa ? `(${r.placa})` : ""}
+            <div className="flex justify-center items-center">
+              <div className="flex flex-col justify-center items-start gap-1.5">
+                {r.compra_correlativo && (
+                  <Text size="xs" fw={600} c={"blue"}>
+                    OC: {r.compra_correlativo}
                   </Text>
-                </Group>
-              )}
-              {r.proveedor_razon_social && (
-                <Text size="xs" c="dimmed" truncate>
-                  {r.proveedor_razon_social}
-                </Text>
-              )}
-            </Stack>
+                )}
+                {r.proveedor_razon_social && (
+                  <Text size="xs" c="gray" fw={600}>
+                    Prov: {r.proveedor_razon_social}
+                  </Text>
+                )}
+                {r.codigo_ticket_balanza && (
+                  <Text size="xs" fw={600}>
+                    Ticket: {r.codigo_ticket_balanza}{" "}
+                    {r.placa ? `(${r.placa})` : ""}
+                  </Text>
+                )}
+              </div>
+            </div>
           );
         },
       },
@@ -332,160 +346,97 @@ export const KardexCarbonPage = () => {
     [currentYear],
   );
 
+  const estilitos = {
+    input:
+      "bg-zinc-900/50 border-zinc-800 focus:border-zinc-300 text-white placeholder:text-zinc-500",
+    label: "text-zinc-400 text-xs font-semibold mb-1 ml-1",
+    dropdown: "bg-zinc-900 border-zinc-800",
+    option: "text-zinc-300 hover:bg-zinc-800",
+  };
   return (
-    <Stack gap="md" className="p-4 md:p-6">
-      {/* Header */}
-      <Group justify="space-between" align="center" wrap="wrap">
-        <div>
-          <Text size="xl" fw={800} className="text-white tracking-tight">
-            Kardex de Carbón
-          </Text>
-          <Text size="xs" c="dimmed">
-            Registro cronológico de ingresos y salidas físicas de carbón por almacén.
-          </Text>
-        </div>
-        <BotonRecargar onReload={cargarMovimientos} loading={loading} />
-      </Group>
-
-      {/* KPI Cards */}
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="sm">
-        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-xl">
-          <Group justify="space-between" align="center">
-            <div>
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                Total Ingresos
-              </Text>
-              <Text size="lg" fw={800} className="text-teal-400 mt-0.5">
-                {formatTN(stats.ingresosTN)}
-              </Text>
-            </div>
-            <ThemeIcon color="teal" variant="light" size="lg" radius="xl">
-              <ArrowDownTrayIcon className="w-5 h-5" />
-            </ThemeIcon>
-          </Group>
-        </Paper>
-
-        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-xl">
-          <Group justify="space-between" align="center">
-            <div>
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                Total Salidas
-              </Text>
-              <Text size="lg" fw={800} className="text-red-400 mt-0.5">
-                {formatTN(stats.salidasTN)}
-              </Text>
-            </div>
-            <ThemeIcon color="red" variant="light" size="lg" radius="xl">
-              <ArrowUpTrayIcon className="w-5 h-5" />
-            </ThemeIcon>
-          </Group>
-        </Paper>
-
-        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-xl">
-          <Group justify="space-between" align="center">
-            <div>
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                Valor Ingresos
-              </Text>
-              <Text size="lg" fw={800} className="text-indigo-400 mt-0.5">
-                {formatPEN(stats.totalCostoIngresos)}
-              </Text>
-            </div>
-            <ThemeIcon color="indigo" variant="light" size="lg" radius="xl">
-              <CircleStackIcon className="w-5 h-5" />
-            </ThemeIcon>
-          </Group>
-        </Paper>
-
-        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-xl">
-          <Group justify="space-between" align="center">
-            <div>
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                Movimientos
-              </Text>
-              <Text size="lg" fw={800} className="text-white mt-0.5">
-                {stats.totalRegistros}
-              </Text>
-            </div>
-            <ThemeIcon color="gray" variant="light" size="lg" radius="xl">
-              <CalendarDaysIcon className="w-5 h-5" />
-            </ThemeIcon>
-          </Group>
-        </Paper>
-      </SimpleGrid>
-
+    <div className="space-y-6 animate-fade-in text-zinc-100">
       {/* Filtros Bar */}
-      <Paper className="bg-zinc-900/50 border border-zinc-800 p-3.5 rounded-xl">
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 6 }} spacing="xs">
-          <Select
-            label="Almacén"
-            placeholder="Todos los almacenes"
-            data={almacenesOptions}
-            value={idAlmacen}
-            onChange={setIdAlmacen}
-            clearable
-            searchable
-            size="xs"
-            radius="md"
-          />
+      <div className="flex flex-col md:flex-row items-end gap-3 w-full">
+        <Select
+          label="Almacén"
+          placeholder="Todos los almacenes"
+          data={almacenesOptions}
+          value={idAlmacen}
+          onChange={setIdAlmacen}
+          clearable
+          searchable
+          size="xs"
+          radius="md"
+          classNames={estilitos}
+        />
 
-          <Select
-            label="Tipo de carbón"
-            placeholder="Todos los tipos"
-            data={tiposCarbonOptions}
-            value={idTipoCarbon}
-            onChange={setIdTipoCarbon}
-            clearable
-            searchable
-            size="xs"
-            radius="md"
-          />
+        <Select
+          label="Tipo de carbón"
+          placeholder="Todos los tipos"
+          data={tiposCarbonOptions}
+          value={idTipoCarbon}
+          onChange={setIdTipoCarbon}
+          clearable
+          searchable
+          size="xs"
+          radius="md"
+          classNames={estilitos}
+        />
 
-          <Select
-            label="Tipo movimiento"
-            data={[
-              { value: "TODOS", label: "Todos" },
-              { value: "Ingreso", label: "Solo Ingresos" },
-              { value: "Salida", label: "Solo Salidas" },
-            ]}
-            value={tipoMovimiento}
-            onChange={(v) => setTipoMovimiento(v ?? "TODOS")}
-            size="xs"
-            radius="md"
-          />
+        <Select
+          label="Tipo movimiento"
+          data={[
+            { value: "TODOS", label: "Todos" },
+            { value: "Ingreso", label: "Solo Ingresos" },
+            { value: "Salida", label: "Solo Salidas" },
+          ]}
+          value={tipoMovimiento}
+          onChange={(v) => setTipoMovimiento(v ?? "TODOS")}
+          size="xs"
+          radius="md"
+          classNames={estilitos}
+        />
 
-          <Select
-            label="Mes"
-            placeholder="Todo el año"
-            data={MESES.map((m) => ({ value: String(m.value), label: m.label }))}
-            value={mes}
-            onChange={setMes}
-            clearable
-            size="xs"
-            radius="md"
-          />
+        <Select
+          label="Mes"
+          placeholder="Todo el año"
+          data={MESES.map((m) => ({
+            value: String(m.value),
+            label: m.label,
+          }))}
+          value={mes}
+          onChange={setMes}
+          clearable
+          size="xs"
+          radius="md"
+          classNames={estilitos}
+        />
 
-          <Select
-            label="Año"
-            data={aniosOptions}
-            value={anio}
-            onChange={setAnio}
-            clearable
-            size="xs"
-            radius="md"
-          />
+        <Select
+          label="Año"
+          data={aniosOptions}
+          value={anio}
+          onChange={setAnio}
+          clearable
+          size="xs"
+          radius="md"
+          classNames={estilitos}
+        />
 
-          <TextInput
-            label="Buscar referencia"
-            placeholder="Ticket, placa, orden..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.currentTarget.value)}
-            leftSection={<MagnifyingGlassIcon className="w-4 h-4 text-zinc-500" />}
-            size="xs"
-            radius="md"
-          />
-        </SimpleGrid>
-      </Paper>
+        <TextInput
+          label="Buscar referencia"
+          placeholder="Ticket, placa, orden..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.currentTarget.value)}
+          leftSection={
+            <MagnifyingGlassIcon className="w-4 h-4 text-zinc-500" />
+          }
+          size="xs"
+          radius="md"
+          classNames={estilitos}
+        />
+        <BotonRecargar onReload={cargarMovimientos} loading={loading} />
+      </div>
 
       {/* Table */}
       <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
@@ -497,6 +448,6 @@ export const KardexCarbonPage = () => {
           noRecordsText="No se encontraron movimientos de kardex de carbón."
         />
       </Paper>
-    </Stack>
+    </div>
   );
 };

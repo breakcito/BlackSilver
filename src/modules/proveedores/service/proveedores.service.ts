@@ -39,6 +39,7 @@ import type {
 export const ProveedoresService = {
   getProveedores: async (filters?: {
     para_carbon?: boolean;
+    sin_lugares?: boolean;
   }): Promise<ProveedorResponse[]> => {
     const { data } = await api.get("/proveedores", { params: filters });
     return data.data; // Retorna el payload del ApiResponse
