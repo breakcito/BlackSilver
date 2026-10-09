@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { CompraCarbonService } from "../service/compra-carbon.service";
 import { useNotify } from "../../../hooks/useNotify";
-import type { CompraCarbonDetalleResponse } from "../service/compra-carbon.responses";
 
 /**
  * Maneja la anulacion de una compra de carbon.
@@ -12,20 +11,20 @@ export const useAnularCompraCarbon = () => {
 
   const anular = async (
     idCompraCarbon: number,
-  ): Promise<CompraCarbonDetalleResponse | null> => {
+  ): Promise<boolean> => {
     setLoading(true);
     try {
-      const resp = await CompraCarbonService.anular(idCompraCarbon);
+      const resp = await CompraCarbonService.anularCompra(idCompraCarbon);
       if (!resp.success) {
         notifyError(resp.message || "No se pudo anular la compra");
-        return null;
+        return false;
       }
       notifySuccess(resp.message || "Compra anulada correctamente");
-      return resp.data;
+      return true;
     } catch (e) {
       console.error(e);
       notifyError("Error al anular la compra de carbon");
-      return null;
+      return false;
     } finally {
       setLoading(false);
     }

@@ -44,6 +44,8 @@ import AsistenciaPage from "../../modules/asistencia/presentation/asistencia.pag
 import PlanillaPage from "../../modules/planilla/presentation/planilla.page.tsx";
 import SystemPage from "../../modules/system/presentation/system.page.tsx";
 import { CompraCarbonPage } from "../../modules/compra-carbon/presentation/compra-carbon-page.tsx";
+import { KardexCarbonPage } from "../../modules/kardex-carbon/presentation/kardex-carbon-page.tsx";
+import { TamizajeCarbonPage } from "../../modules/tamizaje-carbon/presentation/tamizaje-carbon-page.tsx";
 
 export const App = () => {
   const { setModoAuditoria } = useAuditoriaStore();
@@ -128,8 +130,10 @@ export const App = () => {
         <Route path="/asistencia" element={<AsistenciaPage />} />
         <Route path="/planilla" element={<PlanillaPage />} />
 
-        {/* Compra de Carbon (menu directo, sin submenus) */}
+        {/* Operaciones con Carbón */}
         <Route path="/compra-carbon" element={<CompraCarbonPage />} />
+        <Route path="/kardex-carbon" element={<KardexCarbonPage />} />
+        <Route path="/tamizaje-carbon" element={<TamizajeCarbonPage />} />
 
         {/* System module (oculto, solo URL directa) */}
         <Route path="/system" element={<SystemPage />} />

@@ -8,42 +8,35 @@ import {
   NumberInput,
   Paper,
   Select,
+  Switch,
   Text,
+  Stack,
+  SimpleGrid,
 } from "@mantine/core";
 import {
   IconBuildingStore,
   IconFlame,
   IconScale,
   IconUsers,
+  IconReceiptTax,
+  IconCoin,
 } from "@tabler/icons-react";
 
 import { useNotify } from "../../../hooks/useNotify";
 import { AuxService } from "../../../service/auxiliar.service";
 import type { RES_Empresa } from "../../../service/responses/empresa";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
-import type { RES_TarifaCarbon } from "../../../service/responses/tarifa-carbon";
+import { TipoCarbonService } from "../../tipo-carbon/service/tipo-carbon.service";
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
 import { CompraCarbonService } from "../service/compra-carbon.service";
-import type {
-  CompraCarbonDetalleResponse,
-  CompraCarbonResumen,
-} from "../service/compra-carbon.responses";
+import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { getCoincidencias } from "../../../shared/functions/get-coincidencias";
 
 interface Props {
   onCancel: () => void;
-  /**
-   * @param cabecera Fila para insertar en el listado.
-   * @param detalle Payload completo devuelto por el POST (cabecera + detalles).
-   *   Se pasa entero para que la impresion automatica no tenga que volver a
-   *   consultar la compra recien creada.
-   */
-  onCreated: (
-    cabecera: CompraCarbonResumen,
-    detalle: CompraCarbonDetalleResponse,
-  ) => void;
+  onCreated: (compra: CompraCarbonResumen) => void;
 }
 
 const inputClasses = {
@@ -64,44 +57,45 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
   const [empresas, setEmpresas] = useState<RES_Empresa[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorResponse[]>([]);
   const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
-  const [tarifas, setTarifas] = useState<RES_TarifaCarbon[]>([]);
 
-  // Un estado de carga por request: cada input refleja solo el suyo
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [loadingProveedores, setLoadingProveedores] = useState(true);
-  const [loadingTarifas, setLoadingTarifas] = useState(true);
+  const [loadingTipos, setLoadingTipos] = useState(false);
 
-  // Búsqueda tolerante en proveedores
   const [proveedorBusqueda, setProveedorBusqueda] = useState("");
 
   // Cabecera preliminar
   const [idEmpresa, setIdEmpresa] = useState<string | null>(null);
   const [idProveedor, setIdProveedor] = useState<string | null>(null);
+  const [aplicaIgv, setAplicaIgv] = useState<boolean>(false);
+  const [porcentajeIgv] = useState<number>(18);
 
-  // Detalle preliminar único
+  // Detalle prometido
   const [idTipoCarbon, setIdTipoCarbon] = useState<string | null>(null);
-  const [cantidad, setCantidad] = useState<number | string>(0);
+  const [toneladasPrometidas, setToneladasPrometidas] = useState<
+    number | string
+  >(0);
+  const [precioUnitario, setPrecioUnitario] = useState<number | string>(0);
+  const [idTarifaAuto, setIdTarifaAuto] = useState<number | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [loadingTipos, setLoadingTipos] = useState(false);
-
-  // Carga inicial de empresas, proveedores y tarifas
-  // Cada catálogo se pide por separado: si uno falla o tarda, no bloquea a los demás
+  // Cargar empresas y proveedores iniciales
   useEffect(() => {
     let cancel = false;
     setLoadingEmpresas(true);
+    setLoadingProveedores(true);
+
     (async () => {
       try {
         const empRes = await AuxService.get_empresas();
         if (cancel) return;
-
         if (empRes.success && empRes.data) {
           setEmpresas(empRes.data);
-          // Auto-seleccionar Cupper por defecto si existe, o la primera empresa
+          // Auto-elegir Cupper por defecto
           const cupper = empRes.data.find((e) =>
-            e.razon_social.toLowerCase().includes("cupper"),
+            /cupper/i.test(e.razon_social || ""),
           );
           if (cupper) {
             setIdEmpresa(String(cupper.id_empresa));
@@ -109,33 +103,24 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             setIdEmpresa(String(empRes.data[0].id_empresa));
           }
         }
-      } catch (e) {
-        console.error(e);
-        if (!cancel) notifyError("Error al cargar las empresas");
+      } catch (err: unknown) {
+        console.error(err);
       } finally {
         if (!cancel) setLoadingEmpresas(false);
       }
     })();
 
-    return () => {
-      cancel = true;
-    };
-  }, [notifyError]);
-
-  // Proveedores de carbón
-  useEffect(() => {
-    let cancel = false;
-    setLoadingProveedores(true);
     (async () => {
       try {
-        const provArr = await ProveedoresService.getProveedores({
+        const provRes = await ProveedoresService.getProveedores({
           para_carbon: true,
         });
         if (cancel) return;
-        if (Array.isArray(provArr)) setProveedores(provArr);
-      } catch (e) {
-        console.error(e);
-        if (!cancel) notifyError("Error al cargar los proveedores de carbón");
+        if (provRes) {
+          setProveedores(provRes);
+        }
+      } catch (err: unknown) {
+        console.error(err);
       } finally {
         if (!cancel) setLoadingProveedores(false);
       }
@@ -144,64 +129,32 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     return () => {
       cancel = true;
     };
-  }, [notifyError]);
+  }, []);
 
-  // Tarifas de carbón (alimentan el precio unitario estimado)
+  // Al cambiar de proveedor, cargar los tipos de carbón que ofrece
   useEffect(() => {
-    let cancel = false;
-    setLoadingTarifas(true);
-    (async () => {
-      try {
-        const tarifasRes = await AuxService.get_tarifas_carbon();
-        if (cancel) return;
-        if (tarifasRes.success && tarifasRes.data) {
-          setTarifas(
-            Array.isArray(tarifasRes.data)
-              ? tarifasRes.data
-              : [tarifasRes.data],
-          );
-        }
-      } catch (e) {
-        console.error(e);
-        if (!cancel) notifyError("Error al cargar las tarifas de carbón");
-      } finally {
-        if (!cancel) setLoadingTarifas(false);
-      }
-    })();
-
-    return () => {
-      cancel = true;
-    };
-  }, [notifyError]);
-
-  // Cargar tipos de carbón específicos del proveedor seleccionado
-  useEffect(() => {
-    let cancel = false;
-    setIdTipoCarbon(null);
-
     if (!idProveedor) {
       setTipos([]);
+      setIdTipoCarbon(null);
       return;
     }
 
+    let cancel = false;
+    setLoadingTipos(true);
     (async () => {
-      setLoadingTipos(true);
       try {
-        const res = await CompraCarbonService.getTiposPorProveedor(
-          Number(idProveedor),
-        );
+        const tiposRes = await TipoCarbonService.getTipos({
+          id_proveedor: Number(idProveedor),
+        });
         if (cancel) return;
-        if (res.success && res.data) {
-          setTipos(res.data);
-        } else {
-          setTipos([]);
+        if (tiposRes.success && tiposRes.data) {
+          setTipos(tiposRes.data);
+          if (tiposRes.data.length === 1) {
+            setIdTipoCarbon(String(tiposRes.data[0].id_tipo_carbon));
+          }
         }
-      } catch (e) {
-        if (!cancel) {
-          console.error(e);
-          notifyError("Error al cargar los tipos de carbón del proveedor");
-          setTipos([]);
-        }
+      } catch (err: unknown) {
+        console.error(err);
       } finally {
         if (!cancel) setLoadingTipos(false);
       }
@@ -210,9 +163,52 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     return () => {
       cancel = true;
     };
-  }, [idProveedor, notifyError]);
+  }, [idProveedor]);
 
-  // Proveedores visibles con búsqueda tolerante (getCoincidencias)
+  // Al seleccionar tipo de carbón, autocompletar con la tarifa más alta
+  useEffect(() => {
+    if (!idTipoCarbon) {
+      setPrecioUnitario(0);
+      setIdTarifaAuto(null);
+      return;
+    }
+
+    let cancel = false;
+    (async () => {
+      try {
+        const tarifasRes = await AuxService.get_tarifas_carbon({
+          id_tipo_carbon: Number(idTipoCarbon),
+        });
+        if (cancel) return;
+        if (tarifasRes.success && tarifasRes.data) {
+          const list = Array.isArray(tarifasRes.data)
+            ? tarifasRes.data
+            : [tarifasRes.data];
+          if (list.length > 0) {
+            // Obtener la de mayor precio
+            const ordenada = [...list].sort(
+              (a, b) => Number(b.precio_unitario) - Number(a.precio_unitario),
+            );
+            const mayor = ordenada[0];
+            setIdTarifaAuto(mayor.id_tarifa_carbon);
+            setPrecioUnitario(Number(mayor.precio_unitario));
+          } else {
+            setIdTarifaAuto(null);
+          }
+        } else {
+          setIdTarifaAuto(null);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+
+    return () => {
+      cancel = true;
+    };
+  }, [idTipoCarbon]);
+
+  // Proveedores filtrados con búsqueda tolerante
   const proveedoresVisibles = useMemo(() => {
     const q = proveedorBusqueda.trim();
     if (!q) return proveedores;
@@ -222,290 +218,271 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     }).map((r) => r.item);
   }, [proveedores, proveedorBusqueda]);
 
-  // Tarifa mayor para el tipo de carbón seleccionado
-  const tarifaMayor = useMemo(() => {
-    if (!idTipoCarbon) return null;
-    const idTipoNum = Number(idTipoCarbon);
-    const tarifasDelTipo = tarifas.filter(
-      (t) =>
-        t.id_tipo_carbon === idTipoNum && (t.estado ?? "Activo") === "Activo",
-    );
-    if (tarifasDelTipo.length === 0) return null;
-    return tarifasDelTipo.reduce((max, cur) =>
-      Number(cur.precio_unitario) > Number(max.precio_unitario) ? cur : max,
-    );
-  }, [idTipoCarbon, tarifas]);
+  // Cálculos de cotización
+  const totalCotizado = useMemo(() => {
+    const cant = Number(toneladasPrometidas) || 0;
+    const pu = Number(precioUnitario) || 0;
+    return Math.round(cant * pu * 100) / 100;
+  }, [toneladasPrometidas, precioUnitario]);
 
-  const precioUnitarioEstimado = Number(tarifaMayor?.precio_unitario ?? 0);
-  const cantidadNum = Number(cantidad) || 0;
-  const subtotalEstimado =
-    Math.round(cantidadNum * precioUnitarioEstimado * 100) / 100;
+  const montoIgvCotizado = useMemo(() => {
+    if (!aplicaIgv) return 0;
+    return Math.round(totalCotizado * (porcentajeIgv / 100) * 100) / 100;
+  }, [aplicaIgv, totalCotizado, porcentajeIgv]);
 
   const handleSubmit = async () => {
     setError(null);
-
     if (!idEmpresa) {
-      setError("Debe seleccionar una empresa");
+      setError("Debe seleccionar la empresa compradora");
       return;
     }
     if (!idProveedor) {
-      setError("Debe seleccionar un proveedor de carbón");
+      setError("Debe seleccionar el proveedor");
       return;
     }
     if (!idTipoCarbon) {
-      setError("Debe seleccionar el tipo de carbón a comprar");
+      setError("Debe seleccionar el tipo de carbón prometido");
       return;
     }
-    if (cantidadNum <= 0) {
-      setError("La cantidad en toneladas debe ser mayor a 0");
+    const tn = Number(toneladasPrometidas);
+    if (isNaN(tn) || tn <= 0) {
+      setError("Debe indicar una cantidad válida de toneladas (> 0)");
       return;
     }
 
     setSaving(true);
     try {
-      const resp = await CompraCarbonService.crearPreliminar({
+      const res = await CompraCarbonService.crearCompra({
         id_empresa: Number(idEmpresa),
         id_proveedor: Number(idProveedor),
-        detalles: [
-          {
-            id_tipo_carbon: Number(idTipoCarbon),
-            cantidad: cantidadNum,
-            precio_unitario: precioUnitarioEstimado,
-          },
-        ],
+        id_tipo_carbon_prometido: Number(idTipoCarbon),
+        toneladas_prometidas: tn,
+        aplica_igv: aplicaIgv,
+        porcentaje_igv: aplicaIgv ? porcentajeIgv : 0,
+        precio_unitario_cotizado: Number(precioUnitario) || 0,
+        id_tarifa_carbon: idTarifaAuto,
       });
 
-      if (!resp.success || !resp.data) {
-        setError(resp.message || "Error al registrar la compra preliminar");
-        return;
+      if (res.success && res.data) {
+        notifySuccess("Orden de compra preliminar creada correctamente");
+        onCreated(res.data);
+      } else {
+        setError(res.message || "Error al crear la orden de compra");
+        notifyError(res.message || "Error al crear la orden");
       }
-
-      notifySuccess(
-        `Compra preliminar ${resp.data.cabecera.correlativo} registrada exitosamente`,
-      );
-      onCreated(
-        {
-          ...resp.data.cabecera,
-          cantidad_items: resp.data.detalles.length || 1,
-        },
-        resp.data,
-      );
-    } catch (e) {
-      console.error(e);
-      setError("Ocurrió un error inesperado al registrar la compra preliminar");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error inesperado";
+      setError(msg);
+      notifyError(msg);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <Stack gap="md">
       {error && (
-        <Alert color="red" radius="lg" variant="light">
-          <Text size="xs">{error}</Text>
+        <Alert color="red" variant="light" title="Atención" radius="md">
+          {error}
         </Alert>
       )}
 
-      {/* Cabecera */}
+      {/* Datos de Cabecera */}
       <Paper
         p="md"
         radius="lg"
-        className="bg-zinc-900/40 border border-zinc-800"
+        className="bg-zinc-900/60 border border-zinc-800"
       >
-        {/* <Text
-          size="xs"
-          fw={700}
-          c="dimmed"
-          className="uppercase tracking-wider mb-3"
-        >
-          1. Datos de Cabecera
-        </Text> */}
-        <Group gap="md" grow>
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
+          Datos de la Compra
+        </Text>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
           <Select
             label="Empresa compradora"
-            placeholder={
-              loadingEmpresas ? "Cargando empresas..." : "Seleccione la empresa"
-            }
-            leftSection={
-              <IconBuildingStore className="w-4 h-4 text-zinc-400" />
-            }
+            placeholder="Seleccione empresa"
             data={empresas.map((e) => ({
               value: String(e.id_empresa),
               label: e.razon_social,
             }))}
             value={idEmpresa}
             onChange={setIdEmpresa}
-            size="xs"
-            radius="lg"
+            leftSection={<IconBuildingStore size={16} />}
+            rightSection={
+              loadingEmpresas ? <Loader size={14} color="indigo" /> : null
+            }
+            disabled={loadingEmpresas || saving}
             classNames={inputClasses}
             searchable
-            disabled={loadingEmpresas || saving}
-            rightSection={
-              loadingEmpresas ? <Loader size="xs" color="indigo" /> : undefined
-            }
-            required
+            nothingFoundMessage="Sin empresas registradas"
+            size="xs"
+            radius="lg"
           />
 
           <Select
-            label="Proveedor de Carbón"
-            placeholder={
-              loadingProveedores
-                ? "Cargando proveedores..."
-                : "Buscar por razón social o documento..."
-            }
-            leftSection={<IconUsers className="w-4 h-4 text-zinc-400" />}
+            label="Proveedor"
+            placeholder="Buscar por RUC o Razón Social"
             data={proveedoresVisibles.map((p) => ({
               value: String(p.id_proveedor),
-              label: `${p.razon_social} (${p.tipo_entidad === "Natural" ? `DNI ${p.dni}` : `RUC ${p.ruc}`})`,
+              label: `${p.razon_social} (${p.ruc || p.dni || "S/D"})`,
             }))}
             value={idProveedor}
             onChange={setIdProveedor}
             searchValue={proveedorBusqueda}
             onSearchChange={setProveedorBusqueda}
-            size="xs"
-            radius="lg"
-            clearable
+            leftSection={<IconUsers size={16} />}
+            rightSection={
+              loadingProveedores ? <Loader size={14} color="indigo" /> : null
+            }
+            disabled={loadingProveedores || saving}
             classNames={inputClasses}
             searchable
-            nothingFoundMessage="No se encontraron proveedores"
-            disabled={loadingProveedores || saving}
-            rightSection={
-              loadingProveedores ? (
-                <Loader size="xs" color="indigo" />
-              ) : undefined
-            }
-            required
+            nothingFoundMessage="Sin coincidencias"
+            size="xs"
+            radius="lg"
           />
+        </SimpleGrid>
+
+        <Group
+          justify="space-between"
+          mt="md"
+          align="center"
+          className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800/80"
+        >
+          <div>
+            <Text size="xs" fw={600} c="white">
+              ¿Esta compra aplica IGV esta?
+            </Text>
+            <Text size="xs" c="gray">
+              Determina si se requerirán comprobantes/facturas o pagos directos
+              al proveedor
+            </Text>
+          </div>
+          <Group gap="sm">
+            <Badge
+              color={aplicaIgv ? "indigo" : "gray"}
+              variant="light"
+              size="sm"
+            >
+              {aplicaIgv ? `IGV (${porcentajeIgv}%)` : "Sin IGV"}
+            </Badge>
+            <Switch
+              checked={aplicaIgv}
+              onChange={(e) => setAplicaIgv(e.currentTarget.checked)}
+              color="indigo"
+              size="sm"
+            />
+          </Group>
         </Group>
       </Paper>
 
-      {/* Detalle único */}
+      {/* Tipo de carbón y cotización */}
       <Paper
         p="md"
         radius="lg"
-        className="bg-zinc-900/40 border border-zinc-800"
+        className="bg-zinc-900/60 border border-zinc-800"
       >
-        {/* <Text
-          size="xs"
-          fw={700}
-          c="dimmed"
-          className="uppercase tracking-wider mb-3"
-        >
-          2. Detalle de la Carga a Comprar
-        </Text> */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
+          Carga a cotizar
+        </Text>
+        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
           <Select
             label="Tipo de carbón"
             placeholder={
-              !idProveedor
-                ? "Primero elija un proveedor..."
-                : loadingTipos
-                  ? "Cargando tipos del proveedor..."
-                  : tipos.length === 0
-                    ? "Este proveedor no tiene tipos de carbón asignados"
-                    : "Seleccionar tipo de carbón"
+              idProveedor
+                ? "Seleccione tipo ofrecido"
+                : "Elija primero el proveedor"
             }
-            leftSection={<IconFlame className="w-4 h-4 text-amber-500" />}
             data={tipos.map((t) => ({
               value: String(t.id_tipo_carbon),
-              label: `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`,
+              label: `${t.nombre} ${t.codigo ? `(${t.codigo})` : ""}`,
             }))}
             value={idTipoCarbon}
             onChange={setIdTipoCarbon}
-            size="xs"
-            radius="lg"
+            leftSection={<IconFlame size={16} />}
+            rightSection={
+              loadingTipos ? <Loader size={14} color="indigo" /> : null
+            }
+            disabled={!idProveedor || loadingTipos || saving}
             classNames={inputClasses}
             searchable
-            disabled={!idProveedor || loadingTipos || saving}
-            nothingFoundMessage="No hay tipos de carbón para este proveedor"
-            rightSection={
-              loadingTipos ? <Loader size="xs" color="orange" /> : undefined
-            }
-            required
+            clearable
+            nothingFoundMessage="El proveedor no tiene tipos de carbón asignados"
+            size="xs"
+            radius="lg"
           />
 
           <NumberInput
-            label="Cantidad estimada (TM)"
-            placeholder="0.00"
-            leftSection={<IconScale className="w-4 h-4 text-zinc-400" />}
-            value={cantidad}
-            onChange={setCantidad}
-            step={0.1}
-            fixedDecimalScale
-            size="xs"
-            radius="lg"
+            label="Toneladas (TM)"
+            placeholder="Ej. 100"
+            value={toneladasPrometidas}
+            onChange={setToneladasPrometidas}
+            step={1}
+            leftSection={<IconScale size={16} />}
             classNames={inputClasses}
             disabled={saving}
-            required
+            size="xs"
+            radius="lg"
           />
-        </div>
 
-        {/* Resumen de Tarifa Aplicada */}
-        <div className="mt-4 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-3">
-          <div>
-            <Group gap="xs">
-              <Badge variant="light" color="yellow" size="sm">
-                Tarifa Mayor Aplicada
-              </Badge>
-              {loadingTarifas ? (
-                <Text size="xs" c="gray.5">
-                  Cargando tarifas...
-                </Text>
-              ) : tarifaMayor ? (
-                <Text size="xs" c="zinc.3">
-                  Ceniza: {tarifaMayor.inicio_porcentaje_ceniza}% -{" "}
-                  {tarifaMayor.fin_porcentaje_ceniza}%
-                </Text>
-              ) : (
-                <Text size="xs" c="gray.5">
-                  {idTipoCarbon
-                    ? "Sin tarifa registrada (S/ 0.00)"
-                    : "Seleccione un tipo de carbón"}
-                </Text>
-              )}
-            </Group>
-            <Text size="xs" c="zinc.4" mt={2}>
-              Precio por TM:{" "}
-              <span className="font-mono font-bold text-white">
-                {loadingTarifas ? "S/ --" : formatPEN(precioUnitarioEstimado)}
-              </span>
-            </Text>
-          </div>
+          <NumberInput
+            label="Precio x TN (S/)"
+            placeholder="0.00"
+            value={precioUnitario}
+            onChange={setPrecioUnitario}
+            fixedDecimalScale
+            leftSection={<IconCoin size={16} />}
+            classNames={inputClasses}
+            disabled={saving}
+            size="xs"
+            radius="lg"
+          />
 
-          <div className="text-right">
-            <Text size="11px" c="gray.5" className="uppercase tracking-wider">
-              Total Estimado Preliminar
-            </Text>
-            <Text size="lg" fw={900} c="emerald.4" className="font-mono">
-              {formatPEN(subtotalEstimado)}
-            </Text>
-          </div>
-        </div>
+          {/* Resumen de totales */}
+          <Group justify="space-between">
+            <div className="text-left">
+              <Text size="xs" c="gray">
+                Total cotizado
+              </Text>
+              <Text size="md" fw={800} c="teal">
+                {formatPEN(totalCotizado)}
+              </Text>
+            </div>
+            {aplicaIgv && (
+              <div className="text-right">
+                <Text size="xs" c="gray">
+                  IGV (18% ref.)
+                </Text>
+                <Text size="md" fw={800} c="gray.3">
+                  {formatPEN(montoIgvCotizado)}
+                </Text>
+              </div>
+            )}
+          </Group>
+        </SimpleGrid>
       </Paper>
 
       {/* Botones de acción */}
-      <Group justify="flex-end" gap="sm" pt="xs">
+      <Group justify="flex-end" gap="sm" mt="xs">
         <Button
-          variant="subtle"
-          color="gray"
-          size="xs"
-          radius="lg"
+          variant="default"
           onClick={onCancel}
           disabled={saving}
+          size="xs"
+          radius="lg"
         >
           Cancelar
         </Button>
         <Button
-          variant="filled"
           color="indigo"
-          size="xs"
-          radius="lg"
           onClick={handleSubmit}
           loading={saving}
+          size="xs"
+          radius="lg"
+          leftSection={<IconReceiptTax size={16} />}
         >
-          Guardar Compra Preliminar
+          Guardar orden preliminar
         </Button>
       </Group>
-    </div>
+    </Stack>
   );
 };

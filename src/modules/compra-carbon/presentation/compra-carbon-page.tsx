@@ -9,7 +9,7 @@ import type { RES_Empresa } from "../../../service/responses/empresa";
 import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import { RegistroCompraCarbon } from "./registro-compra-carbon";
-import type { CompraCarbonDetalleResponse } from "../service/compra-carbon.responses";
+import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { CompraCarbonFilter } from "./components/compra-carbon-filter";
 import { CompraCarbonListado } from "./components/compra-carbon-listado";
@@ -44,7 +44,7 @@ export const CompraCarbonPage = () => {
    * Se guarda el payload completo que devuelve el POST (cabecera + detalles)
    * para que el listado genere el documento sin volver a consultar la compra.
    */
-  const [autoPrint, setAutoPrint] = useState<CompraCarbonDetalleResponse | null>(
+  const [autoPrint, setAutoPrint] = useState<CompraCarbonResumen | null>(
     null,
   );
 
@@ -112,11 +112,11 @@ export const CompraCarbonPage = () => {
           empresasById={empresasById}
           proveedoresById={proveedoresById}
           onAprobada={updateCompraLocal}
-          onEvidenciasActualizadas={updateCompraLocal}
           onAnulada={updateCompraLocal}
-          onReimprimir={(detalle) => setAutoPrint(detalle)}
+          onReimprimir={(compra) => setAutoPrint(compra)}
           autoPrint={autoPrint}
           onAutoPrintConsumido={() => setAutoPrint(null)}
+          onRefresh={recargar}
         />
       )}
 
@@ -137,12 +137,10 @@ export const CompraCarbonPage = () => {
       >
         <RegistroCompraCarbon
           onCancel={() => setOpenRegistro(false)}
-          onCreated={(cabecera, detalle) => {
-            insertCompra(cabecera);
+          onCreated={(nuevaCompra) => {
+            insertCompra(nuevaCompra);
             setOpenRegistro(false);
-            // Dispara auto-impresion del PDF en el siguiente render del listado,
-            // usando los datos que ya devolvio el POST.
-            setAutoPrint(detalle);
+            setAutoPrint(nuevaCompra);
           }}
         />
       </ModalEstandar>
