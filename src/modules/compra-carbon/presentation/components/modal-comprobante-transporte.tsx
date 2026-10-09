@@ -8,7 +8,6 @@ import {
   Select,
   SimpleGrid,
   Stack,
-  Switch,
   Text,
   TextInput,
 } from "@mantine/core";
@@ -136,7 +135,9 @@ export const ModalComprobanteTransporte = ({
       return;
     }
     if (cargasSeleccionadas.length === 0) {
-      notifyError("Seleccione al menos una carga para este comprobante de flete");
+      notifyError(
+        "Seleccione al menos una carga para este comprobante de flete",
+      );
       return;
     }
 
@@ -163,7 +164,9 @@ export const ModalComprobanteTransporte = ({
         onSuccess(res.data);
         onClose();
       } else {
-        notifyError(res?.message || "Error al registrar comprobante de transporte");
+        notifyError(
+          res?.message || "Error al registrar comprobante de transporte",
+        );
       }
     } catch (err: unknown) {
       notifyError(
@@ -180,27 +183,27 @@ export const ModalComprobanteTransporte = ({
     <ModalEstandar
       opened={opened}
       close={onClose}
-      title="Registrar Factura de Flete de Transporte"
+      title="Registrar Factura de Transporte"
       size="lg"
       validateClose
     >
       <Stack gap="md">
         {/* Selector de Transportista */}
-        <Select
-          label="Empresa de Transporte"
-          placeholder="Seleccione transportista"
-          data={listaTransportistas}
-          value={idTransportista}
-          onChange={setIdTransportista}
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
-          searchable
-          required
-        />
 
         {/* Factura y Fecha */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <Select
+            label="Empresa de Transporte"
+            placeholder="Seleccione transportista"
+            data={listaTransportistas}
+            value={idTransportista}
+            onChange={setIdTransportista}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            searchable
+            required
+          />
           <TextInput
             label="Número de factura"
             placeholder="Ej. F001-9988"
@@ -224,56 +227,55 @@ export const ModalComprobanteTransporte = ({
             radius="lg"
             required
           />
-        </SimpleGrid>
-
-        {/* Detracción Transporte */}
-        <Group
-          justify="space-between"
-          p="sm"
-          className="bg-zinc-900/60 rounded-xl border border-zinc-800"
-        >
-          <div>
-            <Text size="xs" fw={600} c="white">
-              ¿Aplica detracción transporte?
-            </Text>
-            <Text size="xs" c="dimmed">
-              Retención oficial al Banco de la Nación (habitual 4%)
-            </Text>
-          </div>
-          <Group gap="xs">
-            {conDetraccion && (
-              <NumberInput
-                value={pctDetraccion}
-                onChange={setPctDetraccion}
-                min={1}
-                max={30}
+          {/* Detracción Transporte */}
+          <NumberInput
+            label={
+              <Checkbox
+                checked={conDetraccion}
+                onChange={(e) => setConDetraccion(e.currentTarget.checked)}
+                label="¿Aplicar detracción?"
                 size="xs"
-                radius="lg"
-                rightSection={<Text size="xs" mr={8}>%</Text>}
-                hideControls
-                w={90}
+                color="indigo"
+                styles={{
+                  label: {
+                    fontWeight: 600,
+                    color: "white",
+                    paddingLeft: 8,
+                    cursor: "pointer",
+                  },
+                  input: { cursor: "pointer" },
+                }}
               />
-            )}
-            <Switch
-              checked={conDetraccion}
-              onChange={(e) => setConDetraccion(e.currentTarget.checked)}
-              color="indigo"
-              size="sm"
-            />
-          </Group>
-        </Group>
+            }
+            value={conDetraccion ? pctDetraccion : ""}
+            onChange={setPctDetraccion}
+            placeholder="0"
+            disabled={!conDetraccion}
+            rightSection={
+              <Text size="xs" c="dimmed" mr={8}>
+                %
+              </Text>
+            }
+            hideControls
+            classNames={inputClasses}
+          />
+        </SimpleGrid>
 
         {/* Cargas cubiertas por este flete */}
         <div>
           <Text size="xs" fw={700} c="white" mb={4}>
-            Cargas con flete pendiente para este transportista ({cargasSeleccionadas.length}/
+            Cargas con este transportista ({cargasSeleccionadas.length}/
             {cargasDelTransportista.length}):
           </Text>
 
           {cargasDelTransportista.length === 0 ? (
-            <Paper p="sm" className="bg-zinc-950/60 border border-zinc-800 text-center">
+            <Paper
+              p="sm"
+              className="bg-zinc-950/60 border border-zinc-800 text-center"
+            >
               <Text size="xs" c="dimmed">
-                No hay cargas con flete pendiente asociadas al transportista seleccionado.
+                No hay cargas con flete pendiente asociadas al transportista
+                seleccionado.
               </Text>
             </Paper>
           ) : (

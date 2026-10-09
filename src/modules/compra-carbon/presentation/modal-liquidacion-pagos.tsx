@@ -322,7 +322,7 @@ export const ModalLiquidacionPagos = ({
         opened
         close={handleCerrarModal}
         title="Liquidación y Pagos"
-        size="90rem"
+        size="75rem"  
         validateClose
       >
         <Paper p="xl" className="bg-zinc-950 text-center">
@@ -337,7 +337,6 @@ export const ModalLiquidacionPagos = ({
   const rightSection = (
     <Group gap="md" align="center">
       <Text size="xs" c="gray">
-        Proveedor:{" "}
         <span className="text-zinc-200 font-semibold">
           {cabecera.proveedor}
         </span>{" "}
@@ -376,14 +375,14 @@ export const ModalLiquidacionPagos = ({
       <ModalEstandar
         opened
         close={handleCerrarModal}
-        title={`Liquidación y Pagos — ${cabecera.correlativo}`}
-        size="90rem"
+        title={`Liquidación — ${cabecera.correlativo}`}
+        size="80rem"
         validateClose
         rightSection={rightSection}
       >
-        <Stack gap="md">
+        <Stack gap="md" className="w-full">
           {/* Tabs de Gestión: Carbón y Transporte */}
-          <Tabs defaultValue="proveedor" color="indigo">
+          <Tabs defaultValue="proveedor" color="indigo" className="w-full">
             <Tabs.List className="border-b border-zinc-800">
               <Tabs.Tab
                 value="proveedor"
@@ -969,7 +968,7 @@ export const ModalLiquidacionPagos = ({
                 <Group justify="space-between" align="center">
                   <div>
                     <Text size="sm" fw={700} c="white">
-                      Facturas de Transporte / Flete
+                      Facturas de Transporte
                     </Text>
                     <Text size="xs" c="gray">
                       {cargasSinComprobanteFlete.length} carga(s) con flete
@@ -1132,13 +1131,13 @@ export const ModalLiquidacionPagos = ({
                                 </Badge>
                               </Group>
                             </Group>
-                            <div className="space-y-1.5">
+                            <div className="grid grid-cols-2 gap-2">
                               {cargasDelFlete.map((c) => (
                                 <Group
                                   key={c.id_carga_compra_carbon}
                                   justify="space-between"
                                   p="xs"
-                                  className="bg-zinc-900/50 rounded-md border border-zinc-800/50"
+                                  className="bg-zinc-800 rounded-md border border-zinc-700"
                                 >
                                   <Group gap="xs">
                                     <Badge

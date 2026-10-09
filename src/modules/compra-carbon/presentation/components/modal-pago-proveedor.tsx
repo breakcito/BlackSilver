@@ -598,7 +598,7 @@ export const ModalPagoProveedor = ({
                 <Group gap="xs">
                   <IconCoins size={16} className="text-yellow-400" />
                   <Text size="xs" fw={700} c="white">
-                    Anticipos del proveedor aplicables a este pago:
+                    Anticipos:
                   </Text>
                 </Group>
                 <Group gap="xs">
@@ -610,7 +610,7 @@ export const ModalPagoProveedor = ({
                     leftSection={<IconPlus size={12} />}
                     onClick={() => setModalNuevoAnticipo(true)}
                   >
-                    + Registrar Anticipo
+                    Registrar Anticipo
                   </Button>
                   <Tooltip label="Refrescar anticipos">
                     <Button
@@ -660,16 +660,6 @@ export const ModalPagoProveedor = ({
                         descontar.
                       </Text>
                     </Group>
-                    <Button
-                      variant="light"
-                      color="yellow"
-                      size="compact-xs"
-                      radius="md"
-                      leftSection={<IconPlus size={12} />}
-                      onClick={() => setModalNuevoAnticipo(true)}
-                    >
-                      Registrar Anticipo
-                    </Button>
                   </Group>
                 </Paper>
               ) : (
@@ -678,7 +668,7 @@ export const ModalPagoProveedor = ({
                   radius="md"
                   className="bg-zinc-950/60 border border-zinc-800 max-h-40 overflow-y-auto"
                 >
-                  <Stack gap={6}>
+                  <SimpleGrid cols={{ base: 2 }} spacing="xs">
                     {anticipos.map((a) => {
                       const saldoDisp = Number(a.saldo_actual);
                       const usado = anticiposSeleccionados[a.id_anticipo] || 0;
@@ -687,13 +677,14 @@ export const ModalPagoProveedor = ({
                           key={a.id_anticipo}
                           justify="space-between"
                           align="center"
+                          wrap="nowrap"
                           className="p-1.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80"
                         >
-                          <div>
-                            <Text size="xs" fw={700} c="white">
-                              Anticipo #{a.id_anticipo}
+                          <div className="min-w-0">
+                            <Text size="xs" fw={700} c="white" truncate>
+                              {a.codigo_comprobante}
                             </Text>
-                            <Text size="xs" c="dimmed">
+                            <Text size="xs" c="gray" truncate>
                               Disponible:{" "}
                               <span className="text-emerald-400 font-bold">
                                 S/ {formatNumber(saldoDisp)}
@@ -701,12 +692,12 @@ export const ModalPagoProveedor = ({
                             </Text>
                           </div>
                           <NumberInput
-                            placeholder="Monto a usar"
+                            placeholder="Monto"
                             max={saldoDisp}
                             min={0}
                             size="xs"
                             radius="lg"
-                            w={120}
+                            w={90}
                             value={usado || ""}
                             onChange={(val) =>
                               handleSetMontoAnticipoDirecto(
@@ -718,7 +709,7 @@ export const ModalPagoProveedor = ({
                         </Group>
                       );
                     })}
-                  </Stack>
+                  </SimpleGrid>
                 </Paper>
               )}
             </div>

@@ -225,13 +225,44 @@ export const ModalPagoTransporte = ({
     <ModalEstandar
       opened={opened}
       close={onClose}
-      title={`Registrar Pago de Flete: ${comprobante.codigo_comprobante}`}
-      size="md"
+      title={`Registrar Pago: ${comprobante.codigo_comprobante}`}
+      size="lg"
       validateClose
+      rightSection={
+        comprobante.con_detraccion && (
+          <Group justify="space-between" p="sm">
+            <div>
+              <Text size="xs" fw={600} c="white">
+                Pagar detracción
+              </Text>
+              <Text size="xs" c="gray">
+                Pendiente: S/{" "}
+                {formatNumber(
+                  Math.max(
+                    0,
+                    Number(comprobante.monto_detraccion) -
+                      Number(comprobante.avance_pago_detraccion),
+                  ),
+                )}
+              </Text>
+            </div>
+            <Switch
+              checked={esParaDetraccion}
+              onChange={(e) => setEsParaDetraccion(e.currentTarget.checked)}
+              color="orange"
+              size="sm"
+            />
+          </Group>
+        )
+      }
     >
       <Stack gap="md">
         {/* Información del Comprobante */}
-        <Paper p="xs" radius="md" className="bg-zinc-900/60 border border-zinc-800">
+        <Paper
+          p="xs"
+          radius="md"
+          className="bg-zinc-900/60 border border-zinc-800"
+        >
           <Group justify="space-between">
             <div>
               <Text size="xs" c="dimmed">
@@ -256,7 +287,7 @@ export const ModalPagoTransporte = ({
 
         {/* Cuenta de Origen Empresa */}
         <Select
-          label="Cuenta bancaria de la empresa (origen)"
+          label="Cuenta bancaria de la empresa"
           placeholder="Seleccione cuenta de Cupper en soles"
           data={cuentasEmpresa.map((c) => ({
             value: String(c.id),
@@ -270,7 +301,6 @@ export const ModalPagoTransporte = ({
           searchable
           required
         />
-
         {/* Medio de Pago y N° Operación */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
           <Select
@@ -286,9 +316,7 @@ export const ModalPagoTransporte = ({
 
           <TextInput
             label="N° Operación"
-            placeholder={
-              medioPago === "Efectivo" ? "Opcional" : "Obligatorio"
-            }
+            placeholder={medioPago === "Efectivo" ? "Opcional" : "Obligatorio"}
             value={numeroOperacion}
             onChange={(e) => setNumeroOperacion(e.currentTarget.value)}
             classNames={inputClasses}
@@ -298,45 +326,10 @@ export const ModalPagoTransporte = ({
           />
         </SimpleGrid>
 
-        {/* Detracción Transporte */}
-        {comprobante.con_detraccion && (
-          <Group
-            justify="space-between"
-            p="sm"
-            className="bg-zinc-900/60 rounded-xl border border-zinc-800"
-          >
-            <div>
-              <Text size="xs" fw={600} c="white">
-                ¿Es pago de detracción de transporte?
-              </Text>
-              <Text size="xs" c="dimmed">
-                Pendiente: S/{" "}
-                {formatNumber(
-                  Math.max(
-                    0,
-                    Number(comprobante.monto_detraccion) -
-                      Number(comprobante.avance_pago_detraccion),
-                  ),
-                )}
-              </Text>
-            </div>
-            <Switch
-              checked={esParaDetraccion}
-              onChange={(e) => setEsParaDetraccion(e.currentTarget.checked)}
-              color="orange"
-              size="sm"
-            />
-          </Group>
-        )}
-
         {/* Cuenta Destino Transportista */}
         {medioPago !== "Efectivo" && (
           <Select
-            label={
-              esParaDetraccion
-                ? "Cuenta de detracción del transportista (Banco de la Nación)"
-                : "Cuenta bancaria del transportista (destino)"
-            }
+            label={"Cuenta bancaria del transportista "}
             placeholder={
               cuentasTransFiltradas.length > 0
                 ? "Seleccione cuenta del transportista"
@@ -374,8 +367,6 @@ export const ModalPagoTransporte = ({
             placeholder="0.00"
             value={montoPagado}
             onChange={setMontoPagado}
-            min={0.01}
-            decimalScale={2}
             fixedDecimalScale
             classNames={inputClasses}
             size="xs"
@@ -415,12 +406,11 @@ export const ModalPagoTransporte = ({
           className="bg-indigo-950/20 border border-indigo-900/40"
         >
           <Group justify="space-between">
-            <Text size="xs" c="dimmed">
-              Medio:{" "}
-              <span className="text-white font-bold">{medioPago}</span>
+            <Text size="xs" c="gray">
+              Medio: <span className="text-white font-bold">{medioPago}</span>
             </Text>
-            <Text size="sm" fw={800} c="teal.4">
-              Monto a transferir: S/ {formatNumber(Number(montoPagado) || 0)}
+            <Text size="sm" fw={700} c="teal">
+              Monto: S/ {formatNumber(Number(montoPagado) || 0)}
             </Text>
           </Group>
         </Paper>

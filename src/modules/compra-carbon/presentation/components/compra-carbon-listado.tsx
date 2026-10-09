@@ -83,7 +83,6 @@ const estadoBadge = (
   }
 };
 
-
 export const CompraCarbonListado = ({
   compras,
   busqueda,
@@ -565,7 +564,11 @@ export const CompraCarbonListado = ({
 
             {/* Exportar Liquidación (Excel) */}
             {totalCargas > 0 && (
-              <Tooltip label="Exportar Liquidación (Excel)" withArrow position="top">
+              <Tooltip
+                label="Exportar Liquidación (Excel)"
+                withArrow
+                position="top"
+              >
                 <ActionIcon
                   variant="light"
                   color="teal"
