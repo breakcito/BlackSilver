@@ -448,9 +448,9 @@ export const CompraCarbonListado = ({
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const esAnulado = r.estado === EstadoCompraCarbon.Anulado;
-        const esPagado = r.estado === EstadoCompraCarbon.Pagado;
+        // const esPagado = r.estado === EstadoCompraCarbon.Pagado;
         const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
-        const puedeRegistrarCarga = !esAnulado && !esPagado && !esCerrado;
+        const puedeRegistrarCarga = !esAnulado && !esCerrado;
         return (
           <div className="flex items-center justify-center gap-2">
             <Badge variant="light" color="cyan" radius="md" size="md">
