@@ -530,9 +530,9 @@ export const CompraCarbonListado = ({
         const esPagado = r.estado === EstadoCompraCarbon.Pagado;
         const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
         const totalCargas = r.cantidad_cargas ?? r.cantidad_items ?? 0;
-        const puedeLiquidar = !esAnulado;
+        const puedeLiquidar = !esAnulado && totalCargas >= 1;
         const puedeCerrar =
-          !esAnulado && !esPagado && !esCerrado && totalCargas >= 1;
+          !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
         const puedeAnular =
           !esAnulado && !esPagado && !esCerrado && totalCargas === 0;
         const isPrinting = printingId === r.id_compra_carbon;
@@ -565,7 +565,7 @@ export const CompraCarbonListado = ({
             {/* Exportar Liquidación (Excel) */}
             {totalCargas > 0 && (
               <Tooltip
-                label="Exportar Liquidación (Excel)"
+                label="Exportar Liquidación"
                 withArrow
                 position="top"
               >
@@ -709,60 +709,46 @@ export const CompraCarbonListado = ({
             : "Cargas"
         }
         size="95rem"
+        rightSection={
+          detallesModal != null && (
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <Group gap="md">
+                {detallesModal.data != null &&
+                  detallesModal.data.cargas.length > 0 &&
+                  detallesModal.compra.estado !== EstadoCompraCarbon.Anulado &&
+                  detallesModal.compra.estado !== EstadoCompraCarbon.Pagado &&
+                  detallesModal.compra.estado !==
+                    EstadoCompraCarbon.Cerrado && (
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      color="indigo"
+                      radius="md"
+                      leftSection={<TruckIcon className="w-3.5 h-3.5" />}
+                      onClick={() => {
+                        const comp = detallesModal.compra;
+                        setDetallesModal(null);
+                        setModalCargas(comp);
+                      }}
+                    >
+                      Añadir carga
+                    </Button>
+                  )}{" "}
+                <Text size="xs" c="gray">
+                  Total Neto:{" "}
+                  <span className="text-emerald-400 font-bold font-mono">
+                    {formatPEN(
+                      Number(detallesModal.compra.total_real_con_descuento),
+                    )}
+                  </span>
+                </Text>
+              </Group>
+            </div>
+          )
+        }
       >
         {detallesModal && (
           <div className="space-y-4">
-            {/* Resumen financiero */}
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
-              <Text
-                size="xs"
-                fw={800}
-                c="zinc.4"
-                className="uppercase tracking-widest mb-3"
-              >
-                Resumen financiero
-              </Text>
-              <div className="flex flex-wrap gap-x-6 gap-y-2">
-                <Group gap="xs">
-                  <Text size="xs" c="dimmed">
-                    Total Cotizado:{" "}
-                    <span className="text-zinc-300 font-bold font-mono">
-                      {formatPEN(Number(detallesModal.compra.total_cotizado))}
-                    </span>
-                  </Text>
-                </Group>
-                <Group gap="xs">
-                  <Text size="xs" c="dimmed">
-                    IGV Cotizado
-                    {detallesModal.compra.aplica_igv
-                      ? ` (${formatNumber(Number(detallesModal.compra.porcentaje_igv))}%)`
-                      : ""}
-                    :{" "}
-                    <span className="text-zinc-300 font-bold font-mono">
-                      {formatPEN(
-                        Number(detallesModal.compra.monto_igv_cotizado),
-                      )}
-                    </span>
-                  </Text>
-                </Group>
-                <Group gap="xs">
-                  <Text size="xs" c="dimmed">
-                    Total Real con Descuento:{" "}
-                    <span className="text-emerald-400 font-bold font-mono">
-                      {formatPEN(
-                        Number(detallesModal.compra.total_real_con_descuento),
-                      )}
-                    </span>
-                  </Text>
-                </Group>
-                {!detallesModal.compra.aplica_igv && (
-                  <Badge color="gray" variant="light" size="xs" radius="sm">
-                    Pago neto (sin IGV)
-                  </Badge>
-                )}
-              </div>
-            </div>
-
             {detallesModal.loading && (
               <Stack align="center" gap="md" py="xl">
                 <div className="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
@@ -801,56 +787,27 @@ export const CompraCarbonListado = ({
                     )}
                   </Group>
 
-                  <Group gap="xs">
-                    {detallesModal.data.cargas.length >= 1 &&
-                      detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Anulado &&
-                      detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Pagado &&
-                      detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Cerrado && (
-                        <Button
-                          size="compact-xs"
-                          variant="light"
-                          color="orange"
-                          radius="md"
-                          leftSection={
-                            <LockClosedIcon className="w-3.5 h-3.5" />
-                          }
-                          onClick={() => {
-                            setOpenCerrarModal({
-                              id: detallesModal.compra.id_compra_carbon,
-                              correlativo: detallesModal.compra.correlativo,
-                            });
-                          }}
-                        >
-                          Cerrar compra
-                        </Button>
-                      )}
-
-                    {detallesModal.data.cargas.length > 0 &&
-                      detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Anulado &&
-                      detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Pagado &&
-                      detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Cerrado && (
-                        <Button
-                          size="compact-xs"
-                          variant="light"
-                          color="indigo"
-                          radius="md"
-                          leftSection={<TruckIcon className="w-3.5 h-3.5" />}
-                          onClick={() => {
-                            const comp = detallesModal.compra;
-                            setDetallesModal(null);
-                            setModalCargas(comp);
-                          }}
-                        >
-                          Añadir carga
-                        </Button>
-                      )}
-                  </Group>
+                  {detallesModal.data.cargas.length > 0 &&
+                    detallesModal.compra.estado !==
+                      EstadoCompraCarbon.Anulado &&
+                    detallesModal.compra.estado !== EstadoCompraCarbon.Pagado &&
+                    detallesModal.compra.estado !==
+                      EstadoCompraCarbon.Cerrado && (
+                      <Button
+                        size="compact-xs"
+                        variant="light"
+                        color="indigo"
+                        radius="md"
+                        leftSection={<TruckIcon className="w-3.5 h-3.5" />}
+                        onClick={() => {
+                          const comp = detallesModal.compra;
+                          setDetallesModal(null);
+                          setModalCargas(comp);
+                        }}
+                      >
+                        Añadir carga
+                      </Button>
+                    )}
                 </Group>
 
                 {detallesModal.data.cargas.length === 0 ? (
@@ -897,19 +854,19 @@ export const CompraCarbonListado = ({
                       <thead className="bg-zinc-900 text-zinc-400 text-[11px] font-medium uppercase tracking-wider">
                         <tr>
                           <th className="px-3 py-2 text-center w-8">#</th>
-                          <th className="py-2 text-center w-28">Tipo</th>
+                          <th className="py-2 text-center w-24">Tipo</th>
                           <th className="px-3 py-2 text-center w-16">Ticket</th>
                           <th className="px-3 py-2 text-center w-28">
                             Lugar Ext.
                           </th>
-                          <th className="px-3 py-2 text-center w-35">
+                          <th className="px-3 py-2 text-center w-32">
                             Transportista
                           </th>
-                          <th className="px-3 py-2 text-center w-28">
+                          <th className="px-3 py-2 text-center w-24">
                             GR / GT
                           </th>
                           <th className="px-3 py-2 text-center w-24">Leyes</th>
-                          <th className="px-3 py-2 text-center w-28">
+                          <th className="px-3 py-2 text-center w-24">
                             Toneladas
                           </th>
                           <th className="px-3 py-2 text-center w-24">
@@ -918,8 +875,8 @@ export const CompraCarbonListado = ({
                           <th className="px-3 py-2 text-center w-24">
                             (−) Flete
                           </th>
-                          <th className="px-3 py-2 text-center w-28">Neto</th>
-                          <th className="px-3 py-2 text-center w-24">Estado</th>
+                          <th className="px-3 py-2 text-center w-24">Neto</th>
+                          <th className="px-3 py-2 text-center w-32">Estado</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-800 bg-zinc-900/40">
@@ -1236,8 +1193,6 @@ export const CompraCarbonListado = ({
             <Text component="span" fw={600} c="white">
               Ya no se permitirá registrar nuevas cargas de carbón a esta orden.
             </Text>{" "}
-            El proceso de liquidación y pagos continuará con las cargas
-            actuales.
           </Text>
           <Group justify="center" gap="sm" mt="xs" w="100%">
             <Button

@@ -323,7 +323,7 @@ export const ModalRegistrarTamizaje = ({
     <ModalEstandar
       opened={opened}
       close={onClose}
-      title="Registrar Tamizaje de Carbón"
+      title="Registrar Zarandeo"
       size="xl"
       validateClose
     >

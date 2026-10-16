@@ -65,7 +65,7 @@ const estilitos = {
 };
 
 export const TamizajeCarbonPage = () => {
-  useTitlePage("Tamizaje de Carbón");
+  useTitlePage("Zarandeo de Carbón");
   const { notifyError } = useNotify();
 
   const currentYear = new Date().getFullYear();
@@ -605,7 +605,7 @@ export const TamizajeCarbonPage = () => {
             onClick={() => setOpenNuevoTamizaje(true)}
             className="font-semibold shadow-md shadow-teal-950/40"
           >
-            Nuevo Tamizaje
+            Nuevo Zarandeo
           </Button>
         </div>
       </div>

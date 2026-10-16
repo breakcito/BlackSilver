@@ -316,6 +316,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             searchable
             nothingFoundMessage="Sin empresas registradas"
             size="xs"
+            clearable
             radius="lg"
           />
 
@@ -337,6 +338,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             disabled={loadingProveedores || saving}
             classNames={inputClasses}
             searchable
+            clearable
             nothingFoundMessage="Sin coincidencias"
             size="xs"
             radius="lg"

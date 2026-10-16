@@ -59,7 +59,7 @@ export const exportarLiquidacionExcel = async (
   ws.getCell("C3").font = fontData;
 
   ws.mergeCells("A4:B4");
-  ws.getCell("A4").value = "N° DE REPORTE:";
+  ws.getCell("A4").value = "OC:";
   ws.getCell("A4").font = fontHeader;
   ws.mergeCells("C4:F4");
   ws.getCell("C4").value = cabecera.correlativo;
@@ -199,7 +199,7 @@ export const exportarLiquidacionExcel = async (
     addSummaryRow("TOTAL", totalConIgv, true);
   }
   if (totalDetraccion > 0) {
-    addSummaryRow("(-) DETRACCIÓN", totalDetraccion, false, true);
+    addSummaryRow("DETRACCIÓN (10%)", totalDetraccion, false, true);
   }
   addSummaryRow("NETO A PAGAR", netoAPagar, true);
 
@@ -218,7 +218,7 @@ export const exportarLiquidacionExcel = async (
 
     anticipos_utilizados.forEach((ant) => {
       const fAnt = ant.fecha_hora_pago ? dayjs(ant.fecha_hora_pago).format("DD/MM/YYYY") : "—";
-      const desc = `${fAnt} - ${ant.medio_pago} ${ant.numero_operacion ? `(Op: ${ant.numero_operacion})` : ""}`;
+      const desc = `${fAnt} - ${ant.medio_pago}`;
       addSummaryRow(desc, Number(ant.monto_retirado), false, true);
     });
   }

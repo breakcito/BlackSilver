@@ -312,8 +312,7 @@ export const ModalLiquidacionPagos = ({
 
   const estaCerrada =
     cabecera?.estado === "Cerrado" ||
-    cabecera?.estado === "Anulado" ||
-    cabecera?.estado === "Pagado";
+    cabecera?.estado === "Anulado";
   const puedeCerrar = !estaCerrada && (detalle?.cargas?.length ?? 0) >= 1;
 
   if ((loading && !detalle) || !cabecera) {
@@ -323,7 +322,6 @@ export const ModalLiquidacionPagos = ({
         close={handleCerrarModal}
         title="Liquidación y Pagos"
         size="75rem"  
-        validateClose
       >
         <Paper p="xl" className="bg-zinc-950 text-center">
           <Text size="sm" c="gray">
@@ -340,33 +338,10 @@ export const ModalLiquidacionPagos = ({
         <span className="text-zinc-200 font-semibold">
           {cabecera.proveedor}
         </span>{" "}
-        ({cabecera.proveedor_ruc || cabecera.proveedor_dni})
+        {cabecera.proveedor_ruc || cabecera.proveedor_dni || ''}
       </Text>
 
-      <Group gap="xs">
-        <Button
-          size="xs"
-          radius="lg"
-          color="teal"
-          variant="light"
-          leftSection={<IconDownload size={15} />}
-          onClick={() => exportarLiquidacionExcel(detalle)}
-        >
-          Exportar Liquidación (Excel)
-        </Button>
-        {puedeCerrar && (
-          <Button
-            size="xs"
-            radius="lg"
-            color="orange"
-            variant="light"
-            leftSection={<IconLock size={15} />}
-            onClick={() => setOpenConfirmCerrar(true)}
-          >
-            Cerrar Compra
-          </Button>
-        )}
-      </Group>
+  
     </Group>
   );
 
