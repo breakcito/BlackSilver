@@ -20,6 +20,7 @@ import {
 } from "@mantine/core";
 import {
   IconPlus,
+  IconPencil,
   IconTrash,
   IconTruck,
   IconMapPin,
@@ -51,11 +52,20 @@ import { FormTarifaCarbon } from "../../../presentation/utils/form-tarifa-carbon
 import { FormTransportista } from "../../../presentation/utils/form-transportista";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
+import type { CargaCompraCarbonItem } from "../service/compra-carbon.responses";
 
 interface Props {
   compra: CompraCarbonResumen;
   onSuccess: () => void;
   onCancel: () => void;
+  /**
+   * Si viene definida, el modal entra en modo edicion para esa carga.
+   * El backend hace la reversión/aplicación de stock + kardex en una sola
+   * transaccion. Solo se puede editar si la carga NO esta Anulada ni
+   * Pagada, y si NO tiene comprobante / pago / comprobante de flete
+   * asignado.
+   */
+  cargaInicial?: CargaCompraCarbonItem | null;
 }
 
 const inputClasses = {
@@ -72,7 +82,12 @@ interface CargaFormState extends CargaFormItem {
   id_almacen_tipo_destino: "empresa" | "cliente";
 }
 
-export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
+export const ModalRegistroCargas = ({
+  compra,
+  onSuccess,
+  onCancel,
+  cargaInicial,
+}: Props) => {
   const { notifyError, notifySuccess } = useNotify();
 
   const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
@@ -108,32 +123,81 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Inicializar con 1 carga por defecto heredando el tipo de carbón prometido
-  const [cargas, setCargas] = useState<CargaFormState[]>([
-    {
-      id_tipo_carbon: compra.id_tipo_carbon_prometido,
-      tipo_despacho: "Envio",
-      id_almacen_tipo_destino: "empresa",
-      id_almacen_empresa_llegada: null,
-      id_almacen_cliente_llegada: null,
-      id_almacen_proveedor_recojo: null,
-      id_lugar_extraccion: null,
-      placa: "",
-      fecha_hora_ingreso: dayjs().format("YYYY-MM-DDTHH:mm"),
-      guia_remitente: "",
-      guia_transportista: "",
-      codigo_ticket_balanza: "",
-      cantidad: 0,
-      porcentaje_ceniza: 0,
-      porcentaje_humedad: 0,
-      precio_unitario: Number(compra.precio_unitario_cotizado || 0),
-      pagar_flete: false,
-      id_transportista: null,
-      costo_flete_por_tonelada: 0,
-      id_tarifa_carbon: null,
-      archivos: [],
-    },
-  ]);
+  const esEdicionCarga = Boolean(cargaInicial);
+
+  // Inicializar con 1 carga por defecto (modo registro) o con la carga
+  // inicial precargada (modo edicion de una carga individual).
+  const [cargas, setCargas] = useState<CargaFormState[]>(() => {
+    if (cargaInicial) {
+      const tipoDestino = cargaInicial.id_almacen_cliente_llegada
+        ? "cliente"
+        : "empresa";
+      return [
+        {
+          id_tipo_carbon: cargaInicial.id_tipo_carbon,
+          tipo_despacho: (cargaInicial.tipo_despacho as "Envio" | "Recojo") || "Envio",
+          id_almacen_tipo_destino: tipoDestino,
+          id_almacen_empresa_llegada: cargaInicial.id_almacen_empresa_llegada
+            ? Number(cargaInicial.id_almacen_empresa_llegada)
+            : null,
+          id_almacen_cliente_llegada: cargaInicial.id_almacen_cliente_llegada
+            ? Number(cargaInicial.id_almacen_cliente_llegada)
+            : null,
+          id_almacen_proveedor_recojo: cargaInicial.id_almacen_proveedor_recojo
+            ? Number(cargaInicial.id_almacen_proveedor_recojo)
+            : null,
+          id_lugar_extraccion: cargaInicial.id_lugar_extraccion
+            ? Number(cargaInicial.id_lugar_extraccion)
+            : null,
+          placa: cargaInicial.placa ?? "",
+          fecha_hora_ingreso: cargaInicial.fecha_hora_ingreso
+            ? dayjs(cargaInicial.fecha_hora_ingreso).format("YYYY-MM-DDTHH:mm")
+            : dayjs().format("YYYY-MM-DDTHH:mm"),
+          guia_remitente: cargaInicial.guia_remitente ?? "",
+          guia_transportista: cargaInicial.guia_transportista ?? "",
+          codigo_ticket_balanza: cargaInicial.codigo_ticket_balanza ?? "",
+          cantidad: Number(cargaInicial.cantidad) || 0,
+          porcentaje_ceniza: Number(cargaInicial.porcentaje_ceniza) || 0,
+          porcentaje_humedad: Number(cargaInicial.porcentaje_humedad) || 0,
+          precio_unitario: Number(cargaInicial.precio_unitario) || 0,
+          pagar_flete: Boolean(cargaInicial.pagar_flete),
+          id_transportista: cargaInicial.id_transportista
+            ? Number(cargaInicial.id_transportista)
+            : null,
+          costo_flete_por_tonelada: Number(cargaInicial.costo_flete_por_tonelada) || 0,
+          id_tarifa_carbon: cargaInicial.id_tarifa_carbon
+            ? Number(cargaInicial.id_tarifa_carbon)
+            : null,
+          archivos: [],
+        },
+      ];
+    }
+    return [
+      {
+        id_tipo_carbon: compra.id_tipo_carbon_prometido,
+        tipo_despacho: "Envio",
+        id_almacen_tipo_destino: "empresa",
+        id_almacen_empresa_llegada: null,
+        id_almacen_cliente_llegada: null,
+        id_almacen_proveedor_recojo: null,
+        id_lugar_extraccion: null,
+        placa: "",
+        fecha_hora_ingreso: dayjs().format("YYYY-MM-DDTHH:mm"),
+        guia_remitente: "",
+        guia_transportista: "",
+        codigo_ticket_balanza: "",
+        cantidad: 0,
+        porcentaje_ceniza: 0,
+        porcentaje_humedad: 0,
+        precio_unitario: Number(compra.precio_unitario_cotizado || 0),
+        pagar_flete: false,
+        id_transportista: null,
+        costo_flete_por_tonelada: 0,
+        id_tarifa_carbon: null,
+        archivos: [],
+      },
+    ];
+  });
 
   // Carga de catálogos necesarios
   useEffect(() => {
@@ -393,6 +457,24 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
         archivos: c.archivos,
       }));
 
+      // Modo edicion: una sola carga, llamada directa a actualizarCarga.
+      if (esEdicionCarga && cargaInicial) {
+        const payload = payloads[0];
+        const res = await CompraCarbonService.actualizarCarga(
+          compra.id_compra_carbon,
+          cargaInicial.id_carga_compra_carbon,
+          payload,
+        );
+        if (res.success) {
+          notifySuccess("Carga actualizada correctamente");
+          onSuccess();
+        } else {
+          setError(res.message || "Error al actualizar la carga");
+          notifyError(res.message || "Error al actualizar la carga");
+        }
+        return;
+      }
+
       const res = await CompraCarbonService.registrarCargas(
         compra.id_compra_carbon,
         payloads,
@@ -428,17 +510,21 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
           {formatNumber(compra.toneladas_prometidas, 2)} TN (
           {compra.tipo_carbon_prometido})
         </Text>
-        <Button
-          size="xs"
-          radius="lg"
-          variant="light"
-          color="indigo"
-          leftSection={<IconPlus size={16} />}
-          onClick={handleAgregarCarga}
-          disabled={saving}
-        >
-          Añadir otra carga
-        </Button>
+        {/* Solo se ofrece "Agregar otra carga" en modo registro (no en edicion
+            de una carga individual). */}
+        {!esEdicionCarga && (
+          <Button
+            size="xs"
+            radius="lg"
+            variant="light"
+            color="indigo"
+            leftSection={<IconPlus size={16} />}
+            onClick={handleAgregarCarga}
+            disabled={saving}
+          >
+            Añadir otra carga
+          </Button>
+        )}
       </Group>
 
       {/* Lista de cargas a ingresar */}
@@ -1060,9 +1146,11 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
           loading={saving}
           size="xs"
           radius="lg"
-          leftSection={<IconPlus size={16} />}
+          leftSection={esEdicionCarga ? <IconPencil size={16} /> : <IconPlus size={16} />}
         >
-          Guardar e ingresar cargas ({cargas.length})
+          {esEdicionCarga
+            ? "Guardar cambios de la carga"
+            : `Guardar e ingresar cargas (${cargas.length})`}
         </Button>
       </Group>
 

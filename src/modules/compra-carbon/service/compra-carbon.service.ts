@@ -1,6 +1,8 @@
 import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type {
+  ActualizarCargaRequest,
+  ActualizarCompraCarbonRequest,
   CrearCompraCarbonRequest,
   CargaFormItem,
   RegistrarComprobanteProveedorPayload,
@@ -52,6 +54,40 @@ export const CompraCarbonService = {
     return data;
   },
 
+  /**
+   * Edita la cabecera de una compra existente. El backend rechaza si la
+   * compra esta Pagado, Cerrado o Anulado.
+   */
+  actualizarCompra: async (
+    idCompraCarbon: number,
+    payload: ActualizarCompraCarbonRequest,
+  ): Promise<IRespuesta<CompraCarbonResumen>> => {
+    const { data } = await api.put<IRespuesta<CompraCarbonResumen>>(
+      `${PATH}/${idCompraCarbon}`,
+      payload,
+    );
+    return data;
+  },
+
+  /**
+   * Edita una carga individual. El backend rechaza si la carga esta Anulada,
+   * tiene comprobante/pago asignado, o la cabecera esta Pagado/Cerrado/Anulado.
+   * Si cambian campos stock-affecting (id_almacen_empresa_llegada,
+   * id_tipo_carbon, cantidad), el backend revierte y reaplica el movimiento
+   * de stock + kardex en una sola transaccion.
+   */
+  actualizarCarga: async (
+    idCompraCarbon: number,
+    idCarga: number,
+    payload: ActualizarCargaRequest,
+  ): Promise<IRespuesta<CompraCarbonDetalleResponse>> => {
+    const { data } = await api.put<IRespuesta<CompraCarbonDetalleResponse>>(
+      `${PATH}/${idCompraCarbon}/cargas/${idCarga}`,
+      payload,
+    );
+    return data;
+  },
+
   registrarCargas: async (
     idCompraCarbon: number,
     cargas: CargaFormItem[],
@@ -64,6 +100,8 @@ export const CompraCarbonService = {
           formData.append(`evidencias_${i}[]`, file);
         });
       }
+      // Excluimos `archivos` del payload porque viaja aparte como FormData.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { archivos, ...resto } = c;
       return resto;
     });
