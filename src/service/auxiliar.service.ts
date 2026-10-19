@@ -327,11 +327,22 @@ export const AuxService = {
   get_cuentas_transportista: async (filters?: {
     id_transportista?: number | number[];
     id_cuenta_bancaria?: number | number[];
+    moneda?: Moneda;
+    es_para_detraccion?: boolean;
     estado?: EstadoBase;
   }): Promise<IRespuesta<RES_CuentaTransportista[]>> => {
+    const params = filters
+      ? {
+          ...filters,
+          ...(filters.es_para_detraccion !== undefined && {
+            es_para_detraccion: filters.es_para_detraccion ? 1 : 0,
+          }),
+        }
+      : undefined;
+
     const { data } = await api.get<IRespuesta<RES_CuentaTransportista[]>>(
       `${path}/cuentas-transportista`,
-      { params: filters },
+      { params },
     );
     return data;
   },

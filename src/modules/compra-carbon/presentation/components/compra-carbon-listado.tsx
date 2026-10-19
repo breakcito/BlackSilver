@@ -1055,7 +1055,13 @@ export const CompraCarbonListado = ({
             compra={modalCargas}
             onCancel={() => setModalCargas(null)}
             onSuccess={() => {
+              // Tras registrar las cargas, abrimos directo el modal de
+              // liquidacion y pagos con la misma compra para que el usuario
+              // pueda registrar comprobantes / pagos sin pasos intermedios.
+              // Capturamos la referencia ANTES de cerrar el modal de cargas.
+              const compraACerrar = modalCargas;
               setModalCargas(null);
+              setModalLiquidacion(compraACerrar);
               onRefresh?.();
             }}
           />

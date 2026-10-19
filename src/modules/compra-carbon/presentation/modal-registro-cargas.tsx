@@ -16,6 +16,7 @@ import {
   Switch,
   Text,
   TextInput,
+  Tooltip,
 } from "@mantine/core";
 import {
   IconPlus,
@@ -27,7 +28,7 @@ import {
   IconCoins,
   IconTag,
   IconAlertTriangle,
-  IconCirclePlus,
+  IconEye,
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
 
@@ -47,7 +48,9 @@ import type { RES_TarifaCarbon } from "../../../service/responses/tarifa-carbon"
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { MultiFilePicker } from "../../../presentation/utils/archivo/multifile-picker";
 import { FormTarifaCarbon } from "../../../presentation/utils/form-tarifa-carbon";
+import { FormTransportista } from "../../../presentation/utils/form-transportista";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
+import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 
 interface Props {
   compra: CompraCarbonResumen;
@@ -89,6 +92,18 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
   const [tarifas, setTarifas] = useState<RES_TarifaCarbon[]>([]);
   const [openNuevaTarifa, setOpenNuevaTarifa] = useState(false);
   const [targetTarifaIdx, setTargetTarifaIdx] = useState<number | null>(null);
+
+  // Modal para registrar un nuevo transportista (boton "+").
+  const [openNuevoTransportista, setOpenNuevoTransportista] = useState(false);
+  const [targetTransportistaIdx, setTargetTransportistaIdx] = useState<
+    number | null
+  >(null);
+
+  // Modal que lista las tarifas del tipo de carbon seleccionado.
+  const [openListadoTarifas, setOpenListadoTarifas] = useState(false);
+  const [targetTarifasListadoIdx, setTargetTarifasListadoIdx] = useState<
+    number | null
+  >(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -850,20 +865,25 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                         >
                           {`Sin tarifa para ${formatNumber(Number(carga.porcentaje_ceniza))}% ceniza (precio editable)`}
                         </Badge>
-                        <Button
-                          variant="subtle"
-                          color="indigo"
-                          size="compact-xs"
-                          radius="lg"
-                          leftSection={<IconCirclePlus size={14} />}
-                          onClick={() => {
-                            setTargetTarifaIdx(index);
-                            setOpenNuevaTarifa(true);
-                          }}
-                          className="font-semibold text-xs h-6"
+                        <Tooltip
+                          label="Ver tarifas registradas"
+                          withArrow
                         >
-                          Crear tarifa
-                        </Button>
+                          <ActionIcon
+                            variant="subtle"
+                            color="indigo"
+                            size="sm"
+                            radius="lg"
+                            onClick={() => {
+                              setTargetTarifasListadoIdx(index);
+                              setOpenListadoTarifas(true);
+                            }}
+                            className="font-semibold"
+                            disabled={saving}
+                          >
+                            <IconEye size={16} />
+                          </ActionIcon>
+                        </Tooltip>
                       </>
                     );
                   })()}
@@ -903,30 +923,54 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                 {/* Resto de campos: ocupa las 8 columnas restantes (2/3) y todo el ancho */}
                 {carga.pagar_flete && (
                   <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
-                    <Select
-                      label="Empresa de transporte"
-                      placeholder="Seleccione transportista"
-                      data={transportistas.map((t) => ({
-                        value: String(t.id_transportista),
-                        label: t.razon_social,
-                      }))}
-                      value={
-                        carga.id_transportista
-                          ? String(carga.id_transportista)
-                          : null
-                      }
-                      onChange={(val) =>
-                        handleChangeCarga(
-                          index,
-                          "id_transportista",
-                          val ? Number(val) : null,
-                        )
-                      }
-                      classNames={inputClasses}
-                      size="xs"
-                      radius="lg"
-                      searchable
-                    />
+                    <Group gap="xs" align="flex-end" wrap="nowrap">
+                      <Select
+                        className="flex-1"
+                        label="Empresa de transporte"
+                        placeholder="Seleccione transportista"
+                        data={transportistas.map((t) => ({
+                          value: String(t.id_transportista),
+                          label: t.razon_social,
+                        }))}
+                        value={
+                          carga.id_transportista
+                            ? String(carga.id_transportista)
+                            : null
+                        }
+                        onChange={(val) =>
+                          handleChangeCarga(
+                            index,
+                            "id_transportista",
+                            val ? Number(val) : null,
+                          )
+                        }
+                        classNames={inputClasses}
+                        size="xs"
+                        radius="lg"
+                        searchable
+                        rightSection={
+                          loadingTipos ? (
+                            <Loader size="12" color="indigo" />
+                          ) : undefined
+                        }
+                      />
+                      <Tooltip label="Registrar nuevo transportista" withArrow>
+                        <ActionIcon
+                          size={32}
+                          variant="filled"
+                          color="indigo.6"
+                          radius="lg"
+                          onClick={() => {
+                            setTargetTransportistaIdx(index);
+                            setOpenNuevoTransportista(true);
+                          }}
+                          disabled={saving}
+                          className="mb-0.75"
+                        >
+                          <IconPlus size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
 
                     <NumberInput
                       label="Costo flete x TN (S/)"
@@ -1022,7 +1066,122 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
         </Button>
       </Group>
 
-      {/* Modal: Nueva tarifa de carbón */}
+      {/* Modal: Registrar nuevo transportista (boton "+") */}
+      <ModalEstandar
+        opened={openNuevoTransportista}
+        close={() => {
+          setOpenNuevoTransportista(false);
+          setTargetTransportistaIdx(null);
+        }}
+        validateClose
+        title="Nuevo Transportista"
+        size="md"
+      >
+        <FormTransportista
+          onSuccess={(nuevo) => {
+            // Insertamos al inicio y lo dejamos seleccionado en la carga que abrio el modal.
+            setTransportistas((prev) => [nuevo, ...prev]);
+            if (targetTransportistaIdx !== null) {
+              handleChangeCarga(
+                targetTransportistaIdx,
+                "id_transportista",
+                Number(nuevo.id_transportista),
+              );
+            }
+            setOpenNuevoTransportista(false);
+            setTargetTransportistaIdx(null);
+          }}
+          onCancel={() => {
+            setOpenNuevoTransportista(false);
+            setTargetTransportistaIdx(null);
+          }}
+        />
+      </ModalEstandar>
+
+      {/* Modal: Listado de tarifas del tipo de carbon de la fila + boton para crear mas */}
+      <ModalEstandar
+        opened={openListadoTarifas}
+        close={() => {
+          setOpenListadoTarifas(false);
+          setTargetTarifasListadoIdx(null);
+        }}
+        title={
+          targetTarifasListadoIdx !== null && tipos.length > 0
+            ? `Tarifas de ${
+                tipos.find(
+                  (t) =>
+                    Number(t.id_tipo_carbon) ===
+                    Number(cargas[targetTarifasListadoIdx]?.id_tipo_carbon),
+                )?.nombre ?? "carbón"
+              }`
+            : "Tarifas de Carbón"
+        }
+        size="60rem"
+      >
+        <Stack gap="md">
+          {(() => {
+            const tipoId =
+              targetTarifasListadoIdx !== null
+                ? Number(cargas[targetTarifasListadoIdx]?.id_tipo_carbon || 0)
+                : 0;
+            const propias = tarifas.filter(
+              (t) => Number(t.id_tipo_carbon) === tipoId,
+            );
+            return (
+              <DataTableEstandar
+                records={propias}
+                idAccessor="id_tarifa_carbon"
+                columns={[
+                  {
+                    accessor: "index",
+                    title: "#",
+                  },
+                  {
+                    accessor: "inicio_porcentaje_ceniza",
+                    title: "Ceniza desde (%)",
+                  },
+                  {
+                    accessor: "fin_porcentaje_ceniza",
+                    title: "Ceniza hasta (%)",
+                  },
+                  {
+                    accessor: "precio_unitario",
+                    title: "Precio unit. (S/ x TN)",
+                  },
+                  {
+                    accessor: "estado",
+                    title: "Estado",
+                  },
+                ]}
+                loading={loadingTipos}
+              />
+            );
+          })()}
+          <Group justify="flex-end" gap="sm">
+            <Button
+              color="indigo"
+              size="xs"
+              radius="lg"
+              leftSection={<IconPlus size={14} />}
+              onClick={() => {
+                setTargetTarifaIdx(targetTarifasListadoIdx);
+                setOpenNuevaTarifa(true);
+              }}
+              disabled={
+                targetTarifasListadoIdx === null ||
+                !cargas[targetTarifasListadoIdx]?.id_tipo_carbon
+              }
+            >
+              Registrar nueva tarifa
+            </Button>
+          </Group>
+        </Stack>
+      </ModalEstandar>
+
+      {/* Modal: Nueva tarifa de carbón.
+          IMPORTANTE: va al final para quedar visualmente ENCIMA del listado de
+          tarifas (zIndex + orden del portal de Mantine). Asi el usuario ve el
+          form al hacer click en "Registrar nueva tarifa". */}
       <ModalEstandar
         opened={openNuevaTarifa}
         close={() => {
