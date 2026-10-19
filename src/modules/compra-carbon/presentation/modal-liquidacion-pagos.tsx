@@ -1251,6 +1251,7 @@ export const ModalLiquidacionPagos = ({
           nombreProveedor={cabecera.proveedor}
           comprobante={modalPagoProv.comprobante}
           cargasDisponiblesDirectas={cargasSinPagoDirecto}
+          aplicaIgv={Boolean(cabecera.aplica_igv)}
           onSuccess={handleSuccessPagoProv}
         />
       )}

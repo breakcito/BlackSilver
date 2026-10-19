@@ -55,6 +55,12 @@ interface Props {
   comprobante: ComprobanteCompraCarbonItem | null;
   /** Cargas sin pago directo disponible (solo si no aplica IGV) */
   cargasDisponiblesDirectas?: CargaCompraCarbonItem[];
+  /**
+   * `true` si la cabecera de la compra aplica IGV (modo "con factura"). Usado
+   * para sugerir el medio de pago por defecto: Transferencia si aplica IGV,
+   * Efectivo si NO aplica IGV. El usuario siempre puede cambiarlo.
+   */
+  aplicaIgv?: boolean;
   onSuccess: (data: RespuestaRegistrarPagoProveedor) => void;
 }
 
@@ -67,6 +73,7 @@ export const ModalPagoProveedor = ({
   nombreProveedor,
   comprobante,
   cargasDisponiblesDirectas = [],
+  aplicaIgv,
   onSuccess,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -170,12 +177,16 @@ export const ModalPagoProveedor = ({
   useEffect(() => {
     if (opened) {
       cargarCuentas();
-      setMedioPago("Transferencia");
+      // Default segun aplica_igv: si NO aplica IGV sugerimos Efectivo, caso
+      // contrario Transferencia. El usuario siempre puede cambiarlo.
+      setMedioPago(aplicaIgv ? "Transferencia" : "Efectivo");
       setNumeroOperacion("");
       setFechaHoraPago(dayjs().format("YYYY-MM-DDTHH:mm"));
       setObservacion("");
       setArchivos([]);
       setEsParaDetraccion(false);
+      setIdCuentaEmpresa(null);
+      setIdCuentaProveedor(null);
 
       if (comprobante) {
         // Sugerir saldo pendiente neto o de detracción
@@ -200,6 +211,9 @@ export const ModalPagoProveedor = ({
         setAnticiposSeleccionados({});
       }
     }
+    // aplicaIgv intencionalmente omitido: solo se evalua al abrir; cambios
+    // posteriores no deben resetear el medio de pago ya elegido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, comprobante, idEmpresa, idProveedor]);
 
   // Si cambia el switch de detracción en comprobante, ajustar sugerencia de monto
@@ -274,8 +288,12 @@ export const ModalPagoProveedor = ({
   };
 
   const handleGuardar = async () => {
-    if (!idCuentaEmpresa) {
-      notifyError("Seleccione la cuenta bancaria de origen de la empresa");
+    // La cuenta bancaria de la empresa solo es obligatoria cuando el pago es
+    // bancario (Transferencia / Depósito). En Efectivo es opcional.
+    if (medioPago !== "Efectivo" && !idCuentaEmpresa) {
+      notifyError(
+        "Para transferencias o depósitos debe seleccionar la cuenta bancaria de origen de la empresa",
+      );
       return;
     }
     if (medioPago !== "Efectivo" && !idCuentaProveedor) {
@@ -322,7 +340,12 @@ export const ModalPagoProveedor = ({
           id_comprobante_compra_carbon: comprobante
             ? comprobante.id_comprobante_compra_carbon
             : undefined,
-          id_cuenta_bancaria_empresa: Number(idCuentaEmpresa),
+          id_cuenta_bancaria_empresa:
+            medioPago === "Efectivo" && !idCuentaEmpresa
+              ? undefined
+              : idCuentaEmpresa
+                ? Number(idCuentaEmpresa)
+                : undefined,
           id_cuenta_bancaria_proveedor: idCuentaProveedor
             ? Number(idCuentaProveedor)
             : undefined,
@@ -447,8 +470,16 @@ export const ModalPagoProveedor = ({
 
           {/* Cuentas de la Empresa (Origen) */}
           <Select
-            label="Cuenta bancaria de la empresa (origen)"
-            placeholder="Seleccione cuenta de Cupper en soles"
+            label={
+              medioPago === "Efectivo"
+                ? "Cuenta bancaria de la empresa (opcional en efectivo)"
+                : "Cuenta bancaria de la empresa (origen)"
+            }
+            placeholder={
+              medioPago === "Efectivo"
+                ? "Opcional para efectivo"
+                : "Seleccione cuenta de Cupper en soles"
+            }
             data={cuentasEmpresa.map((c) => ({
               value: String(c.id),
               label: c.label,
@@ -459,7 +490,8 @@ export const ModalPagoProveedor = ({
             size="xs"
             radius="lg"
             searchable
-            required
+            clearable
+            required={medioPago !== "Efectivo"}
           />
 
           {/* Medio de pago y N° Operación */}
@@ -666,31 +698,87 @@ export const ModalPagoProveedor = ({
                 <Paper
                   p="xs"
                   radius="md"
-                  className="bg-zinc-950/60 border border-zinc-800 max-h-40 overflow-y-auto"
+                  className="bg-zinc-950/60 border border-zinc-800 max-h-44 overflow-y-auto"
                 >
-                  <SimpleGrid cols={{ base: 2 }} spacing="xs">
+                  <Stack gap={6}>
                     {anticipos.map((a) => {
                       const saldoDisp = Number(a.saldo_actual);
                       const usado = anticiposSeleccionados[a.id_anticipo] || 0;
+                      const isChecked = usado > 0;
+                      const fechaCorta = a.fecha_hora_pago
+                        ? dayjs(a.fecha_hora_pago).format("DD/MM/YYYY")
+                        : "—";
                       return (
                         <Group
                           key={a.id_anticipo}
                           justify="space-between"
                           align="center"
                           wrap="nowrap"
-                          className="p-1.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80"
+                          className={`p-1.5 rounded-lg border ${isChecked ? "bg-yellow-950/30 border-yellow-800/60" : "bg-zinc-900/40 border-zinc-800/80"}`}
                         >
-                          <div className="min-w-0">
-                            <Text size="xs" fw={700} c="white" truncate>
-                              {a.codigo_comprobante}
-                            </Text>
-                            <Text size="xs" c="gray" truncate>
-                              Disponible:{" "}
-                              <span className="text-emerald-400 font-bold">
-                                S/ {formatNumber(saldoDisp)}
-                              </span>
-                            </Text>
-                          </div>
+                          <Checkbox
+                            size="xs"
+                            color="yellow"
+                            label={
+                              <div className="min-w-0 leading-tight">
+                                <Group gap={6} wrap="nowrap">
+                                  <Text size="xs" fw={700} c="white">
+                                    {a.codigo_comprobante}
+                                  </Text>
+                                  <Text size="xs" c="zinc.5">
+                                    #{a.id_anticipo}
+                                  </Text>
+                                </Group>
+                                <Group
+                                   gap={6}
+                                   wrap="nowrap"
+                                   mt={2}
+                                   className="text-[11px] text-zinc-400"
+                                >
+                                  <span>
+                                    <span className="text-zinc.500">
+                                      Disp:
+                                    </span>{" "}
+                                    <span className="text-emerald-400 font-bold">
+                                      S/ {formatNumber(saldoDisp)}
+                                    </span>
+                                  </span>
+                                  <span className="text-zinc.600">·</span>
+                                  <span>
+                                    <span className="text-zinc.500">
+                                      Fecha:
+                                    </span>{" "}
+                                    {fechaCorta}
+                                  </span>
+                                  {a.medio_pago ? (
+                                    <>
+                                      <span className="text-zinc.600">·</span>
+                                      <span>{a.medio_pago}</span>
+                                    </>
+                                  ) : null}
+                                  {a.cuenta_proveedor_banco ? (
+                                    <>
+                                      <span className="text-zinc.600">·</span>
+                                      <span className="truncate max-w-30">
+                                        {a.cuenta_proveedor_banco}
+                                        {a.cuenta_proveedor_moneda
+                                          ? ` (${a.cuenta_proveedor_moneda})`
+                                          : ""}
+                                      </span>
+                                    </>
+                                  ) : null}
+                                </Group>
+                              </div>
+                            }
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.currentTarget.checked;
+                              handleSetMontoAnticipoDirecto(
+                                a.id_anticipo,
+                                checked ? saldoDisp : 0,
+                              );
+                            }}
+                          />
                           <NumberInput
                             placeholder="Monto"
                             max={saldoDisp}
@@ -698,7 +786,12 @@ export const ModalPagoProveedor = ({
                             size="xs"
                             radius="lg"
                             w={90}
-                            value={usado || ""}
+                            // Forzamos a `""` cuando NO esta marcado: Mantine
+                            // NumberInput retiene su valor tipeado interno aunque
+                            // el value controlado sea vacio al alternar disabled.
+                            value={isChecked ? usado : ""}
+                            fixedDecimalScale
+                            disabled={!isChecked}
                             onChange={(val) =>
                               handleSetMontoAnticipoDirecto(
                                 a.id_anticipo,
@@ -709,7 +802,7 @@ export const ModalPagoProveedor = ({
                         </Group>
                       );
                     })}
-                  </SimpleGrid>
+                  </Stack>
                 </Paper>
               )}
             </div>

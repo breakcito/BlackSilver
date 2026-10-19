@@ -46,7 +46,11 @@ export interface RegistrarComprobanteProveedorPayload {
 
 export interface RegistrarPagoProveedorPayload {
   id_comprobante_compra_carbon?: number | null;
-  id_cuenta_bancaria_empresa: number;
+  /**
+   * Requerido solo en pagos bancarios (Transferencia / Depósito).
+   * En Efectivo se omite (no sale dinero de ninguna cuenta).
+   */
+  id_cuenta_bancaria_empresa?: number | null;
   id_cuenta_bancaria_proveedor?: number | null;
   medio_pago: "Transferencia" | "Depósito" | "Efectivo" | string;
   numero_operacion?: string | null;
