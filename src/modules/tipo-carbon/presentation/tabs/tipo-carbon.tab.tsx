@@ -3,7 +3,9 @@ import {
   Alert,
   Badge,
   Button,
+  Center,
   Group,
+  Loader,
   Select,
   Stack,
   Switch,
@@ -43,13 +45,6 @@ const fieldClasses = {
 
 export const TipoCarbonTab = () => {
   const ctrl = useTipoCarbon();
-  const { payload, handleChange, submit, loading, actualizar, eliminar } =
-    useRegistroTipoCarbon((t) => {
-      ctrl.upsertTipo(t);
-      setModal(null);
-      setEditTipo(null);
-    });
-
   const [modal, setModal] = useState<ModalMode>(null);
   const [editTipo, setEditTipo] = useState<RES_TipoCarbon | null>(null);
   const [editPayload, setEditPayload] = useState<CrearTipoCarbonRequest>({
@@ -57,6 +52,13 @@ export const TipoCarbonTab = () => {
     codigo: null,
     para_compra: false,
   });
+
+  const { payload, handleChange, submit, loading, actualizar, eliminar } =
+    useRegistroTipoCarbon((t) => {
+      ctrl.upsertTipo(t);
+      setModal(null);
+      setEditTipo(null);
+    });
 
   const [confirmDelete, setConfirmDelete] = useState<RES_TipoCarbon | null>(
     null,
@@ -142,14 +144,42 @@ export const TipoCarbonTab = () => {
     lastHydratedFor.current = null;
   };
 
-  // Hidratar variantesSeleccionadas una vez por target cuando los datos
-  // frescos ya terminaron de cargar (esperamos a !loading para no leer stale).
+  // Hidratar variantesSeleccionadas **después** de que el fetch termine
+  // (transicion loading: true -> false). Si nos hidratáramos al mero hecho
+  // de abrir el modal, leeríamos variantesActuales todavía vacías (o
+  // cargadas con los datos del target anterior), porque el hook mantiene
+  // su estado entre renders y el setState del fetch aún no se aplicó.
+  //
+  // Tambien reseteamos lastHydratedFor cada vez que arranca un fetch para
+  // permitir re-hidratar tras cerrar y abrir el modal para un nuevo target.
+  const prevLoadingRef = useRef(false);
   useEffect(() => {
     const targetId = variantesTarget?.id_tipo_carbon ?? null;
-    if (targetId === null) return;
-    if (variantesCtrl.loading) return;
+    if (targetId === null) {
+      prevLoadingRef.current = false;
+      lastHydratedFor.current = null;
+      return;
+    }
+
+    const startedLoading = !prevLoadingRef.current && variantesCtrl.loading;
+    const justFinished = prevLoadingRef.current && !variantesCtrl.loading;
+    prevLoadingRef.current = variantesCtrl.loading;
+
+    if (startedLoading) {
+      // Permitir re-hidratar tras cerrar y abrir el modal para el mismo u otro target.
+      lastHydratedFor.current = null;
+    }
+    if (!justFinished) return;
     if (lastHydratedFor.current === targetId) return;
+
     lastHydratedFor.current = targetId;
+    // Sincroniza el draft local (`seleccionadas`) con el resultado del fetch del
+    // hook. Es setState-in-effect a propósito: useEffect SÍ es la primitiva
+    // correcta para pasar de data async (cargada por `useVariantesTipo`) a
+    // estado local editable antes de persistir. La alternativa "derivar en
+    // render" no aplica porque necesitamos permitir agregar/quitar variantes
+    // localmente antes de enviar el PUT bulk.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVariantesSeleccionadas(variantesCtrl.variantesActuales);
   }, [
     variantesTarget?.id_tipo_carbon,
@@ -506,14 +536,16 @@ export const TipoCarbonTab = () => {
           <Select
             label="Agregar variante"
             placeholder={
-              opcionesSelect.length === 0
+              variantesCtrl.loading
+                ? "Cargando tipos disponibles..."
+                : opcionesSelect.length === 0
                 ? "Todos los tipos disponibles ya estan agregados"
                 : "Selecciona un tipo para agregarlo"
             }
             radius="xl"
             searchable
             clearable
-            disabled={opcionesSelect.length === 0}
+            disabled={variantesCtrl.loading || opcionesSelect.length === 0}
             data={opcionesSelect}
             value={pendienteVariante}
             onChange={handleAgregarVariante}
@@ -525,7 +557,19 @@ export const TipoCarbonTab = () => {
             }}
           />
 
-          {variantesSeleccionadas.length === 0 ? (
+          {variantesCtrl.loading ? (
+            <Center
+              h={120}
+              className="border border-dashed border-zinc-800 rounded-lg"
+            >
+              <Stack align="center" gap="xs">
+                <Loader color="indigo" size="md" type="oval" />
+                <Text size="xs" className="text-zinc-500">
+                  Cargando variantes...
+                </Text>
+              </Stack>
+            </Center>
+          ) : variantesSeleccionadas.length === 0 ? (
             <div className="text-zinc-500 text-xs italic px-3 py-2 border border-dashed border-zinc-800 rounded-lg">
               Sin variantes seleccionadas.
             </div>
@@ -576,17 +620,23 @@ export const TipoCarbonTab = () => {
             </Stack>
           )}
 
-          <Text size="xs" className="text-zinc-500">
-            Actualmente {variantesSeleccionadas.length} variante(s)
-            seleccionada(s).
-          </Text>
+          {!variantesCtrl.loading && (
+            <Text size="xs" className="text-zinc-500">
+              Actualmente {variantesSeleccionadas.length} variante(s)
+              seleccionada(s).
+            </Text>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="subtle" onClick={closeVariantes}>
+            <Button
+              variant="subtle"
+              onClick={closeVariantes}
+              disabled={variantesCtrl.saving}
+            >
               Cancelar
             </Button>
             <Button
-              loading={variantesCtrl.saving}
+              loading={variantesCtrl.loading || variantesCtrl.saving}
               onClick={handleGuardarVariantes}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
             >
