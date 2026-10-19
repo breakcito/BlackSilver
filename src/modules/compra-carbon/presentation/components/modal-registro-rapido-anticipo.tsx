@@ -1,23 +1,32 @@
 import { useState, useEffect } from "react";
 import {
+  ActionIcon,
   Button,
-  FileInput,
   Group,
+  Loader,
   NumberInput,
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconCoins, IconUpload } from "@tabler/icons-react";
+import { IconCoins, IconPlus } from "@tabler/icons-react";
 import dayjs from "dayjs";
 
 import { useNotify } from "../../../../hooks/useNotify";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { AuxService } from "../../../../service/auxiliar.service";
 import { ProveedoresService } from "../../../proveedores/service/proveedores.service";
+import {
+  CambistaService,
+  type RES_Cambista,
+} from "../../../../service/cambista.service";
 import { MedioPago } from "../../../../shared/enums/anticipo-proveedor/medio-pago";
+import { CustomDatePicker } from "../../../../presentation/utils/date-picker-input";
+import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
+import { ModalNuevoCambista } from "../../../proveedores/presentation/anticipos-proveedor/components/modal-nuevo-cambista";
 import type {
   AnticipoProveedorResponse,
   CuentaBancariaResponse,
@@ -49,14 +58,22 @@ export const ModalRegistroRapidoAnticipo = ({
   const [medioPago, setMedioPago] = useState<MedioPago>(MedioPago.Transferencia);
   const [idCuentaEmpresa, setIdCuentaEmpresa] = useState<string | null>(null);
   const [idCuentaProveedor, setIdCuentaProveedor] = useState<string | null>(null);
+  const [pagoATerceros, setPagoATerceros] = useState(false);
   const [numeroOperacion, setNumeroOperacion] = useState("");
-  const [fechaHoraPago, setFechaHoraPago] = useState(
-    dayjs().format("YYYY-MM-DDTHH:mm"),
+  const [fechaHoraPago, setFechaHoraPago] = useState<Date | null>(
+    () => new Date(),
   );
   const [codigoComprobante, setCodigoComprobante] = useState("");
   const [observacion, setObservacion] = useState("");
   const [archivos, setArchivos] = useState<File[]>([]);
   const [guardando, setGuardando] = useState(false);
+
+  // Cambistas
+  const [cambistas, setCambistas] = useState<RES_Cambista[]>([]);
+  const [idCambista, setIdCambista] = useState<string | null>(null);
+  const [loadingCambistas, setLoadingCambistas] = useState(true);
+  const [modalNuevoCambistaAbierto, setModalNuevoCambistaAbierto] =
+    useState(false);
 
   // Listas de cuentas
   const [cuentasEmpresa, setCuentasEmpresa] = useState<
@@ -71,10 +88,13 @@ export const ModalRegistroRapidoAnticipo = ({
       setMonto("");
       setMedioPago(MedioPago.Transferencia);
       setNumeroOperacion("");
-      setFechaHoraPago(dayjs().format("YYYY-MM-DDTHH:mm"));
+      setFechaHoraPago(new Date());
       setCodigoComprobante("");
       setObservacion("");
       setArchivos([]);
+      setIdCambista(null);
+      setCambistas([]);
+      setPagoATerceros(false);
 
       // Cargar cuentas
       AuxService.get_cuentas_empresa({ id_empresa: idEmpresa })
@@ -93,21 +113,50 @@ export const ModalRegistroRapidoAnticipo = ({
       ProveedoresService.getCuentasBancarias(idProveedor)
         .then((res) => {
           if (Array.isArray(res)) {
-            const noDetraccion = res.filter((c) => !c.es_para_detraccion);
-            const lista = noDetraccion.map((c: CuentaBancariaResponse) => ({
+            // Sin filtro: mostramos TODAS las cuentas del proveedor, igual
+            // que el modal de Registrar Anticipo en el modulo de
+            // proveedores (que recibe `cuentasProveedor` como prop sin
+            // filtrar). El anticipo en si no es detraccion, asi que el
+            // operador debe poder elegir cualquier cuenta destino.
+            const lista = res.map((c: CuentaBancariaResponse) => ({
               id: c.id_cuenta_bancaria,
               label: `${c.banco} (${c.numero_cuenta})`,
             }));
             setCuentasProveedor(lista);
-            if (lista.length > 0) setIdCuentaProveedor(String(lista[0].id));
+            // Al abrir el modal (cuando pagoATerceros es false),
+            // preseleccionamos la primera cuenta si existe.
+            if (lista.length > 0) {
+              setIdCuentaProveedor(String(lista[0].id));
+            }
           }
         })
         .catch(console.error);
+
+      // Cambistas: lista chica, una sola carga al abrir el modal.
+      setLoadingCambistas(true);
+      CambistaService.listar()
+        .then((res) => {
+          if (res?.success && Array.isArray(res.data)) {
+            setCambistas(res.data);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoadingCambistas(false));
     }
   }, [opened, idEmpresa, idProveedor]);
 
+  // Pago a terceros: si se activa el switch mientras el modal esta
+  // abierto, vaciamos la cuenta destino. Al desactivarlo, no tocamos la
+  // seleccion (la que el operador dejo queda).
+  useEffect(() => {
+    if (pagoATerceros) {
+      setIdCuentaProveedor(null);
+    }
+  }, [pagoATerceros]);
+
   const requiereBanco =
     medioPago === MedioPago.Transferencia || medioPago === MedioPago.Deposito;
+  const requiereCambista = medioPago === MedioPago.Efectivo;
 
   const handleGuardar = async () => {
     const montoNum = Number(monto);
@@ -119,8 +168,10 @@ export const ModalRegistroRapidoAnticipo = ({
       notifyError("Seleccione la cuenta de la empresa de origen");
       return;
     }
-    if (requiereBanco && !idCuentaProveedor) {
-      notifyError("Seleccione la cuenta bancaria de destino del proveedor");
+    if (requiereBanco && !pagoATerceros && !idCuentaProveedor) {
+      notifyError(
+        "Seleccione la cuenta bancaria de destino del proveedor (o active pago a terceros)",
+      );
       return;
     }
     if (requiereBanco && !numeroOperacion.trim()) {
@@ -128,13 +179,13 @@ export const ModalRegistroRapidoAnticipo = ({
       return;
     }
     if (!fechaHoraPago) {
-      notifyError("Ingrese la fecha y hora del pago");
+      notifyError("Ingrese la fecha del pago");
       return;
     }
 
-    const fechaFormateada =
-      fechaHoraPago.replace("T", " ") +
-      (fechaHoraPago.length === 16 ? ":00" : "");
+    // El `CustomDatePicker` emite `Date`, lo pasamos a `YYYY-MM-DD` que es el
+    // formato que acepta el back (le agrega ` 00:00:00` al persistir).
+    const fechaFormateada = dayjs(fechaHoraPago).format("YYYY-MM-DD");
 
     setGuardando(true);
     try {
@@ -145,15 +196,19 @@ export const ModalRegistroRapidoAnticipo = ({
           id_cuenta_bancaria_empresa: idCuentaEmpresa
             ? Number(idCuentaEmpresa)
             : null,
-          id_cuenta_bancaria_proveedor: idCuentaProveedor
-            ? Number(idCuentaProveedor)
-            : null,
+          id_cuenta_bancaria_proveedor:
+            !pagoATerceros && idCuentaProveedor
+              ? Number(idCuentaProveedor)
+              : null,
+          // En Efectivo la plata sale del bolsillo del cambista. Para
+          // los demas medios va null (el back lo normaliza igual).
+          id_cambista: idCambista ? Number(idCambista) : null,
           medio_pago: medioPago,
           fecha_hora_pago: fechaFormateada,
           numero_operacion: numeroOperacion.trim() || null,
           codigo_comprobante: codigoComprobante.trim() || null,
           observacion: observacion.trim() || null,
-          pago_a_terceros: false,
+          pago_a_terceros: pagoATerceros,
           saldo: montoNum,
           evidencias: archivos.length > 0 ? archivos : null,
         },
@@ -183,9 +238,29 @@ export const ModalRegistroRapidoAnticipo = ({
       size="lg"
       validateClose
       rightSection={
-        <Text size="sm" fw={700} c="white">
-          {nombreProveedor}
-        </Text>
+        <Group gap="sm" align="center" wrap="nowrap">
+          {nombreProveedor && (
+            <Text size="sm" fw={700} c="white">
+              {nombreProveedor}
+            </Text>
+          )}
+          <Switch
+            checked={pagoATerceros}
+            onChange={(e) => setPagoATerceros(e.currentTarget.checked)}
+            size="sm"
+            color="yellow"
+            radius="xl"
+            label={
+              <Text
+                size="xs"
+                fw={600}
+                c={pagoATerceros ? "yellow.3" : "zinc.4"}
+              >
+                Pago a terceros
+              </Text>
+            }
+          />
+        </Group>
       }
     >
       <Stack gap="md">
@@ -242,7 +317,7 @@ export const ModalRegistroRapidoAnticipo = ({
 
             <Select
               label="Cuenta del proveedor (destino)"
-              placeholder="Seleccione cuenta"
+              placeholder="Seleccione"
               data={cuentasProveedor.map((c) => ({
                 value: String(c.id),
                 label: c.label,
@@ -253,21 +328,23 @@ export const ModalRegistroRapidoAnticipo = ({
               size="xs"
               radius="lg"
               searchable
-              required
+              clearable
+              withAsterisk={!pagoATerceros}
+              required={!pagoATerceros}
             />
           </SimpleGrid>
         )}
 
         {/* Fecha, N° Operación y Recibo */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <TextInput
-            label="Fecha y hora del pago"
-            type="datetime-local"
+          <CustomDatePicker
+            label="Fecha del pago"
             value={fechaHoraPago}
-            onChange={(e) => setFechaHoraPago(e.currentTarget.value)}
+            onChange={(v) => setFechaHoraPago(v)}
             classNames={inputClasses}
             size="xs"
             radius="lg"
+            withAsterisk
             required
           />
 
@@ -282,6 +359,46 @@ export const ModalRegistroRapidoAnticipo = ({
               radius="lg"
               required
             />
+          ) : requiereCambista ? (
+            <Group align="flex-end" wrap="nowrap" gap="xs">
+              <Select
+                label="Cambista"
+                placeholder={
+                  loadingCambistas ? "Cargando..." : "Seleccione"
+                }
+                data={cambistas.map((c) => ({
+                  value: String(c.id_cambista),
+                  label: c.nombre,
+                }))}
+                value={idCambista}
+                onChange={setIdCambista}
+                searchable
+                clearable
+                disabled={loadingCambistas}
+                rightSection={
+                  loadingCambistas ? (
+                    <Loader size="xs" color="indigo" />
+                  ) : undefined
+                }
+                classNames={inputClasses}
+                size="xs"
+                radius="lg"
+                withAsterisk
+                required
+                style={{ flexGrow: 1, minWidth: 0 }}
+              />
+              <ActionIcon
+                onClick={() => setModalNuevoCambistaAbierto(true)}
+                color="indigo"
+                variant="light"
+                size="lg"
+                title="Anadir cambista"
+                aria-label="Anadir cambista"
+                className="mb-1"
+              >
+                <IconPlus size={18} />
+              </ActionIcon>
+            </Group>
           ) : (
             <TextInput
               label="N° Recibo / Vale (opcional)"
@@ -295,29 +412,23 @@ export const ModalRegistroRapidoAnticipo = ({
           )}
         </SimpleGrid>
 
-        {requiereBanco && (
-          <TextInput
-            label="N° Comprobante / Recibo de referencia (opcional)"
-            placeholder="Ej. FAC-001 o REC-001"
-            value={codigoComprobante}
-            onChange={(e) => setCodigoComprobante(e.currentTarget.value.toUpperCase())}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-          />
-        )}
+        {/* N° Comprobante / Recibo de referencia: opcional y se ve siempre. */}
+      <TextInput
+        label="N° Comprobante / Recibo de referencia (opcional)"
+        placeholder="Ej. FAC-001 o REC-001"
+        value={codigoComprobante}
+        onChange={(e) => setCodigoComprobante(e.currentTarget.value.toUpperCase())}
+        classNames={inputClasses}
+        size="xs"
+        radius="lg"
+      />
 
-        {/* Voucher / Evidencias */}
-        <FileInput
-          label="Voucher / Evidencia del anticipo (opcional)"
-          placeholder="Adjuntar voucher"
-          multiple
-          value={archivos}
-          onChange={setArchivos}
-          leftSection={<IconUpload size={16} />}
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
+        {/* Evidencias */}
+        <MultiFilePicker
+          label="Evidencias"
+          description="Opcional. PDF, JPG, PNG, etc."
+          files={archivos}
+          onFilesChange={setArchivos}
         />
 
         {/* Observación */}
@@ -354,6 +465,24 @@ export const ModalRegistroRapidoAnticipo = ({
           </Button>
         </Group>
       </Stack>
+
+      <ModalNuevoCambista
+        opened={modalNuevoCambistaAbierto}
+        close={() => setModalNuevoCambistaAbierto(false)}
+        onCreated={(c) => {
+          // Sumamos la fila creada (viene con id_cambista + nombre del
+          // back) al listado del select y la dejamos auto-seleccionada.
+          setCambistas((prev) => {
+            const sinDup = prev.filter(
+              (x) => x.id_cambista !== c.id_cambista,
+            );
+            return [...sinDup, c].sort((a, b) =>
+              a.nombre.localeCompare(b.nombre),
+            );
+          });
+          setIdCambista(String(c.id_cambista));
+        }}
+      />
     </ModalEstandar>
   );
 };

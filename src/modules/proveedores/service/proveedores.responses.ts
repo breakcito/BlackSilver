@@ -121,6 +121,9 @@ export interface AnticipoProveedorResponse {
   cuenta_proveedor_moneda: Moneda | null;
   cuenta_proveedor_cci: string | null;
   cuenta_proveedor_banco: string | null;
+  /** Cambista que entrego la plata cuando el medio de pago es Efectivo. */
+  id_cambista: number | null;
+  cambista_nombre: string | null;
   medio_pago: MedioPago | null;
   fecha_hora_pago: string | null;
   numero_operacion: string | null;

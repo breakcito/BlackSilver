@@ -1,31 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActionIcon,
   Alert,
-  Badge,
   Button,
   Group,
   Loader,
   NumberInput,
   Select,
   Stack,
-  Text,
-  Textarea,
   TextInput,
 } from "@mantine/core";
-import { TimePicker } from "@mantine/dates";
 import {
   IconAlertTriangle,
-  IconBuildingBank,
-  IconNotes,
-  IconWallet,
+  IconPlus,
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 
 import { MedioPago } from "../../../../../shared/enums/anticipo-proveedor/medio-pago";
 import { getCoincidencias } from "../../../../../shared/functions/get-coincidencias";
-import { formatMontoPEN } from "../../../../../shared/functions/format-monto-pen";
 import { AuxService } from "../../../../../service/auxiliar.service";
+import {
+  CambistaService,
+  type RES_Cambista,
+} from "../../../../../service/cambista.service";
 import type { RES_Empresa } from "../../../../../service/responses/empresa";
 import type { RES_CuentaEmpresa } from "../../../../../service/responses/cuenta-empresa";
 import { EstadoBase } from "../../../../../shared/enums/_generic/estado-base";
@@ -41,6 +39,7 @@ import type {
   CuentaBancariaResponse,
 } from "../../../service/proveedores.responses";
 import type { ProveedoresService } from "../../../service/proveedores.service";
+import { ModalNuevoCambista } from "./modal-nuevo-cambista";
 
 dayjs.locale("es");
 
@@ -59,19 +58,6 @@ const MEDIOS_PAGO = [
 
 const DEFAULT_CUPPER_ID = 1;
 const MAX_OBSERVACION = 500;
-
-/**
- * `TimePicker` renderiza su raiz como `div`, asi que `autoComplete` y los
- * atributos anti-LastPass tienen que viajar por `hoursInputProps` /
- * `minutesInputProps`: en la raiz se ignorarian y el gestor de contrasenas
- * meteria texto en los spin inputs de hora.
- */
-const INPUT_AUTOFILL = {
-  autoComplete: "off",
-  "data-form-type": "other",
-  "data-lpignore": "true",
-};
-
 
 interface Props {
   idProveedor: number;
@@ -133,8 +119,9 @@ export const RegistroAnticipo = ({
     null,
   );
   const [monto, setMonto] = useState<number | string>("");
-  const [fechaPago, setFechaPago] = useState<Date | null>(null);
-  const [horaPago, setHoraPago] = useState("");
+  // Por defecto: la fecha de hoy, para no obligar al operador a tipearla dos
+  // veces al dia siguiente de cargar el modulo.
+  const [fechaPago, setFechaPago] = useState<Date | null>(() => new Date());
   const [numeroOperacion, setNumeroOperacion] = useState("");
   const [factura, setFactura] = useState("");
   const [observacion, setObservacion] = useState("");
@@ -143,6 +130,12 @@ export const RegistroAnticipo = ({
   const [empresas, setEmpresas] = useState<RES_Empresa[]>([]);
   const [cuentasEmpresa, setCuentasEmpresa] = useState<RES_CuentaEmpresa[]>([]);
   const [busquedaEmpresa, setBusquedaEmpresa] = useState("");
+  const [cambistas, setCambistas] = useState<RES_Cambista[]>([]);
+  const [idCambista, setIdCambista] = useState<string | null>(null);
+  const [busquedaCambista, setBusquedaCambista] = useState("");
+  const [modalNuevoCambistaAbierto, setModalNuevoCambistaAbierto] =
+    useState(false);
+  const [loadingCambistas, setLoadingCambistas] = useState(true);
   const [busquedaCuentaEmpresa, setBusquedaCuentaEmpresa] = useState("");
   const [busquedaCuentaProveedor, setBusquedaCuentaProveedor] = useState("");
 
@@ -184,6 +177,29 @@ export const RegistroAnticipo = ({
         console.error("No se pudieron cargar las empresas", e);
       } finally {
         if (!cancel) setLoadingEmpresas(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Cambistas: lista chica y estable, la cargamos 1 sola vez al
+    // montar. El "+" reabre `CambistaService.listar()` desde el modal de
+    // alta para refrescar el select.
+    let cancel = false;
+    setLoadingCambistas(true);
+    (async () => {
+      try {
+        const resp = await CambistaService.listar();
+        if (!cancel && resp.success && Array.isArray(resp.data)) {
+          setCambistas(resp.data);
+        }
+      } catch (e) {
+        console.error("No se pudieron cargar los cambistas", e);
+      } finally {
+        if (!cancel) setLoadingCambistas(false);
       }
     })();
     return () => {
@@ -241,6 +257,16 @@ export const RegistroAnticipo = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cuentasEmpresa]);
 
+  // Pago a terceros: vaciamos la cuenta destino al activar el switch,
+  // para que la UI arranque sin nada seleccionado (como pide el operador).
+  // Al desactivarlo, no tocamos la seleccion: si el operador la dejo
+  // cargada antes de activar el switch, se mantiene.
+  useEffect(() => {
+    if (pagoATerceros) {
+      setIdCuentaProveedor(null);
+    }
+  }, [pagoATerceros]);
+
   // --- Datos para los Select (getCoincidencias) --------------------------
 
   const empresasVisibles = useMemo(() => {
@@ -271,62 +297,25 @@ export const RegistroAnticipo = ({
 
   const requiereBanco =
     medioPago === MedioPago.Transferencia || medioPago === MedioPago.Deposito;
+  const requiereCambista = medioPago === MedioPago.Efectivo;
 
-  const cuentaEmpresaElegida = cuentasEmpresa.find(
-    (c) => String(c.id_cuenta_bancaria) === idCuentaEmpresa,
-  );
-  const cuentaProveedorElegida = cuentasProveedor.find(
-    (c) => String(c.id_cuenta_bancaria) === idCuentaProveedor,
-  );
-
-  const etiquetaCuentaEmpresa = cuentaEmpresaElegida
-    ? `${cuentaEmpresaElegida.banco} · ${cuentaEmpresaElegida.moneda} · ${cuentaEmpresaElegida.numero_cuenta}`
-    : "";
-  const etiquetaCuentaProveedor = cuentaProveedorElegida
-    ? `${cuentaProveedorElegida.banco} · ${cuentaProveedorElegida.moneda} · ${cuentaProveedorElegida.numero_cuenta}`
-    : "";
-
-  const hayCambios =
-    monto !== "" ||
-    fechaPago !== null ||
-    horaPago !== "" ||
-    numeroOperacion !== "" ||
-    factura !== "" ||
-    observacion !== "" ||
-    evidencias.length > 0;
-
-  const limpiarCampos = () => {
-    setMonto("");
-    setFechaPago(null);
-    setHoraPago("");
-    setNumeroOperacion("");
-    setFactura("");
-    setObservacion("");
-    setEvidencias([]);
-  };
+  const cambistasVisibles = useMemo(() => {
+    const q = busquedaCambista.trim();
+    if (!q) return cambistas;
+    return getCoincidencias(cambistas, q, {
+      keys: ["nombre"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [cambistas, busquedaCambista]);
 
   const handleGuardar = async () => {
     setErrorServidor(null);
 
-    // `fecha_hora_pago` solo se arma si el operador capturo al menos la
-    // fecha. Con fecha pero sin hora usamos 00:00 para respetar el
-    // formato Y-m-d H:i:s que espera el backend.
-    let fechaHoraPago: string | null = null;
-    if (fechaPago) {
-      const fechaBase = dayjs(fechaPago).format("YYYY-MM-DD");
-      const hora = horaPago.trim() === "" ? "00:00" : horaPago.trim();
-      const candidato = dayjs(`${fechaBase} ${hora}`);
-      if (!candidato.isValid()) {
-        limpiarError("horaPago");
-        setErrores((prev) => ({
-          ...prev,
-          horaPago: "La hora del pago no es valida",
-        }));
-        return;
-      }
-      fechaHoraPago = candidato.format("YYYY-MM-DD HH:mm:ss");
-    }
-    limpiarError("horaPago");
+    // `fecha_hora_pago` se persiste solo con la fecha (el back le agrega
+    // ` 00:00:00` si no viene con hora, para respetar el DATETIME).
+    const fechaHoraPago = fechaPago
+      ? dayjs(fechaPago).format("YYYY-MM-DD")
+      : null;
 
     const payload: RegistrarAnticipoRequest = {
       id_empresa: Number(idEmpresa),
@@ -335,6 +324,10 @@ export const RegistroAnticipo = ({
         : null,
       id_cuenta_bancaria_proveedor:
         !pagoATerceros && idCuentaProveedor ? Number(idCuentaProveedor) : null,
+      // En Efectivo la plata sale del bolsillo del cambista, no de una
+      // cuenta. Para los demas medios de pago va null (el back lo
+      // normaliza de todos modos).
+      id_cambista: idCambista ? Number(idCambista) : null,
       medio_pago: medioPago as RegistrarAnticipoRequest["medio_pago"],
       fecha_hora_pago: fechaHoraPago,
       numero_operacion: numeroOperacion.trim() || null,
@@ -376,10 +369,9 @@ export const RegistroAnticipo = ({
       }
 
       notifySuccess("Anticipo registrado correctamente");
-      // `limpiarCampos` va antes del cierre a proposito: `Modal` no
-      // desmonta sus hijos al cerrarse, asi que sin esto los valores
-      // reaparecerian intactos la proxima vez que se abra el modal.
-      limpiarCampos();
+      // El padre remonta `<RegistroAnticipo>` (key=`openRegistro`): no hace
+      // falta limpiar campos manualmente, el siguiente `useState` ya
+      // arranca con la fecha de hoy y los strings vacios.
       onCancel();
       // El POST ya devuelve la fila creada con el mismo SELECT que usa el
       // listado, asi que se la pasa al padre en vez de pedirle la lista
@@ -463,62 +455,44 @@ export const RegistroAnticipo = ({
           classNames={fieldClasses}
         />
         <NumberInput
+          label="Monto del Anticipo (S/)"
           placeholder="0.00"
-          size="xs"
-          label="Monto del anticipo"
-          radius="lg"
-          fw={700}
-          fixedDecimalScale
-          thousandSeparator=","
-          prefix="S/ "
           value={monto}
           onChange={(v) => {
             setMonto(v);
             limpiarError("saldo");
           }}
+          fixedDecimalScale
           error={errores.saldo}
-          hideControls
+          classNames={fieldClasses}
+          size="xs"
+          radius="lg"
           required
-          classNames={{
-            input:
-              "bg-zinc-900/70 border-indigo-500/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 text-white  font-mono transition-all",
-          }}
         />
       </Group>
 
-      {/* --- Cuentas: origen (empresa) y destino (proveedor) --- */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
-        <Group gap={6} align="center">
-          <IconWallet size={12} className="text-teal-400" />
-          <Text size="xs" fw={700} c={"gray.3"} className="uppercase " mt={2}>
-            Cuentas
-          </Text>
-        </Group>
+      {/* --- Cuentas: origen (empresa) y destino (proveedor) | solo si requiereBanco --- */}
+      {requiereBanco && (
         <Group grow align="flex-start">
           <Select
-            label={
-              <>
-                De dónde sale el dinero{" "}
-                {requiereBanco && <span className="text-red-5">*</span>}
-              </>
-            }
+            label="Cuenta de la empresa (origen)"
             radius="lg"
             size="xs"
             searchable
             clearable
+            withAsterisk
+            required
             placeholder={
               loadingCuentas
                 ? "Cargando..."
-                : requiereBanco
-                  ? "Seleccione"
-                  : "No aplica"
+                : "Seleccione"
             }
             data={
               loadingCuentas
                 ? []
                 : cuentasEmpresaVisibles.map((c) => ({
                     value: String(c.id_cuenta_bancaria),
-                    label: `${c.banco} · ${c.moneda} · ${c.numero_cuenta}`,
+                    label: `${c.banco} (${c.numero_cuenta}) - ${c.moneda}`,
                   }))
             }
             value={idCuentaEmpresa}
@@ -528,10 +502,8 @@ export const RegistroAnticipo = ({
             }}
             searchValue={busquedaCuentaEmpresa}
             onSearchChange={setBusquedaCuentaEmpresa}
-            nothingFoundMessage={
-              loadingCuentas ? "Cargando..." : "Sin coincidencias"
-            }
-            disabled={!idEmpresa || !requiereBanco || loadingCuentas}
+            nothingFoundMessage="Sin coincidencias"
+            disabled={!idEmpresa || loadingCuentas}
             rightSection={
               loadingCuentas ? <Loader size="xs" color="indigo" /> : undefined
             }
@@ -539,15 +511,17 @@ export const RegistroAnticipo = ({
             classNames={fieldClasses}
           />
           <Select
-            label="Cuenta destino del proveedor"
+            label="Cuenta del proveedor (destino)"
             radius="lg"
             size="xs"
             searchable
             clearable
-            placeholder={pagoATerceros ? "No aplica" : "Seleccione (opcional)"}
+            withAsterisk={!pagoATerceros}
+            required={!pagoATerceros}
+            placeholder="Seleccione"
             data={cuentasProveedorVisibles.map((c) => ({
               value: String(c.id_cuenta_bancaria),
-              label: `${c.banco} · ${c.moneda} · ${c.numero_cuenta}${c.cci ? ` · CCI ${c.cci}` : ""}`,
+              label: `${c.banco} (${c.numero_cuenta})`,
             }))}
             value={idCuentaProveedor}
             onChange={(v) => {
@@ -557,40 +531,84 @@ export const RegistroAnticipo = ({
             searchValue={busquedaCuentaProveedor}
             onSearchChange={setBusquedaCuentaProveedor}
             nothingFoundMessage="Sin coincidencias"
-            disabled={pagoATerceros}
             error={errores.id_cuenta_bancaria_proveedor}
             classNames={fieldClasses}
           />
         </Group>
-        {pagoATerceros && (
-          <Text size="xs" c="yellow.4" mt="xs">
-            El dinero no se depositó en una cuenta del proveedor.
-          </Text>
-        )}
-      </div>
+      )}
 
-      {/* --- Referencia bancaria y fecha --- */}
+      {/* --- Referencia bancaria, fecha y factura --- */}
       <Group grow align="flex-start">
-        <TextInput
-          label={"Número de operación"}
-          placeholder="Ej. OP-987654"
-          radius="lg"
-          size="xs"
-          value={numeroOperacion}
-          onChange={(e) => {
-            setNumeroOperacion(
-              e.currentTarget.value.toUpperCase().slice(0, 64),
-            );
-            limpiarError("numero_operacion");
-          }}
-          error={errores.numero_operacion}
-          classNames={fieldClasses}
-          name="anticipo_numero_operacion"
-          autoComplete="off"
-          data-form-type="other"
-          data-lpignore="true"
-          required={requiereBanco}
-        />
+        {requiereBanco ? (
+          <TextInput
+            label={"N° Operación bancaria"}
+            placeholder="Ej. OP-987654"
+            radius="lg"
+            size="xs"
+            value={numeroOperacion}
+            onChange={(e) => {
+              setNumeroOperacion(
+                e.currentTarget.value.toUpperCase().slice(0, 64),
+              );
+              limpiarError("numero_operacion");
+            }}
+            error={errores.numero_operacion}
+            classNames={fieldClasses}
+            withAsterisk
+            required
+          />
+        ) : requiereCambista ? (
+          <Group align="flex-end" wrap="nowrap" gap="xs">
+            <Select
+              label="Cambista"
+              radius="lg"
+              size="xs"
+              searchable
+              clearable
+              withAsterisk
+              required
+              placeholder={
+                loadingCambistas ? "Cargando..." : "Seleccione"
+              }
+              data={
+                loadingCambistas
+                  ? []
+                  : cambistasVisibles.map((c) => ({
+                      value: String(c.id_cambista),
+                      label: c.nombre,
+                    }))
+              }
+              value={idCambista}
+              onChange={(v) => {
+                setIdCambista(v);
+                limpiarError("id_cambista");
+              }}
+              searchValue={busquedaCambista}
+              onSearchChange={setBusquedaCambista}
+              nothingFoundMessage="Sin coincidencias"
+              disabled={loadingCambistas}
+              rightSection={
+                loadingCambistas ? (
+                  <Loader size="xs" color="indigo" />
+                ) : undefined
+              }
+              error={errores.id_cambista}
+              classNames={fieldClasses}
+              style={{ flexGrow: 1, minWidth: 0 }}
+            />
+            <ActionIcon
+              onClick={() => setModalNuevoCambistaAbierto(true)}
+              color="indigo"
+              variant="light"
+              size="lg"
+              title="Anadir cambista"
+              aria-label="Anadir cambista"
+              className="mb-1"
+            >
+              <IconPlus size={18} />
+            </ActionIcon>
+          </Group>
+        ) : null}
         <CustomDatePicker
           label={"Fecha del pago"}
           placeholder="Seleccione fecha"
@@ -604,92 +622,37 @@ export const RegistroAnticipo = ({
           required={requiereBanco}
           radius="lg"
           size="xs"
+          withAsterisk
         />
-        {/* `TimePicker` y no `TimeInput`: en Mantine v8 `TimeInput` quedo
-            como un input de texto plano (sus unicas props son `withSeconds`,
-            `minTime`, `maxTime`), sin lista de horas. Ahi el operador tiene
-            que teclear 24h a ciegas y escribir "8:14" thinking en 12h deja el
-            campo en blanco. `format="24h"` quita el AM/PM y `withDropdown`
-            muestra las columnas 00-23 y 00-59, de modo que la ambiguedad
-            desaparece en lugar de depender de que el operador la adivine.
-            El `onChange` emite `"HH:mm"`, el mismo formato que espera
-            `dayjs` en `handleGuardar`. */}
-        <TimePicker
-          label="Hora (24 h)"
-          format="24h"
-          withDropdown
+        <TextInput
+          label="Factura / comprobante"
+          placeholder="Ej. F001-00123"
           radius="lg"
           size="xs"
-          value={horaPago}
-          onChange={(v) => {
-            setHoraPago(v);
-            limpiarError("horaPago");
+          value={factura}
+          onChange={(e) => {
+            setFactura(e.currentTarget.value.toUpperCase().slice(0, 64));
+            limpiarError("codigo_comprobante");
           }}
-          error={errores.horaPago}
-          classNames={{
-            ...fieldClasses,
-            fieldsGroup: "w-full justify-center",
-          }}
-          name="anticipo_hora_pago"
-          hoursInputLabel="Hora"
-          minutesInputLabel="Minuto"
-          hoursInputProps={INPUT_AUTOFILL}
-          minutesInputProps={INPUT_AUTOFILL}
+          error={errores.codigo_comprobante}
+          classNames={fieldClasses}
         />
       </Group>
 
-      {/* --- Comprobante --- */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
-        <Group gap={6} align="center">
-          <IconNotes size={12} className="text-blue-400" />
-          <Text size="xs" fw={700} c={"gray.3"} className="uppercase " mt={2}>
-            Comprobante
-          </Text>
-        </Group>
-        <Group grow align="flex-start">
-          <TextInput
-            label="Factura / comprobante"
-            placeholder="Ej. F001-00123"
-            radius="lg"
-            size="xs"
-            value={factura}
-            onChange={(e) => {
-              setFactura(e.currentTarget.value.toUpperCase().slice(0, 64));
-              limpiarError("codigo_comprobante");
-            }}
-            error={errores.codigo_comprobante}
-            classNames={fieldClasses}
-            name="anticipo_codigo_comprobante"
-            autoComplete="off"
-            data-form-type="other"
-            data-lpignore="true"
-          />
-          <Textarea
-            label="Observación"
-            placeholder="Motivo, detalle del pago a terceros, etc."
-            radius="lg"
-            size="xs"
-            autosize
-            minRows={1}
-            maxRows={4}
-            value={observacion}
-            onChange={(e) => {
-              setObservacion(e.currentTarget.value);
-              limpiarError("observacion");
-            }}
-            maxLength={MAX_OBSERVACION}
-            error={errores.observacion}
-            classNames={fieldClasses}
-            name="anticipo_observacion"
-            autoComplete="off"
-            data-form-type="other"
-            data-lpignore="true"
-          />
-        </Group>
-        <Text size="10px" c="dimmed" ta="right" mt={4}>
-          {observacion.length}/{MAX_OBSERVACION}
-        </Text>
-      </div>
+      {/* --- Observacion --- */}
+      <TextInput
+        label="Observación"
+        placeholder="Motivo, detalle del pago a terceros, etc."
+        radius="lg"
+        size="xs"
+        value={observacion}
+        onChange={(e) => {
+          setObservacion(e.currentTarget.value.slice(0, MAX_OBSERVACION));
+          limpiarError("observacion");
+        }}
+        error={errores.observacion}
+        classNames={fieldClasses}
+      />
 
       <MultiFilePicker
         label="Evidencias"
@@ -698,84 +661,48 @@ export const RegistroAnticipo = ({
         onFilesChange={setEvidencias}
       />
 
-      {/* --- Resumen: el operador ve a donde va el dinero antes de guardar --- */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-3">
-        <Text
-          size="10px"
-          fw={700}
-          className="uppercase tracking-widest text-zinc-500 mb-2"
-        >
-          Resumen del pago
-        </Text>
-        <Group justify="space-between" gap="md" wrap="nowrap">
-          <Group gap="xs" wrap="nowrap" className="min-w-0 flex-1">
-            <IconBuildingBank size={16} className="shrink-0 text-zinc-500" />
-            <Text size="xs" className="truncate" c="zinc.3">
-              {etiquetaCuentaEmpresa || "Cuenta de la empresa sin elegir"}
-            </Text>
-            <Text size="xs" c="zinc.6" className="shrink-0">
-              →
-            </Text>
-            <Badge
-              size="sm"
-              radius="xl"
-              variant="light"
-              color={pagoATerceros ? "yellow" : "indigo"}
-              className="shrink-0"
-            >
-              {pagoATerceros ? "Tercero" : "Proveedor"}
-            </Badge>
-            <Text size="xs" className="truncate" c="zinc.3">
-              {pagoATerceros
-                ? "cuenta no registrada"
-                : etiquetaCuentaProveedor || "sin cuenta indicada"}
-            </Text>
-          </Group>
-          <Text
-            size="sm"
-            fw={700}
-            className="font-mono text-emerald-400 shrink-0"
-          >
-            {monto !== "" && Number.isFinite(Number(monto))
-              ? formatMontoPEN(Number(monto))
-              : "S/ 0.00"}
-          </Text>
-        </Group>
-      </div>
-
-      <Group justify="space-between">
+      <Group justify="flex-end">
         <Button
-          variant="subtle"
-          color="gray"
+          variant="default"
           radius="xl"
           size="xs"
-          onClick={limpiarCampos}
-          disabled={!hayCambios}
+          onClick={onCancel}
+          disabled={guardando}
+          className="bg-zinc-800! text-zinc-300! border-zinc-700!"
         >
-          Limpiar
+          Cerrar
         </Button>
-        <Group gap="sm">
-          <Button
-            variant="default"
-            radius="xl"
-            size="xs"
-            onClick={onCancel}
-            disabled={guardando}
-            className="bg-zinc-800! text-zinc-300! border-zinc-700!"
-          >
-            Cerrar
-          </Button>
-          <Button
-            radius="xl"
-            size="xs"
-            loading={guardando}
-            onClick={handleGuardar}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-900/20"
-          >
-            Registrar anticipo
-          </Button>
-        </Group>
+        <Button
+          radius="xl"
+          size="xs"
+          loading={guardando}
+          onClick={handleGuardar}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-900/20"
+        >
+          Registrar anticipo
+        </Button>
       </Group>
+
+      <ModalNuevoCambista
+        opened={modalNuevoCambistaAbierto}
+        close={() => setModalNuevoCambistaAbierto(false)}
+        onCreated={(c) => {
+          // Refrescamos la lista con la fila que acaba de crear el back
+          // (incluye id y nombre). Como usamos `id_cambista` para
+          // autoseleccionar, NO necesitamos volver a pegarle al
+          // GET /cambistas.
+          setCambistas((prev) => {
+            const sinDup = prev.filter(
+              (x) => x.id_cambista !== c.id_cambista,
+            );
+            return [...sinDup, c].sort((a, b) =>
+              a.nombre.localeCompare(b.nombre),
+            );
+          });
+          setIdCambista(String(c.id_cambista));
+          setBusquedaCambista("");
+        }}
+      />
     </Stack>
   );
 };

@@ -71,7 +71,17 @@ export const ProveedoresService = {
     const { data } = await api.get(
       `/proveedores/cuentas-bancarias/${idProveedor}`,
     );
-    return data.data;
+    // El back responde `IRespuesta<T>` (`{success, data, message}`); el
+    // `data.data` extrae el array. Si por alguna razon llegara plano
+    // (sin envolver) o `data` viniera null, devolvemos un array vacio
+    // para que el consumidor `Array.isArray(res)` no descarte la carga.
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object" && Array.isArray(data.data)) {
+      return data.data;
+    }
+    return [];
   },
 
   /**
@@ -268,6 +278,9 @@ export const ProveedoresService = {
         "id_cuenta_bancaria_proveedor",
         String(payload.id_cuenta_bancaria_proveedor),
       );
+    }
+    if (payload.id_cambista) {
+      fd.append("id_cambista", String(payload.id_cambista));
     }
     if (payload.medio_pago) {
       fd.append("medio_pago", String(payload.medio_pago));

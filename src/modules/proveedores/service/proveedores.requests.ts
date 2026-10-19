@@ -291,14 +291,23 @@ export const Schema_RegistrarAnticipo = z
       .positive()
       .nullable()
       .optional(),
+    // Cambista: requerido cuando el medio de pago es Efectivo, null en
+    // cualquier otro. Lo validamos en `superRefine`.
+    id_cambista: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional(),
     medio_pago: z.nativeEnum(MedioPago, {
       error: "Seleccione el medio de pago",
     }),
     fecha_hora_pago: z
       .string()
       .regex(
-        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
-        "Formato de fecha y hora invalido",
+        // El back acepta fecha sola o fecha+hora (con ` 00:00:00` si va sola).
+        /^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?$/,
+        "Formato de fecha invalido",
       )
       .nullable()
       .optional(),
@@ -318,40 +327,62 @@ export const Schema_RegistrarAnticipo = z
       .nullable()
       .optional(),
     // Opcional (no `.default`) a proposito: asi el tipo de salida sigue
-    // aceptando payloads que no lo envian, como el registro rapido de
+    // aceptando payloads que no lo envien, como el registro rapido de
     // anticipo dentro de la liquidacion de compra-carbon.
     pago_a_terceros: z.boolean().optional(),
     saldo: z.number().positive("El saldo debe ser mayor a 0"),
   })
   .superRefine((data, ctx) => {
-    // Transferencia y Deposito salen de una cuenta bancaria: sin origen,
-    // fecha y numero de operacion el anticipo no es trazable.
     const requiereBanco =
       data.medio_pago === MedioPago.Transferencia ||
       data.medio_pago === MedioPago.Deposito;
+    const requiereCambista = data.medio_pago === MedioPago.Efectivo;
 
-    if (!requiereBanco) return;
-
-    if (!data.id_cuenta_bancaria_empresa) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Selecciona la cuenta de la empresa de donde sale el dinero",
-        path: ["id_cuenta_bancaria_empresa"],
-      });
-    }
-    if (!data.fecha_hora_pago) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Indica la fecha del pago",
-        path: ["fecha_hora_pago"],
-      });
-    }
-    if (!data.numero_operacion?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Indica el numero de operacion",
-        path: ["numero_operacion"],
-      });
+    if (requiereBanco) {
+      // Transferencia y Deposito salen de una cuenta bancaria: sin origen,
+      // fecha y numero de operacion el anticipo no es trazable.
+      if (!data.id_cuenta_bancaria_empresa) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Selecciona la cuenta de la empresa de donde sale el dinero",
+          path: ["id_cuenta_bancaria_empresa"],
+        });
+      }
+      if (!data.fecha_hora_pago) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Indica la fecha del pago",
+          path: ["fecha_hora_pago"],
+        });
+      }
+      if (!data.numero_operacion?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Indica el numero de operacion",
+          path: ["numero_operacion"],
+        });
+      }
+      // Si NO es pago a terceros, la cuenta destino del proveedor es
+      // obligatoria. Con pago a terceros, el operador la deja vacia.
+      if (!data.pago_a_terceros && !data.id_cuenta_bancaria_proveedor) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Selecciona la cuenta destino del proveedor (o activa pago a terceros)",
+          path: ["id_cuenta_bancaria_proveedor"],
+        });
+      }
+    } else if (requiereCambista) {
+      // Efectivo: la plata sale del bolsillo del cambista, no de una
+      // cuenta bancaria. Es obligatorio identificarlo.
+      if (!data.id_cambista) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Selecciona el cambista",
+          path: ["id_cambista"],
+        });
+      }
     }
   });
 

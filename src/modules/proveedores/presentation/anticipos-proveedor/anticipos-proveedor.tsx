@@ -18,6 +18,7 @@ import {
   IconPlus,
   IconSearch,
   IconTrendingDown,
+  IconUser,
   IconUsers,
 } from "@tabler/icons-react";
 import type { DataTableColumn } from "mantine-datatable";
@@ -263,6 +264,7 @@ export const AnticiposProveedor = ({
         "observacion",
         "cuenta_proveedor_numero",
         "cuenta_bancaria_numero",
+        "cambista_nombre",
         "empresa_nombre",
       ],
       fuseThreshold: 0.4,
@@ -310,18 +312,11 @@ export const AnticiposProveedor = ({
         width: 110,
         textAlign: "center",
         render: (a) => (
-          <div>
-            <Text size="xs" className="text-zinc-200 font-mono">
-              {a.fecha_hora_pago
-                ? dayjs(a.fecha_hora_pago).format("DD/MM/YYYY")
-                : "—"}
-            </Text>
-            <Text size="11px" c="gray.4" className="font-mono">
-              {a.fecha_hora_pago
-                ? dayjs(a.fecha_hora_pago).format("HH:mm")
-                : `Reg. ${dayjs(a.created_at).format("DD/MM/YY")}`}
-            </Text>
-          </div>
+          <Text size="xs" className="text-zinc-200 font-mono">
+            {a.fecha_hora_pago
+              ? dayjs(a.fecha_hora_pago).format("DD/MM/YYYY")
+              : "—"}
+          </Text>
         ),
       },
       {
@@ -368,17 +363,27 @@ export const AnticiposProveedor = ({
         accessor: "id_cuenta_bancaria_empresa",
         title: "Origen",
         textAlign: "center",
-        width: 180,
+        width: 200,
         render: (a) => (
           <div className="min-w-0">
             <Text size="xs" className="" c={"gray.3"} fw={600}>
               {a.empresa_nombre ?? "—"}
             </Text>
-            <Badge size="sm" color="cyan">
-              {a.cuenta_bancaria_numero
-                ? `${a.cuenta_bancaria_moneda ?? ""} ${a.cuenta_bancaria_numero ? " - " + a.cuenta_bancaria_numero : ""}`.trim()
-                : "sin cuenta"}
-            </Badge>
+            {a.cambista_nombre ? (
+              // Efectivo: la plata salio del bolsillo del cambista, no de
+              // una cuenta bancaria. Reemplazamos la "cuenta origen" por
+              // el nombre del cambista para que el operador sepa de donde
+              // salio el dinero de un vistazo.
+              <Badge size="sm" color="yellow" radius="xl" leftSection={<IconUser size={11} />}>
+                Cambista {a.cambista_nombre}
+              </Badge>
+            ) : (
+              <Badge size="sm" color="cyan">
+                {a.cuenta_bancaria_numero
+                  ? `${a.cuenta_bancaria_moneda ?? ""} ${a.cuenta_bancaria_numero ? " - " + a.cuenta_bancaria_numero : ""}`.trim()
+                  : "sin cuenta"}
+              </Badge>
+            )}
           </div>
         ),
       },
@@ -655,6 +660,13 @@ export const AnticiposProveedor = ({
         }
       >
         <RegistroAnticipo
+          // `key` cambia con `openRegistro`: al cerrar/abrir, React
+          // desmonta y vuelve a montar el componente, lo que reinicia
+          // todo su estado local (fechaPago vuelve a `new Date()`,
+          // monto/numeroOperacion a vacios, etc.). Asi el modal arranca
+          // siempre con la fecha de hoy, igual que el modal de
+          // compra-carbon.
+          key={openRegistro ? "open" : "closed"}
           idProveedor={idProveedor}
           cuentasProveedor={cuentasProveedor}
           pagoATerceros={pagoATerceros}
