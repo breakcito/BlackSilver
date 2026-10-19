@@ -16,6 +16,12 @@ export interface CompraCarbonResumen {
   tipo_carbon_prometido: string | null;
   tipo_carbon_prometido_codigo: string | null;
   id_tarifa_carbon: number | null;
+  id_cuenta_proveedor: number | null;
+  proveedor_cuenta_moneda?: string | null;
+  proveedor_cuenta_numero?: string | null;
+  proveedor_cuenta_cci?: string | null;
+  proveedor_cuenta_banco?: string | null;
+  proveedor_cuenta_banco_abv?: string | null;
   correlativo: string;
   numero_correlativo: number;
   aplica_igv: boolean | number;

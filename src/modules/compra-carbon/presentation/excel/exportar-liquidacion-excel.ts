@@ -65,12 +65,43 @@ export const exportarLiquidacionExcel = async (
   ws.getCell("C4").value = cabecera.correlativo;
   ws.getCell("C4").font = { ...fontHeader, color: { argb: "FFC00000" } };
 
+  // Datos bancarios del proveedor registrados en la orden (pueden ser null).
+  const dash = "-";
+  const numCuenta = cabecera.proveedor_cuenta_numero ?? dash;
+  const cci = cabecera.proveedor_cuenta_cci ?? dash;
+  const banco =
+    cabecera.proveedor_cuenta_banco ??
+    cabecera.proveedor_cuenta_banco_abv ??
+    dash;
+
+  ws.mergeCells("A5:B5");
+  ws.getCell("A5").value = "N° CUENTA:";
+  ws.getCell("A5").font = fontHeader;
+  ws.mergeCells("C5:F5");
+  ws.getCell("C5").value = numCuenta;
+  ws.getCell("C5").font = fontData;
+
+  ws.mergeCells("A6:B6");
+  ws.getCell("A6").value = "CCI:";
+  ws.getCell("A6").font = fontHeader;
+  ws.mergeCells("C6:F6");
+  ws.getCell("C6").value = cci;
+  ws.getCell("C6").font = fontData;
+
+  ws.mergeCells("A7:B7");
+  ws.getCell("A7").value = "BANCO:";
+  ws.getCell("A7").font = fontHeader;
+  ws.mergeCells("C7:F7");
+  ws.getCell("C7").value = banco;
+  ws.getCell("C7").font = fontData;
+
   ws.getCell("N2").value = "FECHA EMISIÓN:";
   ws.getCell("N2").font = fontHeader;
   ws.getCell("O2").value = dayjs().format("DD/MM/YYYY");
   ws.getCell("O2").font = fontData;
 
-  // Cabecera de la tabla (Fila 6 y 7)
+  // Cabecera de la tabla (Fila 9; se reserva 1-7 para los datos de cabecera
+// y datos bancarios del proveedor).
   const headersRow1 = [
     "ITEM", "FECHA", "MES", "RUC", "RAZON SOCIAL", "ORDEN DE COMPRA",
     "N° TICKET", "ALMACEN", "PLACA", "LUGAR EXTRACCIÓN",
@@ -78,7 +109,7 @@ export const exportarLiquidacionExcel = async (
     "P. BASE", "FLETE / TN", "P. MATERIA PRIMA", "FECHA FACT.", "N° FACTURA", "SUBTOTAL (S/)"
   ];
 
-  const headerRow = ws.getRow(6);
+  const headerRow = ws.getRow(9);
   headersRow1.forEach((h, idx) => {
     const cell = headerRow.getCell(idx + 1);
     cell.value = h;
@@ -89,7 +120,7 @@ export const exportarLiquidacionExcel = async (
   });
   headerRow.height = 24;
 
-  let currentLine = 7;
+  let currentLine = 10;
   let totalTM = 0;
   let subtotalGeneral = 0;
 

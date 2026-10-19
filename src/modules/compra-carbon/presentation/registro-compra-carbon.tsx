@@ -20,12 +20,15 @@ import {
   IconUsers,
   IconReceiptTax,
   IconCoin,
+  IconCreditCard,
 } from "@tabler/icons-react";
 
 import { useNotify } from "../../../hooks/useNotify";
 import { AuxService } from "../../../service/auxiliar.service";
 import type { RES_Empresa } from "../../../service/responses/empresa";
+import type { RES_CuentaProveedor } from "../../../service/responses/cuenta-proveedor";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
+import { Moneda } from "../../../shared/enums/_generic/moneda";
 import { TipoCarbonService } from "../../tipo-carbon/service/tipo-carbon.service";
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import type { ProveedorResponse } from "../../proveedores/service/proveedores.responses";
@@ -57,16 +60,24 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
   const [empresas, setEmpresas] = useState<RES_Empresa[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorResponse[]>([]);
   const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
+  const [cuentasProveedor, setCuentasProveedor] = useState<RES_CuentaProveedor[]>(
+    [],
+  );
 
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [loadingProveedores, setLoadingProveedores] = useState(true);
   const [loadingTipos, setLoadingTipos] = useState(false);
+  const [loadingCuentas, setLoadingCuentas] = useState(false);
 
   const [proveedorBusqueda, setProveedorBusqueda] = useState("");
+  const [cuentaBusqueda, setCuentaBusqueda] = useState("");
 
   // Cabecera preliminar
   const [idEmpresa, setIdEmpresa] = useState<string | null>(null);
   const [idProveedor, setIdProveedor] = useState<string | null>(null);
+  const [idCuentaProveedor, setIdCuentaProveedor] = useState<string | null>(
+    null,
+  );
   const [aplicaIgv, setAplicaIgv] = useState<boolean>(false);
   const [porcentajeIgv] = useState<number>(18);
 
@@ -166,6 +177,45 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     };
   }, [idProveedor]);
 
+  // Al cambiar de proveedor, cargar las cuentas bancarias en soles y que
+  // no sean de detraccion. Se limpian al cambiar de proveedor.
+  useEffect(() => {
+    setCuentasProveedor([]);
+    setIdCuentaProveedor(null);
+    setCuentaBusqueda("");
+
+    if (!idProveedor) {
+      return;
+    }
+
+    let cancel = false;
+    setLoadingCuentas(true);
+    (async () => {
+      try {
+        const cuentasRes = await AuxService.get_cuentas_proveedor({
+          id_proveedor: Number(idProveedor),
+          moneda: Moneda.Soles,
+          es_para_detraccion: false,
+        });
+        if (cancel) return;
+        if (cuentasRes.success && cuentasRes.data) {
+          const list = Array.isArray(cuentasRes.data)
+            ? cuentasRes.data
+            : [cuentasRes.data];
+          setCuentasProveedor(list);
+        }
+      } catch (err: unknown) {
+        console.error(err);
+      } finally {
+        if (!cancel) setLoadingCuentas(false);
+      }
+    })();
+
+    return () => {
+      cancel = true;
+    };
+  }, [idProveedor]);
+
   // Al seleccionar tipo de carbón, autocompletar con la tarifa más alta
   useEffect(() => {
     if (!idTipoCarbon) {
@@ -219,6 +269,16 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     }).map((r) => r.item);
   }, [proveedores, proveedorBusqueda]);
 
+  // Cuentas visibles con busqueda tolerante (Regla 11 README).
+  const cuentasVisibles = useMemo(() => {
+    const q = cuentaBusqueda.trim();
+    if (!q) return cuentasProveedor;
+    return getCoincidencias(cuentasProveedor, q, {
+      keys: ["banco", "numero_cuenta", "cci"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [cuentasProveedor, cuentaBusqueda]);
+
   // Cálculos de cotización
   const totalCotizado = useMemo(() => {
     const cant = Number(toneladasPrometidas) || 0;
@@ -262,6 +322,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         porcentaje_igv: aplicaIgv ? porcentajeIgv : 0,
         precio_unitario_cotizado: Number(precioUnitario) || 0,
         id_tarifa_carbon: idTarifaAuto,
+        id_cuenta_proveedor: idCuentaProveedor ? Number(idCuentaProveedor) : null,
       });
 
       if (res.success && res.data) {
@@ -297,7 +358,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
           Datos de la Compra
         </Text>
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
           <Select
             label="Empresa compradora"
             placeholder="Seleccione empresa"
@@ -328,7 +389,10 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
               label: `${p.razon_social} (${p.ruc || p.dni || "S/D"})`,
             }))}
             value={idProveedor}
-            onChange={setIdProveedor}
+            onChange={(val) => {
+              setIdProveedor(val);
+              setIdCuentaProveedor(null);
+            }}
             searchValue={proveedorBusqueda}
             onSearchChange={setProveedorBusqueda}
             leftSection={<IconUsers size={16} />}
@@ -342,6 +406,35 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             nothingFoundMessage="Sin coincidencias"
             size="xs"
             radius="lg"
+          />
+
+          <Select
+            label="Cuenta del proveedor"
+            placeholder={
+              idProveedor
+                ? "Seleccione cuenta"
+                : "Elija primero el proveedor"
+            }
+            data={cuentasVisibles.map((c) => ({
+              value: String(c.id_cuenta_bancaria),
+              label: `${c.banco} — ${c.numero_cuenta}${c.cci ? ` / CCI ${c.cci}` : ""}`,
+            }))}
+            value={idCuentaProveedor}
+            onChange={setIdCuentaProveedor}
+            searchValue={cuentaBusqueda}
+            onSearchChange={setCuentaBusqueda}
+            leftSection={<IconCreditCard size={16} />}
+            rightSection={
+              loadingCuentas ? <Loader size={14} color="indigo" /> : null
+            }
+            disabled={!idProveedor || loadingCuentas || saving}
+            classNames={inputClasses}
+            searchable
+            clearable
+            nothingFoundMessage="El proveedor no tiene cuentas en soles / sin detracción"
+            size="xs"
+            radius="lg"
+            comboboxProps={{ withinPortal: true }}
           />
         </SimpleGrid>
 

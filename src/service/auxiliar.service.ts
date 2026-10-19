@@ -35,6 +35,7 @@ import type {
 } from "./responses/ubicacion";
 import type { RES_Transportista } from "./responses/transportista";
 import type { RES_CuentaTransportista } from "./responses/cuenta-transportista";
+import type { RES_CuentaProveedor } from "./responses/cuenta-proveedor";
 import type { RES_TarifaCarbon } from "./responses/tarifa-carbon";
 import type { RES_LugarExtraccionCarbon } from "./responses/lugar-extraccion-carbon";
 
@@ -347,6 +348,33 @@ export const AuxService = {
       `${path}/cuentas-transportista`,
       nuevaCuenta,
     );
+    return data;
+  },
+
+  /**
+   * Cuentas bancarias del proveedor (catalogo de Compra de Carbón).
+   * Permite filtrar por moneda y/o es_para_detraccion para alimentar el
+   * Select del registro preliminar de la orden de compra.
+   */
+  get_cuentas_proveedor: async (filters?: {
+    id_proveedor?: number | number[];
+    id_cuenta_bancaria?: number | number[];
+    moneda?: Moneda;
+    es_para_detraccion?: boolean;
+    estado?: EstadoBase;
+  }): Promise<IRespuesta<RES_CuentaProveedor[] | RES_CuentaProveedor>> => {
+    const params = filters
+      ? {
+          ...filters,
+          ...(filters.es_para_detraccion !== undefined && {
+            es_para_detraccion: filters.es_para_detraccion ? 1 : 0,
+          }),
+        }
+      : undefined;
+
+    const { data } = await api.get<
+      IRespuesta<RES_CuentaProveedor[] | RES_CuentaProveedor>
+    >(`${path}/cuentas-proveedor`, { params });
     return data;
   },
 

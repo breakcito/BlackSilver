@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import {
   Badge,
   Button,
@@ -12,7 +12,6 @@ import {
 } from "@mantine/core";
 import {
   IconCoin,
-  IconDownload,
   IconLock,
   IconPlus,
   IconReceipt,
@@ -31,7 +30,6 @@ import type {
   RespuestaRegistrarPagoTransporte,
 } from "../service/compra-carbon.responses";
 import { formatNumber } from "../../../shared/functions/formatNumber";
-import { exportarLiquidacionExcel } from "./excel/exportar-liquidacion-excel";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 
 // Componentes modulares desacoplados para registro de comprobantes y pagos
@@ -74,34 +72,49 @@ export const ModalLiquidacionPagos = ({
   const [loadingCerrar, setLoadingCerrar] = useState(false);
 
   // Carga de la información de la compra
-  const cargarDetalle = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const res =
-        await CompraCarbonService.getCompraConDetalles(idCompraCarbon);
-      if (res.success && res.data) {
-        setDetalle(res.data);
-      } else {
-        notifyError(res.message || "No se pudo cargar el detalle de la compra");
+  const cargarDetalle = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const res =
+          await CompraCarbonService.getCompraConDetalles(idCompraCarbon);
+        if (res.success && res.data) {
+          setDetalle(res.data);
+        } else {
+          notifyError(res.message || "No se pudo cargar el detalle de la compra");
+        }
+      } catch (err: unknown) {
+        notifyError(
+          err instanceof Error ? err.message : "Error al cargar detalle",
+        );
+      } finally {
+        if (!silent) setLoading(false);
       }
-    } catch (err: unknown) {
-      notifyError(
-        err instanceof Error ? err.message : "Error al cargar detalle",
-      );
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+    },
+    [idCompraCarbon, notifyError],
+  );
 
   useEffect(() => {
     cargarDetalle();
-  }, [idCompraCarbon]);
+  }, [cargarDetalle]);
 
   const cabecera = detalle?.cabecera;
-  const cargas = detalle?.cargas || [];
-  const comprobantesProveedor = detalle?.comprobantes_proveedor || [];
-  const pagosDirectos = detalle?.pagos_directos || [];
-  const comprobantesTransporte = detalle?.comprobantes_transporte || [];
+  // `cargas` se memoiza para que los `useMemo` que dependen de él no
+  // se invaliden cuando `detalle` aún es null (el `|| []` crearía un
+  // array nuevo en cada render).
+  const cargas = useMemo(() => detalle?.cargas ?? [], [detalle]);
+  const comprobantesProveedor = useMemo(
+    () => detalle?.comprobantes_proveedor ?? [],
+    [detalle],
+  );
+  const pagosDirectos = useMemo(
+    () => detalle?.pagos_directos ?? [],
+    [detalle],
+  );
+  const comprobantesTransporte = useMemo(
+    () => detalle?.comprobantes_transporte ?? [],
+    [detalle],
+  );
 
   // Cargas libres para comprobante proveedor
   const cargasSinComprobanteProv = useMemo(
@@ -313,7 +326,6 @@ export const ModalLiquidacionPagos = ({
   const estaCerrada =
     cabecera?.estado === "Cerrado" ||
     cabecera?.estado === "Anulado";
-  const puedeCerrar = !estaCerrada && (detalle?.cargas?.length ?? 0) >= 1;
 
   if ((loading && !detalle) || !cabecera) {
     return (

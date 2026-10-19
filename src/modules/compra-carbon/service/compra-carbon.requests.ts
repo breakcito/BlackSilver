@@ -7,6 +7,7 @@ export interface CrearCompraCarbonRequest {
   porcentaje_igv: number;
   precio_unitario_cotizado?: number;
   id_tarifa_carbon?: number | null;
+  id_cuenta_proveedor?: number | null;
 }
 
 export interface CargaFormItem {
