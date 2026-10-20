@@ -69,7 +69,7 @@ export const iconos_menu_navegacion: IconoMenuEntrada[] = [
   // ----- Nodos cliqueables (path real devuelto por el backend) -----
   // Carbón
   { path: "compra-carbon", icono: TruckIcon },
-  { path: "tamizaje-carbon", icono: ChartPieIcon },
+  { path: "zarandeo-carbon", icono: ChartPieIcon },
   { path: "kardex-carbon", icono: ChartBarIcon },
 
   // Configuracion / Empresa

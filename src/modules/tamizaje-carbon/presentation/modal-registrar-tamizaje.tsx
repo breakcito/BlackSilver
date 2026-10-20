@@ -92,7 +92,9 @@ export const ModalRegistrarTamizaje = ({
   const [submitting, setSubmitting] = useState(false);
 
   // Variantes específicas que salen del carbón padre seleccionado
-  const [variantesPadre, setVariantesPadre] = useState<RES_VarianteCarbon[]>([]);
+  const [variantesPadre, setVariantesPadre] = useState<RES_VarianteCarbon[]>(
+    [],
+  );
   const [loadingVariantes, setLoadingVariantes] = useState(false);
 
   // Dynamic variants rows
@@ -122,7 +124,7 @@ export const ModalRegistrarTamizaje = ({
         if (resEmp?.data) setSupervisores(resEmp.data);
         if (resCargas?.data) setCargasPendientes(resCargas.data);
       } catch (err) {
-        console.error("Error al cargar maestros para tamizaje", err);
+        console.error("Error al cargar maestros para zarandeo", err);
       }
     };
     fetchMaestros();
@@ -243,9 +245,9 @@ export const ModalRegistrarTamizaje = ({
         id_empleado_supervisor: idSupervisor ? Number(idSupervisor) : undefined,
         id_carga_compra_carbon:
           origen === "carga" && idCarga ? Number(idCarga) : undefined,
-        cantidad_tamizada: cantTamizadaNum,
-        es_retamizaje: origen === "stock",
-        fecha_hora_tamizaje: fechaHora,
+        cantidad_zarandeada: cantTamizadaNum,
+        es_rezarandeo: origen === "stock",
+        fecha_hora_zarandeo: fechaHora,
         variantes: variantesValidas.map((v) => ({
           id_tipo_variante: Number(v.id_tipo_variante),
           cantidad_extraida: Number(v.cantidad_extraida),
@@ -325,27 +327,69 @@ export const ModalRegistrarTamizaje = ({
       close={onClose}
       title="Registrar Zarandeo"
       size="xl"
+      rightSection={
+        <Group gap={12}>
+          {/* Almacén */}
+          <Select
+            label="Almacén"
+            placeholder="Seleccione almacén"
+            data={almacenesOptions}
+            value={idAlmacen}
+            onChange={setIdAlmacen}
+            required
+            searchable
+            comboboxProps={{ withinPortal: true }}
+            nothingFoundMessage="No se encontraron almacenes"
+            leftSection={
+              <BuildingStorefrontIcon className="w-4 h-4 text-zinc-500" />
+            }
+            radius="lg"
+            size="xs"
+            classNames={estilitos}
+          />
+
+          <Select
+            label="Origen"
+            data={[
+              { value: "carga", label: "Cargas de carbón" },
+              { value: "stock", label: "Stock actual" },
+            ]}
+            value={origen}
+            onChange={(val) => {
+              const next = (val as "carga" | "stock") || "carga";
+              setOrigen(next);
+              if (next === "stock") {
+                setIdCarga(null);
+              }
+            }}
+            allowDeselect={false}
+            radius="lg"
+            size="xs"
+            classNames={estilitos}
+          />
+        </Group>
+      }
       validateClose
     >
       <Stack gap="md">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Ocupa 1 columna */}
           <div className="col-span-1">
+            {/* Tipo de carbón padre a tamizar */}
             <Select
-              label="Origen del carbón"
-              data={[
-                { value: "carga", label: "Carga de carbón" },
-                { value: "stock", label: "Stock actual" },
-              ]}
-              value={origen}
+              label="Tipo de carbón"
+              placeholder="Seleccione tipo de carbón"
+              data={tiposCarbonOptions}
+              value={idTipoPadre}
               onChange={(val) => {
-                const next = (val as "carga" | "stock") || "carga";
-                setOrigen(next);
-                if (next === "stock") {
-                  setIdCarga(null);
-                }
+                setIdTipoPadre(val);
+                setVariantes([
+                  { id_tipo_variante: null, cantidad_extraida: "" },
+                ]);
               }}
-              allowDeselect={false}
+              required
+              searchable
+              comboboxProps={{ withinPortal: true }}
+              nothingFoundMessage="No se encontraron tipos de carbón"
               radius="lg"
               size="xs"
               classNames={estilitos}
@@ -355,7 +399,7 @@ export const ModalRegistrarTamizaje = ({
           {/* Ocupa 2 columnas */}
           <div className="col-span-1 md:col-span-2">
             <Select
-              label="Carga de carbón a procesar"
+              label="Cargas de carbón"
               placeholder={
                 origen === "carga"
                   ? cargasPendientes.length > 0
@@ -390,46 +434,9 @@ export const ModalRegistrarTamizaje = ({
             />
           </div>
         </div>
+
         {/* Datos Principales */}
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          {/* Almacén */}
-          <Select
-            label="Almacén de proceso"
-            placeholder="Seleccione almacén"
-            data={almacenesOptions}
-            value={idAlmacen}
-            onChange={setIdAlmacen}
-            required
-            searchable
-            comboboxProps={{ withinPortal: true }}
-            nothingFoundMessage="No se encontraron almacenes"
-            leftSection={
-              <BuildingStorefrontIcon className="w-4 h-4 text-zinc-500" />
-            }
-            radius="lg"
-            size="xs"
-            classNames={estilitos}
-          />
-
-          {/* Tipo de carbón padre a tamizar */}
-          <Select
-            label="Tipo de carbón"
-            placeholder="Seleccione tipo de carbón"
-            data={tiposCarbonOptions}
-            value={idTipoPadre}
-            onChange={(val) => {
-              setIdTipoPadre(val);
-              setVariantes([{ id_tipo_variante: null, cantidad_extraida: "" }]);
-            }}
-            required
-            searchable
-            comboboxProps={{ withinPortal: true }}
-            nothingFoundMessage="No se encontraron tipos de carbón"
-            radius="lg"
-            size="xs"
-            classNames={estilitos}
-          />
-
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
           {/* Cantidad a tamizar */}
           <NumberInput
             label="Cantidad a tamizar (TN)"
@@ -476,15 +483,9 @@ export const ModalRegistrarTamizaje = ({
         {/* Sección Variantes Extraídas */}
         <Paper className="bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-xl">
           <Group justify="space-between" align="center" mb="xs">
-            <div>
-              <Text size="sm" fw={700} className="text-white">
-                Variantes Extraídas
-              </Text>
-              <Text size="xs" c="gray">
-                Seleccione las variantes autorizadas para el tipo de carbón a
-                procesar.
-              </Text>
-            </div>
+            <Text size="sm" fw={700} className="text-white">
+              Variantes Extraídas
+            </Text>
             <Button
               variant="light"
               color="teal"

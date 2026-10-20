@@ -13,9 +13,9 @@ export interface RegistrarTamizajeRequest {
   id_tipo_carbon: number;
   id_empleado_supervisor?: number;
   id_carga_compra_carbon?: number;
-  cantidad_tamizada: number;
-  es_retamizaje: boolean;
-  fecha_hora_tamizaje: string;
+  cantidad_zarandeada: number;
+  es_rezarandeo: boolean;
+  fecha_hora_zarandeo: string;
   variantes: RegistrarTamizajeVariantePayload[];
   evidencias?: File[];
 }

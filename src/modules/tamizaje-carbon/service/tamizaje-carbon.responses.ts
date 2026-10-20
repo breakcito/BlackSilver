@@ -20,8 +20,8 @@ export interface StockCarbonItem {
 }
 
 export interface VarianteTamizajeItem {
-  id_variante_tamizaje_carbon: number;
-  id_tamizaje_carbon: number;
+  id_variante_zarandeo_carbon: number;
+  id_zarandeo_carbon: number;
   id_tipo_variante: number;
   tipo_variante_nombre: string;
   tipo_variante_codigo?: string;
@@ -30,7 +30,7 @@ export interface VarianteTamizajeItem {
 }
 
 export interface TamizajeCarbonItem {
-  id_tamizaje_carbon: number;
+  id_zarandeo_carbon: number;
   id_almacen: number;
   almacen_nombre: string;
   id_empleado_registro: number;
@@ -44,11 +44,15 @@ export interface TamizajeCarbonItem {
   carga_ticket_balanza?: string | null;
   carga_placa?: string | null;
   compra_correlativo?: string | null;
-  cantidad_tamizada: number;
+  cantidad_zarandeada: number;
   cantidad_extraida: number;
-  es_retamizaje: boolean;
-  fecha_hora_tamizaje: string;
-  evidencias?: Array<{ url: string; nombre_original?: string; extension?: string }> | null;
+  es_rezarandeo: boolean;
+  fecha_hora_zarandeo: string;
+  evidencias?: Array<{
+    url: string;
+    nombre_original?: string;
+    extension?: string;
+  }> | null;
   created_at?: string;
   variantes?: VarianteTamizajeItem[];
 }

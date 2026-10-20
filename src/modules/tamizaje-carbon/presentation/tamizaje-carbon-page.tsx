@@ -301,17 +301,17 @@ export const TamizajeCarbonPage = () => {
         width: 50,
       },
       {
-        accessor: "fecha_hora_tamizaje",
+        accessor: "fecha_hora_zarandeo",
         title: "Fecha y Hora",
         width: 150,
         textAlign: "center",
         render: (r) => (
           <div className="flex flex-col gap-0 items-center justify-center">
             <Text size="xs" fw={600} className="text-zinc-100">
-              {dayjs(r.fecha_hora_tamizaje).format("DD/MM/YYYY")}
+              {dayjs(r.fecha_hora_zarandeo).format("DD/MM/YYYY")}
             </Text>
             <Text size="xs" c="dimmed" fw={500}>
-              {dayjs(r.fecha_hora_tamizaje).format("HH:mm A")}
+              {dayjs(r.fecha_hora_zarandeo).format("HH:mm A")}
             </Text>
           </div>
         ),
@@ -345,7 +345,7 @@ export const TamizajeCarbonPage = () => {
               )}
             </Group>
             <Text size="sm" fw={700} c={"lime"}>
-              {formatTN(r.cantidad_tamizada)}
+              {formatTN(r.cantidad_zarandeada)}
             </Text>
           </div>
         ),
@@ -367,7 +367,7 @@ export const TamizajeCarbonPage = () => {
             <Group gap={6} wrap="wrap" justify="center">
               {vars.map((v) => (
                 <Badge
-                  key={v.id_variante_tamizaje_carbon}
+                  key={v.id_variante_zarandeo_carbon}
                   variant="outline"
                   color="teal"
                   radius="sm"
@@ -386,7 +386,7 @@ export const TamizajeCarbonPage = () => {
         width: 170,
         textAlign: "center",
         render: (r) => {
-          const tamizada = Number(r.cantidad_tamizada) || 0;
+          const tamizada = Number(r.cantidad_zarandeada) || 0;
           const extraida = Number(r.cantidad_extraida) || 0;
           const merma = Math.max(0, tamizada - extraida);
           const pct =
@@ -796,7 +796,7 @@ export const TamizajeCarbonPage = () => {
         <DataTableEstandar
           records={tamizajesFiltrados}
           columns={tamizajeColumns}
-          idAccessor="id_tamizaje_carbon"
+          idAccessor="id_zarandeo_carbon"
           loading={loadingTamizajes}
           noRecordsText="No se encontraron operaciones de tamizaje registradas."
         />

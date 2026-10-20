@@ -63,17 +63,24 @@ export const TamizajeCarbonService = {
   ): Promise<IRespuesta<TamizajeCarbonItem>> => {
     const formData = new FormData();
 
-    if (payload.id_almacen) formData.append("id_almacen", String(payload.id_almacen));
+    if (payload.id_almacen)
+      formData.append("id_almacen", String(payload.id_almacen));
     formData.append("id_tipo_carbon", String(payload.id_tipo_carbon));
     if (payload.id_empleado_supervisor) {
-      formData.append("id_empleado_supervisor", String(payload.id_empleado_supervisor));
+      formData.append(
+        "id_empleado_supervisor",
+        String(payload.id_empleado_supervisor),
+      );
     }
     if (payload.id_carga_compra_carbon) {
-      formData.append("id_carga_compra_carbon", String(payload.id_carga_compra_carbon));
+      formData.append(
+        "id_carga_compra_carbon",
+        String(payload.id_carga_compra_carbon),
+      );
     }
-    formData.append("cantidad_tamizada", String(payload.cantidad_tamizada));
-    formData.append("es_retamizaje", payload.es_retamizaje ? "1" : "0");
-    formData.append("fecha_hora_tamizaje", payload.fecha_hora_tamizaje);
+    formData.append("cantidad_zarandeada", String(payload.cantidad_zarandeada));
+    formData.append("es_rezarandeo", payload.es_rezarandeo ? "1" : "0");
+    formData.append("fecha_hora_zarandeo", payload.fecha_hora_zarandeo);
     formData.append("variantes", JSON.stringify(payload.variantes));
 
     if (payload.evidencias && payload.evidencias.length > 0) {

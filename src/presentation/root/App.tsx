@@ -111,14 +111,26 @@ export const App = () => {
         <Route path="/activos" element={<ActivosFijosPage />} />
         <Route path="/lotes" element={<LotesPage />} />
         <Route path="/kardex" element={<KardexProductosPage />} />
-        <Route path="/atencion-requerimientos" element={<RequerimientosAlmacenAtencionPage />} />
-        <Route path="/solicitudes" element={<SolicitudesReabastecimientoPage />} />
-        <Route path="/atencion-solicitudes" element={<SolicitudesReabastecimientoAtencionPage />} />
+        <Route
+          path="/atencion-requerimientos"
+          element={<RequerimientosAlmacenAtencionPage />}
+        />
+        <Route
+          path="/solicitudes"
+          element={<SolicitudesReabastecimientoPage />}
+        />
+        <Route
+          path="/atencion-solicitudes"
+          element={<SolicitudesReabastecimientoAtencionPage />}
+        />
         <Route path="/prestamos" element={<PrestamosAlmacenPage />} />
         <Route path="/atencion-prestamos" element={<AtencionPrestamosPage />} />
         <Route path="/cotizaciones" element={<CotizacionesPage />} />
         <Route path="/ordenes-compra" element={<OrdenesCompraPage />} />
-        <Route path="/recepcion-transferencias" element={<RecepcionTransferenciasOCPage />} />
+        <Route
+          path="/recepcion-transferencias"
+          element={<RecepcionTransferenciasOCPage />}
+        />
 
         {/* Operaciones */}
         <Route path="/uso" element={<ControlUsoPage />} />
@@ -126,14 +138,17 @@ export const App = () => {
         <Route path="/consumo" element={<ControlConsumoPage />} />
         <Route path="/lote-mineral" element={<LoteMineralPage />} />
         <Route path="/produccion-mineral" element={<ProduccionMineralPage />} />
-        <Route path="/programacion-horarios" element={<ProgramacionHorariosPage />} />
+        <Route
+          path="/programacion-horarios"
+          element={<ProgramacionHorariosPage />}
+        />
         <Route path="/asistencia" element={<AsistenciaPage />} />
         <Route path="/planilla" element={<PlanillaPage />} />
 
         {/* Operaciones con Carbón */}
         <Route path="/compra-carbon" element={<CompraCarbonPage />} />
         <Route path="/kardex-carbon" element={<KardexCarbonPage />} />
-        <Route path="/tamizaje-carbon" element={<TamizajeCarbonPage />} />
+        <Route path="/zarandeo-carbon" element={<TamizajeCarbonPage />} />
 
         {/* System module (oculto, solo URL directa) */}
         <Route path="/system" element={<SystemPage />} />
