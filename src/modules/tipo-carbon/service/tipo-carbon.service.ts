@@ -8,6 +8,7 @@ import type {
 import type {
   RES_TipoCarbon,
   RES_VarianteCarbon,
+  RES_CalidadCarbon,
 } from "./tipo-carbon.responses";
 
 const path = "/tipo-carbon";
@@ -88,6 +89,27 @@ export const TipoCarbonService = {
   ): Promise<IRespuesta<RES_VarianteCarbon[]>> => {
     const { data } = await api.put<IRespuesta<RES_VarianteCarbon[]>>(
       `${path}/${idTipoCarbon}/variantes`,
+      payload,
+    );
+    return data;
+  },
+
+  getCalidades: async (): Promise<IRespuesta<RES_CalidadCarbon[]>> => {
+    const { data } = await api.get<IRespuesta<RES_CalidadCarbon[]>>(
+      `${path}/calidades`,
+    );
+    return data;
+  },
+
+  actualizarCalidad: async (
+    idCalidadCarbon: number,
+    payload: {
+      porcentaje_inicio_ceniza: number;
+      porcentaje_fin_ceniza: number;
+    },
+  ): Promise<IRespuesta<RES_CalidadCarbon>> => {
+    const { data } = await api.put<IRespuesta<RES_CalidadCarbon>>(
+      `${path}/calidades/${idCalidadCarbon}`,
       payload,
     );
     return data;

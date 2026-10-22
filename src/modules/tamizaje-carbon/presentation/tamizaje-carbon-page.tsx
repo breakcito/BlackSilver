@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Badge,
   Button,
+  Divider,
   Group,
   Modal,
   Paper,
@@ -23,6 +24,7 @@ import {
   PaperClipIcon,
   PlusIcon,
   ScaleIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 
@@ -31,19 +33,22 @@ import { useNotify } from "../../../hooks/useNotify";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { BotonRecargar } from "../../../presentation/utils/boton-recargar";
 import { formatNumber } from "../../../shared/functions/formatNumber";
+import { colorCalidadCarbon } from "../../../shared/functions/calidad-carbon";
 import { cn } from "../../../shared/functions/cn";
 import { MESES } from "../../../shared/variables/meses";
 import { AuxService } from "../../../service/auxiliar.service";
 import { TipoCarbonService } from "../../tipo-carbon/service/tipo-carbon.service";
 import { TamizajeCarbonService } from "../service/tamizaje-carbon.service";
 import { ModalAjustarStock } from "./modal-ajustar-stock";
-import { ModalRegistrarTamizaje } from "./modal-registrar-tamizaje";
+import { ModalRegistrarZarandeo } from "./modal-registrar-zarandeo";
+import { ModalGastosZarandeo } from "./modal-gastos-zarandeo";
 import type {
   StockCarbonItem,
-  StockCarbonLogEntry,
-  TamizajeCarbonItem,
+  ZarandeoCarbonItem,
 } from "../service/tamizaje-carbon.responses";
+import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
+import type { RES_CalidadCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_Almacen } from "../../../service/responses/almacen";
 
 const formatDateTime = (iso: string | null | undefined): string => {
@@ -74,6 +79,7 @@ export const TamizajeCarbonPage = () => {
   // Filter state
   const [idAlmacen, setIdAlmacen] = useState<string | null>(null);
   const [idTipoCarbon, setIdTipoCarbon] = useState<string | null>(null);
+  const [calidad, setCalidad] = useState<string | null>(null);
   const [mes, setMes] = useState<string | null>(String(currentMonth));
   const [anio, setAnio] = useState<string | null>(String(currentYear));
   const [busqueda, setBusqueda] = useState<string>("");
@@ -81,18 +87,21 @@ export const TamizajeCarbonPage = () => {
 
   // Data
   const [stocks, setStocks] = useState<StockCarbonItem[]>([]);
-  const [tamizajes, setTamizajes] = useState<TamizajeCarbonItem[]>([]);
+  const [tamizajes, setTamizajes] = useState<ZarandeoCarbonItem[]>([]);
   const [almacenes, setAlmacenes] = useState<RES_Almacen[]>([]);
   const [tiposCarbon, setTiposCarbon] = useState<RES_TipoCarbon[]>([]);
+  const [calidades, setCalidades] = useState<RES_CalidadCarbon[]>([]);
   const [loadingStocks, setLoadingStocks] = useState(false);
   const [loadingTamizajes, setLoadingTamizajes] = useState(false);
 
   // Modals state
   const [stockToEdit, setStockToEdit] = useState<StockCarbonItem | null>(null);
   const [openNuevoTamizaje, setOpenNuevoTamizaje] = useState(false);
+  const [zarandeoGastos, setZarandeoGastos] =
+    useState<ZarandeoCarbonItem | null>(null);
   const [historialStockModal, setHistorialStockModal] = useState<{
     titulo: string;
-    logs: StockCarbonLogEntry[];
+    logs: RES_CambiosLog[];
   } | null>(null);
   const [evidenciasModal, setEvidenciasModal] = useState<{
     titulo: string;
@@ -103,12 +112,14 @@ export const TamizajeCarbonPage = () => {
   useEffect(() => {
     const fetchMaestros = async () => {
       try {
-        const [resAlm, resTipos] = await Promise.all([
+        const [resAlm, resTipos, resCal] = await Promise.all([
           AuxService.get_almacenes({ para_carbon: true }),
           TipoCarbonService.getTipos(),
+          TipoCarbonService.getCalidades(),
         ]);
         if (resAlm?.data) setAlmacenes(resAlm.data);
         if (resTipos?.data) setTiposCarbon(resTipos.data);
+        if (resCal?.data) setCalidades(resCal.data);
       } catch (err) {
         console.error("Error al cargar maestros", err);
       }
@@ -122,6 +133,8 @@ export const TamizajeCarbonPage = () => {
     try {
       const resp = await TamizajeCarbonService.getStocks({
         id_almacen: idAlmacen ? Number(idAlmacen) : undefined,
+        id_tipo_carbon: idTipoCarbon ? Number(idTipoCarbon) : undefined,
+        calidad: calidad ?? undefined,
       });
       if (resp.success && resp.data) {
         setStocks(resp.data);
@@ -135,13 +148,13 @@ export const TamizajeCarbonPage = () => {
     } finally {
       setLoadingStocks(false);
     }
-  }, [idAlmacen, notifyError]);
+  }, [idAlmacen, idTipoCarbon, calidad, notifyError]);
 
   // Fetch tamizajes
   const cargarTamizajes = useCallback(async () => {
     setLoadingTamizajes(true);
     try {
-      const resp = await TamizajeCarbonService.getTamizajes({
+      const resp = await TamizajeCarbonService.getZarandeos({
         id_almacen: idAlmacen ? Number(idAlmacen) : undefined,
         mes: mes ? Number(mes) : undefined,
         anio: anio ? Number(anio) : undefined,
@@ -154,7 +167,7 @@ export const TamizajeCarbonPage = () => {
       }
     } catch (err) {
       console.error(err);
-      notifyError("Error al cargar historial de tamizajes");
+      notifyError("Error al cargar historial de zarandeos");
       setTamizajes([]);
     } finally {
       setLoadingTamizajes(false);
@@ -201,6 +214,11 @@ export const TamizajeCarbonPage = () => {
     }));
   }, [tiposCarbon]);
 
+  const calidadesOptions = useMemo(
+    () => calidades.map((c) => ({ value: c.nombre, label: c.nombre })),
+    [calidades],
+  );
+
   const aniosOptions = useMemo(
     () => [
       { value: String(currentYear - 2), label: String(currentYear - 2) },
@@ -220,7 +238,6 @@ export const TamizajeCarbonPage = () => {
       para_compra: boolean;
       stockTotal: number;
       matchingStocks: StockCarbonItem[];
-      stockItemUnico: StockCarbonItem | null;
     }> = [];
 
     const processedIds = new Set<number>();
@@ -241,7 +258,6 @@ export const TamizajeCarbonPage = () => {
         para_compra: Boolean(tipo.para_compra),
         stockTotal,
         matchingStocks: matching,
-        stockItemUnico: matching.length === 1 ? matching[0] : null,
       });
     }
 
@@ -262,7 +278,6 @@ export const TamizajeCarbonPage = () => {
           para_compra: Boolean(s.tipo_carbon_para_compra),
           stockTotal,
           matchingStocks: matching,
-          stockItemUnico: matching.length === 1 ? matching[0] : null,
         });
       }
     }
@@ -291,8 +306,8 @@ export const TamizajeCarbonPage = () => {
     return tamizajes.filter((t) => t.id_tipo_carbon === Number(idTipoCarbon));
   }, [tamizajes, idTipoCarbon]);
 
-  // Table columns for Tamizajes
-  const tamizajeColumns: DataTableColumn<TamizajeCarbonItem>[] = useMemo(
+  // Table columns for Zarandeos
+  const tamizajeColumns: DataTableColumn<ZarandeoCarbonItem>[] = useMemo(
     () => [
       {
         accessor: "index",
@@ -320,7 +335,7 @@ export const TamizajeCarbonPage = () => {
         accessor: "almacen_nombre",
         title: "Almacén",
         textAlign: "center",
-        width: 200,
+        width: 180,
         render: (r) => (
           <Text size="xs" fw={600}>
             {r.almacen_nombre}
@@ -330,24 +345,40 @@ export const TamizajeCarbonPage = () => {
       {
         accessor: "tipo_carbon_nombre",
         title: "Carbón Procesado",
-        width: 200,
+        width: 220,
         textAlign: "center",
         render: (r) => (
-          <div className="flex flex-col items-center gap-2">
-            <Group gap={6} wrap="nowrap">
-              <Badge variant="light" color="indigo" radius="sm">
-                {r.tipo_carbon_nombre}
-              </Badge>
-              {r.tipo_carbon_codigo && (
-                <Text size="xs" c="gray" fw={500}>
-                  ({r.tipo_carbon_codigo})
-                </Text>
-              )}
-            </Group>
+          <Group gap={6} wrap="nowrap" justify="center">
+            <Badge variant="light" color="indigo" radius="sm">
+              {r.tipo_carbon_nombre}
+            </Badge>
+            {r.tipo_carbon_codigo && (
+              <Text size="xs" c="gray" fw={500}>
+                ({r.tipo_carbon_codigo})
+              </Text>
+            )}
+          </Group>
+        ),
+      },
+      {
+        accessor: "tipo_carboncito",
+        title: "Cantidad",
+        width: 150,
+        textAlign: "center",
+        render: (r) => (
+          <Group gap={6} wrap="nowrap" justify="center">
             <Text size="sm" fw={700} c={"lime"}>
               {formatTN(r.cantidad_zarandeada)}
             </Text>
-          </div>
+            <Badge
+              variant="light"
+              color={colorCalidadCarbon(r.calidad)}
+              radius="xl"
+              size="sm"
+            >
+              {r.calidad ?? "Sin calidad"}
+            </Badge>
+          </Group>
         ),
       },
       {
@@ -381,68 +412,66 @@ export const TamizajeCarbonPage = () => {
         },
       },
       {
-        accessor: "rendimiento",
-        title: "Rendimiento",
-        width: 170,
+        accessor: "origen",
+        title: "Origen",
+        width: 120,
         textAlign: "center",
         render: (r) => {
-          const tamizada = Number(r.cantidad_zarandeada) || 0;
-          const extraida = Number(r.cantidad_extraida) || 0;
-          const merma = Math.max(0, tamizada - extraida);
-          const pct =
-            tamizada > 0
-              ? Math.round((extraida / tamizada) * 100 * 10) / 10
-              : 0;
-
+          if (r.es_rezarandeo) {
+            return (
+              <Badge variant="light" color="gray" radius="xl" size="sm">
+                Rezarandeo (stock)
+              </Badge>
+            );
+          }
           return (
-            <Stack gap={2} align="center">
-              <Text size="xs" fw={700} className="text-teal-400">
-                Extr: {formatTN(extraida)} ({pct}%)
-              </Text>
-              <Text size="xs" c="gray">
-                Restante: {formatTN(merma)}
-              </Text>
-            </Stack>
+            <Badge variant="light" color="blue" radius="xl" size="sm">
+              {r.cantidad_cargas} carga(s)
+            </Badge>
           );
         },
       },
       {
-        accessor: "referencia",
-        title: "Referencia / Carga",
-        width: 180,
+        accessor: "gastos",
+        title: "Gastos",
+        width: 120,
         textAlign: "center",
-        render: (r) => {
-          if (
-            !r.carga_ticket_balanza &&
-            !r.compra_correlativo &&
-            !r.carga_placa
-          ) {
-            return (
-              <Text size="xs" c="dimmed">
-                —
-              </Text>
-            );
-          }
-          return (
-            <Stack gap={1}>
-              {r.compra_correlativo && (
-                <Text size="xs" fw={600} className="text-blue-400">
-                  OC: {r.compra_correlativo}
-                </Text>
-              )}
-              {r.carga_ticket_balanza && (
-                <Text size="xs" fw={500} className="text-zinc-300">
-                  Ticket: {r.carga_ticket_balanza}
-                </Text>
-              )}
-              {r.carga_placa && (
-                <Text size="xs" c="gray">
-                  Placa: {r.carga_placa}
-                </Text>
-              )}
-            </Stack>
-          );
-        },
+        render: (r) => (
+          <Group gap={4} justify="center" wrap="nowrap">
+            <Tooltip label="Gastos de producción" withArrow>
+              <ActionIcon
+                variant="light"
+                color="indigo"
+                size="md"
+                radius="md"
+                onClick={() => setZarandeoGastos(r)}
+              >
+                <BanknotesIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
+            {r.evidencias && r.evidencias.length > 0 && (
+              <Tooltip
+                label={`Ver ${r.evidencias.length} evidencia(s)`}
+                withArrow
+              >
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  size="md"
+                  radius="md"
+                  onClick={() =>
+                    setEvidenciasModal({
+                      titulo: `${r.tipo_carbon_nombre} · ${r.almacen_nombre}`,
+                      items: r.evidencias ?? [],
+                    })
+                  }
+                >
+                  <PaperClipIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </Group>
+        ),
       },
       {
         accessor: "responsables",
@@ -463,39 +492,6 @@ export const TamizajeCarbonPage = () => {
             )}
           </Stack>
         ),
-      },
-      {
-        accessor: "evidencias",
-        title: "Adjuntos",
-        width: 90,
-        textAlign: "center",
-        render: (r) => {
-          const total = r.evidencias?.length ?? 0;
-          if (total === 0)
-            return (
-              <Text size="xs" c="dimmed">
-                —
-              </Text>
-            );
-          return (
-            <Tooltip label={`Ver ${total} evidencia(s)`} withArrow>
-              <ActionIcon
-                variant="light"
-                color="indigo"
-                size="sm"
-                radius="md"
-                onClick={() =>
-                  setEvidenciasModal({
-                    titulo: `${r.tipo_carbon_nombre} · ${r.almacen_nombre}`,
-                    items: r.evidencias ?? [],
-                  })
-                }
-              >
-                <PaperClipIcon className="w-3.5 h-3.5" />
-              </ActionIcon>
-            </Tooltip>
-          );
-        },
       },
     ],
     [],
@@ -541,6 +537,21 @@ export const TamizajeCarbonPage = () => {
           />
         </div>
 
+        {/* Calidad */}
+        <div className="w-full sm:w-40 md:w-36">
+          <Select
+            label="Calidad"
+            placeholder="Todas"
+            data={calidadesOptions}
+            value={calidad}
+            onChange={setCalidad}
+            clearable
+            size="xs"
+            radius="lg"
+            classNames={estilitos}
+          />
+        </div>
+
         {/* Mes */}
         <div className="w-full sm:w-36 md:w-36">
           <Select
@@ -578,7 +589,7 @@ export const TamizajeCarbonPage = () => {
         <div className="flex-1 min-w-[200px] w-full">
           <TextInput
             label="Búsqueda"
-            placeholder="Ticket, placa, responsable..."
+            placeholder="Carbón, almacén, calidad..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.currentTarget.value)}
             leftSection={
@@ -590,12 +601,12 @@ export const TamizajeCarbonPage = () => {
           />
         </div>
 
-        {/* Acciones: Recargar + Nuevo Tamizaje */}
+        {/* Acciones: Recargar + Nuevo Zarandeo */}
         <div className="flex items-center gap-2 shrink-0">
           <BotonRecargar
             onReload={recargarTodo}
             loading={loadingTamizajes || loadingStocks}
-            tooltip="Recargar datos de stock y tamizajes"
+            tooltip="Recargar datos de stock y zarandeos"
           />
           <Button
             color="teal"
@@ -617,35 +628,19 @@ export const TamizajeCarbonPage = () => {
             <Text
               size="xs"
               fw={700}
-              className="text-zinc-400 uppercase tracking-wider"
+              c={"gray"}
+              className="uppercase tracking-wider"
             >
-              Stock de Carbón{" "}
-              {idAlmacen
-                ? `· ${almacenes.find((a) => String(a.id_almacen) === idAlmacen)?.nombre || ""}`
-                : "· Consolidado"}
+              Stock de Carbón
             </Text>
-            {idTipoCarbon && (
-              <Badge
-                size="xs"
-                variant="light"
-                color="teal"
-                className="cursor-pointer"
-                onClick={() => setIdTipoCarbon(null)}
-                rightSection={<span className="text-xs ml-1">×</span>}
-              >
-                Filtrado por:{" "}
-                {tiposCarbon.find(
-                  (t) => String(t.id_tipo_carbon) === idTipoCarbon,
-                )?.nombre || idTipoCarbon}
-              </Badge>
-            )}
+            <Divider orientation="vertical" />
+            <Text size="xs" c="gray" fw={600}>
+              TOTAL:{" "}
+              <span className="text-teal-400 font-bold">
+                {formatTN(stockTotalGeneral)}
+              </span>
+            </Text>
           </Group>
-          <Text size="xs" c="gray" fw={600}>
-            Total:{" "}
-            <span className="text-teal-400 font-bold">
-              {formatTN(stockTotalGeneral)}
-            </span>
-          </Text>
         </div>
 
         {loadingStocks ? (
@@ -664,21 +659,19 @@ export const TamizajeCarbonPage = () => {
           <div className="flex items-stretch gap-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
             {stockPorTipo.map((item) => {
               const isSelected = idTipoCarbon === String(item.id_tipo_carbon);
-              const hasSingleItem = item.stockItemUnico !== null;
-              const logs = item.stockItemUnico?.cambios_log ?? [];
 
               return (
                 <Paper
                   key={item.id_tipo_carbon}
-                  onClick={() => {
-                    setIdTipoCarbon((prev) =>
-                      prev === String(item.id_tipo_carbon)
-                        ? null
-                        : String(item.id_tipo_carbon),
-                    );
-                  }}
+                  // onClick={() => {
+                  //   setIdTipoCarbon((prev) =>
+                  //     prev === String(item.id_tipo_carbon)
+                  //       ? null
+                  //       : String(item.id_tipo_carbon),
+                  //   );
+                  // }}
                   className={cn(
-                    "group relative cursor-pointer transition-all duration-200 select-none rounded-xl px-3 py-2 border shrink-0 min-w-44 flex-1 max-w-64",
+                    "group relative transition-all duration-200 select-none rounded-xl px-3 py-2 border shrink-0 min-w-52 max-w-72",
                     isSelected
                       ? "bg-teal-950/30 border-teal-500/60 shadow-lg shadow-teal-950/40 ring-1 ring-teal-500/40"
                       : "bg-zinc-900/50 border-zinc-800/90 hover:border-zinc-700 hover:bg-zinc-900/80",
@@ -696,34 +689,27 @@ export const TamizajeCarbonPage = () => {
                       >
                         <ScaleIcon className="w-3.5 h-3.5" />
                       </div>
-                      <Text
-                        size="xs"
-                        fw={700}
-                        className={cn(
-                          "truncate transition-colors",
-                          isSelected
-                            ? "text-teal-200"
-                            : "text-zinc-200 group-hover:text-white",
-                        )}
-                        title={item.nombre}
+                      <Tooltip
+                        label={`Código: ${item.codigo}`}
+                        disabled={!item.codigo}
+                        withArrow
+                        position="top"
                       >
-                        {item.nombre}
-                      </Text>
+                        <Text
+                          size="xs"
+                          fw={700}
+                          className={cn(
+                            "truncate transition-colors",
+                            isSelected
+                              ? "text-teal-200"
+                              : "text-zinc-200 group-hover:text-white",
+                          )}
+                        >
+                          {item.nombre}
+                        </Text>
+                      </Tooltip>
                     </div>
-                    {item.codigo && (
-                      <Badge
-                        size="xs"
-                        variant={isSelected ? "filled" : "light"}
-                        color={isSelected ? "teal" : "indigo"}
-                        radius="sm"
-                      >
-                        {item.codigo}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="flex items-baseline justify-between mt-1">
-                    <div className="flex items-baseline gap-1.5">
+                    <div className="flex items-baseline justify-between mt-1 mb-1.5">
                       <Text
                         size="sm"
                         fw={800}
@@ -735,54 +721,83 @@ export const TamizajeCarbonPage = () => {
                       >
                         {formatTN(item.stockTotal)}
                       </Text>
-                      {item.matchingStocks.length > 1 && !idAlmacen && (
-                        <Text size="9px" c="dimmed" fw={500}>
-                          ({item.matchingStocks.length} alm.)
-                        </Text>
-                      )}
                     </div>
+                  </div>
 
-                    {/* Acciones de Ajuste / Historial */}
-                    <div
-                      className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {hasSingleItem && logs.length > 0 && (
-                        <Tooltip
-                          label={`Ver historial (${logs.length} ajustes)`}
-                          withArrow
+                  {/* Desglose por calidad: el stock se lleva por tipo + calidad */}
+                  <div className="space-y-0.5">
+                    {item.matchingStocks.length === 0 && (
+                      <Text size="11px" c="gray" className="italic">
+                        Sin stock registrado
+                      </Text>
+                    )}
+                    {item.matchingStocks.map((s) => {
+                      const logs = s.cambios_log ?? [];
+                      return (
+                        <div
+                          key={s.id_stock_carbon}
+                          className="flex items-center justify-between gap-1.5 rounded-md hover:bg-zinc-800/60 transition-colors"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            size="sm"
-                            radius="md"
-                            onClick={() =>
-                              setHistorialStockModal({
-                                titulo: `${item.stockItemUnico?.almacen_nombre} · ${item.nombre}`,
-                                logs,
-                              })
-                            }
-                          >
-                            <ClockIcon className="w-3.5 h-3.5" />
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Badge
+                              size="xs"
+                              variant="light"
+                              color={colorCalidadCarbon(s.calidad)}
+                              radius="sm"
+                            >
+                              {s.calidad ?? "Sin calidad"}
+                            </Badge>
+                            <Text
+                              size="xs"
+                              fw={600}
+                              className="font-mono text-zinc-300"
+                            >
+                              {formatNumber(s.stock_actual)}
+                            </Text>
+                          </div>
 
-                      {hasSingleItem && (
-                        <Tooltip label="Ajustar stock manualmente" withArrow>
-                          <ActionIcon
-                            variant="subtle"
-                            color="teal"
-                            size="sm"
-                            radius="md"
-                            onClick={() => setStockToEdit(item.stockItemUnico)}
-                          >
-                            <ScaleIcon className="w-3.5 h-3.5" />
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                    </div>
+                          <div className="flex items-center gap-0.5">
+                            {logs.length > 0 && (
+                              <Tooltip
+                                label={`Ver historial (${logs.length} ajuste(s))`}
+                                withArrow
+                              >
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="gray"
+                                  size="sm"
+                                  radius="md"
+                                  onClick={() =>
+                                    setHistorialStockModal({
+                                      titulo: `${s.almacen_nombre} · ${item.nombre} · ${s.calidad ?? "Sin calidad"}`,
+                                      logs,
+                                    })
+                                  }
+                                >
+                                  <ClockIcon className="w-3.5 h-3.5" />
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+
+                            <Tooltip
+                              label={`Ajustar stock de ${s.calidad ?? "esta calidad"}`}
+                              withArrow
+                            >
+                              <ActionIcon
+                                variant="subtle"
+                                color="teal"
+                                size="sm"
+                                radius="md"
+                                onClick={() => setStockToEdit(s)}
+                              >
+                                <ScaleIcon className="w-3.5 h-3.5" />
+                              </ActionIcon>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </Paper>
               );
@@ -791,14 +806,14 @@ export const TamizajeCarbonPage = () => {
         )}
       </div>
 
-      {/* 3. DataTable con el historial de registros de tamizajes */}
+      {/* 3. DataTable con el historial de zarandeos */}
       <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
         <DataTableEstandar
           records={tamizajesFiltrados}
           columns={tamizajeColumns}
           idAccessor="id_zarandeo_carbon"
           loading={loadingTamizajes}
-          noRecordsText="No se encontraron operaciones de tamizaje registradas."
+          noRecordsText="No se encontraron operaciones de zarandeo registradas."
         />
       </Paper>
 
@@ -812,15 +827,28 @@ export const TamizajeCarbonPage = () => {
         />
       )}
 
-      {/* Modal Registrar Tamizaje */}
-      <ModalRegistrarTamizaje
+      {/* Modal Registrar Zarandeo */}
+      <ModalRegistrarZarandeo
         opened={openNuevoTamizaje}
         onClose={() => setOpenNuevoTamizaje(false)}
         onGuardado={(nuevoTamizaje) => {
           setTamizajes((prev) => [nuevoTamizaje, ...prev]);
           cargarStocks();
+          // Se abre el detalle de gastos para cargarlo de inmediato, que es
+          // cuando el usuario aun tiene el contexto fresco de la operacion.
+          setZarandeoGastos(nuevoTamizaje);
         }}
       />
+
+      {/* Modal Gastos de Producción */}
+      {zarandeoGastos && (
+        <ModalGastosZarandeo
+          opened={Boolean(zarandeoGastos)}
+          onClose={() => setZarandeoGastos(null)}
+          idZarandeoCarbon={zarandeoGastos.id_zarandeo_carbon}
+          tituloZarandeo={`${zarandeoGastos.tipo_carbon_nombre} · ${zarandeoGastos.calidad ?? "Sin calidad"} · ${formatTN(zarandeoGastos.cantidad_zarandeada)} · ${formatDateTime(zarandeoGastos.fecha_hora_zarandeo)}`}
+        />
+      )}
 
       {/* Modal Historial de Ajustes */}
       {historialStockModal && (
@@ -847,20 +875,30 @@ export const TamizajeCarbonPage = () => {
               >
                 <Group justify="space-between" mb={4}>
                   <Text size="xs" fw={600} className="text-indigo-400">
-                    {formatDateTime(log.fecha_hora)}
+                    {formatDateTime(log.update_at)}
                   </Text>
                   <Text size="xs" className="text-zinc-400">
-                    Por: {log.empleado}
+                    Por: {log.nombre_empleado || `Empleado #${log.id_empleado}`}
                   </Text>
                 </Group>
-                <Group gap="sm" mb={4}>
-                  <Text size="xs" c="dimmed">
-                    Stock anterior: {formatTN(log.stock_anterior)}
-                  </Text>
-                  <Text size="xs" fw={700} className="text-white">
-                    → Nuevo stock: {formatTN(log.stock_nuevo)}
-                  </Text>
-                </Group>
+
+                {log.cambios.map((cambio, j) => (
+                  <Group key={j} gap="sm" mb={2}>
+                    <Text size="xs" c="dimmed">
+                      {cambio.campo ?? cambio.campo_bd}:
+                    </Text>
+                    <Text size="xs" c="zinc.400">
+                      {formatNumber(Number(cambio.valor_anterior))}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      →
+                    </Text>
+                    <Text size="xs" fw={700} className="text-white">
+                      {formatNumber(Number(cambio.valor_nuevo))}
+                    </Text>
+                  </Group>
+                ))}
+
                 {log.motivo && (
                   <Text size="xs" className="italic text-zinc-300">
                     Motivo: {log.motivo}

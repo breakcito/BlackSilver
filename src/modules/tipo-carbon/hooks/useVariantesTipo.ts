@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { TipoCarbonService } from "../service/tipo-carbon.service";
 import { useNotify } from "../../../hooks/useNotify";
 import type { RES_VarianteCarbon } from "../service/tipo-carbon.responses";
+import type { VarianteTipoCarbonInput } from "../service/tipo-carbon.requests";
 
 /**
  * Maneja la carga + set masivo de variantes de un tipo de carbon.
  * El backend expone GET /{id}/variantes (lista actual) y GET .../variantes-opciones
- * (todos los tipos menos el propio, para alimentar el MultiSelect).
+ * (todos los tipos menos el propio, para alimentar el Select).
  */
 export const useVariantesTipo = (idTipoCarbon: number | null) => {
   const [variantesActuales, setVariantesActuales] = useState<
@@ -50,12 +51,26 @@ export const useVariantesTipo = (idTipoCarbon: number | null) => {
     fetch();
   }, [fetch]);
 
-  const guardar = async (idsVariante: number[]): Promise<boolean> => {
+  const guardar = async (
+    variantes: VarianteTipoCarbonInput[],
+  ): Promise<boolean> => {
     if (idTipoCarbon === null) return false;
+
+    const suma = variantes.reduce(
+      (acc, v) => acc + (Number(v.porcentaje_extraccion) || 0),
+      0,
+    );
+    if (suma > 100.0001) {
+      notifyError(
+        `La suma de los porcentajes de extracción no puede superar el 100% (actual: ${suma.toFixed(2)}%)`,
+      );
+      return false;
+    }
+
     setSaving(true);
     try {
       const res = await TipoCarbonService.setVariantes(idTipoCarbon, {
-        variantes: idsVariante,
+        variantes,
       });
       if (res.success) {
         notifySuccess("Variantes actualizadas");

@@ -88,6 +88,8 @@ export interface CargaCompraCarbonItem {
   codigo_ticket_balanza: string;
   cantidad: number;
   porcentaje_ceniza: number;
+  /** Calidad deducida del % de ceniza: Baja | Intermedia | Alta. */
+  calidad: string | null;
   porcentaje_humedad: number;
   precio_unitario: number;
   costo_flete_por_tonelada: number;

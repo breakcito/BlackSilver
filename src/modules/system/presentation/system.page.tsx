@@ -5,6 +5,7 @@ import { ConversionesTab } from "./tabs/conversiones.tab";
 import { NavegacionTab } from "./tabs/navegacion.tab";
 import { ArchivosTab } from "./tabs/archivos.tab";
 import { TipoCarbonTab } from "../../tipo-carbon/presentation/tabs/tipo-carbon.tab";
+import { CalidadCarbonTab } from "../../tipo-carbon/presentation/tabs/calidad-carbon.tab";
 
 const SystemPage = () => {
   useTitlePage("System");
@@ -17,6 +18,7 @@ const SystemPage = () => {
           <Tabs.Tab value="navegacion">Navegacion</Tabs.Tab>
           <Tabs.Tab value="archivos">Archivos</Tabs.Tab>
           <Tabs.Tab value="tipo-carbon">Tipos de Carbon</Tabs.Tab>
+          <Tabs.Tab value="calidad-carbon">Calidad de Carbon</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="unidades" pt="md">
           <UnidadesMedidaTab />
@@ -32,6 +34,9 @@ const SystemPage = () => {
         </Tabs.Panel>
         <Tabs.Panel value="tipo-carbon" pt="md">
           <TipoCarbonTab />
+        </Tabs.Panel>
+        <Tabs.Panel value="calidad-carbon" pt="md">
+          <CalidadCarbonTab />
         </Tabs.Panel>
       </Tabs>
     </div>

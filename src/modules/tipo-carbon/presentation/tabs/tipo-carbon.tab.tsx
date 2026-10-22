@@ -6,6 +6,7 @@ import {
   Center,
   Group,
   Loader,
+  NumberInput,
   Select,
   Stack,
   Switch,
@@ -130,10 +131,16 @@ export const TipoCarbonTab = () => {
 
   const handleGuardarVariantes = async () => {
     if (!variantesTarget) return;
-    const ids = variantesSeleccionadas.map((v) => v.id_tipo_variante);
-    const ok = await variantesCtrl.guardar(ids);
+    const payload = variantesSeleccionadas.map((v) => ({
+      id_tipo_variante: v.id_tipo_variante,
+      porcentaje_extraccion: Number(v.porcentaje_extraccion) || 0,
+    }));
+    const ok = await variantesCtrl.guardar(payload);
     if (ok) {
-      ctrl.refreshCantidadVariantes(variantesTarget.id_tipo_carbon, ids.length);
+      ctrl.refreshCantidadVariantes(
+        variantesTarget.id_tipo_carbon,
+        payload.length,
+      );
       closeVariantes();
     }
   };
@@ -221,6 +228,7 @@ export const TipoCarbonTab = () => {
         id_tipo_variante: tipo.id_tipo_carbon,
         nombre: tipo.nombre,
         codigo: tipo.codigo,
+        porcentaje_extraccion: 0,
       },
     ]);
     setPendienteVariante(null);
@@ -231,6 +239,25 @@ export const TipoCarbonTab = () => {
       prev.filter((v) => v.id_tipo_variante !== id),
     );
   };
+
+  const handleCambiarPorcentaje = (id: number, valor: number | string) => {
+    setVariantesSeleccionadas((prev) =>
+      prev.map((v) =>
+        v.id_tipo_variante === id
+          ? { ...v, porcentaje_extraccion: Number(valor) || 0 }
+          : v,
+      ),
+    );
+  };
+
+  const sumaPorcentajes = useMemo(
+    () =>
+      variantesSeleccionadas.reduce(
+        (acc, v) => acc + (Number(v.porcentaje_extraccion) || 0),
+        0,
+      ),
+    [variantesSeleccionadas],
+  );
 
   const handleEliminar = async () => {
     if (!confirmDelete) return;
@@ -517,30 +544,25 @@ export const TipoCarbonTab = () => {
       <ModalEstandar
         opened={!!variantesTarget}
         close={closeVariantes}
-        title="Variantes"
+        title="Variantes "
         size="sm"
+        rightSection={
+          variantesTarget && (
+            <Badge c={"blue"} variant="light">
+              {variantesTarget.nombre}
+            </Badge>
+          )
+        }
       >
         <Stack gap="md">
-          {variantesTarget && (
-            <div>
-              <Text size="sm" fw={600} className="text-zinc-200">
-                {variantesTarget.nombre}
-              </Text>
-              <Text size="xs" className="text-zinc-500">
-                Selecciona los tipos (ya existentes) que son variante de este
-                tipo.
-              </Text>
-            </div>
-          )}
-
           <Select
             label="Agregar variante"
             placeholder={
               variantesCtrl.loading
                 ? "Cargando tipos disponibles..."
                 : opcionesSelect.length === 0
-                ? "Todos los tipos disponibles ya estan agregados"
-                : "Selecciona un tipo para agregarlo"
+                  ? "Todos los tipos disponibles ya estan agregados"
+                  : "Selecciona un tipo para agregarlo"
             }
             radius="xl"
             searchable
@@ -578,19 +600,10 @@ export const TipoCarbonTab = () => {
               {variantesSeleccionadas.map((v) => (
                 <div
                   key={v.id_tipo_variante}
-                  className="flex items-center justify-between gap-3 p-3 bg-gradient-to-r from-zinc-900/60 to-zinc-900/30 border border-zinc-800 rounded-xl hover:border-indigo-700/60 transition-colors"
+                  className="flex items-center justify-between gap-3 p-3 bg-linear-to-r from-zinc-900/60 to-zinc-900/30 border border-zinc-800 rounded-xl hover:border-indigo-700/60 transition-colors"
                 >
-                  <Group gap="sm" wrap="nowrap">
-                    <Badge
-                      variant="filled"
-                      color="indigo"
-                      radius="xl"
-                      size="lg"
-                      className="shrink-0"
-                    >
-                      <IconSettings size={14} stroke={1.8} />
-                    </Badge>
-                    <div className="flex flex-col min-w-0">
+                  <Group gap="sm" wrap="nowrap" className="flex-1 min-w-0">
+                    <div className="flex flex-col min-w-0 flex-1">
                       <Text
                         size="sm"
                         fw={500}
@@ -600,10 +613,27 @@ export const TipoCarbonTab = () => {
                       </Text>
                       {v.codigo && (
                         <Text size="xs" className="text-zinc-500">
-                          Codigo: {v.codigo}
+                          {v.codigo}
                         </Text>
                       )}
                     </div>
+                    <NumberInput
+                      value={v.porcentaje_extraccion}
+                      onChange={(val) =>
+                        handleCambiarPorcentaje(v.id_tipo_variante, val)
+                      }
+                      max={100}
+                      suffix=" %"
+                      hideControls
+                      placeholder="0"
+                      aria-label={`Porcentaje de extracción de ${v.nombre}`}
+                      classNames={{
+                        input:
+                          "bg-zinc-900/50 border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white w-24",
+                      }}
+                      radius="lg"
+                      size="xs"
+                    />
                   </Group>
                   <Button
                     variant="subtle"
@@ -621,10 +651,20 @@ export const TipoCarbonTab = () => {
           )}
 
           {!variantesCtrl.loading && (
-            <Text size="xs" className="text-zinc-500">
-              Actualmente {variantesSeleccionadas.length} variante(s)
-              seleccionada(s).
-            </Text>
+            <Group justify="space-between">
+              <Text size="xs" className="text-zinc-500">
+                Actualmente {variantesSeleccionadas.length} variante(s)
+                seleccionada(s).
+              </Text>
+              <Badge
+                variant="light"
+                color={sumaPorcentajes > 100 ? "red" : "teal"}
+                radius="xl"
+                size="sm"
+              >
+                Suma extracción: {sumaPorcentajes.toFixed(2)}%
+              </Badge>
+            </Group>
           )}
 
           <div className="flex justify-end gap-2 pt-2">

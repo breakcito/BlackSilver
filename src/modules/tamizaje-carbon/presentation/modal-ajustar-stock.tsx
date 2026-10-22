@@ -12,6 +12,7 @@ import { useState } from "react";
 import { CheckIcon, XMarkIcon, ScaleIcon } from "@heroicons/react/24/outline";
 import { useNotify } from "../../../hooks/useNotify";
 import { formatNumber } from "../../../shared/functions/formatNumber";
+import { colorCalidadCarbon } from "../../../shared/functions/calidad-carbon";
 import { TamizajeCarbonService } from "../service/tamizaje-carbon.service";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import type { StockCarbonItem } from "../service/tamizaje-carbon.responses";
@@ -110,6 +111,18 @@ export const ModalAjustarStock = ({
             </Text>
             <Badge variant="light" color="indigo" radius="sm">
               {stockItem.tipo_carbon_nombre}
+            </Badge>
+          </Group>
+          <Group justify="space-between" mb="xs">
+            <Text size="xs" c="dimmed">
+              Calidad:
+            </Text>
+            <Badge
+              variant="light"
+              color={colorCalidadCarbon(stockItem.calidad)}
+              radius="sm"
+            >
+              {stockItem.calidad ?? "Sin calidad"}
             </Badge>
           </Group>
           <Group justify="space-between">

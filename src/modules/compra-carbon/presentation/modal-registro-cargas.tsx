@@ -46,11 +46,16 @@ import type { RES_LugarExtraccionCarbon } from "../../../service/responses/lugar
 import type { RES_Transportista } from "../../../service/responses/transportista";
 import type { RES_TarifaCarbon } from "../../../service/responses/tarifa-carbon";
 import { formatNumber } from "../../../shared/functions/formatNumber";
+import {
+  colorCalidadCarbon,
+  resolverCalidadCarbon,
+} from "../../../shared/functions/calidad-carbon";
 import { MultiFilePicker } from "../../../presentation/utils/archivo/multifile-picker";
 import { FormTarifaCarbon } from "../../../presentation/utils/form-tarifa-carbon";
 import { FormTransportista } from "../../../presentation/utils/form-transportista";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
+import type { RES_CalidadCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 
 interface Props {
   compra: CompraCarbonResumen;
@@ -87,6 +92,7 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
     { id: number; direccion: string; cliente: string }[]
   >([]);
   const [transportistas, setTransportistas] = useState<RES_Transportista[]>([]);
+  const [calidades, setCalidades] = useState<RES_CalidadCarbon[]>([]);
 
   const [loadingTipos, setLoadingTipos] = useState(true);
   const [tarifas, setTarifas] = useState<RES_TarifaCarbon[]>([]);
@@ -141,17 +147,19 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
     setLoadingTipos(true);
     (async () => {
       try {
-        const [tiposRes, almRes, lugRes, transRes, tarifasRes] =
+        const [tiposRes, almRes, lugRes, transRes, tarifasRes, calRes] =
           await Promise.all([
             TipoCarbonService.getTipos({ id_proveedor: compra.id_proveedor }),
             AuxService.get_almacenes({ para_carbon: true }),
             AuxService.get_lugares_extraccion_carbon(compra.id_proveedor),
             AuxService.get_transportistas(),
             AuxService.get_tarifas_carbon(),
+            TipoCarbonService.getCalidades(),
           ]);
         if (cancel) return;
 
         if (tiposRes.success && tiposRes.data) setTipos(tiposRes.data);
+        if (calRes.success && calRes.data) setCalidades(calRes.data);
         if (tarifasRes.success && tarifasRes.data) {
           const tList: RES_TarifaCarbon[] = Array.isArray(tarifasRes.data)
             ? tarifasRes.data
@@ -788,22 +796,45 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                   radius="lg"
                 />
 
-                <NumberInput
-                  label="% Ceniza"
-                  placeholder="0.00"
-                  value={carga.porcentaje_ceniza}
-                  onChange={(val) =>
-                    handleChangeCarga(
-                      index,
-                      "porcentaje_ceniza",
-                      Number(val) || 0,
-                    )
-                  }
-                  max={100}
-                  classNames={inputClasses}
-                  size="xs"
-                  radius="lg"
-                />
+                <div>
+                  <NumberInput
+                    label="% Ceniza"
+                    placeholder="0.00"
+                    value={carga.porcentaje_ceniza}
+                    onChange={(val) =>
+                      handleChangeCarga(
+                        index,
+                        "porcentaje_ceniza",
+                        Number(val) || 0,
+                      )
+                    }
+                    max={100}
+                    classNames={inputClasses}
+                    size="xs"
+                    radius="lg"
+                  />
+                  {(() => {
+                    const calidad = resolverCalidadCarbon(
+                      carga.porcentaje_ceniza,
+                      calidades,
+                    );
+                    if (!calidad) return null;
+                    return (
+                      <Badge
+                        mt={4}
+                        color={colorCalidadCarbon(calidad.nombre)}
+                        variant="light"
+                        size="xs"
+                        radius="xl"
+                        className="font-medium"
+                      >
+                        Calidad: {calidad.nombre} (
+                        {formatNumber(calidad.porcentaje_inicio_ceniza)}% –
+                        {formatNumber(calidad.porcentaje_fin_ceniza)}%)
+                      </Badge>
+                    );
+                  })()}
+                </div>
 
                 <NumberInput
                   label="Precio unit. / TN (S/)"
