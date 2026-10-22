@@ -350,16 +350,6 @@ export const ModalRegistrarZarandeo = ({
     [variantes, cantTamizadaNum],
   );
 
-  const mermaDesecho = useMemo(
-    () => Math.max(0, cantTamizadaNum - totalExtraido),
-    [cantTamizadaNum, totalExtraido],
-  );
-
-  const rendimientoPorc = useMemo(() => {
-    if (cantTamizadaNum <= 0) return 0;
-    return Math.min(100, (totalExtraido / cantTamizadaNum) * 100);
-  }, [cantTamizadaNum, totalExtraido]);
-
   const sumaPorcentajes = useMemo(
     () =>
       variantes.reduce(

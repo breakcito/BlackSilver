@@ -10,3 +10,13 @@ export enum TipoCalidadCarbon {
   Intermedia = "Intermedia",
   Alta = "Alta",
 }
+
+/**
+ * Verifica que un texto arbitrario sea una de las calidades soportadas.
+ * Útil cuando el valor viene de un catálogo o de un `Select` (que devuelve
+ * `string`), y se necesita narrowing al enum.
+ */
+export const esTipoCalidadCarbon = (
+  valor: string | null | undefined,
+): valor is TipoCalidadCarbon =>
+  valor != null && (Object.values(TipoCalidadCarbon) as string[]).includes(valor);

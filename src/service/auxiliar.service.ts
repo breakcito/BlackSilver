@@ -38,6 +38,8 @@ import type { RES_CuentaTransportista } from "./responses/cuenta-transportista";
 import type { RES_CuentaProveedor } from "./responses/cuenta-proveedor";
 import type { RES_TarifaCarbon } from "./responses/tarifa-carbon";
 import type { RES_LugarExtraccionCarbon } from "./responses/lugar-extraccion-carbon";
+import type { RES_VehiculoCarbon } from "./responses/vehiculo-carbon";
+import type { RES_StockCarbon } from "./responses/stock-carbon";
 
 const path = "/aux";
 
@@ -475,9 +477,19 @@ export const AuxService = {
   get_marcas: async (filters?: {
     id_marca?: number;
     estado?: string;
+    /** true = solo marcas de vehiculos, false = solo las demas. */
+    de_vehiculos?: boolean;
   }): Promise<IRespuesta<RES_Marca[]>> => {
+    const params = filters
+      ? {
+          ...filters,
+          ...(filters.de_vehiculos !== undefined && {
+            de_vehiculos: filters.de_vehiculos ? 1 : 0,
+          }),
+        }
+      : undefined;
     const { data } = await api.get<IRespuesta<RES_Marca[]>>(`${path}/marcas`, {
-      params: filters,
+      params,
     });
     return data;
   },
@@ -487,10 +499,17 @@ export const AuxService = {
    */
   crear_marca: async (nuevaMarca: {
     nombre: string;
+    /** Registra la marca como del catalogo de vehiculos. */
+    de_vehiculos?: boolean;
   }): Promise<IRespuesta<RES_Marca>> => {
     const { data } = await api.post<IRespuesta<RES_Marca>>(
       `${path}/marcas`,
-      nuevaMarca,
+      {
+        nombre: nuevaMarca.nombre,
+        ...(nuevaMarca.de_vehiculos !== undefined && {
+          de_vehiculos: nuevaMarca.de_vehiculos ? 1 : 0,
+        }),
+      },
     );
     return data;
   },
@@ -796,6 +815,52 @@ export const AuxService = {
     const { data } = await api.post<IRespuesta<RES_LugarExtraccionCarbon>>(
       `/lugar-extraccion-carbon`,
       nuevo,
+    );
+    return data;
+  },
+
+  /**
+   * Catalogo de vehiculos de carbon (despacho de ventas).
+   */
+  get_vehiculos_carbon: async (filters?: {
+    id_vehiculo_carbon?: number;
+    filtros?: string;
+  }): Promise<IRespuesta<RES_VehiculoCarbon[]>> => {
+    const { data } = await api.get<IRespuesta<RES_VehiculoCarbon[]>>(
+      `${path}/vehiculos-carbon`,
+      { params: filters },
+    );
+    return data;
+  },
+
+  /**
+   * Registra un vehiculo de carbon. Pensado para el boton "+" del formulario
+   * de despacho de una venta.
+   */
+  crear_vehiculo_carbon: async (nuevo: {
+    id_marca?: number | null;
+    tipo_vehiculo: string;
+    placa: string;
+  }): Promise<IRespuesta<RES_VehiculoCarbon>> => {
+    const { data } = await api.post<IRespuesta<RES_VehiculoCarbon>>(
+      `${path}/vehiculos-carbon`,
+      nuevo,
+    );
+    return data;
+  },
+
+  /**
+   * Stock de carbon por almacen, tipo y calidad.
+   */
+  get_stock_carbon: async (filters?: {
+    id_almacen?: number;
+    id_tipo_carbon?: number;
+    calidad?: string;
+    filtros?: string;
+  }): Promise<IRespuesta<RES_StockCarbon[]>> => {
+    const { data } = await api.get<IRespuesta<RES_StockCarbon[]>>(
+      `${path}/stock-carbon`,
+      { params: filters },
     );
     return data;
   },
