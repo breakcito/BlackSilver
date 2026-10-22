@@ -9,6 +9,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  Table,
   Text,
   TextInput,
   Tooltip,
@@ -20,11 +21,11 @@ import {
   BuildingStorefrontIcon,
   CalendarDaysIcon,
   ClockIcon,
+  DocumentIcon,
   MagnifyingGlassIcon,
-  PaperClipIcon,
   PlusIcon,
   ScaleIcon,
-  BanknotesIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 
@@ -42,7 +43,9 @@ import { TamizajeCarbonService } from "../service/tamizaje-carbon.service";
 import { ModalAjustarStock } from "./modal-ajustar-stock";
 import { ModalRegistrarZarandeo } from "./modal-registrar-zarandeo";
 import { ModalGastosZarandeo } from "./modal-gastos-zarandeo";
+import { ModalEvidenciasZarandeo } from "./modal-evidencias-zarandeo";
 import type {
+  CargaZarandeoItem,
   StockCarbonItem,
   ZarandeoCarbonItem,
 } from "../service/tamizaje-carbon.responses";
@@ -50,6 +53,7 @@ import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_CalidadCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_Almacen } from "../../../service/responses/almacen";
+import type { IArchivo } from "../../../shared/interfaces/archivo";
 
 const formatDateTime = (iso: string | null | undefined): string => {
   if (!iso) return "—";
@@ -104,8 +108,13 @@ export const TamizajeCarbonPage = () => {
     logs: RES_CambiosLog[];
   } | null>(null);
   const [evidenciasModal, setEvidenciasModal] = useState<{
+    idZarandeoCarbon: number;
     titulo: string;
-    items: Array<{ url: string; nombre_original?: string; extension?: string }>;
+    evidencias: IArchivo[];
+  } | null>(null);
+  const [cargasModal, setCargasModal] = useState<{
+    titulo: string;
+    cargas: CargaZarandeoItem[];
   } | null>(null);
 
   // Load masters
@@ -318,7 +327,7 @@ export const TamizajeCarbonPage = () => {
       {
         accessor: "fecha_hora_zarandeo",
         title: "Fecha y Hora",
-        width: 150,
+        width: 100,
         textAlign: "center",
         render: (r) => (
           <div className="flex flex-col gap-0 items-center justify-center">
@@ -335,7 +344,7 @@ export const TamizajeCarbonPage = () => {
         accessor: "almacen_nombre",
         title: "Almacén",
         textAlign: "center",
-        width: 180,
+        width: 120,
         render: (r) => (
           <Text size="xs" fw={600}>
             {r.almacen_nombre}
@@ -345,10 +354,10 @@ export const TamizajeCarbonPage = () => {
       {
         accessor: "tipo_carbon_nombre",
         title: "Carbón Procesado",
-        width: 220,
+        width: 120,
         textAlign: "center",
         render: (r) => (
-          <Group gap={6} wrap="nowrap" justify="center">
+          <Stack gap={6} justify="center" align="center">
             <Badge variant="light" color="indigo" radius="sm">
               {r.tipo_carbon_nombre}
             </Badge>
@@ -357,16 +366,16 @@ export const TamizajeCarbonPage = () => {
                 ({r.tipo_carbon_codigo})
               </Text>
             )}
-          </Group>
+          </Stack>
         ),
       },
       {
         accessor: "tipo_carboncito",
         title: "Cantidad",
-        width: 150,
+        width: 120,
         textAlign: "center",
         render: (r) => (
-          <Group gap={6} wrap="nowrap" justify="center">
+          <Stack gap={6} justify="center" align="center">
             <Text size="sm" fw={700} c={"lime"}>
               {formatTN(r.cantidad_zarandeada)}
             </Text>
@@ -378,14 +387,14 @@ export const TamizajeCarbonPage = () => {
             >
               {r.calidad ?? "Sin calidad"}
             </Badge>
-          </Group>
+          </Stack>
         ),
       },
       {
         accessor: "variantes",
         title: "Variantes",
         textAlign: "center",
-        width: 300,
+        width: 200,
         render: (r) => {
           const vars = r.variantes ?? [];
           if (vars.length === 0)
@@ -414,7 +423,7 @@ export const TamizajeCarbonPage = () => {
       {
         accessor: "origen",
         title: "Origen",
-        width: 120,
+        width: 200,
         textAlign: "center",
         render: (r) => {
           if (r.es_rezarandeo) {
@@ -424,10 +433,63 @@ export const TamizajeCarbonPage = () => {
               </Badge>
             );
           }
+
+          const cargas = r.cargas ?? [];
+          if (cargas.length === 0) {
+            return (
+              <Text size="xs" c="dimmed">
+                —
+              </Text>
+            );
+          }
+
+          const visibles = cargas.slice(0, 2);
+
           return (
-            <Badge variant="light" color="blue" radius="xl" size="sm">
-              {r.cantidad_cargas} carga(s)
-            </Badge>
+            <Group gap={6} justify="center" wrap="nowrap">
+              {visibles.map((c, i) => (
+                <Tooltip
+                  key={c.id_carga_compra_carbon ?? i}
+                  label={`OC ${c.compra_correlativo ?? "—"} · ${formatNumber(c.cantidad)} TN · ${formatNumber(c.porcentaje_ceniza)}% ceniza`}
+                  withArrow
+                >
+                  <Badge
+                    variant="outline"
+                    color="blue"
+                    radius="sm"
+                    size="sm"
+                    className="font-mono"
+                  >
+                    {c.placa || "—"}
+                    {c.codigo_ticket_balanza
+                      ? ` · ${c.codigo_ticket_balanza}`
+                      : ""}
+                  </Badge>
+                </Tooltip>
+              ))}
+
+              {cargas.length > 1 && (
+                <Tooltip
+                  label={`Ver las ${cargas.length} cargas de esta producción`}
+                  withArrow
+                >
+                  <ActionIcon
+                    variant="light"
+                    color="blue"
+                    size="md"
+                    radius="md"
+                    onClick={() =>
+                      setCargasModal({
+                        titulo: `${r.tipo_carbon_nombre} · ${r.almacen_nombre}`,
+                        cargas,
+                      })
+                    }
+                  >
+                    <EyeIcon className="w-4 h-4" />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </Group>
           );
         },
       },
@@ -437,8 +499,16 @@ export const TamizajeCarbonPage = () => {
         width: 120,
         textAlign: "center",
         render: (r) => (
-          <Group gap={4} justify="center" wrap="nowrap">
-            <Tooltip label="Gastos de producción" withArrow>
+          <Group gap={8} justify="center" wrap="nowrap">
+            <Stack gap={0} align="end">
+              <Text size="sm" c="red" fw={700} className="font-mono">
+                S/ {formatNumber(r.gastos_total)}
+              </Text>
+              <Text size="11px" fw={600} c="gray">
+                {r.gastos_cantidad} gasto{r.gastos_cantidad === 1 ? "" : "s"}
+              </Text>
+            </Stack>
+            <Tooltip label="Ver detalle de gastos" withArrow>
               <ActionIcon
                 variant="light"
                 color="indigo"
@@ -446,50 +516,70 @@ export const TamizajeCarbonPage = () => {
                 radius="md"
                 onClick={() => setZarandeoGastos(r)}
               >
-                <BanknotesIcon className="w-4 h-4" />
+                <EyeIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
-            {r.evidencias && r.evidencias.length > 0 && (
-              <Tooltip
-                label={`Ver ${r.evidencias.length} evidencia(s)`}
-                withArrow
-              >
-                <ActionIcon
-                  variant="light"
-                  color="gray"
-                  size="md"
-                  radius="md"
-                  onClick={() =>
-                    setEvidenciasModal({
-                      titulo: `${r.tipo_carbon_nombre} · ${r.almacen_nombre}`,
-                      items: r.evidencias ?? [],
-                    })
-                  }
-                >
-                  <PaperClipIcon className="w-4 h-4" />
-                </ActionIcon>
-              </Tooltip>
-            )}
           </Group>
         ),
       },
       {
+        accessor: "evidencias",
+        title: "Evidencias",
+        width: 160,
+        textAlign: "center",
+        render: (r) => {
+          const total = r.evidencias?.length ?? 0;
+          return (
+            <Group gap={6} justify="center" wrap="nowrap">
+              <Badge
+                variant="light"
+                color={total > 0 ? "teal" : "gray"}
+                radius="md"
+                size="sm"
+                leftSection={<DocumentIcon className="w-3.5 h-3.5" />}
+              >
+                {total} archivo(s)
+              </Badge>
+              <Tooltip label="Ver y gestionar evidencias" withArrow>
+                <ActionIcon
+                  variant="light"
+                  color="teal"
+                  size="md"
+                  radius="md"
+                  onClick={() =>
+                    setEvidenciasModal({
+                      idZarandeoCarbon: r.id_zarandeo_carbon,
+                      titulo: `${r.tipo_carbon_nombre} · ${r.almacen_nombre}`,
+                      evidencias: r.evidencias ?? [],
+                    })
+                  }
+                >
+                  <EyeIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          );
+        },
+      },
+      {
         accessor: "responsables",
         title: "Responsables",
-        width: 170,
+        width: 180,
         textAlign: "center",
         render: (r) => (
           <Stack gap={1}>
-            <Text size="xs" c={"white"} fw={600}>
-              <span className="text-zinc-400">Reg: </span>
-              {r.empleado_registro}
-            </Text>
-            {r.empleado_supervisor && (
+            <div className="text-left">
               <Text size="xs" c={"white"} fw={600}>
-                <span className="text-zinc-400">Sup: </span>
-                {r.empleado_supervisor}
+                <span className="text-zinc-400">Reg: </span>
+                {r.empleado_registro}
               </Text>
-            )}
+              {r.empleado_supervisor && (
+                <Text size="xs" c={"white"} fw={600}>
+                  <span className="text-zinc-400">Sup: </span>
+                  {r.empleado_supervisor}
+                </Text>
+              )}
+            </div>
           </Stack>
         ),
       },
@@ -912,12 +1002,35 @@ export const TamizajeCarbonPage = () => {
 
       {/* Modal Ver Evidencias */}
       {evidenciasModal && (
-        <Modal
+        <ModalEvidenciasZarandeo
           opened={Boolean(evidenciasModal)}
           onClose={() => setEvidenciasModal(null)}
+          idZarandeoCarbon={evidenciasModal.idZarandeoCarbon}
+          titulo={evidenciasModal.titulo}
+          evidencias={evidenciasModal.evidencias}
+          onUpdated={(nuevas) => {
+            setEvidenciasModal((prev) =>
+              prev ? { ...prev, evidencias: nuevas } : prev,
+            );
+            setTamizajes((prev) =>
+              prev.map((t) =>
+                t.id_zarandeo_carbon === evidenciasModal.idZarandeoCarbon
+                  ? { ...t, evidencias: nuevas }
+                  : t,
+              ),
+            );
+          }}
+        />
+      )}
+
+      {/* Modal Ver Cargas de la producción */}
+      {cargasModal && (
+        <Modal
+          opened={Boolean(cargasModal)}
+          onClose={() => setCargasModal(null)}
           title={
             <Text fw={700} size="sm" className="text-white">
-              Evidencias / Adjuntos · {evidenciasModal.titulo}
+              Cargas de la producción · {cargasModal.titulo}
             </Text>
           }
           centered
@@ -927,30 +1040,86 @@ export const TamizajeCarbonPage = () => {
             header: "bg-zinc-950 border-b border-zinc-800 text-white",
           }}
         >
-          <Stack gap="sm">
-            {evidenciasModal.items.map((ev, i) => (
-              <Paper
-                key={i}
-                className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-lg flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <PaperClipIcon className="w-4 h-4 text-zinc-400 shrink-0" />
-                  <Text size="xs" className="text-zinc-200 truncate">
-                    {ev.nombre_original || `Adjunto #${i + 1}`}
-                  </Text>
-                </div>
-                {ev.url && (
-                  <a
-                    href={ev.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-semibold text-teal-400 hover:text-teal-300 hover:underline shrink-0"
+          <Stack gap="xs">
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" c="dimmed">
+                {cargasModal.cargas.length} carga(s) tomadas en este zarandeo
+              </Text>
+              <Badge color="blue" variant="light" radius="xl">
+                {formatTN(
+                  cargasModal.cargas.reduce(
+                    (acc, c) => acc + (Number(c.cantidad) || 0),
+                    0,
+                  ),
+                )}{" "}
+                TN
+              </Badge>
+            </Group>
+
+            <Table
+              highlightOnHover
+              withTableBorder={false}
+              verticalSpacing="xs"
+            >
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th className="text-zinc-400 text-xs font-semibold">
+                    Placa
+                  </Table.Th>
+                  <Table.Th className="text-zinc-400 text-xs font-semibold">
+                    Ticket de balanza
+                  </Table.Th>
+                  <Table.Th className="text-zinc-400 text-xs font-semibold">
+                    OC
+                  </Table.Th>
+                  <Table.Th className="text-zinc-400 text-xs font-semibold">
+                    % Ceniza
+                  </Table.Th>
+                  <Table.Th
+                    className="text-zinc-400 text-xs font-semibold"
+                    align="right"
                   >
-                    Ver archivo ↗
-                  </a>
-                )}
-              </Paper>
-            ))}
+                    TN
+                  </Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {cargasModal.cargas.map((c, i) => (
+                  <Table.Tr key={c.id_carga_compra_carbon ?? i}>
+                    <Table.Td>
+                      <Text
+                        size="xs"
+                        fw={600}
+                        c="zinc.200"
+                        className="font-mono"
+                      >
+                        {c.placa || "—"}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="xs" c="zinc.300" className="font-mono">
+                        {c.codigo_ticket_balanza || "—"}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="xs" c="blue.4">
+                        {c.compra_correlativo || "—"}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="xs" c="zinc.300">
+                        {formatNumber(c.porcentaje_ceniza)}%
+                      </Text>
+                    </Table.Td>
+                    <Table.Td align="right">
+                      <Text size="xs" fw={700} c="zinc.100">
+                        {formatNumber(c.cantidad)}
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
           </Stack>
         </Modal>
       )}

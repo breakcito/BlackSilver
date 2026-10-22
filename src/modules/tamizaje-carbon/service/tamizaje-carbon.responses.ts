@@ -1,4 +1,5 @@
 import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
+import type { IArchivo } from "../../../shared/interfaces/archivo";
 import type { TipoCalidadCarbon } from "../../../shared/enums/carbon/tipo-calidad-carbon";
 import type { TipoGastoZarandeo } from "../../../shared/enums/carbon/tipo-gasto-zarandeo";
 
@@ -57,11 +58,11 @@ export interface ZarandeoCarbonItem {
   fecha_hora_zarandeo: string;
   cantidad_cargas: number;
   total_cargas_cantidad: number;
-  evidencias?: Array<{
-    url: string;
-    nombre_original?: string;
-    extension?: string;
-  }> | null;
+  /** Cantidad de gastos de producción registrados en el zarandeo. */
+  gastos_cantidad: number;
+  /** Suma de los totales de los gastos de producción del zarandeo. */
+  gastos_total: number | string;
+  evidencias?: IArchivo[] | null;
   created_at?: string;
   variantes?: VarianteZarandeoItem[];
   cargas?: CargaZarandeoItem[];

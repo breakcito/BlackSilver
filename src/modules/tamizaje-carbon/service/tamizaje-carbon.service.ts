@@ -1,5 +1,6 @@
 import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
+import type { IArchivo } from "../../../shared/interfaces/archivo";
 import type {
   ActualizarStockManualRequest,
   RegistrarGastoZarandeoPayload,
@@ -106,6 +107,45 @@ export const TamizajeCarbonService = {
   ): Promise<IRespuesta<GastoZarandeoItem[]>> => {
     const { data } = await api.get<IRespuesta<GastoZarandeoItem[]>>(
       `${PATH}/gastos/${idZarandeoCarbon}`,
+    );
+    return data;
+  },
+
+  /**
+   * Sube archivos como evidencias del zarandeo y devuelve la lista completa
+   * de evidencias (las previas + las nuevas).
+   */
+  subirEvidencias: async (
+    idZarandeoCarbon: number,
+    archivos: File[],
+  ): Promise<IRespuesta<IArchivo[]>> => {
+    const formData = new FormData();
+    formData.append("id_zarandeo_carbon", String(idZarandeoCarbon));
+    archivos.forEach((file) => formData.append("evidencias[]", file));
+
+    const { data } = await api.post<IRespuesta<IArchivo[]>>(
+      `${PATH}/evidencias`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  /**
+   * Elimina una evidencia del zarandeo (archivo físico + registro).
+   */
+  eliminarEvidencia: async (
+    idZarandeoCarbon: number,
+    pathRelativo: string,
+  ): Promise<IRespuesta<IArchivo[]>> => {
+    const { data } = await api.delete<IRespuesta<IArchivo[]>>(
+      `${PATH}/evidencias`,
+      {
+        data: {
+          id_zarandeo_carbon: idZarandeoCarbon,
+          path_relativo: pathRelativo,
+        },
+      },
     );
     return data;
   },

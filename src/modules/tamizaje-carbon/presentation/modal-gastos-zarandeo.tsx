@@ -13,6 +13,7 @@ import {
   Text,
   TextInput,
   Textarea,
+  Tooltip,
 } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -265,7 +266,7 @@ export const ModalGastosZarandeo = ({
       opened={opened}
       close={onClose}
       title="Gastos de Producción"
-      size="xl"
+      size="55rem"
       validateClose
       rightSection={
         tituloZarandeo && (
@@ -371,7 +372,9 @@ export const ModalGastosZarandeo = ({
                 label="Número de reporte (opcional)"
                 placeholder="Ej: REP-0042"
                 value={numeroReporte}
-                onChange={(e) => setNumeroReporte(e.currentTarget.value.toUpperCase())}
+                onChange={(e) =>
+                  setNumeroReporte(e.currentTarget.value.toUpperCase())
+                }
                 radius="lg"
                 size="xs"
                 classNames={estilitos}
@@ -382,7 +385,9 @@ export const ModalGastosZarandeo = ({
               label="Descripción (opcional)"
               placeholder="Detalle del gasto realizado..."
               value={descripcion}
-              onChange={(e) => setDescripcion(e.currentTarget.value.toUpperCase())}
+              onChange={(e) =>
+                setDescripcion(e.currentTarget.value.toUpperCase())
+              }
               minRows={2}
               mt="sm"
               radius="lg"
@@ -451,7 +456,9 @@ export const ModalGastosZarandeo = ({
 
             <Group justify="space-between" mt={24}>
               <Group ml={4} gap={"xs"}>
-                <Text size="xs" fw={600}>Total:</Text>
+                <Text size="xs" fw={600}>
+                  Total:
+                </Text>
                 <TextInput
                   value={formatNumber(total)}
                   readOnly
@@ -519,27 +526,42 @@ export const ModalGastosZarandeo = ({
             >
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th className="text-zinc-400 text-xs font-semibold">
-                    Gasto
-                  </Table.Th>
-                  <Table.Th className="text-zinc-400 text-xs font-semibold">
+                  <Table.Th
+                    ta={"center"}
+                    className="text-zinc-400 text-xs font-semibold"
+                  >
                     Fecha
                   </Table.Th>
-                  <Table.Th className="text-zinc-400 text-xs font-semibold">
-                    Proveedor
-                  </Table.Th>
-                  <Table.Th className="text-zinc-400 text-xs font-semibold">
-                    Reporte
+                  <Table.Th
+                    ta={"center"}
+                    className="text-zinc-400 text-xs font-semibold"
+                    w={150}
+                  >
+                    Gasto
                   </Table.Th>
                   <Table.Th
+                    ta={"center"}
                     className="text-zinc-400 text-xs font-semibold"
-                    align="right"
+                    w={150}
+                  >
+                    Proveedor
+                  </Table.Th>
+                  <Table.Th
+                    ta={"center"}
+                    className="text-zinc-400 text-xs font-semibold"
+                  >
+                    Reporte
+                  </Table.Th>
+
+                  <Table.Th
+                    ta={"center"}
+                    className="text-zinc-400 text-xs font-semibold"
                   >
                     Cantidad
                   </Table.Th>
                   <Table.Th
                     className="text-zinc-400 text-xs font-semibold"
-                    align="right"
+                    ta={"center"}
                   >
                     Total
                   </Table.Th>
@@ -548,43 +570,64 @@ export const ModalGastosZarandeo = ({
               <Table.Tbody>
                 {gastos.map((g) => (
                   <Table.Tr key={g.id_gasto_produccion_carbon}>
-                    <Table.Td>
-                      <Badge
-                        color={COLOR_POR_GASTO[g.gasto] ?? "gray"}
-                        variant="light"
-                        radius="xl"
-                        size="sm"
-                      >
-                        {g.gasto === TipoGastoZarandeo.Otro
-                          ? (g.otro_gasto ?? "Otro")
-                          : g.gasto}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c="zinc.300">
+                    <Table.Td ta={"center"}>
+                      <Text size="xs" c="gray">
                         {g.fecha}
-                        {g.hora_inicio && g.hora_fin
-                          ? ` · ${g.hora_inicio}-${g.hora_fin}`
-                          : ""}
                       </Text>
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td ta={"center"} w={150}>
+                      <Stack gap={5} justify="center" align="center" w={150}>
+                        <Badge
+                          color={COLOR_POR_GASTO[g.gasto] ?? "gray"}
+                          variant="light"
+                          radius="xl"
+                          size="sm"
+                        >
+                          {g.gasto === TipoGastoZarandeo.Otro
+                            ? (g.otro_gasto ?? "Otro")
+                            : g.gasto}
+                        </Badge>
+                        <Tooltip
+                          label={g.descripcion || ""}
+                          multiline
+                          w={280}
+                          withArrow
+                          position="top"
+                        >
+                          <Text
+                            size="xs"
+                            lineClamp={3}
+                            style={{ width: "100%", cursor: "help" }}
+                          >
+                            {g.descripcion || ""}
+                          </Text>
+                        </Tooltip>
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td ta={"center"}>
                       <Text size="xs" c="zinc.300">
                         {g.proveedor_razon_social || "—"}
                       </Text>
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td ta={"center"}>
                       <Text size="xs" c="zinc.300">
                         {g.numero_reporte || "—"}
                       </Text>
                     </Table.Td>
-                    <Table.Td align="right">
-                      <Text size="xs" c="zinc.300">
-                        {formatNumber(g.cantidad)}
-                      </Text>
+                    <Table.Td ta={"center"}>
+                      <Stack gap={4} justify="center" align="center">
+                        <Text size="xs" c="zinc.300">
+                          {formatNumber(g.cantidad)}
+                        </Text>
+                        <Badge size="sm" color="grape" variant="filled">
+                          {g.hora_inicio && g.hora_fin
+                            ? `${dayjs(`1970-01-01 ${g.hora_inicio}`).format("HH:mm")} - ${dayjs(`1970-01-01 ${g.hora_fin}`).format("HH:mm")}`
+                            : ""}
+                        </Badge>
+                      </Stack>
                     </Table.Td>
-                    <Table.Td align="right">
-                      <Text size="xs" fw={700} c="indigo.3">
+                    <Table.Td ta={"center"}>
+                      <Text size="xs" fw={700} c="red">
                         S/ {formatNumber(g.total)}
                       </Text>
                     </Table.Td>
