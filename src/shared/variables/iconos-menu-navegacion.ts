@@ -16,7 +16,8 @@ import {
   FireIcon,
   ChartPieIcon,
   WrenchIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  BanknotesIcon
 } from "@heroicons/react/24/outline";
 
 // Normaliza un nombre a slug estable (lowercase, sin acentos, guiones).
@@ -71,6 +72,7 @@ export const iconos_menu_navegacion: IconoMenuEntrada[] = [
   { path: "compra-carbon", icono: TruckIcon },
   { path: "zarandeo-carbon", icono: ChartPieIcon },
   { path: "kardex-carbon", icono: ChartBarIcon },
+  { path: "venta-carbon", icono: BanknotesIcon },
 
   // Configuracion / Empresa
   { path: "empresas", icono: BuildingOffice2Icon },
