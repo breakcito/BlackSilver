@@ -286,6 +286,87 @@ export interface CompraCarbonDetalleResponse {
   transportistas_flete: TransportistaFlete[];
 }
 
+/**
+ * Una fila del reporte "Registro de Compras" (Control de Compras).
+ *
+ * Es una carga de carbon con su cabecera de OC y los comprobantes y pagos
+ * ya resueltos: el backend devuelve el PRIMER pago que NO es para
+ * detraccion (directo o del comprobante del proveedor).
+ */
+export interface RES_FilaControlCompras {
+  id_carga_compra_carbon: number;
+  fecha_hora_ingreso: string;
+  codigo_ticket_balanza: string | null;
+  placa: string | null;
+  guia_remitente: string | null;
+  guia_transportista: string | null;
+  tipo_despacho: string | null;
+  cantidad: number;
+  porcentaje_ceniza: number | null;
+  porcentaje_humedad: number | null;
+  precio_unitario: number;
+  costo_flete_por_tonelada: number;
+  precio_materia_prima: number;
+  subtotal: number;
+  monto_igv: number;
+  total: number;
+  monto_detraccion: number;
+  neto_a_pagar: number;
+  flete_subtotal: number;
+  flete_igv: number;
+  flete_total: number;
+  flete_monto_detraccion: number;
+  flete_neto_a_pagar: number;
+  pagar_flete: boolean | number;
+  estado: string;
+  tipo_carbon_nombre: string;
+  tipo_carbon_codigo: string | null;
+  lugar_extraccion: string | null;
+  almacen_empresa_nombre: string | null;
+  almacen_cliente_direccion: string | null;
+  cliente_destino: string | null;
+  id_compra_carbon: number;
+  correlativo: string;
+  aplica_igv: boolean | number;
+  porcentaje_igv: number;
+  porcentaje_detraccion: number;
+  porcentaje_igv_flete: number;
+  porcentaje_detraccion_flete: number;
+  proveedor: string;
+  proveedor_ruc: string | null;
+  proveedor_dni: string | null;
+  id_empresa: number;
+  empresa: string;
+  transportista_razon_social: string | null;
+  transportista_ruc: string | null;
+  transportista_dni: string | null;
+  /** Comprobante del proveedor (factura) que ampara la carga. */
+  id_comprobante_compra_carbon: number | null;
+  comprobante_codigo: string | null;
+  comprobante_fecha_emision: string | null;
+  /** Primer pago al proveedor que NO es para detraccion. */
+  pago_fecha_hora: string | null;
+  pago_medio: string | null;
+  pago_numero_operacion: string | null;
+  pago_proveedor_banco: string | null;
+  pago_proveedor_numero_cuenta: string | null;
+  /** Comprobante de transporte (factura del flete). */
+  id_comprobante_transporte_carbon: number | null;
+  comprobante_transporte_codigo: string | null;
+  comprobante_transporte_fecha_emision: string | null;
+  /** Primer pago al transportista que NO es para detraccion. */
+  pago_flete_fecha_hora: string | null;
+  pago_flete_medio: string | null;
+  pago_flete_numero_operacion: string | null;
+  pago_flete_banco: string | null;
+  pago_flete_numero_cuenta: string | null;
+}
+
+export interface RES_ReporteControlCompras {
+  anio: number;
+  cargas: RES_FilaControlCompras[];
+}
+
 export interface RespuestaRegistrarComprobanteProveedor {
   id_comprobante_compra_carbon: number;
   comprobante: ComprobanteCompraCarbonItem;

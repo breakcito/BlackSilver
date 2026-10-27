@@ -4,6 +4,7 @@ import { ArrowPathIcon } from "@heroicons/react/24/outline";
 
 import { useTitlePage } from "../../../hooks/useTitlePage";
 import { useCompraCarbon } from "../hooks/useCompraCarbon";
+import { useControlComprasExcel } from "../hooks/useControlComprasExcel";
 import { RegistroCompraCarbon } from "./registro-compra-carbon";
 import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
@@ -30,6 +31,9 @@ export const CompraCarbonPage = () => {
   } = useCompraCarbon();
 
   const [openRegistro, setOpenRegistro] = useState(false);
+
+  const { exportar: exportarControlCompras, exportando } =
+    useControlComprasExcel();
   /**
    * Cuando se registra una compra, el listado imprime automaticamente su PDF.
    * Se guarda el payload completo que devuelve el POST (cabecera + detalles)
@@ -52,6 +56,8 @@ export const CompraCarbonPage = () => {
         cambiarPeriodo={cambiarPeriodo}
         recargar={recargar}
         loading={loading}
+        onExportarControlCompras={() => void exportarControlCompras(anio)}
+        exportandoControlCompras={exportando}
       />
 
       {loading && compras.length === 0 ? (

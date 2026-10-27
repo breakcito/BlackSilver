@@ -15,6 +15,7 @@ import type {
   RespuestaRegistrarPagoProveedor,
   RespuestaRegistrarComprobanteTransporte,
   RespuestaRegistrarPagoTransporte,
+  RES_ReporteControlCompras,
 } from "./compra-carbon.responses";
 
 const PATH = "/compras-carbon";
@@ -30,6 +31,20 @@ export const CompraCarbonService = {
     const { data } = await api.get<IRespuesta<CompraCarbonResumen[]>>(PATH, {
       params: filters,
     });
+    return data;
+  },
+
+  /**
+   * Reporte "Registro de Compras" (Control de Compras) de un año: todas las
+   * cargas que ingresaron al almacén en ese año, con comprobantes y pagos.
+   */
+  getReporteControlCompras: async (
+    anio: number,
+  ): Promise<IRespuesta<RES_ReporteControlCompras>> => {
+    const { data } = await api.get<IRespuesta<RES_ReporteControlCompras>>(
+      `${PATH}/reporte`,
+      { params: { anio } },
+    );
     return data;
   },
 

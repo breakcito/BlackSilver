@@ -19,8 +19,6 @@ const DASH = "-";
  * partido en remitente/transportista y el bloque de factura con la fecha, el
  * numero de comprobante y el subtotal del flete.
  */
-const COLUMNAS = 19;
-
 const C = {
   ITEM: 1,
   FECHA: 2,
@@ -41,6 +39,19 @@ const C = {
   FACTURA_FECHA: 17,
   FACTURA_NUMERO: 18,
   FACTURA_SUBTOTAL: 19,
+} as const;
+
+/**
+ * Columnas del bloque de identificacion del transportista (TRANSPORTISTA,
+ * N° DE CUENTA, CCI, NOMBRE DE BANCO).
+ *
+ * La etiqueta ocupa A:B y el dato C:F. La banda naranja se detiene en la
+ * columna F: las columnas siguientes quedan sin relleno ni borde, igual que
+ * en el formato de referencia.
+ */
+const IDENT = {
+  etiqueta: { desde: 1, hasta: 2 },
+  dato: { desde: 3, hasta: 6 },
 } as const;
 
 /**
@@ -167,28 +178,25 @@ export const exportarLiquidacionFleteExcel = async (
 
     bloqueIdentificacion.forEach(([label, valor]) => {
       const fila = ws.getRow(linea);
-      ws.mergeCells(linea, 1, linea, 2);
-      const celdaLabel = fila.getCell(1);
+      ws.mergeCells(linea, IDENT.etiqueta.desde, linea, IDENT.etiqueta.hasta);
+      const celdaLabel = fila.getCell(IDENT.etiqueta.desde);
       celdaLabel.value = label;
       celdaLabel.font = fontLabel;
       celdaLabel.alignment = { vertical: "middle", horizontal: "left" };
       celdaLabel.fill = fillTransportista;
       celdaLabel.border = borderMedio;
 
-      ws.mergeCells(linea, 3, linea, 6);
-      const celdaValor = fila.getCell(3);
+      ws.mergeCells(linea, IDENT.dato.desde, linea, IDENT.dato.hasta);
+      const celdaValor = fila.getCell(IDENT.dato.desde);
       celdaValor.value = valor;
       celdaValor.font = { ...fontData, bold: true };
       celdaValor.alignment = { vertical: "middle", horizontal: "center" };
       celdaValor.fill = fillTransportista;
       celdaValor.border = borderMedio;
 
-      // La banda naranja se extiende hasta el final de la tabla. Se estilan
-      // celda por celda (sin merge) para no dejar un rango combinado vacío.
-      for (let c = 7; c <= COLUMNAS; c++) {
-        fila.getCell(c).fill = fillTransportista;
-        fila.getCell(c).border = borderMedio;
-      }
+      // El relleno naranja cubre solo el par etiqueta/dato (columnas A:F).
+      // Las columnas siguientes de la fila se dejan sin color ni borde: la
+      // banda no debe llegar hasta el final de la tabla.
       fila.height = 16;
       linea++;
     });
