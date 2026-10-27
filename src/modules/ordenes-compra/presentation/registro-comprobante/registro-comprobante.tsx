@@ -291,7 +291,7 @@ export const RegistroComprobante = ({
                       fixedDecimalScale
                       leftSection={
                         <Text
-                          size="md"
+                          size="sm"
                           fw={950}
                           c="indigo.4"
                           className="font-mono"
@@ -301,7 +301,7 @@ export const RegistroComprobante = ({
                       }
                       classNames={{
                         input:
-                          "bg-zinc-900/90 border-indigo-500/40 text-white h-16 shadow-2xl focus:border-indigo-500 focus:ring-indigo-500/20",
+                          "bg-zinc-900/90 border-indigo-500/40 text-white h-11 shadow-lg focus:border-indigo-500 focus:ring-indigo-500/20",
                         label:
                           "text-indigo-400 font-black mb-2 uppercase text-[11px]! tracking-[0.15em] ml-2",
                       }}
