@@ -102,10 +102,6 @@ export const CompraCarbonService = {
     formData.append("codigo_comprobante", payload.codigo_comprobante);
     formData.append("fecha_emision", payload.fecha_emision);
     if (payload.observacion) formData.append("observacion", payload.observacion);
-    formData.append("con_detraccion", payload.con_detraccion ? "1" : "0");
-    if (payload.porcentaje_detraccion !== undefined) {
-      formData.append("porcentaje_detraccion", String(payload.porcentaje_detraccion));
-    }
     formData.append("ids_cargas", JSON.stringify(payload.ids_cargas));
     if (payload.anticipos && payload.anticipos.length > 0) {
       formData.append("anticipos", JSON.stringify(payload.anticipos));
@@ -167,10 +163,6 @@ export const CompraCarbonService = {
     formData.append("codigo_comprobante", payload.codigo_comprobante);
     formData.append("fecha_emision", payload.fecha_emision);
     if (payload.observacion) formData.append("observacion", payload.observacion);
-    formData.append("con_detraccion", payload.con_detraccion ? "1" : "0");
-    if (payload.porcentaje_detraccion !== undefined) {
-      formData.append("porcentaje_detraccion", String(payload.porcentaje_detraccion));
-    }
     formData.append("ids_cargas", JSON.stringify(payload.ids_cargas));
     if (payload.evidencias && payload.evidencias.length > 0) {
       payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
@@ -190,7 +182,9 @@ export const CompraCarbonService = {
   ): Promise<IRespuesta<RespuestaRegistrarPagoTransporte>> => {
     const formData = new FormData();
     formData.append("id_comprobante_transporte_carbon", String(payload.id_comprobante_transporte_carbon));
-    formData.append("id_cuenta_bancaria_empresa", String(payload.id_cuenta_bancaria_empresa));
+    if (payload.id_cuenta_bancaria_empresa) {
+      formData.append("id_cuenta_bancaria_empresa", String(payload.id_cuenta_bancaria_empresa));
+    }
     if (payload.id_cuenta_bancaria_transportista) {
       formData.append("id_cuenta_bancaria_transportista", String(payload.id_cuenta_bancaria_transportista));
     }

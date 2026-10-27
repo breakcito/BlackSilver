@@ -17,6 +17,7 @@ import {
   DocumentArrowDownIcon,
   EyeIcon,
   LockClosedIcon,
+  PlusIcon,
   TruckIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -32,6 +33,7 @@ import { useAnularCompraCarbon } from "../../hooks/useAnularCompraCarbon";
 import { ModalRegistroCargas } from "../modal-registro-cargas";
 import { ModalLiquidacionPagos } from "../modal-liquidacion-pagos";
 import { exportarLiquidacionExcel } from "../excel/exportar-liquidacion-excel";
+import { exportarLiquidacionFleteExcel } from "../excel/exportar-liquidacion-flete-excel";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoCompraCarbon } from "../../../../shared/enums/compra-carbon/estado-compra-carbon";
 import type {
@@ -125,6 +127,7 @@ export const CompraCarbonListado = ({
   const [motivoAnular, setMotivoAnular] = useState("");
   const [printingId, setPrintingId] = useState<number | null>(null);
   const [exportingId, setExportingId] = useState<number | null>(null);
+  const [exportingFleteId, setExportingFleteId] = useState<number | null>(null);
 
   const handleExportarExcel = async (r: CompraCarbonResumen) => {
     try {
@@ -139,6 +142,27 @@ export const CompraCarbonListado = ({
       notifyError(err instanceof Error ? err.message : "Error al exportar");
     } finally {
       setExportingId(null);
+    }
+  };
+
+  const handleExportarFleteExcel = async (r: CompraCarbonResumen) => {
+    try {
+      setExportingFleteId(r.id_compra_carbon);
+      const res = await CompraCarbonService.getCompraConDetalles(
+        r.id_compra_carbon,
+      );
+      if (res.data) {
+        await exportarLiquidacionFleteExcel(res.data);
+        notifySuccess("Liquidación de fletes exportada");
+      }
+    } catch (err: unknown) {
+      notifyError(
+        err instanceof Error
+          ? err.message
+          : "Error al exportar la liquidación de fletes",
+      );
+    } finally {
+      setExportingFleteId(null);
     }
   };
 
@@ -260,7 +284,6 @@ export const CompraCarbonListado = ({
             proveedoresById ? proveedoresById[compra.id_proveedor] : null
           }
           urlLogoEmpresa={empresa.url_logo ?? null}
-          colorPredominante={empresa.color_predominante ?? null}
         />,
         { documentTitle: `Compra de Carbon - ${compra.correlativo}`, target },
       );
@@ -424,7 +447,7 @@ export const CompraCarbonListado = ({
       ),
     },
     {
-      accessor: "total_real_con_descuento",
+      accessor: "total_real_neto",
       title: "Avance",
       width: 120,
       textAlign: "center",
@@ -434,8 +457,13 @@ export const CompraCarbonListado = ({
             {formatNumber(Number(r.total_toneladas_reales), 2)} TN
           </Text>
           <Text size="xs" c="white" className="font-mono" fw={800}>
-            S/. {formatNumber(r.total_real_con_descuento)}
+            S/. {formatNumber(r.total_real_neto)}
           </Text>
+          {(r.cantidad_cargas_con_flete ?? 0) > 0 && (
+            <Text size="10px" c="blue.4" className="font-mono" fw={700}>
+              Flete: S/. {formatNumber(r.total_real_flete_neto)}
+            </Text>
+          )}
         </Stack>
       ),
     },
@@ -452,7 +480,7 @@ export const CompraCarbonListado = ({
         return (
           <div className="flex items-center justify-center gap-2">
             <Badge variant="light" color="cyan" radius="md" size="md">
-              {r.cantidad_cargas ?? r.cantidad_items ?? 0}
+              {r.cantidad_cargas ?? 0}
             </Badge>
             <Tooltip label="Ver cargas" withArrow position="top">
               <ActionIcon
@@ -481,7 +509,7 @@ export const CompraCarbonListado = ({
                     setModalCargas(r);
                   }}
                 >
-                  <TruckIcon className="w-4 h-4 text-white" />
+                  <PlusIcon className="w-4 h-4 text-white" />
                 </ActionIcon>
               </Tooltip>
             )}
@@ -527,7 +555,7 @@ export const CompraCarbonListado = ({
         const esAnulado = r.estado === EstadoCompraCarbon.Anulado;
         const esPagado = r.estado === EstadoCompraCarbon.Pagado;
         const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
-        const totalCargas = r.cantidad_cargas ?? r.cantidad_items ?? 0;
+        const totalCargas = r.cantidad_cargas ?? 0;
         const puedeLiquidar = !esAnulado && totalCargas >= 1;
         const puedeCerrar =
           !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
@@ -579,6 +607,29 @@ export const CompraCarbonListado = ({
                   }}
                 >
                   <ArrowDownTrayIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+
+            {/* Exportar Liquidación de Fletes (solo si hay cargas con flete) */}
+            {(r.cantidad_cargas_con_flete ?? 0) > 0 && (
+              <Tooltip
+                label="Exportar Liquidación de Fletes"
+                withArrow
+                position="top"
+              >
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  radius="xl"
+                  size="md"
+                  loading={exportingFleteId === r.id_compra_carbon}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleExportarFleteExcel(r);
+                  }}
+                >
+                  <TruckIcon className="w-4 h-4" />
                 </ActionIcon>
               </Tooltip>
             )}
@@ -735,9 +786,7 @@ export const CompraCarbonListado = ({
                 <Text size="xs" c="gray">
                   Total Neto:{" "}
                   <span className="text-emerald-400 font-bold font-mono">
-                    {formatPEN(
-                      Number(detallesModal.compra.total_real_con_descuento),
-                    )}
+                    {formatPEN(Number(detallesModal.compra.total_real_neto))}
                   </span>
                 </Text>
               </Group>
@@ -868,11 +917,13 @@ export const CompraCarbonListado = ({
                             Toneladas
                           </th>
                           <th className="px-3 py-2 text-center w-24">
-                            Subtotal
+                            Flete x TN
                           </th>
                           <th className="px-3 py-2 text-center w-24">
-                            (−) Flete
+                            Subtotal
                           </th>
+                          <th className="px-3 py-2 text-center w-24">IGV</th>
+                          <th className="px-3 py-2 text-center w-24">Detr.</th>
                           <th className="px-3 py-2 text-center w-24">Neto</th>
                           <th className="px-3 py-2 text-center w-32">Estado</th>
                         </tr>
@@ -985,33 +1036,45 @@ export const CompraCarbonListado = ({
                                     c={"yellow"}
                                     fw={600}
                                   >
-                                    {formatPEN(Number(d.precio_unitario))} P/U
+                                    {formatPEN(Number(d.precio_unitario))} x TN
+                                  </Text>
+                                </td>
+
+                                <td className="px-3 py-2 text-center">
+                                  <Text size="xs" fw={700} c={"blue.3"}>
+                                    {Number(d.costo_flete_por_tonelada) > 0
+                                      ? formatPEN(
+                                          Number(d.costo_flete_por_tonelada),
+                                        )
+                                      : "—"}
                                   </Text>
                                 </td>
 
                                 <td className="px-3 py-2 text-center">
                                   <Text size="xs" fw={800} c={"teal"}>
-                                    {formatPEN(
-                                      Number(d.subtotal_antes_descuento),
-                                    )}
+                                    {formatPEN(Number(d.subtotal))}
+                                  </Text>
+                                  <Text
+                                    size="11px"
+                                    mt={5}
+                                    c={"yellow"}
+                                    fw={600}
+                                  >
+                                    {formatPEN(Number(d.precio_materia_prima))} M. PRIMA
                                   </Text>
                                 </td>
                                 <td className="px-3 py-2 text-center">
-                                  <Text size="xs" fw={700} c={"red"}>
-                                    {Number(d.descuento_flete) > 0
-                                      ? `−${formatPEN(Number(d.descuento_flete))}`
-                                      : "—"}
+                                  <Text size="xs" fw={700} c={"gray.4"}>
+                                    {formatPEN(Number(d.monto_igv))}
                                   </Text>
-                                  <Text size="11px" fw={600} c={""} mt={5}>
-                                    {Number(d.costo_flete_por_tonelada) > 0
-                                      ? formatPEN(
-                                          Number(d.costo_flete_por_tonelada),
-                                        ) + " x TN"
-                                      : "—"}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <Text size="xs" fw={700} c={"orange.4"}>
+                                    {formatPEN(Number(d.monto_detraccion))}
                                   </Text>
                                 </td>
                                 <td className="px-3 py-2 text-center font-mono text-emerald-400 font-bold">
-                                  {formatPEN(Number(d.subtotal_con_descuento))}
+                                  {formatPEN(Number(d.neto_a_pagar))}
                                 </td>
                                 <td className="px-3 py-2 text-center">
                                   <Badge
@@ -1049,6 +1112,13 @@ export const CompraCarbonListado = ({
           close={() => setModalCargas(null)}
           title={`Registrar Carga — ${modalCargas.correlativo}`}
           size="75rem"
+          rightSection={
+            <Text size="xs" c="gray">
+              Proveedor: {modalCargas.proveedor} · Estimado:{" "}
+              {formatNumber(modalCargas.toneladas_prometidas, 2)} TN (
+              {modalCargas.tipo_carbon_prometido})
+            </Text>
+          }
           validateClose
         >
           <ModalRegistroCargas

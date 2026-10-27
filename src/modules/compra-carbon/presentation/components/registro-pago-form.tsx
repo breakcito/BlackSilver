@@ -101,11 +101,6 @@ export const RegistroPagoForm = ({
     setMonto(saldoDisponible);
   }, [saldoDisponible]);
 
-  // Cambiar de bucket invalida la cuenta elegida: ya no pertenece a la lista.
-  useEffect(() => {
-    setCuentaDestino(null);
-  }, [esParaDetraccion]);
-
   const requiereOperacion = MEDIO_PAGO_EXIGE_OPERACION(medioPago);
   const montoNum = Number(monto) || 0;
 

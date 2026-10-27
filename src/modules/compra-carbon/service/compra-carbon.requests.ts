@@ -5,6 +5,8 @@ export interface CrearCompraCarbonRequest {
   toneladas_prometidas: number;
   aplica_igv: boolean;
   porcentaje_igv: number;
+  /** Detracción SUNAT sobre el carbón: 10% si aplica IGV, 0 si no. */
+  porcentaje_detraccion?: number;
   precio_unitario_cotizado?: number;
   id_tarifa_carbon?: number | null;
   id_cuenta_proveedor?: number | null;
@@ -37,8 +39,6 @@ export interface RegistrarComprobanteProveedorPayload {
   codigo_comprobante: string;
   fecha_emision: string;
   observacion?: string | null;
-  con_detraccion: boolean;
-  porcentaje_detraccion?: number;
   ids_cargas: number[];
   anticipos?: { id_anticipo_proveedor: number; monto_retirado: number }[];
   evidencias?: File[];
@@ -68,15 +68,17 @@ export interface RegistrarComprobanteTransportePayload {
   codigo_comprobante: string;
   fecha_emision: string;
   observacion?: string | null;
-  con_detraccion: boolean;
-  porcentaje_detraccion?: number;
   ids_cargas: number[];
   evidencias?: File[];
 }
 
 export interface RegistrarPagoTransportePayload {
   id_comprobante_transporte_carbon: number;
-  id_cuenta_bancaria_empresa: number;
+  /**
+   * Requerido solo en pagos bancarios (Transferencia / Depósito).
+   * En Efectivo se omite (no sale dinero de ninguna cuenta).
+   */
+  id_cuenta_bancaria_empresa?: number | null;
   id_cuenta_bancaria_transportista?: number | null;
   medio_pago: "Transferencia" | "Depósito" | "Efectivo" | string;
   numero_operacion?: string | null;

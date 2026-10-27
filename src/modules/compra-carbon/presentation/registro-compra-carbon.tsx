@@ -54,15 +54,21 @@ const inputClasses = {
 
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
 
+/**
+ * Detracción SUNAT sobre el carbón: 10%, y solo si la compra aplica IGV.
+ * El valor viaja al backend y queda guardado en `compra_carbon`.
+ */
+const PORCENTAJE_DETRACCION = 10;
+
 export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
 
   const [empresas, setEmpresas] = useState<RES_Empresa[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorResponse[]>([]);
   const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
-  const [cuentasProveedor, setCuentasProveedor] = useState<RES_CuentaProveedor[]>(
-    [],
-  );
+  const [cuentasProveedor, setCuentasProveedor] = useState<
+    RES_CuentaProveedor[]
+  >([]);
 
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [loadingProveedores, setLoadingProveedores] = useState(true);
@@ -203,6 +209,10 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             ? cuentasRes.data
             : [cuentasRes.data];
           setCuentasProveedor(list);
+          // Se preselecciona la primera cuenta que devuelve la API.
+          if (list.length > 0) {
+            setIdCuentaProveedor(String(list[0].id_cuenta_bancaria));
+          }
         }
       } catch (err: unknown) {
         console.error(err);
@@ -291,6 +301,24 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
     return Math.round(totalCotizado * (porcentajeIgv / 100) * 100) / 100;
   }, [aplicaIgv, totalCotizado, porcentajeIgv]);
 
+  // Cascada de la compra: subtotal -> IGV -> total -> detracción -> neto a
+  // pagar. La detracción es 10% y solo aplica si la compra emite IGV; el
+  // porcentaje viaja al backend y queda en `compra_carbon`.
+  const totalConIgv = useMemo(() => {
+    return Math.round((totalCotizado + montoIgvCotizado) * 100) / 100;
+  }, [totalCotizado, montoIgvCotizado]);
+
+  const montoDetraccionCotizado = useMemo(() => {
+    if (!aplicaIgv) return 0;
+    return (
+      Math.round(((totalConIgv * PORCENTAJE_DETRACCION) / 100) * 100) / 100
+    );
+  }, [aplicaIgv, totalConIgv]);
+
+  const netoAPagarCotizado = useMemo(() => {
+    return Math.round((totalConIgv - montoDetraccionCotizado) * 100) / 100;
+  }, [totalConIgv, montoDetraccionCotizado]);
+
   const handleSubmit = async () => {
     setError(null);
     if (!idEmpresa) {
@@ -320,9 +348,12 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         toneladas_prometidas: tn,
         aplica_igv: aplicaIgv,
         porcentaje_igv: aplicaIgv ? porcentajeIgv : 0,
+        porcentaje_detraccion: aplicaIgv ? PORCENTAJE_DETRACCION : 0,
         precio_unitario_cotizado: Number(precioUnitario) || 0,
         id_tarifa_carbon: idTarifaAuto,
-        id_cuenta_proveedor: idCuentaProveedor ? Number(idCuentaProveedor) : null,
+        id_cuenta_proveedor: idCuentaProveedor
+          ? Number(idCuentaProveedor)
+          : null,
       });
 
       if (res.success && res.data) {
@@ -355,9 +386,31 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
-          Datos de la Compra
-        </Text>
+        <Group justify="space-between" align="center">
+          <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
+            Datos de la Compra
+          </Text>
+
+          <Group gap="sm">
+            <Text size="xs" fw={600} c="white">
+              ¿Aplica IGV?
+            </Text>
+            <Badge
+              color={aplicaIgv ? "indigo" : "gray"}
+              variant="light"
+              size="sm"
+            >
+              {aplicaIgv ? `IGV (${porcentajeIgv}%)` : "Sin IGV"}
+            </Badge>
+            <Switch
+              checked={aplicaIgv}
+              onChange={(e) => setAplicaIgv(e.currentTarget.checked)}
+              color="indigo"
+              size="sm"
+            />
+          </Group>
+        </Group>
+
         <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
           <Select
             label="Empresa compradora"
@@ -411,9 +464,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
           <Select
             label="Cuenta del proveedor"
             placeholder={
-              idProveedor
-                ? "Seleccione cuenta"
-                : "Elija primero el proveedor"
+              idProveedor ? "Seleccione cuenta" : "Elija primero el proveedor"
             }
             data={cuentasVisibles.map((c) => ({
               value: String(c.id_cuenta_bancaria),
@@ -437,38 +488,6 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             comboboxProps={{ withinPortal: true }}
           />
         </SimpleGrid>
-
-        <Group
-          justify="space-between"
-          mt="md"
-          align="center"
-          className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800/80"
-        >
-          <div>
-            <Text size="xs" fw={600} c="white">
-              ¿Esta compra aplica IGV esta?
-            </Text>
-            <Text size="xs" c="gray">
-              Determina si se requerirán comprobantes/facturas o pagos directos
-              al proveedor
-            </Text>
-          </div>
-          <Group gap="sm">
-            <Badge
-              color={aplicaIgv ? "indigo" : "gray"}
-              variant="light"
-              size="sm"
-            >
-              {aplicaIgv ? `IGV (${porcentajeIgv}%)` : "Sin IGV"}
-            </Badge>
-            <Switch
-              checked={aplicaIgv}
-              onChange={(e) => setAplicaIgv(e.currentTarget.checked)}
-              color="indigo"
-              size="sm"
-            />
-          </Group>
-        </Group>
       </Paper>
 
       {/* Tipo de carbón y cotización */}
@@ -480,7 +499,7 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
         <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
           Carga a cotizar
         </Text>
-        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
           <Select
             label="Tipo de carbón"
             placeholder={
@@ -532,29 +551,53 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
             size="xs"
             radius="lg"
           />
-
-          {/* Resumen de totales */}
-          <Group justify="space-between">
-            <div className="text-left">
-              <Text size="xs" c="gray">
-                Total cotizado
-              </Text>
-              <Text size="md" fw={800} c="teal">
-                {formatPEN(totalCotizado)}
-              </Text>
-            </div>
-            {aplicaIgv && (
-              <div className="text-right">
-                <Text size="xs" c="gray">
-                  IGV (18% ref.)
-                </Text>
-                <Text size="md" fw={800} c="gray.3">
-                  {formatPEN(montoIgvCotizado)}
-                </Text>
-              </div>
-            )}
-          </Group>
         </SimpleGrid>
+
+        {/* Resumen de totales */}
+        <Group justify="space-between" grow mt={12}>
+          <div className="text-left">
+            <Text size="xs" c="gray">
+              Subtotal
+            </Text>
+            <Text size="md" fw={800} c="teal">
+              {formatPEN(totalCotizado)}
+            </Text>
+          </div>
+          <div className="text-left">
+            <Text size="xs" c="gray">
+              {aplicaIgv ? `IGV (${porcentajeIgv}%)` : "IGV (-)"}
+            </Text>
+            <Text size="md" fw={800} c="gray.3">
+              {formatPEN(montoIgvCotizado)}
+            </Text>
+          </div>
+          <div className="text-left">
+            <Text size="xs" c="gray">
+              Total
+            </Text>
+            <Text size="md" fw={800} c="white">
+              {formatPEN(totalConIgv)}
+            </Text>
+          </div>
+          <div className="text-left">
+            <Text size="xs" c="gray">
+              {aplicaIgv
+                ? `Detracción (${PORCENTAJE_DETRACCION}%)`
+                : "Detracción (-)"}
+            </Text>
+            <Text size="md" fw={800} c="orange.4">
+              {formatPEN(montoDetraccionCotizado)}
+            </Text>
+          </div>
+          <div className="text-left">
+            <Text size="xs" c="gray">
+              Neto a pagar
+            </Text>
+            <Text size="md" fw={800} c="lime.4">
+              {formatPEN(netoAPagarCotizado)}
+            </Text>
+          </div>
+        </Group>
       </Paper>
 
       {/* Botones de acción */}

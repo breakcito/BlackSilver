@@ -47,6 +47,8 @@ export const colorCalidadCarbon = (nombreCalidad: string | null | undefined) => 
     case TipoCalidadCarbon.Intermedia:
       return "yellow";
     case TipoCalidadCarbon.Alta:
+      return "orange";
+    case TipoCalidadCarbon.Calidad:
       return "red";
     default:
       return "gray";

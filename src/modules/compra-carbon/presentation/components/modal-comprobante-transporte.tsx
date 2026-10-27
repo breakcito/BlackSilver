@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import {
+  Badge,
   Button,
   Checkbox,
   Group,
-  NumberInput,
   Paper,
   Select,
   SimpleGrid,
@@ -29,6 +29,10 @@ interface Props {
   opened: boolean;
   onClose: () => void;
   idCompraCarbon: number;
+  /** IGV del flete de la compra (siempre 18%). */
+  porcentajeIgvFlete: number;
+  /** Detracción SUNAT del flete de la compra (siempre 4%). */
+  porcentajeDetraccionFlete: number;
   cargasDisponiblesFlete: CargaCompraCarbonItem[];
   onSuccess: (data: RespuestaRegistrarComprobanteTransporte) => void;
 }
@@ -37,6 +41,8 @@ export const ModalComprobanteTransporte = ({
   opened,
   onClose,
   idCompraCarbon,
+  porcentajeIgvFlete,
+  porcentajeDetraccionFlete,
   cargasDisponiblesFlete,
   onSuccess,
 }: Props) => {
@@ -47,8 +53,6 @@ export const ModalComprobanteTransporte = ({
   const [fechaEmision, setFechaEmision] = useState(
     dayjs().format("YYYY-MM-DD"),
   );
-  const [conDetraccion, setConDetraccion] = useState(true);
-  const [pctDetraccion, setPctDetraccion] = useState<number | string>(4);
   const [cargasSeleccionadas, setCargasSeleccionadas] = useState<number[]>([]);
   const [archivos, setArchivos] = useState<File[]>([]);
   const [observacion, setObservacion] = useState("");
@@ -72,8 +76,6 @@ export const ModalComprobanteTransporte = ({
     if (opened) {
       setCodigoComprobante("");
       setFechaEmision(dayjs().format("YYYY-MM-DD"));
-      setConDetraccion(true);
-      setPctDetraccion(4);
       setArchivos([]);
       setObservacion("");
 
@@ -100,26 +102,35 @@ export const ModalComprobanteTransporte = ({
     );
   }, [idTransportista, cargasDelTransportista]);
 
-  // Totales
+  // Totales. Cascada del flete: subtotal -> IGV -> total -> detracción -> neto.
   const totalFlete = useMemo(() => {
     const seleccionadas = cargasDelTransportista.filter((c) =>
       cargasSeleccionadas.includes(c.id_carga_compra_carbon),
     );
     const suma = seleccionadas.reduce(
-      (acc, c) => acc + Number(c.descuento_flete || 0),
+      (acc, c) => acc + Number(c.flete_subtotal || 0),
       0,
     );
     return round2(suma);
   }, [cargasDelTransportista, cargasSeleccionadas]);
 
+  const montoIgv = useMemo(() => {
+    if (porcentajeIgvFlete <= 0) return 0;
+    return round2((totalFlete * porcentajeIgvFlete) / 100);
+  }, [totalFlete, porcentajeIgvFlete]);
+
+  const importeTotal = useMemo(() => {
+    return round2(totalFlete + montoIgv);
+  }, [totalFlete, montoIgv]);
+
   const montoDetraccion = useMemo(() => {
-    if (!conDetraccion || Number(pctDetraccion) <= 0) return 0;
-    return round2((totalFlete * Number(pctDetraccion)) / 100);
-  }, [conDetraccion, pctDetraccion, totalFlete]);
+    if (porcentajeDetraccionFlete <= 0) return 0;
+    return round2((importeTotal * porcentajeDetraccionFlete) / 100);
+  }, [importeTotal, porcentajeDetraccionFlete]);
 
   const totalNetoFlete = useMemo(() => {
-    return round2(Math.max(0, totalFlete - montoDetraccion));
-  }, [totalFlete, montoDetraccion]);
+    return round2(Math.max(0, importeTotal - montoDetraccion));
+  }, [importeTotal, montoDetraccion]);
 
   const handleGuardar = async () => {
     if (!idTransportista) {
@@ -150,10 +161,6 @@ export const ModalComprobanteTransporte = ({
           codigo_comprobante: codigoComprobante.trim().toUpperCase(),
           fecha_emision: fechaEmision,
           observacion: observacion.trim() || undefined,
-          con_detraccion: conDetraccion,
-          porcentaje_detraccion: conDetraccion
-            ? Number(pctDetraccion)
-            : undefined,
           ids_cargas: cargasSeleccionadas,
           evidencias: archivos.length > 0 ? archivos : undefined,
         },
@@ -227,39 +234,31 @@ export const ModalComprobanteTransporte = ({
             radius="lg"
             required
           />
-          {/* Detracción Transporte */}
-          <NumberInput
-            label={
-              <Checkbox
-                checked={conDetraccion}
-                onChange={(e) => setConDetraccion(e.currentTarget.checked)}
-                label="¿Aplicar detracción?"
-                size="xs"
-                color="indigo"
-                styles={{
-                  label: {
-                    fontWeight: 600,
-                    color: "white",
-                    paddingLeft: 8,
-                    cursor: "pointer",
-                  },
-                  input: { cursor: "pointer" },
-                }}
-              />
-            }
-            value={conDetraccion ? pctDetraccion : ""}
-            onChange={setPctDetraccion}
-            placeholder="0"
-            disabled={!conDetraccion}
-            rightSection={
-              <Text size="xs" c="dimmed" mr={8}>
-                %
-              </Text>
-            }
-            hideControls
-            classNames={inputClasses}
-          />
         </SimpleGrid>
+
+        {/* Impuestos del flete aplicados por la orden de compra */}
+        <Group
+          justify="space-between"
+          p="sm"
+          className="bg-zinc-900/60 rounded-xl border border-zinc-800"
+        >
+          <div>
+            <Text size="xs" fw={600} c="white">
+              Impuestos del flete
+            </Text>
+            <Text size="xs" c="dimmed">
+              Se aplican automaticamente a esta factura de transporte
+            </Text>
+          </div>
+          <Group gap="xs">
+            <Badge color="indigo" variant="light" size="sm">
+              IGV {formatNumber(porcentajeIgvFlete)}%
+            </Badge>
+            <Badge color="orange" variant="light" size="sm">
+              Detracción {formatNumber(porcentajeDetraccionFlete)}%
+            </Badge>
+          </Group>
+        </Group>
 
         {/* Cargas cubiertas por este flete */}
         <div>
@@ -313,7 +312,7 @@ export const ModalComprobanteTransporte = ({
                         }}
                       />
                       <Text size="xs" fw={700} c="white">
-                        S/ {formatNumber(c.descuento_flete)}
+                        S/ {formatNumber(c.flete_subtotal)}
                       </Text>
                     </Group>
                   );
@@ -351,25 +350,41 @@ export const ModalComprobanteTransporte = ({
           radius="md"
           className="bg-indigo-950/20 border border-indigo-900/40"
         >
-          <Group justify="space-between">
+          <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
             <div>
               <Text size="xs" c="dimmed">
-                Total Flete
+                Subtotal Flete
               </Text>
               <Text size="sm" fw={700} c="white">
                 S/ {formatNumber(totalFlete)}
               </Text>
             </div>
-            {conDetraccion && (
-              <div>
-                <Text size="xs" c="dimmed">
-                  Detracción ({pctDetraccion}%)
-                </Text>
-                <Text size="sm" fw={700} c="orange.4">
-                  S/ {formatNumber(montoDetraccion)}
-                </Text>
-              </div>
-            )}
+            <div>
+              <Text size="xs" c="dimmed">
+                IGV ({formatNumber(porcentajeIgvFlete)}%)
+              </Text>
+              <Text size="sm" fw={700} c="indigo.4">
+                S/ {formatNumber(montoIgv)}
+              </Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed">
+                Importe Total
+              </Text>
+              <Text size="sm" fw={700} c="white">
+                S/ {formatNumber(importeTotal)}
+              </Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed">
+                Detracción ({formatNumber(porcentajeDetraccionFlete)}%)
+              </Text>
+              <Text size="sm" fw={700} c="orange.4">
+                S/ {formatNumber(montoDetraccion)}
+              </Text>
+            </div>
+          </SimpleGrid>
+          <Group justify="flex-end" mt="xs">
             <div>
               <Text size="xs" c="dimmed">
                 Neto a Pagar

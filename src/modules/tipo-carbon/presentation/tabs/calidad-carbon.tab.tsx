@@ -21,7 +21,8 @@ import { TipoCalidadCarbon } from "../../../../shared/enums/carbon/tipo-calidad-
 const COLOR_POR_CALIDAD: Record<string, string> = {
   [TipoCalidadCarbon.Baja]: "teal",
   [TipoCalidadCarbon.Intermedia]: "yellow",
-  [TipoCalidadCarbon.Alta]: "red",
+  [TipoCalidadCarbon.Alta]: "orange",
+  [TipoCalidadCarbon.Calidad]: "red",
 };
 
 const estilos = {

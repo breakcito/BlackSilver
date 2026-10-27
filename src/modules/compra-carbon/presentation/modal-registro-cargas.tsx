@@ -4,7 +4,6 @@ import {
   Alert,
   Badge,
   Button,
-  Checkbox,
   Divider,
   Group,
   Loader,
@@ -26,7 +25,6 @@ import {
   IconScale,
   IconReceipt,
   IconCoins,
-  IconTag,
   IconAlertTriangle,
   IconEye,
 } from "@tabler/icons-react";
@@ -55,6 +53,7 @@ import { FormTarifaCarbon } from "../../../presentation/utils/form-tarifa-carbon
 import { FormTransportista } from "../../../presentation/utils/form-transportista";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
+import { round2 } from "./components/input-classes";
 import type { RES_CalidadCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 
 interface Props {
@@ -76,6 +75,36 @@ const inputClasses = {
 interface CargaFormState extends CargaFormItem {
   id_almacen_tipo_destino: "empresa" | "cliente";
 }
+
+/**
+ * Fila etiqueta/valor de los bloques de costo de una carga.
+ */
+const FilaCosto = ({
+  etiqueta,
+  valor,
+  sufijo,
+  destacado = false,
+  color = "zinc.200",
+}: {
+  etiqueta: string;
+  valor: number;
+  sufijo?: string;
+  destacado?: boolean;
+  color?: string;
+}) => (
+  <Group justify="space-between" gap="xs" wrap="nowrap">
+    <Text
+      size="xs"
+      c={destacado ? "zinc.300" : "dimmed"}
+      fw={destacado ? 700 : 500}
+    >
+      {etiqueta}
+    </Text>
+    <Text size="xs" fw={destacado ? 800 : 700} c={color} className="font-mono">
+      {`S/ ${formatNumber(valor)}${sufijo ? ` ${sufijo}` : ""}`}
+    </Text>
+  </Group>
+);
 
 export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -304,8 +333,12 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
             : Number(actual.porcentaje_ceniza);
         const tipoId =
           field === "id_tipo_carbon"
-            ? (val ? Number(val) : null)
-            : (actual.id_tipo_carbon ? Number(actual.id_tipo_carbon) : null);
+            ? val
+              ? Number(val)
+              : null
+            : actual.id_tipo_carbon
+              ? Number(actual.id_tipo_carbon)
+              : null;
 
         if (tipoId && ceniza > 0) {
           const tarifaCoincide = tarifaPara(tipoId, ceniza);
@@ -422,6 +455,13 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
     }
   };
 
+  // Porcentajes de la compra (CompraCarbon) que gobiernan el IGV y la
+  // detraccion, tanto del carbon como del flete.
+  const pctIgv = Number(compra.porcentaje_igv) || 0;
+  const pctDetraccion = Number(compra.porcentaje_detraccion) || 0;
+  const pctIgvFlete = Number(compra.porcentaje_igv_flete) || 0;
+  const pctDetraccionFlete = Number(compra.porcentaje_detraccion_flete) || 0;
+
   return (
     <Stack gap="md">
       {error && (
@@ -430,12 +470,34 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
         </Alert>
       )}
 
-      <Group justify="space-between" align="center">
-        <Text size="xs" c="gray">
-          Proveedor: {compra.proveedor} · Estimado:{" "}
-          {formatNumber(compra.toneladas_prometidas, 2)} TN (
-          {compra.tipo_carbon_prometido})
-        </Text>
+      {/* Impuestos de la orden: se leen de la compra a la que pertenece la
+          carga. No son un parametro del registro. */}
+      <Group justify="space-between">
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            Aplicado por la orden:
+          </Text>
+          <Badge color="indigo" variant="light" size="sm">
+            IGV {formatNumber(Number(compra.porcentaje_igv || 0))}%
+          </Badge>
+          <Badge
+            color={
+              Number(compra.porcentaje_detraccion || 0) > 0 ? "orange" : "gray"
+            }
+            variant="light"
+            size="sm"
+          >
+            Detracción {formatNumber(Number(compra.porcentaje_detraccion || 0))}
+            %
+          </Badge>
+          {/* <Badge color="blue" variant="light" size="sm">
+            IGV flete {formatNumber(Number(compra.porcentaje_igv_flete || 0))}%
+          </Badge> */}
+          <Badge color="cyan" variant="light" size="sm">
+            Detracción flete{" "}
+            {formatNumber(Number(compra.porcentaje_detraccion_flete || 0))}%
+          </Badge>
+        </Group>
         <Button
           size="xs"
           radius="lg"
@@ -452,18 +514,42 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
       {/* Lista de cargas a ingresar */}
       <Stack gap="lg">
         {cargas.map((carga, index) => {
-          const subtotalAntes =
-            Math.round(
-              Number(carga.cantidad) * Number(carga.precio_unitario) * 100,
-            ) / 100;
-          const descuentoFlete = carga.pagar_flete
-            ? Math.round(
-                Number(carga.cantidad) *
-                  Number(carga.costo_flete_por_tonelada) *
-                  100,
-              ) / 100
+          // Mismo criterio que aplica el backend al registrar la carga
+          // (CompraCarbonData::insert_cargas), con los porcentajes de la
+          // compra a la que pertenece.
+          const cantidad = Number(carga.cantidad) || 0;
+          const precioUnitario = Number(carga.precio_unitario) || 0;
+          const costoFleteTn = carga.pagar_flete
+            ? Number(carga.costo_flete_por_tonelada) || 0
             : 0;
-          const subtotalConDesc = Math.max(0, subtotalAntes - descuentoFlete);
+
+          // ── COSTOS DEL CARBON ──────────────────────────────────────
+          // El flete lo asume la empresa, asi que sale del precio unitario
+          // que se le reconoce al proveedor por el carbon.
+          const precioMateriaPrima = Math.max(
+            0,
+            Math.round((precioUnitario - costoFleteTn) * 1e6) / 1e6,
+          );
+          const subtotalCarga = round2(precioMateriaPrima * cantidad);
+          const montoIgv =
+            pctIgv > 0 ? round2((subtotalCarga * pctIgv) / 100) : 0;
+          const totalCarga = round2(subtotalCarga + montoIgv);
+          const montoDetraccion =
+            pctDetraccion > 0 ? round2((totalCarga * pctDetraccion) / 100) : 0;
+          const netoAPagar = round2(totalCarga - montoDetraccion);
+
+          // ── COSTOS DE TRANSPORTE ────────────────────────────────────
+          const fleteSubtotal = carga.pagar_flete
+            ? round2(cantidad * costoFleteTn)
+            : 0;
+          const fleteIgv =
+            pctIgvFlete > 0 ? round2((fleteSubtotal * pctIgvFlete) / 100) : 0;
+          const fleteTotal = round2(fleteSubtotal + fleteIgv);
+          const fleteMontoDetraccion =
+            pctDetraccionFlete > 0
+              ? round2((fleteTotal * pctDetraccionFlete) / 100)
+              : 0;
+          const fleteNetoAPagar = round2(fleteTotal - fleteMontoDetraccion);
 
           return (
             <Paper
@@ -824,9 +910,8 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                         mt={4}
                         color={colorCalidadCarbon(calidad.nombre)}
                         variant="light"
-                        size="xs"
-                        radius="xl"
-                        className="font-medium"
+                        size="sm"
+                        radius="md"
                       >
                         Calidad: {calidad.nombre} (
                         {formatNumber(calidad.porcentaje_inicio_ceniza)}% –
@@ -836,211 +921,217 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                   })()}
                 </div>
 
-                <NumberInput
-                  label="Precio unit. / TN (S/)"
-                  placeholder="0.00"
-                  value={carga.precio_unitario}
-                  onChange={(val) =>
+                <div className="flex flex-col ">
+                  <NumberInput
+                    label="Precio x TN"
+                    placeholder="0.00"
+                    value={carga.precio_unitario}
+                    onChange={(val) =>
+                      handleChangeCarga(
+                        index,
+                        "precio_unitario",
+                        Number(val) || 0,
+                      )
+                    }
+                    fixedDecimalScale
+                    leftSection={<IconCoins size={16} />}
+                    classNames={inputClasses}
+                    size="xs"
+                    radius="lg"
+                  />
+                  {/* Indicador de Tarifa aplicada según % de ceniza */}
+                  {carga.id_tipo_carbon &&
+                    Number(carga.porcentaje_ceniza) > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {(() => {
+                          const tarifa = tarifaPara(
+                            Number(carga.id_tipo_carbon),
+                            Number(carga.porcentaje_ceniza),
+                          );
+                          if (tarifa) {
+                            return (
+                              <Badge
+                                color="teal"
+                                variant="light"
+                                size="sm"
+                                radius="md"
+                              >
+                                {`${tarifa.inicio_porcentaje_ceniza}% - ${tarifa.fin_porcentaje_ceniza}% · S/ ${formatNumber(
+                                  Number(tarifa.precio_unitario),
+                                )}`}
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <>
+                              <Badge
+                                color="yellow"
+                                variant="light"
+                                size="sm"
+                                radius="md"
+                                leftSection={
+                                  <IconAlertTriangle
+                                    size={12}
+                                    className="text-yellow-400"
+                                  />
+                                }
+                              >
+                                {`Sin tarifa - ${formatNumber(Number(carga.porcentaje_ceniza))}% de ceniza`}
+                              </Badge>
+                              <Tooltip
+                                label="Ver tarifas registradas"
+                                withArrow
+                              >
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="indigo"
+                                  size="sm"
+                                  radius="lg"
+                                  onClick={() => {
+                                    setTargetTarifasListadoIdx(index);
+                                    setOpenListadoTarifas(true);
+                                  }}
+                                  className="font-semibold"
+                                  disabled={saving}
+                                >
+                                  <IconEye size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                </div>
+              </SimpleGrid>
+
+              {/* Flete */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 w-full mt-2">
+                <Group gap="xs" align="flex-end" wrap="nowrap">
+                  <Select
+                    className="flex-1"
+                    label="Empresa de transporte"
+                    placeholder="Seleccione transportista"
+                    data={transportistas.map((t) => ({
+                      value: String(t.id_transportista),
+                      label: t.razon_social,
+                    }))}
+                    value={
+                      carga.id_transportista
+                        ? String(carga.id_transportista)
+                        : null
+                    }
+                    onChange={(val) =>
+                      handleChangeCarga(
+                        index,
+                        "id_transportista",
+                        val ? Number(val) : null,
+                      )
+                    }
+                    classNames={inputClasses}
+                    size="xs"
+                    radius="lg"
+                    searchable
+                    rightSection={
+                      loadingTipos ? (
+                        <Loader size="12" color="indigo" />
+                      ) : undefined
+                    }
+                  />
+                  <Tooltip label="Registrar nuevo transportista" withArrow>
+                    <ActionIcon
+                      size={32}
+                      variant="filled"
+                      color="indigo.6"
+                      radius="lg"
+                      onClick={() => {
+                        setTargetTransportistaIdx(index);
+                        setOpenNuevoTransportista(true);
+                      }}
+                      disabled={saving}
+                      className="mb-0.75"
+                    >
+                      <IconPlus size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
+
+                <TextInput
+                  label="Guía transportista (opcional)"
+                  placeholder="Ej. V001-1234"
+                  value={carga.guia_transportista || ""}
+                  onChange={(e) =>
                     handleChangeCarga(
                       index,
-                      "precio_unitario",
-                      Number(val) || 0,
+                      "guia_transportista",
+                      e.currentTarget.value.toUpperCase(),
                     )
                   }
-                  fixedDecimalScale
-                  leftSection={<IconCoins size={16} />}
                   classNames={inputClasses}
                   size="xs"
                   radius="lg"
                 />
-              </SimpleGrid>
 
-              {/* Indicador de Tarifa aplicada según % de ceniza */}
-              {carga.id_tipo_carbon && Number(carga.porcentaje_ceniza) > 0 && (
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  {(() => {
-                    const tarifa = tarifaPara(
-                      Number(carga.id_tipo_carbon),
-                      Number(carga.porcentaje_ceniza),
-                    );
-                    if (tarifa) {
-                      return (
-                        <Badge
-                          color="teal"
-                          variant="light"
-                          size="sm"
-                          radius="md"
-                          leftSection={
-                            <IconTag size={12} className="text-teal-400" />
-                          }
-                        >
-                          {`Tarifa aplicada: ${tarifa.inicio_porcentaje_ceniza}% - ${tarifa.fin_porcentaje_ceniza}% ceniza · S/ ${formatNumber(
-                            Number(tarifa.precio_unitario),
-                          )}/TM`}
-                        </Badge>
-                      );
-                    }
-                    return (
-                      <>
-                        <Badge
-                          color="yellow"
-                          variant="light"
-                          size="sm"
-                          radius="md"
-                          leftSection={
-                            <IconAlertTriangle
-                              size={12}
-                              className="text-yellow-400"
-                            />
-                          }
-                        >
-                          {`Sin tarifa para ${formatNumber(Number(carga.porcentaje_ceniza))}% ceniza (precio editable)`}
-                        </Badge>
-                        <Tooltip
-                          label="Ver tarifas registradas"
-                          withArrow
-                        >
-                          <ActionIcon
-                            variant="subtle"
-                            color="indigo"
-                            size="sm"
-                            radius="lg"
-                            onClick={() => {
-                              setTargetTarifasListadoIdx(index);
-                              setOpenListadoTarifas(true);
+                <NumberInput
+                  styles={{
+                    label: {
+                      width: "100%",
+                      display: "block",
+                    },
+                  }}
+                  label={
+                    <div className="flex items-center justify-between w-full">
+                      <span>Flete x TN</span>
+                      <Tooltip
+                        label="Se descontará el flete al proveedor y se pagará a la empresa de transporte"
+                        withArrow
+                        position="top"
+                        multiline
+                        w={220}
+                      >
+                        <div className="inline-flex">
+                          <Switch
+                            size="xs"
+                            label="Pagar flete"
+                            checked={carga.pagar_flete}
+                            onChange={(e) =>
+                              handleChangeCarga(
+                                index,
+                                "pagar_flete",
+                                e.currentTarget.checked,
+                              )
+                            }
+                            styles={{
+                              label: {
+                                fontSize: "11px",
+                                paddingLeft: "6px",
+                                cursor: "pointer",
+                              },
                             }}
-                            className="font-semibold"
-                            disabled={saving}
-                          >
-                            <IconEye size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Flete */}
-              <div className="mt-2 p-3 bg-zinc-950/40 rounded-xl border border-zinc-800/60 w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                {/* Pregunta: ocupa 4 columnas de 12 (1/3 aprox) */}
-                <div
-                  className={`flex flex-row gap-2.5 items-start ${carga.pagar_flete ? "lg:col-span-4" : "lg:col-span-12"}`}
-                >
-                  <Checkbox
-                    checked={carga.pagar_flete}
-                    onChange={(e) =>
-                      handleChangeCarga(
-                        index,
-                        "pagar_flete",
-                        e.currentTarget.checked,
-                      )
-                    }
-                    color="indigo"
-                    size="sm"
-                    className="mt-0.5"
-                  />
-                  <div className="text-left">
-                    <Text size="xs" fw={600} c="white">
-                      ¿Se pagará flete por esta carga?
-                    </Text>
-                    <Text size="xs" c="gray">
-                      Se descontará el flete al proveedor y se pagará a la
-                      empresa de transporte
-                    </Text>
-                  </div>
-                </div>
-
-                {/* Resto de campos: ocupa las 8 columnas restantes (2/3) y todo el ancho */}
-                {carga.pagar_flete && (
-                  <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
-                    <Group gap="xs" align="flex-end" wrap="nowrap">
-                      <Select
-                        className="flex-1"
-                        label="Empresa de transporte"
-                        placeholder="Seleccione transportista"
-                        data={transportistas.map((t) => ({
-                          value: String(t.id_transportista),
-                          label: t.razon_social,
-                        }))}
-                        value={
-                          carga.id_transportista
-                            ? String(carga.id_transportista)
-                            : null
-                        }
-                        onChange={(val) =>
-                          handleChangeCarga(
-                            index,
-                            "id_transportista",
-                            val ? Number(val) : null,
-                          )
-                        }
-                        classNames={inputClasses}
-                        size="xs"
-                        radius="lg"
-                        searchable
-                        rightSection={
-                          loadingTipos ? (
-                            <Loader size="12" color="indigo" />
-                          ) : undefined
-                        }
-                      />
-                      <Tooltip label="Registrar nuevo transportista" withArrow>
-                        <ActionIcon
-                          size={32}
-                          variant="filled"
-                          color="indigo.6"
-                          radius="lg"
-                          onClick={() => {
-                            setTargetTransportistaIdx(index);
-                            setOpenNuevoTransportista(true);
-                          }}
-                          disabled={saving}
-                          className="mb-0.75"
-                        >
-                          <IconPlus size={16} />
-                        </ActionIcon>
+                          />
+                        </div>
                       </Tooltip>
-                    </Group>
-
-                    <NumberInput
-                      label="Costo flete x TN (S/)"
-                      placeholder="0.00"
-                      value={carga.costo_flete_por_tonelada}
-                      onChange={(val) =>
-                        handleChangeCarga(
-                          index,
-                          "costo_flete_por_tonelada",
-                          Number(val) || 0,
-                        )
-                      }
-                      fixedDecimalScale
-                      classNames={inputClasses}
-                      size="xs"
-                      radius="lg"
-                    />
-
-                    <TextInput
-                      label="Guía transportista (opcional)"
-                      placeholder="Ej. V001-1234"
-                      value={carga.guia_transportista || ""}
-                      onChange={(e) =>
-                        handleChangeCarga(
-                          index,
-                          "guia_transportista",
-                          e.currentTarget.value.toUpperCase(),
-                        )
-                      }
-                      classNames={inputClasses}
-                      size="xs"
-                      radius="lg"
-                    />
-                  </div>
-                )}
+                    </div>
+                  }
+                  placeholder="0.00"
+                  value={carga.costo_flete_por_tonelada}
+                  onChange={(val) =>
+                    handleChangeCarga(
+                      index,
+                      "costo_flete_por_tonelada",
+                      Number(val) || 0,
+                    )
+                  }
+                  fixedDecimalScale
+                  classNames={inputClasses}
+                  disabled={!carga.pagar_flete}
+                  size="xs"
+                  radius="lg"
+                />
               </div>
-
-              {/* Evidencias de la carga */}
-              <div className="mt-3">
+              {/* Desglose de costos de la carga (mismos campos que se
+                  guardan en carga_compra_carbon) */}
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" mt="md">
                 <MultiFilePicker
                   label="Evidencias / Fotos de la carga (balanza, guías, etc.)"
                   files={carga.archivos || []}
@@ -1048,28 +1139,95 @@ export const ModalRegistroCargas = ({ compra, onSuccess, onCancel }: Props) => {
                     handleChangeCarga(index, "archivos", files)
                   }
                 />
-              </div>
 
-              {/* Subtotal de la carga */}
-              <Group justify="flex-end" mt="md" gap="xl">
-                <Text size="xs" c="dimmed">
-                  Subtotal base:{" "}
-                  <span className="text-zinc-200 font-semibold">
-                    S/ {formatNumber(subtotalAntes)}
-                  </span>
-                </Text>
-                {carga.pagar_flete && (
-                  <Text size="xs" c="dimmed">
-                    Desc. Flete:{" "}
-                    <span className="text-red-400 font-semibold">
-                      - S/ {formatNumber(descuentoFlete)}
-                    </span>
-                  </Text>
-                )}
-                <Text size="sm" fw={700} c="indigo.4">
-                  Subtotal carga: S/ {formatNumber(subtotalConDesc)}
-                </Text>
-              </Group>
+                <Group grow>
+                  {/* COSTOS DEL CARBON */}
+                  <Paper
+                    p="xs"
+                    radius="md"
+                    className="bg-zinc-950/60 border border-zinc-800"
+                  >
+                    <Group justify="space-between" mb={6} gap="xs">
+                      <Text
+                        size="10px"
+                        fw={800}
+                        c="zinc.400"
+                        className="uppercase tracking-wider"
+                      >
+                        Costos del carbón
+                      </Text>
+                      <Text size="10px" c="gray">
+                        IGV {formatNumber(pctIgv)}%
+                      </Text>
+                    </Group>
+                    <FilaCosto
+                      etiqueta="Precio materia prima"
+                      valor={precioMateriaPrima}
+                    />
+                    <FilaCosto etiqueta="Subtotal" valor={subtotalCarga} />
+                    <FilaCosto etiqueta="Monto IGV" valor={montoIgv} />
+                    <FilaCosto etiqueta="Total" valor={totalCarga} destacado />
+                    <FilaCosto
+                      etiqueta="Monto de detracción"
+                      valor={montoDetraccion}
+                      color="orange.4"
+                    />
+                    <FilaCosto
+                      etiqueta="Neto a pagar"
+                      valor={netoAPagar}
+                      destacado
+                      color="teal.4"
+                    />
+                  </Paper>
+                  {/* COSTOS DE TRANSPORTE */}
+                  {carga.pagar_flete && (
+                    <Paper
+                      p="xs"
+                      radius="md"
+                      className="bg-zinc-950/60 border border-blue-900/40"
+                    >
+                      <Group justify="space-between" mb={6} gap="xs">
+                        <Text
+                          size="10px"
+                          fw={800}
+                          c="blue.3"
+                          className="uppercase tracking-wider"
+                        >
+                          Costos de transporte
+                        </Text>
+                        <Text size="10px" c="gray">
+                          IGV {formatNumber(pctIgvFlete)}%
+                        </Text>
+                      </Group>
+                      <FilaCosto
+                        etiqueta="Flete por tonelada"
+                        valor={costoFleteTn}
+                      />
+                      <FilaCosto
+                        etiqueta="Subtotal flete"
+                        valor={fleteSubtotal}
+                      />
+                      <FilaCosto etiqueta="IGV del flete" valor={fleteIgv} />
+                      <FilaCosto
+                        etiqueta="Total del flete"
+                        valor={fleteTotal}
+                        destacado
+                      />
+                      <FilaCosto
+                        etiqueta="Detracción del flete"
+                        valor={fleteMontoDetraccion}
+                        color="orange.4"
+                      />
+                      <FilaCosto
+                        etiqueta="Neto a pagar del flete"
+                        valor={fleteNetoAPagar}
+                        destacado
+                        color="teal.4"
+                      />
+                    </Paper>
+                  )}
+                </Group>
+              </SimpleGrid>
             </Paper>
           );
         })}

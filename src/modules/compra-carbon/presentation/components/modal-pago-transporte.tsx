@@ -33,6 +33,8 @@ interface Props {
   idCompraCarbon: number;
   idEmpresa: number;
   comprobante: ComprobanteTransporteItem;
+  /** Detracción SUNAT del flete de la compra (siempre 4%). */
+  porcentajeDetraccionFlete?: number;
   onSuccess: (data: RespuestaRegistrarPagoTransporte) => void;
 }
 
@@ -42,6 +44,7 @@ export const ModalPagoTransporte = ({
   idCompraCarbon,
   idEmpresa,
   comprobante,
+  porcentajeDetraccionFlete = 0,
   onSuccess,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -121,7 +124,7 @@ export const ModalPagoTransporte = ({
 
       const pendienteNeto = Math.max(
         0,
-        Number(comprobante.total_neto) - Number(comprobante.avance_pago_neto),
+        Number(comprobante.monto_neto) - Number(comprobante.avance_pago_neto),
       );
       const pendienteDet = Math.max(
         0,
@@ -144,7 +147,7 @@ export const ModalPagoTransporte = ({
     } else {
       const pendienteNeto = Math.max(
         0,
-        Number(comprobante.total_neto) - Number(comprobante.avance_pago_neto),
+        Number(comprobante.monto_neto) - Number(comprobante.avance_pago_neto),
       );
       setMontoPagado(pendienteNeto > 0 ? pendienteNeto : "");
     }
@@ -156,7 +159,10 @@ export const ModalPagoTransporte = ({
   );
 
   const handleGuardar = async () => {
-    if (!idCuentaEmpresa) {
+    // La cuenta bancaria de la empresa solo es obligatoria cuando el pago es
+    // bancario (Transferencia / Depósito). En Efectivo no sale dinero de
+    // ninguna cuenta.
+    if (medioPago !== "Efectivo" && !idCuentaEmpresa) {
       notifyError("Seleccione la cuenta bancaria de origen de la empresa");
       return;
     }
@@ -187,7 +193,9 @@ export const ModalPagoTransporte = ({
         {
           id_comprobante_transporte_carbon:
             comprobante.id_comprobante_transporte_carbon,
-          id_cuenta_bancaria_empresa: Number(idCuentaEmpresa),
+          id_cuenta_bancaria_empresa: idCuentaEmpresa
+            ? Number(idCuentaEmpresa)
+            : undefined,
           id_cuenta_bancaria_transportista: idCuentaTransportista
             ? Number(idCuentaTransportista)
             : undefined,
@@ -229,7 +237,7 @@ export const ModalPagoTransporte = ({
       size="lg"
       validateClose
       rightSection={
-        comprobante.con_detraccion && (
+        porcentajeDetraccionFlete > 0 && (
           <Group justify="space-between" p="sm">
             <div>
               <Text size="xs" fw={600} c="white">
@@ -276,9 +284,9 @@ export const ModalPagoTransporte = ({
               <Badge color="indigo" variant="light" size="sm">
                 Factura {comprobante.codigo_comprobante}
               </Badge>
-              {comprobante.con_detraccion && (
+              {porcentajeDetraccionFlete > 0 && (
                 <Badge color="orange" variant="light" size="sm">
-                  Detracción {comprobante.porcentaje_detraccion}%
+                  Detracción {formatNumber(porcentajeDetraccionFlete)}%
                 </Badge>
               )}
             </Group>
@@ -288,7 +296,11 @@ export const ModalPagoTransporte = ({
         {/* Cuenta de Origen Empresa */}
         <Select
           label="Cuenta bancaria de la empresa"
-          placeholder="Seleccione cuenta de Cupper en soles"
+          placeholder={
+            medioPago === "Efectivo"
+              ? "Opcional en efectivo"
+              : "Seleccione cuenta de Cupper en soles"
+          }
           data={cuentasEmpresa.map((c) => ({
             value: String(c.id),
             label: c.label,
@@ -299,7 +311,8 @@ export const ModalPagoTransporte = ({
           size="xs"
           radius="lg"
           searchable
-          required
+          clearable
+          required={medioPago !== "Efectivo"}
         />
         {/* Medio de Pago y N° Operación */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">

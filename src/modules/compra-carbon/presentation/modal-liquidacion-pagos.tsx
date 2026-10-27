@@ -10,12 +10,7 @@ import {
   Tabs,
   Text,
 } from "@mantine/core";
-import {
-  IconCoin,
-  IconLock,
-  IconPlus,
-  IconReceipt,
-} from "@tabler/icons-react";
+import { IconCoin, IconLock, IconPlus, IconReceipt } from "@tabler/icons-react";
 import dayjs from "dayjs";
 
 import { useNotify } from "../../../hooks/useNotify";
@@ -81,7 +76,9 @@ export const ModalLiquidacionPagos = ({
         if (res.success && res.data) {
           setDetalle(res.data);
         } else {
-          notifyError(res.message || "No se pudo cargar el detalle de la compra");
+          notifyError(
+            res.message || "No se pudo cargar el detalle de la compra",
+          );
         }
       } catch (err: unknown) {
         notifyError(
@@ -107,10 +104,7 @@ export const ModalLiquidacionPagos = ({
     () => detalle?.comprobantes_proveedor ?? [],
     [detalle],
   );
-  const pagosDirectos = useMemo(
-    () => detalle?.pagos_directos ?? [],
-    [detalle],
-  );
+  const pagosDirectos = useMemo(() => detalle?.pagos_directos ?? [], [detalle]);
   const comprobantesTransporte = useMemo(
     () => detalle?.comprobantes_transporte ?? [],
     [detalle],
@@ -225,8 +219,7 @@ export const ModalLiquidacionPagos = ({
           ? {
               ...c,
               id_pago_compra_carbon: data.pago.id_pago_compra_carbon,
-              pago_directo_numero_operacion:
-                data.pago.numero_operacion || null,
+              pago_directo_numero_operacion: data.pago.numero_operacion || null,
               estado: "Pagado",
             }
           : c,
@@ -324,8 +317,7 @@ export const ModalLiquidacionPagos = ({
   };
 
   const estaCerrada =
-    cabecera?.estado === "Cerrado" ||
-    cabecera?.estado === "Anulado";
+    cabecera?.estado === "Cerrado" || cabecera?.estado === "Anulado";
 
   if ((loading && !detalle) || !cabecera) {
     return (
@@ -333,7 +325,7 @@ export const ModalLiquidacionPagos = ({
         opened
         close={handleCerrarModal}
         title="Liquidación y Pagos"
-        size="75rem"  
+        size="75rem"
       >
         <Paper p="xl" className="bg-zinc-950 text-center">
           <Text size="sm" c="gray">
@@ -350,10 +342,8 @@ export const ModalLiquidacionPagos = ({
         <span className="text-zinc-200 font-semibold">
           {cabecera.proveedor}
         </span>{" "}
-        {cabecera.proveedor_ruc || cabecera.proveedor_dni || ''}
+        {cabecera.proveedor_ruc || cabecera.proveedor_dni || ""}
       </Text>
-
-  
     </Group>
   );
 
@@ -444,14 +434,15 @@ export const ModalLiquidacionPagos = ({
                               >
                                 {cmp.estado}
                               </Badge>
-                              {cmp.con_detraccion && (
+                              {cabecera.porcentaje_detraccion > 0 && (
                                 <Badge
                                   color="orange"
                                   variant="outline"
                                   size="xs"
                                 >
                                   Detracción{" "}
-                                  {formatNumber(cmp.porcentaje_detraccion)}%
+                                  {formatNumber(cabecera.porcentaje_detraccion)}
+                                  %
                                 </Badge>
                               )}
                             </Group>
@@ -481,23 +472,55 @@ export const ModalLiquidacionPagos = ({
                         </Group>
 
                         <SimpleGrid
-                          cols={{ base: 2, md: 4 }}
+                          cols={{ base: 2, md: 7 }}
                           spacing="sm"
                           mt="sm"
                         >
                           <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
                             <Text size="xs" c="gray">
+                              Subtotal
+                            </Text>
+                            <Text size="sm" fw={700} c="white">
+                              S/ {formatNumber(cmp.subtotal)}
+                            </Text>
+                          </Paper>
+                          <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
+                            <Text size="xs" c="gray">
+                              Anticipos Amortizados
+                            </Text>
+                            <Text size="sm" fw={700} c="teal">
+                              S/ {formatNumber(cmp.monto_pagado_anticipos)}
+                            </Text>
+                          </Paper>
+                          <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
+                            <Text size="xs" c="gray">
+                              Base imponible
+                            </Text>
+                            <Text size="sm" fw={700} c="yellow">
+                              S/ {formatNumber(cmp.base_imponible)}
+                            </Text>
+                          </Paper>
+                          <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
+                            <Text size="xs" c="gray">
+                              IGV (18%)
+                            </Text>
+                            <Text size="sm" fw={700} c="cyan">
+                              S/ {formatNumber(cmp.monto_igv)}
+                            </Text>
+                          </Paper>
+                          <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
+                            <Text size="xs" c="gray">
                               Total Facturado
                             </Text>
                             <Text size="sm" fw={700} c="white">
-                              S/ {formatNumber(cmp.total)}
+                              S/ {formatNumber(cmp.importe_total)}
                             </Text>
                           </Paper>
-                          {cmp.con_detraccion && (
+                          {cabecera.porcentaje_detraccion > 0 && (
                             <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
                               <Text size="xs" c="gray">
                                 Detracción (
-                                {formatNumber(cmp.porcentaje_detraccion)}%)
+                                {formatNumber(cabecera.porcentaje_detraccion)}%)
                               </Text>
                               <Text size="sm" fw={700} c="orange">
                                 S/ {formatNumber(cmp.monto_detraccion)}
@@ -514,27 +537,20 @@ export const ModalLiquidacionPagos = ({
                               </Text>
                             </Paper>
                           )}
+
                           <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
                             <Text size="xs" c="gray">
-                              Anticipos Amortizados
-                            </Text>
-                            <Text size="sm" fw={700} c="teal">
-                              S/ {formatNumber(cmp.monto_pagado_anticipos)}
-                            </Text>
-                          </Paper>
-                          <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
-                            <Text size="xs" c="gray">
-                              Neto por Pagar en Banco
+                              Neto por Pagar
                             </Text>
                             <Text size="sm" fw={700} c="white">
-                              S/ {formatNumber(cmp.total_neto)}
+                              S/ {formatNumber(cmp.monto_neto)}
                             </Text>
                             <Text size="xs" c="gray">
                               Pendiente: S/{" "}
                               {formatNumber(
                                 Math.max(
                                   0,
-                                  Number(cmp.total_neto) -
+                                  Number(cmp.monto_neto) -
                                     Number(cmp.avance_pago_neto),
                                 ),
                               )}
@@ -605,11 +621,7 @@ export const ModalLiquidacionPagos = ({
                                         </Text>
                                       )}
                                       <Text size="xs" fw={700} c="zinc.200">
-                                        S/{" "}
-                                        {formatNumber(
-                                          c.subtotal_con_descuento ||
-                                            c.subtotal_antes_descuento,
-                                        )}
+                                        S/ {formatNumber(c.subtotal)}
                                       </Text>
                                     </Group>
                                   </Group>
@@ -904,11 +916,7 @@ export const ModalLiquidacionPagos = ({
                                       </Text>
                                     </Group>
                                     <Text size="xs" fw={700} c="zinc.200">
-                                      S/{" "}
-                                      {formatNumber(
-                                        c.subtotal_con_descuento ||
-                                          c.subtotal_antes_descuento,
-                                      )}
+                                      S/ {formatNumber(c.subtotal)}
                                     </Text>
                                   </Group>
                                 ))}
@@ -1012,8 +1020,17 @@ export const ModalLiquidacionPagos = ({
                           </Group>
                           <Text size="xs" c="gray" mt={1}>
                             Emisión:{" "}
-                            {dayjs(ct.fecha_emision).format("DD/MM/YYYY")} ·
-                            Detracción {formatNumber(ct.porcentaje_detraccion)}%
+                            {dayjs(ct.fecha_emision).format("DD/MM/YYYY")}
+                            {cabecera.porcentaje_detraccion_flete > 0 && (
+                              <>
+                                {" "}
+                                · Detracción{" "}
+                                {formatNumber(
+                                  cabecera.porcentaje_detraccion_flete,
+                                )}
+                                %
+                              </>
+                            )}
                           </Text>
                         </div>
 
@@ -1045,14 +1062,17 @@ export const ModalLiquidacionPagos = ({
                             Total Flete
                           </Text>
                           <Text size="sm" fw={700} c="white">
-                            S/ {formatNumber(ct.total)}
+                            S/ {formatNumber(ct.importe_total)}
                           </Text>
                         </Paper>
-                        {ct.con_detraccion && (
+                        {cabecera.porcentaje_detraccion_flete > 0 && (
                           <Paper p="xs" className="bg-zinc-950/40 rounded-lg">
                             <Text size="xs" c="gray">
                               Detracción (
-                              {formatNumber(ct.porcentaje_detraccion)}%)
+                              {formatNumber(
+                                cabecera.porcentaje_detraccion_flete,
+                              )}
+                              %)
                             </Text>
                             <Text size="sm" fw={700} c="orange">
                               S/ {formatNumber(ct.monto_detraccion)}
@@ -1074,14 +1094,14 @@ export const ModalLiquidacionPagos = ({
                             Neto por Pagar en Banco
                           </Text>
                           <Text size="sm" fw={700} c="white">
-                            S/ {formatNumber(ct.total_neto)}
+                            S/ {formatNumber(ct.monto_neto)}
                           </Text>
                           <Text size="xs" c="gray">
                             Pendiente: S/{" "}
                             {formatNumber(
                               Math.max(
                                 0,
-                                Number(ct.total_neto) -
+                                Number(ct.monto_neto) -
                                   Number(ct.avance_pago_neto),
                               ),
                             )}
@@ -1144,12 +1164,7 @@ export const ModalLiquidacionPagos = ({
                                       /TN
                                     </Text>
                                     <Text size="xs" fw={700} c="zinc.200">
-                                      S/{" "}
-                                      {formatNumber(
-                                        c.descuento_flete ||
-                                          Number(c.cantidad) *
-                                            Number(c.costo_flete_por_tonelada),
-                                      )}
+                                      S/ {formatNumber(c.flete_subtotal)}
                                     </Text>
                                   </Group>
                                 </Group>
@@ -1234,7 +1249,10 @@ export const ModalLiquidacionPagos = ({
           onClose={() => setModalComprobanteProv(false)}
           idCompraCarbon={idCompraCarbon}
           idProveedor={cabecera.id_proveedor}
+          idEmpresa={cabecera.id_empresa}
           nombreProveedor={cabecera.proveedor}
+          porcentajeIgv={Number(cabecera.porcentaje_igv)}
+          porcentajeDetraccion={Number(cabecera.porcentaje_detraccion)}
           cargasDisponibles={cargasSinComprobanteProv}
           onSuccess={handleSuccessComprobanteProv}
         />
@@ -1252,6 +1270,7 @@ export const ModalLiquidacionPagos = ({
           comprobante={modalPagoProv.comprobante}
           cargasDisponiblesDirectas={cargasSinPagoDirecto}
           aplicaIgv={Boolean(cabecera.aplica_igv)}
+          porcentajeDetraccion={Number(cabecera.porcentaje_detraccion)}
           onSuccess={handleSuccessPagoProv}
         />
       )}
@@ -1262,6 +1281,10 @@ export const ModalLiquidacionPagos = ({
           opened={modalComprobanteTrans}
           onClose={() => setModalComprobanteTrans(false)}
           idCompraCarbon={idCompraCarbon}
+          porcentajeIgvFlete={Number(cabecera.porcentaje_igv_flete)}
+          porcentajeDetraccionFlete={Number(
+            cabecera.porcentaje_detraccion_flete,
+          )}
           cargasDisponiblesFlete={cargasSinComprobanteFlete}
           onSuccess={handleSuccessComprobanteTrans}
         />
@@ -1275,6 +1298,9 @@ export const ModalLiquidacionPagos = ({
           idCompraCarbon={idCompraCarbon}
           idEmpresa={cabecera.id_empresa}
           comprobante={modalPagoTrans.comprobante}
+          porcentajeDetraccionFlete={Number(
+            cabecera.porcentaje_detraccion_flete,
+          )}
           onSuccess={handleSuccessPagoTrans}
         />
       )}

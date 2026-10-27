@@ -61,6 +61,8 @@ interface Props {
    * Efectivo si NO aplica IGV. El usuario siempre puede cambiarlo.
    */
   aplicaIgv?: boolean;
+  /** Detracción SUNAT de la compra (0 si no aplica IGV). */
+  porcentajeDetraccion?: number;
   onSuccess: (data: RespuestaRegistrarPagoProveedor) => void;
 }
 
@@ -74,6 +76,7 @@ export const ModalPagoProveedor = ({
   comprobante,
   cargasDisponiblesDirectas = [],
   aplicaIgv,
+  porcentajeDetraccion = 0,
   onSuccess,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -192,7 +195,7 @@ export const ModalPagoProveedor = ({
         // Sugerir saldo pendiente neto o de detracción
         const pendienteNeto = Math.max(
           0,
-          Number(comprobante.total_neto) - Number(comprobante.avance_pago_neto),
+          Number(comprobante.monto_neto) - Number(comprobante.avance_pago_neto),
         );
         const pendienteDet = Math.max(
           0,
@@ -229,7 +232,7 @@ export const ModalPagoProveedor = ({
       } else {
         const pendienteNeto = Math.max(
           0,
-          Number(comprobante.total_neto) - Number(comprobante.avance_pago_neto),
+          Number(comprobante.monto_neto) - Number(comprobante.avance_pago_neto),
         );
         setMontoPagado(pendienteNeto > 0 ? pendienteNeto : "");
       }
@@ -244,7 +247,7 @@ export const ModalPagoProveedor = ({
       cargasSeleccionadas.includes(c.id_carga_compra_carbon),
     );
     const suma = seleccionadas.reduce(
-      (acc, c) => acc + Number(c.subtotal_con_descuento || 0),
+      (acc, c) => acc + Number(c.subtotal || 0),
       0,
     );
     return round2(suma);
@@ -263,6 +266,21 @@ export const ModalPagoProveedor = ({
     if (comprobante) return 0;
     return round2(Math.max(0, totalCargasDirectas - totalAnticiposDirectos));
   }, [comprobante, totalCargasDirectas, totalAnticiposDirectos]);
+
+  // Saldo pendiente del comprobante al que se esta pagando. El pago no puede
+  // excederlo: un sobrepago no queda registrado en ningun lado y el comprobante
+  // se cerraria como pagado con el saldo en negativo.
+  const saldoPendiente = useMemo(() => {
+    if (!comprobante) return 0;
+    const neto = round2(
+      Number(comprobante.monto_neto) - Number(comprobante.avance_pago_neto),
+    );
+    const detraccion = round2(
+      Number(comprobante.monto_detraccion) -
+        Number(comprobante.avance_pago_detraccion),
+    );
+    return esParaDetraccion ? detraccion : neto;
+  }, [comprobante, esParaDetraccion]);
 
   // Actualizar automáticamente monto a pagar sugerido en pago directo
   useEffect(() => {
@@ -318,6 +336,25 @@ export const ModalPagoProveedor = ({
     }
     if (comprobante && montoNum <= 0) {
       notifyError("Ingrese un monto a pagar válido mayor a 0");
+      return;
+    }
+    // No se permite pagar mas que el saldo pendiente del comprobante.
+    if (comprobante && montoNum - saldoPendiente > 0.01) {
+      notifyError(
+        `El monto a pagar (S/ ${formatNumber(montoNum)}) supera el saldo pendiente (S/ ${formatNumber(saldoPendiente)})`,
+      );
+      return;
+    }
+    // En pago directo el monto en efectivo mas los anticipos amortizados no
+    // puede superar el importe de las cargas selecuradas.
+    if (
+      !comprobante &&
+      totalCargasDirectas > 0 &&
+      montoNum + totalAnticiposDirectos - totalCargasDirectas > 0.01
+    ) {
+      notifyError(
+        `El monto a pagar (S/ ${formatNumber(montoNum)}) más los anticipos aplicados (S/ ${formatNumber(totalAnticiposDirectos)}) supera el total de las cargas (S/ ${formatNumber(totalCargasDirectas)})`,
+      );
       return;
     }
     if (!fechaHoraPago) {
@@ -387,9 +424,34 @@ export const ModalPagoProveedor = ({
     }
   };
 
-  const cuentasProveedorFiltradas = cuentasProveedor.filter((c) =>
-    esParaDetraccion ? c.es_detraccion : !c.es_detraccion,
+  const cuentasProveedorFiltradas = useMemo(
+    () =>
+      cuentasProveedor.filter((c) =>
+        esParaDetraccion ? c.es_detraccion : !c.es_detraccion,
+      ),
+    [cuentasProveedor, esParaDetraccion],
   );
+
+  // Se preselecciona la primera cuenta de la lista, respetando el filtro del
+  // tipo de pago: al pagar detraccion solo valen las cuentas de detraccion, y
+  // al pagar el neto solo las cuentas corrientes. En efectivo no hay cuenta
+  // de destino: el selector ni siquiera se muestra.
+  useEffect(() => {
+    if (medioPago === "Efectivo") {
+      setIdCuentaProveedor(null);
+      return;
+    }
+    if (cuentasProveedorFiltradas.length === 0) {
+      setIdCuentaProveedor(null);
+      return;
+    }
+    const sigueVigente = cuentasProveedorFiltradas.some(
+      (c) => String(c.id) === idCuentaProveedor,
+    );
+    if (!sigueVigente) {
+      setIdCuentaProveedor(String(cuentasProveedorFiltradas[0].id));
+    }
+  }, [cuentasProveedorFiltradas, idCuentaProveedor, medioPago]);
 
   return (
     <>
@@ -404,7 +466,7 @@ export const ModalPagoProveedor = ({
         size="lg"
         validateClose
         rightSection={
-          comprobante && comprobante.con_detraccion ? (
+          comprobante && porcentajeDetraccion > 0 ? (
             <Checkbox
               checked={esParaDetraccion}
               onChange={(e) => setEsParaDetraccion(e.currentTarget.checked)}
@@ -453,10 +515,9 @@ export const ModalPagoProveedor = ({
                   <Badge color="indigo" variant="light" size="sm">
                     Factura {comprobante.codigo_comprobante}
                   </Badge>
-                  {comprobante.con_detraccion && (
+                  {porcentajeDetraccion > 0 && (
                     <Badge color="orange" variant="light" size="sm">
-                      Detracción{" "}
-                      {formatNumber(comprobante.porcentaje_detraccion)}%
+                      Detracción {formatNumber(porcentajeDetraccion)}%
                     </Badge>
                   )}
                 </Group>
@@ -613,7 +674,7 @@ export const ModalPagoProveedor = ({
                           }}
                         />
                         <Text size="xs" fw={700} c="white">
-                          S/ {formatNumber(c.subtotal_con_descuento)}
+                          S/ {formatNumber(c.subtotal)}
                         </Text>
                       </Group>
                     );

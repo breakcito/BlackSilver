@@ -21,7 +21,6 @@ interface CompraCarbonPDFProps {
   empresa: RES_Empresa;
   proveedor?: ProveedorResponse | null;
   urlLogoEmpresa?: string | null;
-  colorPredominante?: string | null;
 }
 
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
@@ -193,9 +192,13 @@ export const CompraCarbonPDF = ({
     fCreacion.format("MMMM"),
   )} de ${fCreacion.year()}`;
 
-  const totalCotizado = Number(cabecera.total_cotizado || 0);
   const aplicaIgv = Boolean(cabecera.aplica_igv);
+  const subtotalCotizado = Number(cabecera.subtotal_cotizado || 0);
   const igvMonto = Number(cabecera.monto_igv_cotizado || 0);
+  const totalCotizado = Number(cabecera.total_cotizado || 0);
+  const pctDetraccion = Number(cabecera.porcentaje_detraccion || 0);
+  const detraccionMonto = Number(cabecera.monto_detraccion_cotizado || 0);
+  const netoAPagar = Number(cabecera.neto_a_pagar_cotizado || 0);
 
   return (
     <Document title={`Orden de Compra Preliminar - ${cabecera.correlativo}`}>
@@ -292,7 +295,7 @@ export const CompraCarbonPDF = ({
             <Text style={STYLES.celdaPrecio}>
               {formatPEN(Number(cabecera.precio_unitario_cotizado))}
             </Text>
-            <Text style={STYLES.celdaImporte}>{formatPEN(totalCotizado)}</Text>
+            <Text style={STYLES.celdaImporte}>{formatPEN(subtotalCotizado)}</Text>
           </View>
 
           <View style={STYLES.tablaEspacio} />
@@ -303,15 +306,21 @@ export const CompraCarbonPDF = ({
           <View style={STYLES.letrasCol}>
             <Text style={STYLES.letrasLabel}>IMPORTE EN LETRAS:</Text>
             <Text style={STYLES.letrasValor}>
-              {`${numeroALetras(totalCotizado)} ${totalCotizado === 1 ? "SOL" : "SOLES"}`}
+              {`${numeroALetras(netoAPagar)} ${netoAPagar === 1 ? "SOL" : "SOLES"}`}
             </Text>
           </View>
 
           <View style={STYLES.resumenCol}>
             <View style={STYLES.resumenFila}>
+              <Text style={STYLES.resumenLabel}>SUBTOTAL</Text>
+              <Text style={STYLES.resumenValor}>
+                {formatPEN(subtotalCotizado)}
+              </Text>
+            </View>
+            <View style={STYLES.resumenFila}>
               <Text style={STYLES.resumenLabel}>
                 {aplicaIgv
-                  ? `IGV REF. (${formatNumber(cabecera.porcentaje_igv)}%)`
+                  ? `IGV (${formatNumber(cabecera.porcentaje_igv)}%)`
                   : "IGV"}
               </Text>
               <Text style={STYLES.resumenValor}>
@@ -322,6 +331,22 @@ export const CompraCarbonPDF = ({
               <Text style={STYLES.resumenTotalLabel}>TOTAL</Text>
               <Text style={STYLES.resumenTotalValor}>
                 {formatPEN(totalCotizado)}
+              </Text>
+            </View>
+            {pctDetraccion > 0 && (
+              <View style={STYLES.resumenFila}>
+                <Text style={STYLES.resumenLabel}>
+                  {`DETRACCIÓN (${formatNumber(pctDetraccion)}%)`}
+                </Text>
+                <Text style={STYLES.resumenValor}>
+                  {formatPEN(detraccionMonto)}
+                </Text>
+              </View>
+            )}
+            <View style={STYLES.resumenFila}>
+              <Text style={STYLES.resumenTotalLabel}>NETO A PAGAR</Text>
+              <Text style={STYLES.resumenTotalValor}>
+                {formatPEN(netoAPagar)}
               </Text>
             </View>
           </View>

@@ -9,6 +9,7 @@ export enum TipoCalidadCarbon {
   Baja = "Baja",
   Intermedia = "Intermedia",
   Alta = "Alta",
+  Calidad = "Calidad",
 }
 
 /**

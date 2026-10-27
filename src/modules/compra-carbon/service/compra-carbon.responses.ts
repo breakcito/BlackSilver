@@ -26,10 +26,24 @@ export interface CompraCarbonResumen {
   numero_correlativo: number;
   aplica_igv: boolean | number;
   porcentaje_igv: number;
+  /** Detracción SUNAT sobre el carbón: 10% si aplica IGV, 0 si no. */
+  porcentaje_detraccion: number;
+  /** IGV del flete: 18% siempre. */
+  porcentaje_igv_flete: number;
+  /** Detracción SUNAT sobre el flete: 4% siempre. */
+  porcentaje_detraccion_flete: number;
   toneladas_prometidas: number;
   precio_unitario_cotizado: number;
-  total_cotizado: number;
+  /** precio_unitario_cotizado * toneladas_prometidas */
+  subtotal_cotizado: number;
+  /** 18% del subtotal si aplica IGV, 0 si no. */
   monto_igv_cotizado: number;
+  /** subtotal_cotizado + monto_igv_cotizado */
+  total_cotizado: number;
+  /** total_cotizado * porcentaje_detraccion */
+  monto_detraccion_cotizado: number;
+  /** total_cotizado - monto_detraccion_cotizado */
+  neto_a_pagar_cotizado: number;
   id_empleado_registro: number;
   empleado_registro: string;
   id_empleado_cierre?: number | null;
@@ -41,11 +55,16 @@ export interface CompraCarbonResumen {
   created_at: string;
   estado: string;
   cantidad_cargas: number;
-  cantidad_items?: number;
+  /** Cargas de la compra cuyo flete paga la empresa. */
+  cantidad_cargas_con_flete: number;
   total_toneladas_reales: number;
   ficha_tecnica: string[];
-  total_real_con_descuento: number;
-  evidencias?: IArchivo[];
+  /** Suma del subtotal de las cargas (carbón sin flete). */
+  total_real_subtotal: number;
+  /** Suma del neto_a_pagar de las cargas. */
+  total_real_neto: number;
+  /** Suma del flete_neto_a_pagar de las cargas. */
+  total_real_flete_neto: number;
   log_cambios?: RES_CambiosLog[] | null;
 }
 
@@ -73,8 +92,11 @@ export interface CargaCompraCarbonItem {
   tarifa_precio_unitario: number | null;
   id_transportista: number | null;
   transportista_razon_social: string | null;
+  transportista_ruc: string | null;
+  transportista_dni: string | null;
   id_comprobante_transporte_carbon: number | null;
   comprobante_transporte_codigo: string | null;
+  comprobante_transporte_fecha_emision: string | null;
   id_comprobante_compra_carbon: number | null;
   comprobante_compra_codigo: string | null;
   id_pago_compra_carbon: number | null;
@@ -93,9 +115,30 @@ export interface CargaCompraCarbonItem {
   porcentaje_humedad: number;
   precio_unitario: number;
   costo_flete_por_tonelada: number;
-  subtotal_antes_descuento: number;
-  descuento_flete: number;
-  subtotal_con_descuento: number;
+  // COSTOS DEL CARBON
+  /** precio_unitario - costo_flete_por_tonelada */
+  precio_materia_prima: number;
+  /** precio_materia_prima * cantidad */
+  subtotal: number;
+  /** subtotal * porcentaje_igv de la compra */
+  monto_igv: number;
+  /** subtotal + monto_igv */
+  total: number;
+  /** total * porcentaje_detraccion de la compra */
+  monto_detraccion: number;
+  /** total - monto_detraccion */
+  neto_a_pagar: number;
+  // COSTOS DE TRANSPORTE
+  /** cantidad * costo_flete_por_tonelada */
+  flete_subtotal: number;
+  /** flete_subtotal * porcentaje_igv_flete de la compra */
+  flete_igv: number;
+  /** flete_subtotal + flete_igv */
+  flete_total: number;
+  /** flete_total * porcentaje_detraccion_flete de la compra */
+  flete_monto_detraccion: number;
+  /** flete_total - flete_monto_detraccion */
+  flete_neto_a_pagar: number;
   evidencias: IArchivo[];
   log_cambios?: RES_CambiosLog[] | null;
   created_at: string;
@@ -147,13 +190,20 @@ export interface ComprobanteCompraCarbonItem {
   fecha_emision: string;
   observacion: string | null;
   evidencias: IArchivo[];
-  total: number;
-  con_detraccion: boolean;
-  porcentaje_detraccion: number;
-  monto_detraccion: number;
-  total_sin_detraccion: number;
+  /** Suma del subtotal de las cargas amparadas. */
+  subtotal: number;
+  /** Suma de los anticipos amortizados contra este comprobante. */
   monto_pagado_anticipos: number;
-  total_neto: number;
+  /** subtotal - monto_pagado_anticipos */
+  base_imponible: number;
+  /** base_imponible * porcentaje_igv de la compra */
+  monto_igv: number;
+  /** base_imponible + monto_igv */
+  importe_total: number;
+  /** importe_total * porcentaje_detraccion de la compra */
+  monto_detraccion: number;
+  /** importe_total - monto_detraccion */
+  monto_neto: number;
   avance_pago_detraccion: number;
   avance_pago_neto: number;
   created_at: string;
@@ -195,16 +245,35 @@ export interface ComprobanteTransporteItem {
   fecha_emision: string;
   observacion: string | null;
   evidencias: IArchivo[];
-  total: number;
-  con_detraccion: boolean;
-  porcentaje_detraccion: number;
+  /** Suma del flete_subtotal de las cargas amparadas. */
+  subtotal: number;
+  /** subtotal * porcentaje_igv_flete de la compra */
+  monto_igv: number;
+  /** subtotal + monto_igv */
+  importe_total: number;
+  /** importe_total * porcentaje_detraccion_flete de la compra */
   monto_detraccion: number;
-  total_neto: number;
+  /** importe_total - monto_detraccion */
+  monto_neto: number;
   avance_pago_detraccion: number;
   avance_pago_neto: number;
   created_at: string;
   estado: string;
   pagos: PagoTransporteItem[];
+}
+
+/**
+ * Transportista con flete en la compra, con la primera cuenta bancaria en
+ * soles que no es de detracción (la que recibe el pago del flete).
+ */
+export interface TransportistaFlete {
+  id_transportista: number;
+  razon_social: string;
+  ruc: string | null;
+  dni: string | null;
+  numero_cuenta: string | null;
+  cci: string | null;
+  banco: string | null;
 }
 
 export interface CompraCarbonDetalleResponse {
@@ -214,6 +283,7 @@ export interface CompraCarbonDetalleResponse {
   pagos_directos: PagoCompraItem[];
   comprobantes_transporte: ComprobanteTransporteItem[];
   anticipos_utilizados: TransaccionAnticipoItem[];
+  transportistas_flete: TransportistaFlete[];
 }
 
 export interface RespuestaRegistrarComprobanteProveedor {

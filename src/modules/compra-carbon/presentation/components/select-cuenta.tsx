@@ -119,6 +119,20 @@ export const SelectCuenta = ({
     return [...cuentas, cuentaCreada];
   }, [cuentas, cuentaCreada]);
 
+  // Se preselecciona la primera cuenta de la lista. La lista ya viene
+  // filtrada por el padre (soles y flag de detraccion), asi que la primera es
+  // la recomendada. Si la eleccion actual deja de estar en la lista (cambio de
+  // proveedor, de tipo de pago o alta de una cuenta), se vuelve a la primera.
+  useEffect(() => {
+    if (cuentasEffectivas.length === 0) return;
+    const sigueVigente = cuentasEffectivas.some(
+      (c) => String(c.id_cuenta_bancaria) === value,
+    );
+    if (!sigueVigente) {
+      onChange(String(cuentasEffectivas[0].id_cuenta_bancaria));
+    }
+  }, [cuentasEffectivas, value, onChange]);
+
   const bancosVisibles = useMemo(() => {
     const query = qBanco.trim();
     if (!query) return bancos;

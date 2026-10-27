@@ -9,8 +9,8 @@ import {
   Paper,
   SimpleGrid,
   Stack,
-  Switch,
   Text,
+  Textarea,
   TextInput,
   ThemeIcon,
   Tooltip,
@@ -43,7 +43,13 @@ interface Props {
   onClose: () => void;
   idCompraCarbon: number;
   idProveedor: number;
+  /** Empresa compradora: los anticipos se registran a su nombre. */
+  idEmpresa: number;
   nombreProveedor?: string;
+  /** IGV de la compra (0 si no aplica). */
+  porcentajeIgv: number;
+  /** Detracción SUNAT de la compra (0 si no aplica IGV). */
+  porcentajeDetraccion: number;
   cargasDisponibles: CargaCompraCarbonItem[];
   onSuccess: (data: RespuestaRegistrarComprobanteProveedor) => void;
 }
@@ -53,7 +59,10 @@ export const ModalComprobanteProveedor = ({
   onClose,
   idCompraCarbon,
   idProveedor,
+  idEmpresa,
   nombreProveedor,
+  porcentajeIgv,
+  porcentajeDetraccion,
   cargasDisponibles,
   onSuccess,
 }: Props) => {
@@ -64,8 +73,6 @@ export const ModalComprobanteProveedor = ({
   const [fechaEmision, setFechaEmision] = useState(
     dayjs().format("YYYY-MM-DD"),
   );
-  const [conDetraccion, setConDetraccion] = useState(true);
-  const [pctDetraccion, setPctDetraccion] = useState<number | string>(10);
   const [cargasSeleccionadas, setCargasSeleccionadas] = useState<number[]>([]);
   const [anticiposSeleccionados, setAnticiposSeleccionados] = useState<
     Record<number, number>
@@ -120,26 +127,18 @@ export const ModalComprobanteProveedor = ({
     }
   }, [opened, idProveedor]);
 
-  // Cálculos dinámicos
+  // Cálculos dinámicos. Misma cascada que aplica el backend al registrar
+  // el comprobante: subtotal -> base imponible -> IGV -> total -> detracción.
   const totalCargas = useMemo(() => {
     const seleccionadas = cargasDisponibles.filter((c) =>
       cargasSeleccionadas.includes(c.id_carga_compra_carbon),
     );
     const suma = seleccionadas.reduce(
-      (acc, c) => acc + Number(c.subtotal_con_descuento || 0),
+      (acc, c) => acc + Number(c.subtotal || 0),
       0,
     );
     return round2(suma);
   }, [cargasDisponibles, cargasSeleccionadas]);
-
-  const montoDetraccion = useMemo(() => {
-    if (!conDetraccion || Number(pctDetraccion) <= 0) return 0;
-    return round2((totalCargas * Number(pctDetraccion)) / 100);
-  }, [conDetraccion, pctDetraccion, totalCargas]);
-
-  const totalSinDetraccion = useMemo(() => {
-    return round2(Math.max(0, totalCargas - montoDetraccion));
-  }, [totalCargas, montoDetraccion]);
 
   const totalAnticiposAplicados = useMemo(() => {
     const suma = Object.values(anticiposSeleccionados).reduce(
@@ -149,9 +148,27 @@ export const ModalComprobanteProveedor = ({
     return round2(suma);
   }, [anticiposSeleccionados]);
 
+  const baseImponible = useMemo(() => {
+    return round2(Math.max(0, totalCargas - totalAnticiposAplicados));
+  }, [totalCargas, totalAnticiposAplicados]);
+
+  const montoIgv = useMemo(() => {
+    if (porcentajeIgv <= 0) return 0;
+    return round2((baseImponible * porcentajeIgv) / 100);
+  }, [baseImponible, porcentajeIgv]);
+
+  const importeTotal = useMemo(() => {
+    return round2(baseImponible + montoIgv);
+  }, [baseImponible, montoIgv]);
+
+  const montoDetraccion = useMemo(() => {
+    if (porcentajeDetraccion <= 0) return 0;
+    return round2((importeTotal * porcentajeDetraccion) / 100);
+  }, [importeTotal, porcentajeDetraccion]);
+
   const totalNetoAPagar = useMemo(() => {
-    return round2(Math.max(0, totalSinDetraccion - totalAnticiposAplicados));
-  }, [totalSinDetraccion, totalAnticiposAplicados]);
+    return round2(Math.max(0, importeTotal - montoDetraccion));
+  }, [importeTotal, montoDetraccion]);
 
   // Selección de todos / ninguno de cargas
   const handleToggleTodasCargas = () => {
@@ -186,12 +203,12 @@ export const ModalComprobanteProveedor = ({
     if (!anticipo) return;
     const saldoMax = Number(anticipo.saldo_actual);
 
-    // Calcular cuánto le falta por cubrir al total sin detracción
+    // El anticipo no puede exceder el subtotal de las cargas amplitudes.
     const otrosAnticipos = Object.entries(anticiposSeleccionados).reduce(
       (acc, [id, val]) => (Number(id) === idAnticipo ? acc : acc + val),
       0,
     );
-    const faltaCubrir = Math.max(0, totalSinDetraccion - otrosAnticipos);
+    const faltaCubrir = Math.max(0, totalCargas - otrosAnticipos);
     const montoSugerido = Math.min(saldoMax, faltaCubrir);
 
     handleSetMontoAnticipo(idAnticipo, montoSugerido);
@@ -210,9 +227,9 @@ export const ModalComprobanteProveedor = ({
       notifyError("Debe seleccionar al menos una carga para este comprobante");
       return;
     }
-    if (totalAnticiposAplicados > totalSinDetraccion) {
+    if (totalAnticiposAplicados > totalCargas) {
       notifyError(
-        `El total de anticipos aplicados (S/ ${formatNumber(totalAnticiposAplicados)}) no puede superar el total sin detracción (S/ ${formatNumber(totalSinDetraccion)})`,
+        `El total de anticipos aplicados (S/ ${formatNumber(totalAnticiposAplicados)}) no puede superar el subtotal de las cargas (S/ ${formatNumber(totalCargas)})`,
       );
       return;
     }
@@ -232,10 +249,6 @@ export const ModalComprobanteProveedor = ({
           codigo_comprobante: codigoComprobante.trim().toUpperCase(),
           fecha_emision: fechaEmision,
           observacion: observacion.trim() || undefined,
-          con_detraccion: conDetraccion,
-          porcentaje_detraccion: conDetraccion
-            ? Number(pctDetraccion)
-            : undefined,
           ids_cargas: cargasSeleccionadas,
           anticipos: payloadAnticipos.length > 0 ? payloadAnticipos : undefined,
           evidencias: archivos.length > 0 ? archivos : undefined,
@@ -274,7 +287,7 @@ export const ModalComprobanteProveedor = ({
               Aplica IGV
             </Badge>
             <div>
-              <Text size="xs" c="dimmed">
+              <Text size="xs" c="gray">
                 Proveedor
               </Text>
               <Text size="sm" fw={700} c="white">
@@ -311,46 +324,33 @@ export const ModalComprobanteProveedor = ({
             />
           </SimpleGrid>
 
-          {/* Detracción SUNAT */}
-          <Group
+          {/* Impuestos de la orden de compra (no editables aqui) */}
+          {/* <Group
             justify="space-between"
             p="sm"
             className="bg-zinc-900/60 rounded-xl border border-zinc-800"
           >
             <div>
               <Text size="xs" fw={600} c="white">
-                ¿Aplica detracción SUNAT?
+                Impuestos de la orden de compra
               </Text>
-              <Text size="xs" c="dimmed">
-                Retención oficial para depósito al Banco de la Nación
+              <Text size="xs" c="gray">
+                Se aplican automaticamente a esta factura
               </Text>
             </div>
             <Group gap="xs">
-              {conDetraccion && (
-                <NumberInput
-                  value={pctDetraccion}
-                  onChange={setPctDetraccion}
-                  min={1}
-                  max={30}
-                  size="xs"
-                  radius="lg"
-                  rightSection={
-                    <Text size="xs" mr={8}>
-                      %
-                    </Text>
-                  }
-                  hideControls
-                  w={90}
-                />
-              )}
-              <Switch
-                checked={conDetraccion}
-                onChange={(e) => setConDetraccion(e.currentTarget.checked)}
-                color="indigo"
+              <Badge color="indigo" variant="light" size="sm">
+                IGV {formatNumber(porcentajeIgv)}%
+              </Badge>
+              <Badge
+                color={porcentajeDetraccion > 0 ? "orange" : "gray"}
+                variant="light"
                 size="sm"
-              />
+              >
+                Detracción {formatNumber(porcentajeDetraccion)}%
+              </Badge>
             </Group>
-          </Group>
+          </Group> */}
 
           {/* Cargas Disponibles */}
           <div>
@@ -378,7 +378,7 @@ export const ModalComprobanteProveedor = ({
                 p="sm"
                 className="bg-zinc-950/60 border border-zinc-800 text-center"
               >
-                <Text size="xs" c="dimmed">
+                <Text size="xs" c="gray">
                   No hay cargas pendientes de facturación en esta orden de
                   compra.
                 </Text>
@@ -432,9 +432,9 @@ export const ModalComprobanteProveedor = ({
                         <Text
                           size="xs"
                           fw={700}
-                          c={estaCheck ? "teal" : "dimmed"}
+                          c={estaCheck ? "teal" : "gray"}
                         >
-                          S/ {formatNumber(c.subtotal_con_descuento)}
+                          S/ {formatNumber(c.subtotal)}
                         </Text>
                       </Group>
                     );
@@ -486,7 +486,7 @@ export const ModalComprobanteProveedor = ({
               >
                 <Group justify="center" gap="xs">
                   <Loader size="xs" color="yellow" />
-                  <Text size="xs" c="dimmed">
+                  <Text size="xs" c="gray">
                     Consultando anticipos disponibles del proveedor...
                   </Text>
                 </Group>
@@ -507,7 +507,7 @@ export const ModalComprobanteProveedor = ({
                     >
                       <IconAlertCircle size={14} />
                     </ThemeIcon>
-                    <Text size="xs" c="dimmed">
+                    <Text size="xs" c="gray">
                       El proveedor no cuenta con anticipos libres. Puedes
                       registrar uno ahora mismo.
                     </Text>
@@ -555,9 +555,6 @@ export const ModalComprobanteProveedor = ({
 
                           <div>
                             <Group gap="xs">
-                              <Text size="xs" fw={700} c="white">
-                                #{a.id_anticipo}
-                              </Text>
                               <Badge color="yellow" variant="outline" size="xs">
                                 {dayjs(a.fecha_hora_pago).format("DD/MM/YYYY")}
                               </Badge>
@@ -600,6 +597,17 @@ export const ModalComprobanteProveedor = ({
             )}
           </div>
 
+          {/* Observación */}
+          <Textarea
+            label="Observación"
+            placeholder="Opcional"
+            value={observacion}
+            onChange={(e) => setObservacion(e.currentTarget.value)}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+          />
+
           {/* Adjuntos / Factura Digital */}
           <div className="bg-zinc-950/40 p-3 rounded-2xl border border-dashed border-zinc-800">
             <MultiFilePicker
@@ -611,59 +619,73 @@ export const ModalComprobanteProveedor = ({
             />
           </div>
 
-          {/* Observación */}
-          <TextInput
-            label="Observación"
-            placeholder="Opcional"
-            value={observacion}
-            onChange={(e) => setObservacion(e.currentTarget.value)}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-          />
-
           {/* Resumen Financiero de la Factura */}
           <Paper
             p="sm"
             radius="md"
             className="bg-indigo-950/20 border border-indigo-900/40"
           >
-            <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
+            <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="xs">
               <div>
-                <Text size="xs" c="dimmed">
-                  Total Cargas
+                <Text size="xs" c="gray">
+                  Subtotal
                 </Text>
                 <Text size="sm" fw={700} c="white">
                   S/ {formatNumber(totalCargas)}
                 </Text>
               </div>
 
-              {conDetraccion && (
-                <div>
-                  <Text size="xs" c="dimmed">
-                    Detracción ({pctDetraccion}%)
-                  </Text>
-                  <Text size="sm" fw={700} c="orange.4">
-                    S/ {formatNumber(montoDetraccion)}
-                  </Text>
-                </div>
-              )}
-
               <div>
-                <Text size="xs" c="dimmed">
+                <Text size="xs" c="gray">
                   Anticipos descontados
                 </Text>
                 <Text
                   size="sm"
                   fw={700}
-                  c={totalAnticiposAplicados > 0 ? "yellow.4" : "dimmed"}
+                  c={totalAnticiposAplicados > 0 ? "yellow.4" : "gray"}
                 >
                   -S/ {formatNumber(totalAnticiposAplicados)}
                 </Text>
               </div>
 
               <div>
-                <Text size="xs" c="dimmed">
+                <Text size="xs" c="gray">
+                  Base Imponible
+                </Text>
+                <Text size="sm" fw={700} c="white">
+                  S/ {formatNumber(baseImponible)}
+                </Text>
+              </div>
+
+              <div>
+                <Text size="xs" c="gray">
+                  IGV ({formatNumber(porcentajeIgv)}%)
+                </Text>
+                <Text size="sm" fw={700} c="indigo.4">
+                  S/ {formatNumber(montoIgv)}
+                </Text>
+              </div>
+
+              <div>
+                <Text size="xs" c="gray">
+                  Importe Total
+                </Text>
+                <Text size="sm" fw={800} c="white">
+                  S/ {formatNumber(importeTotal)}
+                </Text>
+              </div>
+
+              <div>
+                <Text size="xs" c="gray">
+                  Detracción ({formatNumber(porcentajeDetraccion)}%)
+                </Text>
+                <Text size="sm" fw={700} c="orange.4">
+                  S/ {formatNumber(montoDetraccion)}
+                </Text>
+              </div>
+
+              <div>
+                <Text size="xs" c="gray">
                   Neto a pagar en banco
                 </Text>
                 <Text size="sm" fw={800} c="teal.4">
@@ -702,6 +724,7 @@ export const ModalComprobanteProveedor = ({
         opened={modalNuevoAnticipo}
         onClose={() => setModalNuevoAnticipo(false)}
         idProveedor={idProveedor}
+        idEmpresa={idEmpresa}
         nombreProveedor={nombreProveedor}
         onSuccess={(nuevo) => {
           setAnticipos((prev) => [nuevo, ...prev]);
