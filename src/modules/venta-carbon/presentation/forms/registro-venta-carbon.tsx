@@ -241,7 +241,7 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
           id_vehiculo_carbon: Number(c.id_vehiculo_carbon),
           tipo_vehiculo: c.tipo_vehiculo,
           calidad: c.calidad,
-          cantidad_estimada: c.cantidad_estimada,
+          cantidad_toneladas: c.cantidad_toneladas,
           segunda_placa: c.segunda_placa.trim() || null,
           fecha_hora_salida: c.fecha_hora_salida,
           archivos: c.archivos,

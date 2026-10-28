@@ -15,7 +15,6 @@ export interface RegistrarZarandeoRequest {
   id_tipo_carbon: number;
   /** Calidad del carbón a zarandear: define el stock (tipo, calidad) afectado. */
   calidad: string;
-  id_empleado_supervisor?: number;
   /** Cargas del grupo elegidas. Vacio = rezarandeo sobre el stock existente. */
   id_cargas?: number[];
   cantidad_zarandeada: number;

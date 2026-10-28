@@ -149,7 +149,7 @@ export const ListaCargasVenta = ({
         if (i === index) return;
         if (otra.id_tipo_carbon !== idTipo) return;
         if (otra.calidad !== calidad) return;
-        asignadoPorOtras += Number(otra.cantidad_estimada) || 0;
+        asignadoPorOtras += Number(otra.cantidad_toneladas) || 0;
       });
 
       return Math.max(0, stock - asignadoPorOtras);
@@ -174,7 +174,7 @@ export const ListaCargasVenta = ({
     actualizar(index, {
       id_tipo_carbon: idTipo,
       calidad,
-      cantidad_estimada:
+      cantidad_toneladas:
         disponible > 0 ? Math.round(disponible * 10000) / 10000 : 0,
     });
   };
@@ -286,9 +286,9 @@ export const ListaCargasVenta = ({
                 <NumberInput
                   label="Cantidad estimada (TN)"
                   placeholder="0.00"
-                  value={carga.cantidad_estimada}
+                  value={carga.cantidad_toneladas}
                   onChange={(val) =>
-                    actualizar(index, { cantidad_estimada: Number(val) || 0 })
+                    actualizar(index, { cantidad_toneladas: Number(val) || 0 })
                   }
                   leftSection={<IconScale size={16} />}
                   classNames={inputClasses}
@@ -320,7 +320,7 @@ export const ListaCargasVenta = ({
                           color="teal"
                           onClick={() =>
                             actualizar(index, {
-                              cantidad_estimada:
+                              cantidad_toneladas:
                                 Math.round(disponible * 10000) / 10000,
                             })
                           }
@@ -334,7 +334,7 @@ export const ListaCargasVenta = ({
                 )}
                 {carga.id_tipo_carbon &&
                   carga.calidad &&
-                  carga.cantidad_estimada > disponible && (
+                  carga.cantidad_toneladas > disponible && (
                     <Text size="10px" c="red.4" mt={4} fw={600}>
                       La cantidad supera el stock disponible
                     </Text>

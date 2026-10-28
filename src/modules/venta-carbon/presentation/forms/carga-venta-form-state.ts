@@ -14,7 +14,7 @@ export interface CargaVentaFormState {
   id_vehiculo_carbon: number | null;
   tipo_vehiculo: TipoVehiculoCarbon | null;
   calidad: TipoCalidadCarbon | null;
-  cantidad_estimada: number;
+  cantidad_toneladas: number;
   segunda_placa: string;
   fecha_hora_salida: string;
   archivos: File[];
@@ -29,7 +29,7 @@ export const esCargaVentaVacia = (carga: CargaVentaFormState): boolean =>
   !carga.id_tipo_carbon &&
   !carga.id_vehiculo_carbon &&
   !carga.calidad &&
-  !carga.cantidad_estimada &&
+  !carga.cantidad_toneladas &&
   !carga.segunda_placa.trim() &&
   carga.archivos.length === 0;
 
@@ -51,7 +51,7 @@ export const esCargaVentaCompleta = (
       carga.id_vehiculo_carbon &&
       carga.tipo_vehiculo &&
       carga.calidad &&
-      carga.cantidad_estimada > 0 &&
+      carga.cantidad_toneladas > 0 &&
       carga.fecha_hora_salida,
   );
 
@@ -60,7 +60,7 @@ export const nuevaCargaVenta = (): CargaVentaFormState => ({
   id_vehiculo_carbon: null,
   tipo_vehiculo: null,
   calidad: null,
-  cantidad_estimada: 0,
+  cantidad_toneladas: 0,
   segunda_placa: "",
   fecha_hora_salida: dayjs().format("YYYY-MM-DDTHH:mm"),
   archivos: [],

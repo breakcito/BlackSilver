@@ -24,7 +24,6 @@ export interface CargaVentaCarbonItem {
   vehiculo_tipo: string | null;
   vehiculo_marca: string | null;
   calidad: TipoCalidadCarbon | null;
-  cantidad_estimada: number;
   segunda_placa: string | null;
   fecha_hora_salida: string | null;
 
@@ -32,7 +31,7 @@ export interface CargaVentaCarbonItem {
   id_tipo_carbon_confirmado: number | null;
   tipo_carbon_confirmado: string | null;
   tipo_carbon_confirmado_codigo: string | null;
-  cantidad_confirmada: number;
+  cantidad_toneladas: number;
   fecha_hora_ingreso: string | null;
   guia_remitente: string | null;
   guia_transportista: string | null;
@@ -86,7 +85,7 @@ export interface VentaCarbonResumen {
 
   cantidad_cargas: number;
   cantidad_cargas_confirmadas: number;
-  total_toneladas_estimadas: number;
+  total_toneladas: number;
   total_toneladas_confirmadas: number;
   total_subtotal: number;
 

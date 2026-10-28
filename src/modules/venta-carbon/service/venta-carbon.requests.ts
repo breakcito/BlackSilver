@@ -6,7 +6,7 @@ export interface CargaVentaFormItem {
   id_vehiculo_carbon: number;
   tipo_vehiculo: string;
   calidad: TipoCalidadCarbon;
-  cantidad_estimada: number;
+  cantidad_toneladas: number;
   segunda_placa: string | null;
   fecha_hora_salida: string;
   archivos: File[];
@@ -23,7 +23,7 @@ export interface CrearVentaCarbonRequest {
 
 export interface ConfirmarLlegadaPayload {
   id_tipo_carbon_confirmado: number;
-  cantidad_confirmada: number;
+  cantidad_toneladas: number;
   fecha_hora_ingreso: string;
   guia_remitente: string | null;
   guia_transportista: string | null;

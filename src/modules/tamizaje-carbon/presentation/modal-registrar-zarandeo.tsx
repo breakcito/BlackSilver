@@ -42,7 +42,6 @@ import type {
   RES_VarianteCarbon,
 } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_Almacen } from "../../../service/responses/almacen";
-import type { RES_Empleado } from "../../../service/responses/empleado";
 import type {
   GrupoCargasItem,
   StockCarbonItem,
@@ -68,6 +67,11 @@ const estilitos = {
   option: "text-zinc-300 hover:bg-zinc-800",
 };
 
+// El supervisor del zarandeo es fijo: el reporte de planta lo firma siempre
+// el mismo empleado (Dember Michael, id_empleado = 8). El backend graba ese
+// id sin importar lo que se envie, asi que aqui no hay nada que elegir.
+const SUPERVISOR_FIJO_NOMBRE = "Dember Michael";
+
 export const ModalRegistrarZarandeo = ({
   opened,
   onClose,
@@ -78,7 +82,6 @@ export const ModalRegistrarZarandeo = ({
   // Masters
   const [almacenes, setAlmacenes] = useState<RES_Almacen[]>([]);
   const [tiposCarbon, setTiposCarbon] = useState<RES_TipoCarbon[]>([]);
-  const [supervisores, setSupervisores] = useState<RES_Empleado[]>([]);
   const [grupos, setGrupos] = useState<GrupoCargasItem[]>([]);
   const [stockPorCalidad, setStockPorCalidad] = useState<StockCarbonItem[]>([]);
 
@@ -89,7 +92,6 @@ export const ModalRegistrarZarandeo = ({
   // Form state
   const [idAlmacen, setIdAlmacen] = useState<string | null>(null);
   const [idTipoPadre, setIdTipoPadre] = useState<string | null>(null);
-  const [idSupervisor, setIdSupervisor] = useState<string | null>(null);
   const [calidad, setCalidad] = useState<string | null>(null);
   const [cantidadTamizada, setCantidadTamizada] = useState<number | string>("");
   const [fechaHora, setFechaHora] = useState(
@@ -101,7 +103,6 @@ export const ModalRegistrarZarandeo = ({
   // Búsquedas controladas de los selects sobre catálogo
   const [almacenBusqueda, setAlmacenBusqueda] = useState("");
   const [tipoBusqueda, setTipoBusqueda] = useState("");
-  const [supervisorBusqueda, setSupervisorBusqueda] = useState("");
 
   // Variantes registradas en el catálogo para el tipo padre
   const [catalogoVariantes, setCatalogoVariantes] = useState<
@@ -131,10 +132,9 @@ export const ModalRegistrarZarandeo = ({
     if (!opened) return;
     const fetchMaestros = async () => {
       try {
-        const [resAlm, resTipos, resEmp] = await Promise.all([
+        const [resAlm, resTipos] = await Promise.all([
           AuxService.get_almacenes({ para_carbon: true }),
           TipoCarbonService.getTipos(),
-          AuxService.get_empleados(),
         ]);
         if (resAlm?.data) {
           const list = resAlm.data;
@@ -144,7 +144,6 @@ export const ModalRegistrarZarandeo = ({
           }
         }
         if (resTipos?.data) setTiposCarbon(resTipos.data);
-        if (resEmp?.data) setSupervisores(resEmp.data);
       } catch (err) {
         console.error("Error al cargar maestros para zarandeo", err);
       }
@@ -278,7 +277,6 @@ export const ModalRegistrarZarandeo = ({
       setOrigen("carga");
       setIdGrupo(null);
       setIdTipoPadre(null);
-      setIdSupervisor(null);
       setCalidad(null);
       setCantidadTamizada("");
       setFechaHora(dayjs().format("YYYY-MM-DD HH:mm"));
@@ -489,7 +487,6 @@ export const ModalRegistrarZarandeo = ({
         id_almacen: Number(idAlmacen),
         id_tipo_carbon: Number(idTipoPadre),
         calidad,
-        id_empleado_supervisor: idSupervisor ? Number(idSupervisor) : undefined,
         id_cargas: idCargas,
         cantidad_zarandeada: cantTamizadaNum,
         es_rezarandeo: origen === "stock",
@@ -533,25 +530,6 @@ export const ModalRegistrarZarandeo = ({
       })),
     [tiposConVariantes],
   );
-
-  const supervisoresOptions = useMemo(
-    () =>
-      supervisores.map((s) => ({
-        value: String(s.id_empleado),
-        label: s.dni ? `${s.nombre_completo} (${s.dni})` : s.nombre_completo,
-      })),
-    [supervisores],
-  );
-
-  // Búsqueda tolerante sobre catálogos (Fuse + FlexSearch).
-  const supervisoresVisibles = useMemo(() => {
-    const q = supervisorBusqueda.trim();
-    if (!q) return supervisoresOptions;
-    return getCoincidencias(supervisoresOptions, q, {
-      keys: ["label"],
-      fuseThreshold: 0.4,
-    }).map((r) => r.item);
-  }, [supervisoresOptions, supervisorBusqueda]);
 
   const tiposVisibles = useMemo(() => {
     const q = tipoBusqueda.trim();
@@ -816,21 +794,10 @@ export const ModalRegistrarZarandeo = ({
             classNames={estilitos}
           />
 
-          <Select
+          <TextInput
             label="Supervisor a cargo"
-            placeholder="Opcional"
-            data={supervisoresVisibles}
-            value={idSupervisor}
-            onChange={(val) => {
-              setIdSupervisor(val);
-              setSupervisorBusqueda("");
-            }}
-            clearable
-            searchable
-            searchValue={supervisorBusqueda}
-            onSearchChange={setSupervisorBusqueda}
-            comboboxProps={{ withinPortal: true }}
-            nothingFoundMessage="No se encontraron empleados"
+            value={SUPERVISOR_FIJO_NOMBRE}
+            readOnly
             leftSection={<UserIcon className="w-4 h-4 text-zinc-500" />}
             radius="lg"
             size="xs"

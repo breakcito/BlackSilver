@@ -62,7 +62,7 @@ export const VentaCarbonService = {
         id_vehiculo_carbon: c.id_vehiculo_carbon,
         tipo_vehiculo: c.tipo_vehiculo,
         calidad: c.calidad,
-        cantidad_estimada: c.cantidad_estimada,
+        cantidad_toneladas: c.cantidad_toneladas,
         segunda_placa: c.segunda_placa,
         fecha_hora_salida: c.fecha_hora_salida,
       };
@@ -82,7 +82,9 @@ export const VentaCarbonService = {
   registrarCargas: async (
     idVentaCarbon: number,
     cargas: CargaVentaFormItem[],
-  ): Promise<IRespuesta<{ ids_cargas: number[]; venta: VentaCarbonResumen }>> => {
+  ): Promise<
+    IRespuesta<{ ids_cargas: number[]; venta: VentaCarbonResumen }>
+  > => {
     const formData = new FormData();
 
     const limpias = cargas.map((c, i) => {
@@ -96,7 +98,7 @@ export const VentaCarbonService = {
         id_vehiculo_carbon: c.id_vehiculo_carbon,
         tipo_vehiculo: c.tipo_vehiculo,
         calidad: c.calidad,
-        cantidad_estimada: c.cantidad_estimada,
+        cantidad_toneladas: c.cantidad_toneladas,
         segunda_placa: c.segunda_placa,
         fecha_hora_salida: c.fecha_hora_salida,
       };
@@ -124,7 +126,7 @@ export const VentaCarbonService = {
       "id_tipo_carbon_confirmado",
       String(payload.id_tipo_carbon_confirmado),
     );
-    formData.append("cantidad_confirmada", String(payload.cantidad_confirmada));
+    formData.append("cantidad_toneladas", String(payload.cantidad_toneladas));
     formData.append("fecha_hora_ingreso", payload.fecha_hora_ingreso);
     formData.append("precio_base", String(payload.precio_base));
     formData.append("descuento", String(payload.descuento));
@@ -144,7 +146,8 @@ export const VentaCarbonService = {
       formData.append("codigo_reporte", payload.codigo_reporte);
     if (payload.observacion)
       formData.append("observacion", payload.observacion);
-    if (payload.codigo_venta) formData.append("codigo_venta", payload.codigo_venta);
+    if (payload.codigo_venta)
+      formData.append("codigo_venta", payload.codigo_venta);
 
     if (payload.analisis_granulometria) {
       formData.append(

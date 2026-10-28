@@ -749,6 +749,11 @@ export const TamizajeCarbonPage = () => {
           <div className="flex items-stretch gap-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
             {stockPorTipo.map((item) => {
               const isSelected = idTipoCarbon === String(item.id_tipo_carbon);
+              // El desglose es por (almacen x calidad): si el tipo tiene stock
+              // en mas de un almacen hay que dizer cual es cual.
+              const cantidadAlmacenes = new Set(
+                item.matchingStocks.map((s) => s.id_almacen),
+              ).size;
 
               return (
                 <Paper
@@ -806,7 +811,7 @@ export const TamizajeCarbonPage = () => {
                         className={
                           item.stockTotal > 0
                             ? "text-teal-400 font-mono tracking-tight"
-                            : "text-zinc-500 font-mono"
+                            : "text-zinc-400 font-mono"
                         }
                       >
                         {formatTN(item.stockTotal)}
@@ -838,6 +843,15 @@ export const TamizajeCarbonPage = () => {
                             >
                               {s.calidad ?? "Sin calidad"}
                             </Badge>
+                            {cantidadAlmacenes > 1 && (
+                              <Text
+                                size="10px"
+                                c="dimmed"
+                                className="truncate max-w-24"
+                              >
+                                {s.almacen_nombre}
+                              </Text>
+                            )}
                             <Text
                               size="xs"
                               fw={600}

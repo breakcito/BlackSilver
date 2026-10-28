@@ -53,10 +53,12 @@ export const ModalConfirmarLlegada = ({
   const [loadingTipos, setLoadingTipos] = useState(true);
 
   const [idTipoConfirmado, setIdTipoConfirmado] = useState<string | null>(
-    carga.id_tipo_carbon_estimado ? String(carga.id_tipo_carbon_estimado) : null,
+    carga.id_tipo_carbon_estimado
+      ? String(carga.id_tipo_carbon_estimado)
+      : null,
   );
   const [cantidadConfirmada, setCantidadConfirmada] = useState<number>(
-    Number(carga.cantidad_estimada) || 0,
+    Number(carga.cantidad_toneladas) || 0,
   );
   const [fechaHoraIngreso, setFechaHoraIngreso] = useState(
     dayjs().format("YYYY-MM-DDTHH:mm"),
@@ -125,8 +127,10 @@ export const ModalConfirmarLlegada = ({
   const requiereAnalisis =
     tipoConfirmado?.nombre?.trim().toLowerCase() === TIPO_CON_ANALISIS;
 
-  const subtotalSinDescuento = Math.round(cantidadConfirmada * precioBase * 100) / 100;
-  const subtotal = Math.round((subtotalSinDescuento - descuento + bono) * 100) / 100;
+  const subtotalSinDescuento =
+    Math.round(cantidadConfirmada * precioBase * 100) / 100;
+  const subtotal =
+    Math.round((subtotalSinDescuento - descuento + bono) * 100) / 100;
 
   const handleSubmit = async () => {
     setError(null);
@@ -159,7 +163,7 @@ export const ModalConfirmarLlegada = ({
         carga.id_carga_venta_carbon,
         {
           id_tipo_carbon_confirmado: Number(idTipoConfirmado),
-          cantidad_confirmada: cantidadConfirmada,
+          cantidad_toneladas: cantidadConfirmada,
           fecha_hora_ingreso: fechaHoraIngreso,
           guia_remitente: guiaRemitente.trim() || null,
           guia_transportista: guiaTransportista.trim() || null,
@@ -172,10 +176,8 @@ export const ModalConfirmarLlegada = ({
           porcentaje_pizarra: requiereAnalisis ? porcentajePizarra : 0,
           analisis_granulometria: requiereAnalisis
             ? {
-                mayor_a_uno:
-                  mayorAUno === "" ? null : Number(mayorAUno),
-                menor_a_uno:
-                  menorAUno === "" ? null : Number(menorAUno),
+                mayor_a_uno: mayorAUno === "" ? null : Number(mayorAUno),
+                menor_a_uno: menorAUno === "" ? null : Number(menorAUno),
                 un_medio: unMedio === "" ? null : Number(unMedio),
               }
             : null,
@@ -257,7 +259,7 @@ export const ModalConfirmarLlegada = ({
           <Text size="xs" c="gray">
             Estimado:{" "}
             <span className="text-zinc-200 font-semibold">
-              {formatNumber(carga.cantidad_estimada)} TN
+              {formatNumber(carga.cantidad_toneladas)} TN
             </span>
           </Text>
           <Text size="xs" c="gray">
@@ -287,7 +289,6 @@ export const ModalConfirmarLlegada = ({
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-
         <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm">
           <Select
             label="Tipo de carbon confirmado"
@@ -454,18 +455,6 @@ export const ModalConfirmarLlegada = ({
             </Group>
             <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
               <NumberInput
-                label="% Pizarra"
-                placeholder="0.00"
-                value={porcentajePizarra}
-                onChange={(val) => setPorcentajePizarra(Number(val) || 0)}
-                max={100}
-                classNames={inputClasses}
-                size="xs"
-                radius="lg"
-                hideControls
-                disabled={saving}
-              />
-              <NumberInput
                 label={'Mayor a 1" (%)'}
                 placeholder="0.00"
                 value={mayorAUno}
@@ -494,6 +483,18 @@ export const ModalConfirmarLlegada = ({
                 placeholder="0.00"
                 value={unMedio}
                 onChange={setUnMedio}
+                max={100}
+                classNames={inputClasses}
+                size="xs"
+                radius="lg"
+                hideControls
+                disabled={saving}
+              />
+              <NumberInput
+                label="% Pizarra"
+                placeholder="0.00"
+                value={porcentajePizarra}
+                onChange={(val) => setPorcentajePizarra(Number(val) || 0)}
                 max={100}
                 classNames={inputClasses}
                 size="xs"

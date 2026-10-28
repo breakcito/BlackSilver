@@ -163,14 +163,14 @@ export const VentaCarbonListado = ({
         ),
       },
       {
-        accessor: "total_toneladas_estimadas",
+        accessor: "total_toneladas",
         title: "Toneladas",
         textAlign: "center",
         width: 120,
         render: (r) => (
           <div className="flex flex-col">
             <Text size="xs" fw={700} c="zinc.100">
-              {formatNumber(r.total_toneladas_estimadas)} TN
+              {formatNumber(r.total_toneladas)} TN
             </Text>
             {r.total_toneladas_confirmadas > 0 && (
               <Text size="xs" c="teal.4" fw={800}>
@@ -370,13 +370,8 @@ export const VentaCarbonListado = ({
                 <Table.Td ta={"center"}>
                   <div className="flex flex-col ">
                     <Text size="xs" fw={700} c="zinc.100">
-                      {formatNumber(carga.cantidad_estimada)}
+                      {formatNumber(carga.cantidad_toneladas)}
                     </Text>
-                    {carga.cantidad_confirmada > 0 && (
-                      <Text size="10px" c="teal.4" fw={600}>
-                        conf. {formatNumber(carga.cantidad_confirmada)}
-                      </Text>
-                    )}
                   </div>
                 </Table.Td>
                 <Table.Td ta={"center"}>

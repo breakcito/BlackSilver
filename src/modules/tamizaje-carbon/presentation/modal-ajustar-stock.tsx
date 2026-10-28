@@ -52,10 +52,6 @@ export const ModalAjustarStock = ({
       notifyError("El stock resultante no puede ser negativo");
       return;
     }
-    if (!motivo.trim()) {
-      notifyError("Debe ingresar un motivo para el ajuste manual");
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -136,13 +132,10 @@ export const ModalAjustarStock = ({
         </Paper>
 
         <NumberInput
-          label="Nuevo stock real (TN)"
-          description="Ingrese el peso medido o verificado en almacén"
+          label="Nuevo stock"
           placeholder="0.00"
           value={nuevoStock}
           onChange={setNuevoStock}
-          min={0}
-          decimalScale={4}
           fixedDecimalScale={false}
           required
           radius="lg"
@@ -166,12 +159,11 @@ export const ModalAjustarStock = ({
         )}
 
         <Textarea
-          label="Motivo del ajuste"
+          label="Motivo del ajuste (opcional)"
           placeholder="Ej: Calibración de balanza, merma por humedad, inventario físico semestral..."
           value={motivo}
           onChange={(e) => setMotivo(e.currentTarget.value)}
           minRows={3}
-          required
           radius="lg"
           size="xs"
           classNames={estilitos}

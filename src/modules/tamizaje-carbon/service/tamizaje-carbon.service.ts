@@ -76,12 +76,6 @@ export const TamizajeCarbonService = {
       formData.append("id_almacen", String(payload.id_almacen));
     formData.append("id_tipo_carbon", String(payload.id_tipo_carbon));
     formData.append("calidad", payload.calidad);
-    if (payload.id_empleado_supervisor) {
-      formData.append(
-        "id_empleado_supervisor",
-        String(payload.id_empleado_supervisor),
-      );
-    }
     if (payload.id_cargas && payload.id_cargas.length > 0) {
       formData.append("id_cargas", JSON.stringify(payload.id_cargas));
     }
