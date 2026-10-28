@@ -210,10 +210,11 @@ export const LotesPage = () => {
         opened={openedCreate}
         close={closeCreate}
         title="Ingreso de Stock"
-        size="lg"
+        size="85%"
         validateClose
       >
-        <RegistroLote
+        {openedCreate && (
+          <RegistroLote
           initialAlmacenId={idAlmacen ? Number(idAlmacen) : null}
           almacenes={almacenes}
           onSuccess={(nuevosLotes) => {
@@ -222,7 +223,8 @@ export const LotesPage = () => {
             handlePrint(nuevosLotes);
           }}
           onCancel={closeCreate}
-        />
+          />
+        )}
       </ModalEstandar>
 
       <ModalEstandar
