@@ -461,7 +461,7 @@ export const ModalPagoProveedor = ({
         title={
           comprobante
             ? `Registrar Pago a Factura: ${comprobante.codigo_comprobante}`
-            : "Registrar Pago Directo (Sin IGV)"
+            : "Registrar Pago Directo"
         }
         size="lg"
         validateClose

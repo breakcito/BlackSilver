@@ -295,7 +295,9 @@ export const CompraCarbonPDF = ({
             <Text style={STYLES.celdaPrecio}>
               {formatPEN(Number(cabecera.precio_unitario_cotizado))}
             </Text>
-            <Text style={STYLES.celdaImporte}>{formatPEN(subtotalCotizado)}</Text>
+            <Text style={STYLES.celdaImporte}>
+              {formatPEN(subtotalCotizado)}
+            </Text>
           </View>
 
           <View style={STYLES.tablaEspacio} />
@@ -311,37 +313,41 @@ export const CompraCarbonPDF = ({
           </View>
 
           <View style={STYLES.resumenCol}>
-            <View style={STYLES.resumenFila}>
-              <Text style={STYLES.resumenLabel}>SUBTOTAL</Text>
-              <Text style={STYLES.resumenValor}>
-                {formatPEN(subtotalCotizado)}
-              </Text>
-            </View>
-            <View style={STYLES.resumenFila}>
-              <Text style={STYLES.resumenLabel}>
-                {aplicaIgv
-                  ? `IGV (${formatNumber(cabecera.porcentaje_igv)}%)`
-                  : "IGV"}
-              </Text>
-              <Text style={STYLES.resumenValor}>
-                {aplicaIgv ? formatPEN(igvMonto) : "No aplica"}
-              </Text>
-            </View>
-            <View style={STYLES.resumenFila}>
-              <Text style={STYLES.resumenTotalLabel}>TOTAL</Text>
-              <Text style={STYLES.resumenTotalValor}>
-                {formatPEN(totalCotizado)}
-              </Text>
-            </View>
-            {pctDetraccion > 0 && (
-              <View style={STYLES.resumenFila}>
-                <Text style={STYLES.resumenLabel}>
-                  {`DETRACCIÓN (${formatNumber(pctDetraccion)}%)`}
-                </Text>
-                <Text style={STYLES.resumenValor}>
-                  {formatPEN(detraccionMonto)}
-                </Text>
-              </View>
+            {aplicaIgv && (
+              <>
+                <View style={STYLES.resumenFila}>
+                  <Text style={STYLES.resumenLabel}>SUBTOTAL</Text>
+                  <Text style={STYLES.resumenValor}>
+                    {formatPEN(subtotalCotizado)}
+                  </Text>
+                </View>
+                <View style={STYLES.resumenFila}>
+                  <Text style={STYLES.resumenLabel}>
+                    {aplicaIgv
+                      ? `IGV (${formatNumber(cabecera.porcentaje_igv)}%)`
+                      : "IGV"}
+                  </Text>
+                  <Text style={STYLES.resumenValor}>
+                    {aplicaIgv ? formatPEN(igvMonto) : "No aplica"}
+                  </Text>
+                </View>
+                <View style={STYLES.resumenFila}>
+                  <Text style={STYLES.resumenTotalLabel}>TOTAL</Text>
+                  <Text style={STYLES.resumenTotalValor}>
+                    {formatPEN(totalCotizado)}
+                  </Text>
+                </View>
+                {pctDetraccion > 0 && (
+                  <View style={STYLES.resumenFila}>
+                    <Text style={STYLES.resumenLabel}>
+                      {`DETRACCIÓN (${formatNumber(pctDetraccion)}%)`}
+                    </Text>
+                    <Text style={STYLES.resumenValor}>
+                      {formatPEN(detraccionMonto)}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
             <View style={STYLES.resumenFila}>
               <Text style={STYLES.resumenTotalLabel}>NETO A PAGAR</Text>

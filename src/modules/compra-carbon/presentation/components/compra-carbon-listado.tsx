@@ -512,13 +512,19 @@ export const CompraCarbonListado = ({
     {
       accessor: "cargas",
       title: "Cargas",
-      width: 120,
+      width: 130,
       textAlign: "center",
       render: (r: CompraCarbonResumen) => {
         const esAnulado = r.estado === EstadoCompraCarbon.Anulado;
         // const esPagado = r.estado === EstadoCompraCarbon.Pagado;
         const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
+
+        const esPagado = r.estado === EstadoCompraCarbon.Pagado;
+
+        const totalCargas = r.cantidad_cargas ?? 0;
         const puedeRegistrarCarga = !esAnulado && !esCerrado;
+        const puedeCerrar =
+          !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
         return (
           <div className="flex items-center justify-center gap-2">
             <Badge variant="light" color="cyan" radius="md" size="md">
@@ -552,6 +558,30 @@ export const CompraCarbonListado = ({
                   }}
                 >
                   <PlusIcon className="w-4 h-4 text-white" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {/* 3. Cerrar Compra (solo con >= 1 carga) */}
+            {puedeCerrar && (
+              <Tooltip
+                label="Cerrar orden (no admitir más cargas)"
+                withArrow
+                position="top"
+              >
+                <ActionIcon
+                  variant="light"
+                  color="orange"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenCerrarModal({
+                      id: r.id_compra_carbon,
+                      correlativo: r.correlativo,
+                    });
+                  }}
+                >
+                  <LockClosedIcon className="w-4 h-4" />
                 </ActionIcon>
               </Tooltip>
             )}
@@ -599,11 +629,12 @@ export const CompraCarbonListado = ({
         const esCerrado = r.estado === EstadoCompraCarbon.Cerrado;
         const totalCargas = r.cantidad_cargas ?? 0;
         const puedeLiquidar = !esAnulado && totalCargas >= 1;
-        const puedeCerrar =
-          !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
+        // const puedeCerrar =
+        //   !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
         const puedeAnular =
           !esAnulado && !esPagado && !esCerrado && totalCargas === 0;
-        const puedeEditarCabecera = !esAnulado && !esPagado && !esCerrado;
+        const puedeEditarCabecera =
+          !esAnulado && !esPagado && !esCerrado && totalCargas == 0;
         const isPrinting = printingId === r.id_compra_carbon;
         const tieneCambios =
           r.log_cambios &&
@@ -650,11 +681,7 @@ export const CompraCarbonListado = ({
 
             {/* Exportar Liquidación (Excel) */}
             {totalCargas > 0 && (
-              <Tooltip
-                label="Exportar Liquidación"
-                withArrow
-                position="top"
-              >
+              <Tooltip label="Exportar Liquidación" withArrow position="top">
                 <ActionIcon
                   variant="light"
                   color="teal"
@@ -690,31 +717,6 @@ export const CompraCarbonListado = ({
                   }}
                 >
                   <TruckIcon className="w-4 h-4" />
-                </ActionIcon>
-              </Tooltip>
-            )}
-
-            {/* 3. Cerrar Compra (solo con >= 1 carga) */}
-            {puedeCerrar && (
-              <Tooltip
-                label="Cerrar orden (no admitir más cargas)"
-                withArrow
-                position="top"
-              >
-                <ActionIcon
-                  variant="light"
-                  color="orange"
-                  radius="xl"
-                  size="md"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenCerrarModal({
-                      id: r.id_compra_carbon,
-                      correlativo: r.correlativo,
-                    });
-                  }}
-                >
-                  <LockClosedIcon className="w-4 h-4" />
                 </ActionIcon>
               </Tooltip>
             )}
@@ -1120,7 +1122,8 @@ export const CompraCarbonListado = ({
                                     c={"yellow"}
                                     fw={600}
                                   >
-                                    {formatPEN(Number(d.precio_materia_prima))} M. PRIMA
+                                    {formatPEN(Number(d.precio_materia_prima))}{" "}
+                                    M. PRIMA
                                   </Text>
                                 </td>
                                 <td className="px-3 py-2 text-center">
@@ -1154,26 +1157,29 @@ export const CompraCarbonListado = ({
                                     {/* Lapicito para editar la carga individual. Solo
                                         se muestra si la cabecera y la carga lo permiten. */}
                                     {detallesModal.data &&
-                                      puedeEditarCarga(d, detallesModal.data.cabecera) && (
-                                      <Tooltip
-                                        label="Editar carga"
-                                        withArrow
-                                        position="top"
-                                      >
-                                        <ActionIcon
-                                          variant="subtle"
-                                          color="indigo"
-                                          radius="xl"
-                                          size="sm"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onEditarCarga?.(d);
-                                          }}
+                                      puedeEditarCarga(
+                                        d,
+                                        detallesModal.data.cabecera,
+                                      ) && (
+                                        <Tooltip
+                                          label="Editar carga"
+                                          withArrow
+                                          position="top"
                                         >
-                                          <PencilSquareIcon className="w-3.5 h-3.5" />
-                                        </ActionIcon>
-                                      </Tooltip>
-                                    )}
+                                          <ActionIcon
+                                            variant="subtle"
+                                            color="indigo"
+                                            radius="xl"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onEditarCarga?.(d);
+                                            }}
+                                          >
+                                            <PencilSquareIcon className="w-3.5 h-3.5" />
+                                          </ActionIcon>
+                                        </Tooltip>
+                                      )}
                                   </div>
                                 </td>
                               </tr>

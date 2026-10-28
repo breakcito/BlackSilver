@@ -353,8 +353,7 @@ export const ModalLiquidacionPagos = ({
         opened
         close={handleCerrarModal}
         title={`Liquidación — ${cabecera.correlativo}`}
-        size="80rem"
-        validateClose
+        size="xl"
         rightSection={rightSection}
       >
         <Stack gap="md" className="w-full">
@@ -380,11 +379,11 @@ export const ModalLiquidacionPagos = ({
                   <Group justify="space-between" align="center">
                     <div>
                       <Text size="sm" fw={700} c="white">
-                        Comprobantes / Facturas del Proveedor
+                        Facturas
                       </Text>
                       <Text size="xs" c="gray">
                         {cargasSinComprobanteProv.length} carga(s) pendiente(s)
-                        de asociar a comprobante
+                        de facturar
                       </Text>
                     </div>
                     {!estaCerrada && cargasSinComprobanteProv.length > 0 && (
@@ -395,7 +394,7 @@ export const ModalLiquidacionPagos = ({
                         leftSection={<IconPlus size={15} />}
                         onClick={() => setModalComprobanteProv(true)}
                       >
-                        Registrar Factura Proveedor
+                        Registrar Factura
                       </Button>
                     )}
                   </Group>
@@ -579,7 +578,7 @@ export const ModalLiquidacionPagos = ({
                               <Group justify="space-between" mb={6}>
                                 <Group gap="xs">
                                   <Text size="xs" fw={700} c="white">
-                                    Cargas amparadas ({cargasDelCmp.length}):
+                                    Cargas ({cargasDelCmp.length}):
                                   </Text>
                                   <Badge
                                     size="xs"
@@ -786,7 +785,7 @@ export const ModalLiquidacionPagos = ({
                   <Group justify="space-between" align="center">
                     <div>
                       <Text size="sm" fw={700} c="white">
-                        Pagos Directos al Proveedor (Modalidad Sin IGV)
+                        Pagos Directos al Proveedor
                       </Text>
                       <Text size="xs" c="gray">
                         {cargasSinPagoDirecto.length} carga(s) pendiente(s) de
@@ -831,7 +830,7 @@ export const ModalLiquidacionPagos = ({
                           <div>
                             <Group gap="xs">
                               <Text size="sm" fw={800} c="white">
-                                Pago #{p.id_pago_compra_carbon}
+                                Pago
                               </Text>
                               <Badge color="teal" variant="light" size="xs">
                                 {p.medio_pago}
@@ -880,7 +879,7 @@ export const ModalLiquidacionPagos = ({
                               <Group justify="space-between" mb={6}>
                                 <Group gap="xs">
                                   <Text size="xs" fw={700} c="white">
-                                    Cargas amparadas ({cargasDelPago.length}):
+                                    Cargas ({cargasDelPago.length}):
                                   </Text>
                                   <Badge
                                     size="xs"
@@ -934,7 +933,7 @@ export const ModalLiquidacionPagos = ({
                               className="bg-zinc-950/40 rounded-lg"
                             >
                               <Text size="xs" fw={700} c="white" mb={2}>
-                                Anticipos amortizados con este pago:
+                                Anticipos amortizados:
                               </Text>
                               <Group gap="md">
                                 {p.anticipos_aplicados.map((ant) => (
@@ -943,7 +942,9 @@ export const ModalLiquidacionPagos = ({
                                     size="xs"
                                     c="gray"
                                   >
-                                    Anticipo #{ant.id_anticipo_proveedor}: S/{" "}
+                                    {ant.codigo_comprobante || ""}{" "}
+                                    {ant.medio_pago || ""}{" "}
+                                    {ant.numero_operacion || ""}: S/{" "}
                                     {formatNumber(ant.monto_retirado)}
                                   </Text>
                                 ))}
@@ -1191,7 +1192,7 @@ export const ModalLiquidacionPagos = ({
                                 <div>
                                   <Group gap="xs">
                                     <Text size="xs" fw={700} c="white">
-                                      Pago #{p.id_pago_transporte_carbon}
+                                      Pago
                                     </Text>
                                     {p.es_para_detraccion ? (
                                       <Badge
