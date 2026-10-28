@@ -40,6 +40,16 @@ import { getCoincidencias } from "../../../shared/functions/get-coincidencias";
 interface Props {
   onCancel: () => void;
   onCreated: (compra: CompraCarbonResumen) => void;
+  /**
+   * Si viene definida, el componente entra en modo edicion: precarga los
+   * estados con los valores de la compra indicada y al guardar llama a
+   * CompraCarbonService.actualizarCompra. Si es null, modo registro normal.
+   */
+  compraInicial?: CompraCarbonResumen | null;
+  /**
+   * Callback cuando la edicion termina OK. No se usa en modo registro.
+   */
+  onUpdated?: (compra: CompraCarbonResumen) => void;
 }
 
 const inputClasses = {
@@ -60,7 +70,12 @@ const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
  */
 const PORCENTAJE_DETRACCION = 10;
 
-export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
+export const RegistroCompraCarbon = ({
+  onCancel,
+  onCreated,
+  compraInicial,
+  onUpdated,
+}: Props) => {
   const { notifyError, notifySuccess } = useNotify();
 
   const [empresas, setEmpresas] = useState<RES_Empresa[]>([]);
@@ -97,6 +112,29 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const esEdicion = Boolean(compraInicial);
+
+  // Precarga de estado cuando llega una compra inicial (modo edicion).
+  useEffect(() => {
+    if (!compraInicial) return;
+    setIdEmpresa(String(compraInicial.id_empresa));
+    setIdProveedor(String(compraInicial.id_proveedor));
+    setAplicaIgv(Boolean(compraInicial.aplica_igv));
+    setIdTipoCarbon(String(compraInicial.id_tipo_carbon_prometido));
+    setToneladasPrometidas(Number(compraInicial.toneladas_prometidas));
+    setPrecioUnitario(Number(compraInicial.precio_unitario_cotizado));
+    setIdTarifaAuto(
+      compraInicial.id_tarifa_carbon
+        ? Number(compraInicial.id_tarifa_carbon)
+        : null,
+    );
+    setIdCuentaProveedor(
+      compraInicial.id_cuenta_proveedor
+        ? String(compraInicial.id_cuenta_proveedor)
+        : null,
+    );
+  }, [compraInicial]);
 
   // Cargar empresas y proveedores iniciales
   useEffect(() => {
@@ -187,7 +225,10 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
   // no sean de detraccion. Se limpian al cambiar de proveedor.
   useEffect(() => {
     setCuentasProveedor([]);
-    setIdCuentaProveedor(null);
+    // NO reseteamos idCuentaProveedor aquí: en modo edición el useEffect de
+    // precarga (compraInicial) setea la cuenta y este useEffect se vuelve a
+    // disparar, pisándolo. El reset real ocurre en el onChange del Select de
+    // proveedor, solo cuando el usuario cambia el proveedor manualmente.
     setCuentaBusqueda("");
 
     if (!idProveedor) {
@@ -341,27 +382,54 @@ export const RegistroCompraCarbon = ({ onCancel, onCreated }: Props) => {
 
     setSaving(true);
     try {
-      const res = await CompraCarbonService.crearCompra({
-        id_empresa: Number(idEmpresa),
-        id_proveedor: Number(idProveedor),
-        id_tipo_carbon_prometido: Number(idTipoCarbon),
-        toneladas_prometidas: tn,
-        aplica_igv: aplicaIgv,
-        porcentaje_igv: aplicaIgv ? porcentajeIgv : 0,
-        porcentaje_detraccion: aplicaIgv ? PORCENTAJE_DETRACCION : 0,
-        precio_unitario_cotizado: Number(precioUnitario) || 0,
-        id_tarifa_carbon: idTarifaAuto,
-        id_cuenta_proveedor: idCuentaProveedor
-          ? Number(idCuentaProveedor)
-          : null,
-      });
+      if (esEdicion && compraInicial) {
+        const res = await CompraCarbonService.actualizarCompra(
+          compraInicial.id_compra_carbon,
+          {
+            id_empresa: Number(idEmpresa),
+            id_proveedor: Number(idProveedor),
+            id_tipo_carbon_prometido: Number(idTipoCarbon),
+            id_tarifa_carbon: idTarifaAuto,
+            id_cuenta_proveedor: idCuentaProveedor
+              ? Number(idCuentaProveedor)
+              : null,
+            aplica_igv: aplicaIgv,
+            porcentaje_igv: aplicaIgv ? porcentajeIgv : 0,
+            toneladas_prometidas: tn,
+            precio_unitario_cotizado: Number(precioUnitario) || 0,
+          },
+        );
 
-      if (res.success && res.data) {
-        notifySuccess("Orden de compra preliminar creada correctamente");
-        onCreated(res.data);
+        if (res.success && res.data) {
+          notifySuccess("Orden de compra actualizada correctamente");
+          onUpdated?.(res.data);
+          onCreated(res.data);
+        } else {
+          setError(res.message || "Error al actualizar la orden");
+          notifyError(res.message || "Error al actualizar la orden");
+        }
       } else {
-        setError(res.message || "Error al crear la orden de compra");
-        notifyError(res.message || "Error al crear la orden");
+        const res = await CompraCarbonService.crearCompra({
+          id_empresa: Number(idEmpresa),
+          id_proveedor: Number(idProveedor),
+          id_tipo_carbon_prometido: Number(idTipoCarbon),
+          toneladas_prometidas: tn,
+          aplica_igv: aplicaIgv,
+          porcentaje_igv: aplicaIgv ? porcentajeIgv : 0,
+          precio_unitario_cotizado: Number(precioUnitario) || 0,
+          id_tarifa_carbon: idTarifaAuto,
+          id_cuenta_proveedor: idCuentaProveedor
+            ? Number(idCuentaProveedor)
+            : null,
+        });
+
+        if (res.success && res.data) {
+          notifySuccess("Orden de compra preliminar creada correctamente");
+          onCreated(res.data);
+        } else {
+          setError(res.message || "Error al crear la orden de compra");
+          notifyError(res.message || "Error al crear la orden");
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error inesperado";

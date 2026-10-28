@@ -12,6 +12,49 @@ export interface CrearCompraCarbonRequest {
   id_cuenta_proveedor?: number | null;
 }
 
+/**
+ * Edita la cabecera de una compra existente. Solo aplica si NO esta Pagado,
+ * Cerrado ni Anulado (lo valida el backend). Campos son todos opcionales:
+ * solo se envian los que se quieren cambiar.
+ */
+export interface ActualizarCompraCarbonRequest {
+  id_empresa?: number;
+  id_proveedor?: number;
+  id_tipo_carbon_prometido?: number;
+  id_tarifa_carbon?: number | null;
+  id_cuenta_proveedor?: number | null;
+  aplica_igv?: boolean;
+  porcentaje_igv?: number;
+  toneladas_prometidas?: number;
+  precio_unitario_cotizado?: number;
+}
+
+/**
+ * Edita una carga individual. Solo aplica si la carga NO esta Anulada,
+ * NO tiene comprobante/pago asignado y la cabecera NO esta Pagado/Cerrado/Anulado.
+ */
+export interface ActualizarCargaRequest {
+  id_tipo_carbon?: number;
+  id_lugar_extraccion?: number | null;
+  id_almacen_proveedor_recojo?: number | null;
+  id_almacen_empresa_llegada?: number | null;
+  id_almacen_cliente_llegada?: number | null;
+  id_tarifa_carbon?: number | null;
+  id_transportista?: number | null;
+  tipo_despacho?: "Envio" | "Recojo" | string;
+  placa?: string;
+  fecha_hora_ingreso?: string;
+  guia_remitente?: string;
+  guia_transportista?: string | null;
+  pagar_flete?: boolean;
+  codigo_ticket_balanza?: string;
+  cantidad?: number;
+  porcentaje_ceniza?: number;
+  porcentaje_humedad?: number;
+  precio_unitario?: number;
+  costo_flete_por_tonelada?: number;
+}
+
 export interface CargaFormItem {
   id_tipo_carbon: number;
   id_lugar_extraccion?: number | null;

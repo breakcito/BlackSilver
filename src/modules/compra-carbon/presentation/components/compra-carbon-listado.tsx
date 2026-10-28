@@ -18,6 +18,7 @@ import {
   EyeIcon,
   LockClosedIcon,
   PlusIcon,
+  PencilSquareIcon,
   TruckIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -57,6 +58,16 @@ interface Props {
   autoPrint?: CompraCarbonResumen | null;
   /** Callback cuando el listado ya procesó el autoPrint. */
   onAutoPrintConsumido?: () => void;
+  /**
+   * Callback para abrir el modal de edición de cabecera. La pagina es
+   * responsable de controlar la apertura del modal y de pasar la compra
+   * correspondiente al RegistroCompraCarbon en modo edicion.
+   */
+  onEditarCabecera?: (compra: CompraCarbonResumen) => void;
+  /**
+   * Callback para abrir el modal de edición de una carga individual.
+   */
+  onEditarCarga?: (carga: CargaCompraCarbonItem) => void;
   onRefresh?: () => void;
 }
 
@@ -93,6 +104,8 @@ export const CompraCarbonListado = ({
   onAnulada,
   autoPrint,
   onAutoPrintConsumido,
+  onEditarCabecera,
+  onEditarCarga,
   onRefresh,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -233,6 +246,35 @@ export const CompraCarbonListado = ({
       notifyError("Error al cargar el detalle de la compra");
       setDetallesModal(null);
     }
+  };
+
+  /**
+   * Determina si una carga individual puede editarse. Regla: la cabecera NO
+   * debe estar Pagado/Cerrado/Anulado, y la carga NO debe estar Anulada,
+   * Pagada, ni tener comprobante/pago/comprobante de transporte asignado.
+   * Esto refleja las validaciones del backend.
+   */
+  const puedeEditarCarga = (
+    carga: CargaCompraCarbonItem,
+    cabecera: CompraCarbonDetalleResponse["cabecera"],
+  ): boolean => {
+    if (!cabecera) return false;
+    if (
+      cabecera.estado === EstadoCompraCarbon.Pagado ||
+      cabecera.estado === EstadoCompraCarbon.Cerrado ||
+      cabecera.estado === EstadoCompraCarbon.Anulado
+    ) {
+      return false;
+    }
+    if (carga.estado === "Anulado" || carga.estado === "Pagado") return false;
+    if (
+      carga.id_comprobante_compra_carbon ||
+      carga.id_pago_compra_carbon ||
+      carga.id_comprobante_transporte_carbon
+    ) {
+      return false;
+    }
+    return true;
   };
 
   // Auto-imprimir la compra recién registrada.
@@ -561,6 +603,7 @@ export const CompraCarbonListado = ({
           !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
         const puedeAnular =
           !esAnulado && !esPagado && !esCerrado && totalCargas === 0;
+        const puedeEditarCabecera = !esAnulado && !esPagado && !esCerrado;
         const isPrinting = printingId === r.id_compra_carbon;
         const tieneCambios =
           r.log_cambios &&
@@ -570,6 +613,23 @@ export const CompraCarbonListado = ({
 
         return (
           <Group gap={6} justify="center" wrap="nowrap">
+            {/* 0. Editar cabecera (mientras no este pagada / cerrada / anulada) */}
+            {puedeEditarCabecera && (
+              <Tooltip label="Editar orden de compra" withArrow position="top">
+                <ActionIcon
+                  variant="light"
+                  color="indigo"
+                  radius="xl"
+                  size="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditarCabecera?.(r);
+                  }}
+                >
+                  <PencilSquareIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            )}
             {/* 2. Liquidación y Pagos */}
             {puedeLiquidar && (
               <Tooltip label="Liquidación y Pagos" withArrow position="top">
@@ -1077,19 +1137,44 @@ export const CompraCarbonListado = ({
                                   {formatPEN(Number(d.neto_a_pagar))}
                                 </td>
                                 <td className="px-3 py-2 text-center">
-                                  <Badge
-                                    size="xs"
-                                    variant="light"
-                                    color={
-                                      d.estado === "Pagado"
-                                        ? "emerald"
-                                        : d.estado === "Anulado"
-                                          ? "red"
-                                          : "blue"
-                                    }
-                                  >
-                                    {d.estado || "En Liquidación"}
-                                  </Badge>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <Badge
+                                      size="xs"
+                                      variant="light"
+                                      color={
+                                        d.estado === "Pagado"
+                                          ? "emerald"
+                                          : d.estado === "Anulado"
+                                            ? "red"
+                                            : "blue"
+                                      }
+                                    >
+                                      {d.estado || "En Liquidación"}
+                                    </Badge>
+                                    {/* Lapicito para editar la carga individual. Solo
+                                        se muestra si la cabecera y la carga lo permiten. */}
+                                    {detallesModal.data &&
+                                      puedeEditarCarga(d, detallesModal.data.cabecera) && (
+                                      <Tooltip
+                                        label="Editar carga"
+                                        withArrow
+                                        position="top"
+                                      >
+                                        <ActionIcon
+                                          variant="subtle"
+                                          color="indigo"
+                                          radius="xl"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEditarCarga?.(d);
+                                          }}
+                                        >
+                                          <PencilSquareIcon className="w-3.5 h-3.5" />
+                                        </ActionIcon>
+                                      </Tooltip>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
