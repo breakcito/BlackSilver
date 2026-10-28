@@ -37,6 +37,13 @@ const COLOR_OBSERVACION = "FFED1C24";
 const COLOR_BORDE = "FF000000";
 const COLOR_TEXTO = "FF000000";
 
+/** Azul del titulo del reporte. */
+const COLOR_TITULO = "FF1F4E79";
+/** Relleno de la fila de TOTALES (melocoton). */
+const COLOR_TOTALES = "FFFCE4D6";
+/** Color de la celcha extra de TOTALES (costo MP + IGV menos impuesto). */
+const COLOR_TOTAL_EXTRA = "FFC00000";
+
 const FMT_MONEDA = '"S/."#,##0.00';
 const FMT_NUMERO = "#,##0.00";
 const FMT_ENTERO = "0";
@@ -45,6 +52,27 @@ const FMT_PORCENTAJE = '0.00"%"';
 type ValorCelda = string | number | null | undefined;
 
 type Formato = "texto" | "moneda" | "numero" | "porcentaje" | "entero";
+
+/**
+ * Contexto para construir la formula de la celda de TOTALES de una columna.
+ */
+export interface ContextoTotales {
+  /**
+   * Rango de datos de la PROPIA columna, p.ej. "S6:S241". Se usa para sumar
+   * o promediar la columna.
+   */
+  propio: string;
+  /**
+   * Referencia de la celda de TOTALES de otra columna, p.ej. "BA241".
+   * La columna se ubica por grupo + titulo (+ sub-grupo).
+   */
+  total: (grupo: string, titulo: string, sub?: string) => string;
+  /**
+   * Referencia de la celda de la SEGUNDA fila de totales (la que va una
+   * fila mas abajo), p.ej. "BA242".
+   */
+  total2: (grupo: string, titulo: string, sub?: string) => string;
+}
 
 interface Columna {
   /** Titulo de la columna (siempre va en la fila de nivel 3). */
@@ -56,6 +84,16 @@ interface Columna {
   /** Calcula el valor de la celda. */
   valor?: (fila: RES_FilaControlCompras, index: number) => ValorCelda;
   fmt?: Formato;
+  /**
+   * Formula de la celda de la fila de TOTALES (sin el signo "=").
+   * Si no se define, la celda de TOTALES queda vacia.
+   */
+  total?: (ctx: ContextoTotales) => string;
+  /**
+   * Formula de la celda de la segunda fila de totales (una fila debajo de
+   * TOTALES). Si no se define, la celda queda vacia.
+   */
+  total2?: (ctx: ContextoTotales) => string;
 }
 
 interface Grupo {
@@ -124,6 +162,37 @@ const almacenDestino = (fila: RES_FilaControlCompras): string =>
   "";
 
 // ── Estructura del reporte ───────────────────────────────────────────────
+
+/**
+ * Letra de columna de Excel a partir del indice 1-based: 1 -> A, 26 -> Z,
+ * 27 -> AA, 28 -> AB.
+ */
+const letraColumna = (indice: number): string => {
+  let n = indice;
+  let letras = "";
+  while (n > 0) {
+    const resto = (n - 1) % 26;
+    letras = String.fromCharCode(65 + resto) + letras;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letras;
+};
+
+/** Formato numerico de Excel segun el tipo de dato de la columna. */
+const numFmtDe = (fmt?: Formato): string | undefined => {
+  switch (fmt) {
+    case "moneda":
+      return FMT_MONEDA;
+    case "entero":
+      return FMT_ENTERO;
+    case "porcentaje":
+      return FMT_PORCENTAJE;
+    case "numero":
+      return FMT_NUMERO;
+    default:
+      return undefined;
+  }
+};
 
 const GRUPOS: Grupo[] = [
   {
@@ -248,6 +317,7 @@ const GRUPOS: Grupo[] = [
         ancho: 12,
         fmt: "moneda",
         valor: (f) => num(f.precio_unitario),
+        total: (ctx) => `AVERAGE(${ctx.propio})`,
       },
       {
         titulo: "FLETE",
@@ -266,6 +336,7 @@ const GRUPOS: Grupo[] = [
         ancho: 20,
         fmt: "moneda",
         valor: (f) => num(f.precio_materia_prima),
+        total: (ctx) => `AVERAGE(${ctx.propio})`,
       },
     ],
   },
@@ -288,30 +359,35 @@ const GRUPOS: Grupo[] = [
         ancho: 14,
         fmt: "moneda",
         valor: (f) => num(f.subtotal),
+        total: (ctx) => `SUBTOTAL(9,${ctx.propio})`,
       },
       {
         titulo: "IGV",
         ancho: 13,
         fmt: "moneda",
         valor: (f) => num(f.monto_igv),
+        total: (ctx) => `SUBTOTAL(9,${ctx.propio})`,
       },
       {
         titulo: "TOTAL",
         ancho: 14,
         fmt: "moneda",
         valor: (f) => num(f.total),
+        total: (ctx) => `SUBTOTAL(9,${ctx.propio})`,
       },
       {
         titulo: "DETRACCION",
         ancho: 15,
         fmt: "moneda",
         valor: (f) => num(f.monto_detraccion),
+        total: (ctx) => `SUBTOTAL(9,${ctx.propio})`,
       },
       {
         titulo: "NETO A PAGAR",
         ancho: 17,
         fmt: "moneda",
         valor: (f) => num(f.neto_a_pagar),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "FECHA",
@@ -388,30 +464,35 @@ const GRUPOS: Grupo[] = [
         ancho: 14,
         fmt: "moneda",
         valor: (f) => num(f.flete_subtotal),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "IGV",
         ancho: 13,
         fmt: "moneda",
         valor: (f) => num(f.flete_igv),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "TOTAL",
         ancho: 14,
         fmt: "moneda",
         valor: (f) => num(f.flete_total),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "DETRACCION",
         ancho: 15,
         fmt: "moneda",
         valor: (f) => num(f.flete_monto_detraccion),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "NETO A PAGAR",
         ancho: 17,
         fmt: "moneda",
         valor: (f) => num(f.flete_neto_a_pagar),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "FECHA",
@@ -460,12 +541,22 @@ const GRUPOS: Grupo[] = [
         ancho: 25,
         fmt: "moneda",
         valor: (f) => round2(num(f.subtotal) + num(f.flete_subtotal)),
+        total: (ctx) => `SUM(${ctx.propio})`,
+        // Total de costo de materia prima menos el subtotal de facturacion
+        // de fletes y el subtotal de facturacion de materia prima.
+        total2: (ctx) =>
+          `+${ctx.total("OBSERVACION", "COSTO DE MATERIA PRIMA")}-${ctx.total("FACTURACION FLETES (TRANSPORTISTAS)", "SUBTOTAL")}-${ctx.total("FACTURACION MATERIA PRIMA", "SUBTOTAL")}`,
       },
       {
         titulo: "COSTO DE MATERIA PRIMA MAS IGV",
         ancho: 31,
         fmt: "moneda",
         valor: (f) => round2(num(f.neto_a_pagar) + num(f.flete_total)),
+        total: (ctx) => `SUM(${ctx.propio})`,
+        // Total de costo de materia prima mas IGV menos el total de
+        // facturacion de fletes y el total de facturacion de materia prima.
+        total2: (ctx) =>
+          `+${ctx.total("OBSERVACION", "COSTO DE MATERIA PRIMA MAS IGV")}-${ctx.total("FACTURACION FLETES (TRANSPORTISTAS)", "TOTAL")}-${ctx.total("FACTURACION MATERIA PRIMA", "TOTAL")}`,
       },
       {
         titulo: "IMPUESTO",
@@ -478,12 +569,48 @@ const GRUPOS: Grupo[] = [
               num(f.subtotal) -
               num(f.flete_subtotal),
           ),
+        total: (ctx) => `SUM(${ctx.propio})`,
+        // Total de impuesto menos el IGV de facturacion de fletes y el IGV de
+        // facturacion de materia prima.
+        total2: (ctx) =>
+          `+${ctx.total("OBSERVACION", "IMPUESTO")}-${ctx.total("FACTURACION FLETES (TRANSPORTISTAS)", "IGV")}-${ctx.total("FACTURACION MATERIA PRIMA", "IGV")}`,
+      },
+      {
+        // Columna auxiliar: solo tiene dato en las filas de TOTALES. Es el
+        // costo de materia prima mas IGV menos el impuesto.
+        titulo: "",
+        ancho: 18,
+        fmt: "moneda",
+        total: (ctx) =>
+          `+${ctx.total("OBSERVACION", "COSTO DE MATERIA PRIMA MAS IGV")}-${ctx.total("OBSERVACION", "IMPUESTO")}`,
+        total2: (ctx) =>
+          `+${ctx.total2("OBSERVACION", "COSTO DE MATERIA PRIMA MAS IGV")}-${ctx.total2("OBSERVACION", "IMPUESTO")}`,
       },
     ],
   },
 ];
 
 // ── Generador ────────────────────────────────────────────────────────────
+
+/** Clave de una columna del reporte: grupo + sub-grupo + titulo. */
+const claveColumna = (grupo: string, titulo: string, sub?: string): string =>
+  `${grupo}|${sub ?? ""}|${titulo}`;
+
+/**
+ * Indice (1-based) de cada columna del reporte, para poder referenciar una
+ * celda de TOTALES desde la formula de otra columna.
+ */
+const INDICE_COLUMNAS: Map<string, number> = (() => {
+  const mapa = new Map<string, number>();
+  let indice = 1;
+  GRUPOS.forEach((grupo) => {
+    grupo.columnas.forEach((col) => {
+      mapa.set(claveColumna(grupo.titulo, col.titulo, col.sub), indice);
+      indice += 1;
+    });
+  });
+  return mapa;
+})();
 
 export interface OpcionesControlCompras {
   anio: number;
@@ -522,6 +649,12 @@ export const construirExcelControlCompras = (
       name: "Calibri",
       size: 14,
       bold: true,
+      color: { argb: COLOR_TITULO },
+    };
+    const fontTotales: Partial<ExcelJS.Font> = {
+      name: "Calibri",
+      size: 9,
+      bold: true,
       color: { argb: COLOR_TEXTO },
     };
 
@@ -541,21 +674,13 @@ export const construirExcelControlCompras = (
       left: { style: "thin", color: { argb: COLOR_BORDE } },
       right: { style: "thin", color: { argb: COLOR_BORDE } },
     };
-
-    // ── Cabecera superior: titulo a la izquierda, logo a la derecha ────
-    const FILA_TITULO = 1;
-    const FILA_N1 = 3;
-    const FILA_N2 = 4;
-    const FILA_N3 = 5;
-    const FILA_DATOS = 6;
-
-    ws.getCell(FILA_TITULO, 1).value = `CONTROL DE COMPRAS (${opciones.anio})`;
-    ws.getCell(FILA_TITULO, 1).font = fontTituloReporte;
-    ws.getCell(FILA_TITULO, 1).alignment = {
-      vertical: "middle",
-      horizontal: "left",
+    /** La fila de TOTALES cierra con doble linea, como en el reporte original. */
+    const bordeTotales: Partial<ExcelJS.Borders> = {
+      top: { style: "thin", color: { argb: COLOR_BORDE } },
+      bottom: { style: "double", color: { argb: COLOR_BORDE } },
+      left: { style: "thin", color: { argb: COLOR_BORDE } },
+      right: { style: "thin", color: { argb: COLOR_BORDE } },
     };
-    ws.getRow(FILA_TITULO).height = 34;
 
     // ── Anchos de columna ──────────────────────────────────────────────
     const anchos: number[] = [];
@@ -566,6 +691,24 @@ export const construirExcelControlCompras = (
       ws.getColumn(idx + 1).width = w;
     });
     const TOTAL_COLUMNAS = anchos.length;
+
+    // ── Cabecera superior: titulo centrado en azul, logo a la derecha ────
+    const FILA_TITULO = 1;
+    const FILA_N1 = 3;
+    const FILA_N2 = 4;
+    const FILA_N3 = 5;
+    const FILA_DATOS = 6;
+
+    // El titulo se mergea en todo el ancho para que quede centrado en la
+    // hoja; el logo se ancla encima, en el extremo derecho.
+    ws.mergeCells(FILA_TITULO, 1, FILA_TITULO, TOTAL_COLUMNAS);
+    ws.getCell(FILA_TITULO, 1).value = `CONTROL DE COMPRAS (${opciones.anio})`;
+    ws.getCell(FILA_TITULO, 1).font = fontTituloReporte;
+    ws.getCell(FILA_TITULO, 1).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+    ws.getRow(FILA_TITULO).height = 34;
 
     // ── Logo de la empresa (esquina superior derecha) ──────────────────
     const logoMatch = opciones.logoUrl
@@ -707,19 +850,7 @@ export const construirExcelControlCompras = (
           celda.border = bordeHorizontal;
           if (typeof valor === "number") {
             celda.alignment = { vertical: "middle", horizontal: "right" };
-            switch (col.fmt) {
-              case "moneda":
-                celda.numFmt = FMT_MONEDA;
-                break;
-              case "entero":
-                celda.numFmt = FMT_ENTERO;
-                break;
-              case "porcentaje":
-                celda.numFmt = FMT_PORCENTAJE;
-                break;
-              default:
-                celda.numFmt = FMT_NUMERO;
-            }
+            celda.numFmt = numFmtDe(col.fmt) ?? FMT_NUMERO;
           } else {
             celda.alignment = { vertical: "middle", horizontal: "center" };
           }
@@ -727,6 +858,103 @@ export const construirExcelControlCompras = (
         });
       });
     });
+
+    // ── Fila de TOTALES ────────────────────────────────────────────────
+    // Va debajo de los datos y FUERA del rango del autofiltro, para que no
+    // se oculte al filtrar. Cada celda lleva la formula de su columna.
+    //
+    // Debajo hay una segunda fila de totales: es la que descuenta de los
+    // totales de observacion los montos de fletes y de materia prima.
+    if (cargas.length > 0) {
+      const FILA_TOTALES = FILA_DATOS + cargas.length;
+      const FILA_TOTALES_2 = FILA_TOTALES + 1;
+      const ULTIMA_FILA_DATO = FILA_DATOS + cargas.length - 1;
+
+      /** Referencia de la celda de totales de otra columna. */
+      const celdaDe =
+        (fila: number) =>
+        (grupo: string, titulo: string, sub?: string): string => {
+          const indice = INDICE_COLUMNAS.get(claveColumna(grupo, titulo, sub));
+          if (!indice) {
+            throw new Error(
+              `Columna no encontrada para la formula de totales: ${grupo} / ${titulo}`,
+            );
+          }
+          return `${letraColumna(indice)}${fila}`;
+        };
+
+      const ctx: ContextoTotales = {
+        propio: "",
+        total: celdaDe(FILA_TOTALES),
+        total2: celdaDe(FILA_TOTALES_2),
+      };
+
+      const rowTotales = ws.getRow(FILA_TOTALES);
+      rowTotales.height = 22;
+
+      let c = 1;
+      GRUPOS.forEach((grupo) => {
+        grupo.columnas.forEach((col) => {
+          const celda = rowTotales.getCell(c);
+          celda.fill = fill(COLOR_TOTALES);
+          celda.border = bordeTotales;
+          celda.font = fontTotales;
+          celda.alignment = { vertical: "middle", horizontal: "right" };
+          const fmt = numFmtDe(col.fmt);
+          if (fmt) celda.numFmt = fmt;
+
+          if (col.total) {
+            const letra = letraColumna(c);
+            celda.value = {
+              formula: col.total({
+                ...ctx,
+                propio: `${letra}${FILA_DATOS}:${letra}${ULTIMA_FILA_DATO}`,
+              }),
+            };
+            // La celcha extra (costo MP + IGV menos impuesto) se marca en
+            // rojo, como en el reporte original.
+            if (!col.titulo) {
+              celda.font = { ...fontTotales, color: { argb: COLOR_TOTAL_EXTRA } };
+            }
+          }
+          c++;
+        });
+      });
+
+      // Etiqueta "TOTALES" en la primera columna.
+      const celdaLabel = rowTotales.getCell(1);
+      celdaLabel.value = "TOTALES";
+      celdaLabel.font = { ...fontTotales, size: 10 };
+      celdaLabel.alignment = {
+        vertical: "middle",
+        horizontal: "left",
+        indent: 1,
+      };
+
+      // ── Segunda fila de totales (neto sin fletes ni materia prima) ────
+      const rowTotales2 = ws.getRow(FILA_TOTALES_2);
+      rowTotales2.height = 20;
+
+      let c2 = 1;
+      GRUPOS.forEach((grupo) => {
+        grupo.columnas.forEach((col) => {
+          const celda = rowTotales2.getCell(c2);
+          celda.border = bordeHorizontal;
+          celda.font = fontTotales;
+          celda.alignment = { vertical: "middle", horizontal: "right" };
+          const fmt = numFmtDe(col.fmt);
+          if (fmt) celda.numFmt = fmt;
+
+          if (col.total2) {
+            celda.value = { formula: col.total2(ctx) };
+            if (!col.titulo) {
+              celda.font = { ...fontTotales, color: { argb: COLOR_TOTAL_EXTRA } };
+            }
+          }
+          c2++;
+        });
+      });
+    }
 
     // ── Autofiltro sobre la fila de encabezados ───────────────────────
     if (cargas.length > 0) {
