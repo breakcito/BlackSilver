@@ -68,6 +68,12 @@ interface Props {
    * Callback para abrir el modal de edición de una carga individual.
    */
   onEditarCarga?: (carga: CargaCompraCarbonItem) => void;
+  /**
+   * Detalle de la compra devuelto por la API tras editar una carga. Se
+   * aplica al modal "Cargas Recibidas" para que muestre los cambios sin
+   * recargar la pagina.
+   */
+  detalleActualizado?: CompraCarbonDetalleResponse | null;
   onRefresh?: () => void;
 }
 
@@ -106,6 +112,7 @@ export const CompraCarbonListado = ({
   onAutoPrintConsumido,
   onEditarCabecera,
   onEditarCarga,
+  detalleActualizado,
   onRefresh,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -284,6 +291,23 @@ export const CompraCarbonListado = ({
     onAutoPrintConsumido?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPrint]);
+
+  // Refleja en "Cargas Recibidas" la carga recien editada: el detalle llega
+  // desde la API (cabecera + cargas), asi que no hace falta recargar nada.
+  useEffect(() => {
+    if (!detalleActualizado) return;
+    setDetallesModal((prev) => {
+      if (!prev) return prev;
+      const idCompra = detalleActualizado.cabecera?.id_compra_carbon;
+      if (idCompra !== prev.compra.id_compra_carbon) return prev;
+      return {
+        ...prev,
+        compra: detalleActualizado.cabecera,
+        data: detalleActualizado,
+        loading: false,
+      };
+    });
+  }, [detalleActualizado]);
 
   const [empresasCache, setEmpresasCache] = useState<
     Record<number, RES_Empresa>
@@ -633,8 +657,9 @@ export const CompraCarbonListado = ({
         //   !esAnulado && esPagado && !esCerrado && totalCargas >= 1;
         const puedeAnular =
           !esAnulado && !esPagado && !esCerrado && totalCargas === 0;
-        const puedeEditarCabecera =
-          !esAnulado && !esPagado && !esCerrado && totalCargas == 0;
+        // Editar la cabecera mientras NO este pagada / cerrada / anulada.
+        // Mismo criterio que aplica el backend (ESTADOS_CABECERA_NO_EDITABLES).
+        const puedeEditarCabecera = !esAnulado && !esPagado && !esCerrado;
         const isPrinting = printingId === r.id_compra_carbon;
         const tieneCambios =
           r.log_cambios &&

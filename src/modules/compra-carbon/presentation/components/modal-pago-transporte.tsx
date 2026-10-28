@@ -26,6 +26,7 @@ import type {
   RespuestaRegistrarPagoTransporte,
 } from "../../service/compra-carbon.responses";
 import { inputClasses } from "./input-classes";
+import { SelectCuenta, type CuentaOparable } from "./select-cuenta";
 
 interface Props {
   opened: boolean;
@@ -69,7 +70,7 @@ export const ModalPagoTransporte = ({
     { id: number; label: string; moneda?: string }[]
   >([]);
   const [cuentasTransportista, setCuentasTransportista] = useState<
-    { id: number; label: string; es_detraccion?: boolean }[]
+    CuentaOparable[]
   >([]);
 
   // Cargar cuentas
@@ -100,9 +101,11 @@ export const ModalPagoTransporte = ({
         if (transRes?.success && Array.isArray(transRes.data)) {
           setCuentasTransportista(
             transRes.data.map((c) => ({
-              id: c.id_cuenta_bancaria,
-              label: `${c.banco} (${c.numero_cuenta})${c.es_para_detraccion ? " [CUENTA DETRACCIÓN BN]" : ""}`,
-              es_detraccion: Boolean(c.es_para_detraccion),
+              id_cuenta_bancaria: c.id_cuenta_bancaria,
+              banco: c.banco,
+              banco_abv: c.banco_abv,
+              numero_cuenta: c.numero_cuenta,
+              es_para_detraccion: Boolean(c.es_para_detraccion),
             })),
           );
         }
@@ -155,7 +158,9 @@ export const ModalPagoTransporte = ({
   }, [esParaDetraccion, comprobante]);
 
   const cuentasTransFiltradas = cuentasTransportista.filter((c) =>
-    esParaDetraccion ? c.es_detraccion : !c.es_detraccion,
+    esParaDetraccion
+      ? Number(c.es_para_detraccion) === 1
+      : Number(c.es_para_detraccion) !== 1,
   );
 
   const handleGuardar = async () => {
@@ -341,23 +346,20 @@ export const ModalPagoTransporte = ({
 
         {/* Cuenta Destino Transportista */}
         {medioPago !== "Efectivo" && (
-          <Select
-            label={"Cuenta bancaria del transportista "}
+          <SelectCuenta
+            label="Cuenta bancaria del transportista"
             placeholder={
               cuentasTransFiltradas.length > 0
                 ? "Seleccione cuenta del transportista"
-                : "No hay cuentas registradas para esta modalidad"
+                : "Sin cuentas registradas para esta modalidad"
             }
-            data={cuentasTransFiltradas.map((c) => ({
-              value: String(c.id),
-              label: c.label,
-            }))}
+            cuentas={cuentasTransFiltradas}
+            destino="transportista"
+            idEntidad={comprobante.id_transportista}
             value={idCuentaTransportista}
             onChange={setIdCuentaTransportista}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            searchable
+            disabled={guardando}
+            predeterminadoDetraccion={esParaDetraccion}
             required
           />
         )}

@@ -18,6 +18,8 @@ import { useNotify } from "../../../../hooks/useNotify";
 import { Moneda } from "../../../../shared/enums/_generic/moneda";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
 import type { RES_Banco } from "../../../../service/responses/banco";
+import { inputClasses } from "./input-classes";
+import { RegistroBanco } from "../../../proveedores/presentation/cuentas-bancarias/components/registro-banco";
 
 export type DestinoCuenta = "empresa" | "proveedor" | "transportista";
 
@@ -46,21 +48,29 @@ interface Props {
   predeterminadoDetraccion?: boolean;
 }
 
-const etiqueta = (c: CuentaOparable) => {
-  const detraccion = Number(c.es_para_detraccion) === 1;
+/**
+ * Etiqueta de la cuenta en el Select: "ABREVIATURA - NUMERO".
+ *
+ * En el destino "transportista" no se anexa la marca "(detracción)": el modal
+ * de pago ya lista solo las cuentas de la modalidad vigente (pago normal o
+ * detracción), asi que la marca es redundante.
+ */
+const etiqueta = (c: CuentaOparable, conMarcaDetraccion: boolean) => {
   const base = `${c.banco_abv || c.banco} - ${c.numero_cuenta}`;
-  return detraccion ? `${base} (detracción)` : base;
+  if (!conMarcaDetraccion) return base;
+  return Number(c.es_para_detraccion) === 1
+    ? `${base} (detracción)`
+    : base;
 };
 
 /**
- * Select de cuenta bancaria con alta en un Popover.
+ * Select de cuenta bancaria con alta en un modal.
  *
  * El boton "+" esta fuera del input porque dentro lo captura el Select.
  *
- * El Select del banco DENTRO del Popover va sin `withinPortal` a proposito: con
- * portal su desplegable se monta fuera del arbol del Popover, el click en la
- * opcion se interpreta como click exterior y el Popover se cerraba antes de
- * dejar elegir el banco.
+ * El Select del Banco vive dentro del modal "Nueva cuenta bancaria" (zIndex
+ * 400), asi que su desplegable necesita un z-index propio: por defecto
+ * Mantine usa 300 y el portal quedaria por debajo del modal.
  */
 export const SelectCuenta = ({
   label,
@@ -77,6 +87,7 @@ export const SelectCuenta = ({
   const { notifySuccess, notifyError } = useNotify();
 
   const [abierto, setAbierto] = useState(false);
+  const [abiertoBanco, setAbiertoBanco] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [bancos, setBancos] = useState<RES_Banco[]>([]);
   const [q, setQ] = useState("");
@@ -134,6 +145,9 @@ export const SelectCuenta = ({
   }, [cuentasEffectivas, value, onChange]);
 
   const bancosVisibles = useMemo(() => {
+    // La lista NO se filtra por detraccion: el switch sigue al banco, asi que
+    // el usuario siempre puede cambiar de banco (si se filtrara, con el switch
+    // activo solo se verian bancos nacionales y no habria forma de salir).
     const query = qBanco.trim();
     if (!query) return bancos;
     return getCoincidencias(bancos, query, {
@@ -153,6 +167,17 @@ export const SelectCuenta = ({
 
   const banco = bancos.find((b) => String(b.id_banco) === idBanco);
   const esNacional = Number(banco?.es_nacional ?? 0) === 1;
+
+  /**
+   * El switch de detraccion sigue al banco: se activa solo con el Banco de
+   * la Nacion (regla que valida el backend) y se desactiva con cualquier
+   * otro banco.
+   */
+  const handleBancoChange = (valor: string | null) => {
+    setIdBanco(valor);
+    const nuevo = bancos.find((b) => String(b.id_banco) === valor);
+    setParaDetraccion(!!nuevo && Number(nuevo.es_nacional) === 1);
+  };
 
   const cerrar = () => {
     setAbierto(false);
@@ -257,14 +282,18 @@ export const SelectCuenta = ({
       <div>
           <Text size="xs" fw={600} c="dimmed" mb={4}>
             {label}
-            {required && " *"}
+            {required && (
+              <Text span c="red.6">
+                {" *"}
+              </Text>
+            )}
           </Text>
           <Group gap={6} wrap="nowrap">
             <Select
               placeholder={placeholder}
               data={cuentasVisibles.map((c) => ({
                 value: String(c.id_cuenta_bancaria),
-                label: etiqueta(c),
+                label: etiqueta(c, destino !== "transportista"),
               }))}
               value={value}
               onChange={(v) => {
@@ -283,6 +312,7 @@ export const SelectCuenta = ({
               }
               comboboxProps={{ withinPortal: true }}
               disabled={disabled}
+              classNames={inputClasses}
               className="flex-1"
             />
 
@@ -316,24 +346,50 @@ export const SelectCuenta = ({
         </Text>
 
         <Stack gap="xs">
-          <Select
-            label="Banco"
-            placeholder="Seleccionar"
-            data={bancosVisibles.map((b) => ({
-              value: String(b.id_banco),
-              label: `${b.abreviatura} — ${b.nombre}`,
-            }))}
-            value={idBanco}
-            onChange={setIdBanco}
-            searchable
-            searchValue={qBanco}
-            onSearchChange={setQBanco}
-            nothingFoundMessage="Sin coincidencias"
-            size="xs"
-            radius="lg"
-            comboboxProps={{ withinPortal: true }}
-            required
-          />
+          <Group gap={6} wrap="nowrap" align="flex-end">
+            {/*
+              El desplegable del Banco va en portal (es el default de Combobox)
+              pero con z-index propio. Con el z-index por defecto de Mantine
+              (300) el portal se montaba POR DEBAJO de este modal (zIndex 400)
+              y las opciones no se veian. Por eso se fija 450: por encima del
+              modal de cuenta (400) y por debajo del modal "Registrar Nuevo
+              Banco" (500).
+            */}
+            <Select
+              label="Banco"
+              placeholder="Seleccionar"
+              data={bancosVisibles.map((b) => ({
+                value: String(b.id_banco),
+                label: `${b.nombre} (${b.abreviatura})`,
+              }))}
+              value={idBanco}
+              onChange={handleBancoChange}
+              searchable
+              searchValue={qBanco}
+              onSearchChange={setQBanco}
+              nothingFoundMessage="Sin coincidencias"
+              size="xs"
+              radius="lg"
+              required
+              comboboxProps={{ withinPortal: true, zIndex: 450 }}
+              classNames={inputClasses}
+              className="flex-1"
+            />
+
+            <Tooltip label="Registrar nuevo banco" withArrow zIndex={450}>
+              <ActionIcon
+                size="lg"
+                radius="lg"
+                variant="light"
+                color="indigo"
+                aria-label="Registrar nuevo banco"
+                onClick={() => setAbiertoBanco(true)}
+                className="shrink-0 mb-0.5"
+              >
+                <IconPlus className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
 
           <TextInput
             label="Número de cuenta"
@@ -343,6 +399,7 @@ export const SelectCuenta = ({
             size="xs"
             radius="lg"
             required
+            classNames={inputClasses}
           />
 
           <TextInput
@@ -352,6 +409,7 @@ export const SelectCuenta = ({
             onChange={(e) => setCci(e.currentTarget.value)}
             size="xs"
             radius="lg"
+            classNames={inputClasses}
           />
 
           <Switch
@@ -360,7 +418,9 @@ export const SelectCuenta = ({
             label="Cuenta de detracción"
             color="yellow"
             size="xs"
-            disabled={idBanco !== null && !esNacional}
+            // No se puede marcar a mano: solo con el Banco de la Nacion
+            // seleccionado se puede activar o desactivar.
+            disabled={!esNacional}
             styles={{ label: { fontSize: "xs" } }}
           />
 
@@ -393,6 +453,27 @@ export const SelectCuenta = ({
             </Button>
           </Group>
         </Stack>
+      </ModalEstandar>
+
+      {/* Modal: Registro de Banco (anidado sobre el de nueva cuenta) */}
+      <ModalEstandar
+        opened={abiertoBanco}
+        close={() => setAbiertoBanco(false)}
+        title="Registrar Nuevo Banco"
+        validateClose
+        size="sm"
+        zIndex={500}
+      >
+        <RegistroBanco
+          onCancel={() => setAbiertoBanco(false)}
+          onSuccess={(banco) => {
+            setBancos((prev) => [...prev, banco]);
+            setIdBanco(String(banco.id_banco));
+            // El switch sigue al banco, tambien cuando es recien registrado.
+            setParaDetraccion(Number(banco.es_nacional) === 1);
+            setAbiertoBanco(false);
+          }}
+        />
       </ModalEstandar>
     </>
   );

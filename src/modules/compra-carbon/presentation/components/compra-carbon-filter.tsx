@@ -1,9 +1,9 @@
 import { Button, Select, TextInput } from "@mantine/core";
 import {
+  ArrowDownTrayIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  TableCellsIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { MESES } from "../../../../shared/variables/meses";
@@ -97,7 +97,7 @@ export const CompraCarbonFilter = ({
       <div className="flex gap-2 items-center shrink-0 flex-wrap">
         <BotonRecargar onReload={recargar} loading={loading} />
         <Button
-          leftSection={<TableCellsIcon className="w-5 h-5" />}
+          leftSection={<ArrowDownTrayIcon className="w-5 h-5" />}
           onClick={onExportarControlCompras}
           loading={exportandoControlCompras}
           radius="lg"
