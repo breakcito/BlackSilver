@@ -29,8 +29,6 @@ import { round2 } from "../components/input-classes";
 // ── Paleta ───────────────────────────────────────────────────────────────
 const COLOR_DATOS = "FF1F4E79";
 const COLOR_QUIMICOS = "FF2E75B6";
-const COLOR_GRANULOMETRICOS = "FF00B050";
-const COLOR_PRODUCCION = "FF00B0F0";
 const COLOR_PRECIOS = "FF1F4E79";
 const COLOR_FACTURACION_MP = "FF00B050";
 const COLOR_FACTURACION_FLETE = "FFFFFF00";
@@ -239,28 +237,6 @@ const GRUPOS: Grupo[] = [
         fmt: "porcentaje",
         valor: (f) => numero(f.porcentaje_humedad),
       },
-    ],
-  },
-  {
-    titulo: "ANALISIS GRANULOMETRICOS",
-    color: COLOR_GRANULOMETRICOS,
-    columnas: [
-      // La granulometria sale del zarandeo de la carga. Todavia no se expone
-      // en el reporte: las columnas quedan reservadas.
-      { titulo: "MIXTO", ancho: 11, valor: () => "" },
-      { titulo: "BANCA", ancho: 11, valor: () => "" },
-      { titulo: "CISCO", ancho: 11, valor: () => "" },
-    ],
-  },
-  {
-    titulo: "PRODUCCION",
-    color: COLOR_PRODUCCION,
-    columnas: [
-      // Tipos de carbon resultantes del zarandeo: quedan reservados.
-      { titulo: "TIPO DE MIXTO", ancho: 17, valor: () => "" },
-      { titulo: "TIPO A", ancho: 12, valor: () => "" },
-      { titulo: "BANCA", ancho: 12, valor: () => "" },
-      { titulo: "PIZARRA", ancho: 12, valor: () => "" },
     ],
   },
   {

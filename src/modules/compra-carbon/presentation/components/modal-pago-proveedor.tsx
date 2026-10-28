@@ -43,6 +43,7 @@ import type {
 } from "../../service/compra-carbon.responses";
 import { inputClasses, round2 } from "./input-classes";
 import { ModalRegistroRapidoAnticipo } from "./modal-registro-rapido-anticipo";
+import { SelectCuenta, type CuentaOparable } from "./select-cuenta";
 
 interface Props {
   opened: boolean;
@@ -108,7 +109,7 @@ export const ModalPagoProveedor = ({
     { id: number; label: string; moneda?: string }[]
   >([]);
   const [cuentasProveedor, setCuentasProveedor] = useState<
-    { id: number; label: string; es_detraccion?: boolean }[]
+    CuentaOparable[]
   >([]);
 
   // Anticipos del Proveedor (en caso de pago directo sin IGV)
@@ -140,9 +141,11 @@ export const ModalPagoProveedor = ({
       if (Array.isArray(provRes)) {
         setCuentasProveedor(
           provRes.map((c: CuentaBancariaResponse) => ({
-            id: c.id_cuenta_bancaria,
-            label: `${c.banco} (${c.numero_cuenta})${c.es_para_detraccion ? " [CUENTA DETRACCIÓN BN]" : ""}`,
-            es_detraccion: Boolean(c.es_para_detraccion),
+            id_cuenta_bancaria: c.id_cuenta_bancaria,
+            banco: c.banco,
+            banco_abv: c.banco_abv,
+            numero_cuenta: c.numero_cuenta,
+            es_para_detraccion: Boolean(c.es_para_detraccion),
           })),
         );
       }
@@ -427,7 +430,9 @@ export const ModalPagoProveedor = ({
   const cuentasProveedorFiltradas = useMemo(
     () =>
       cuentasProveedor.filter((c) =>
-        esParaDetraccion ? c.es_detraccion : !c.es_detraccion,
+        esParaDetraccion
+          ? Number(c.es_para_detraccion) === 1
+          : Number(c.es_para_detraccion) !== 1,
       ),
     [cuentasProveedor, esParaDetraccion],
   );
@@ -446,10 +451,12 @@ export const ModalPagoProveedor = ({
       return;
     }
     const sigueVigente = cuentasProveedorFiltradas.some(
-      (c) => String(c.id) === idCuentaProveedor,
+      (c) => String(c.id_cuenta_bancaria) === idCuentaProveedor,
     );
     if (!sigueVigente) {
-      setIdCuentaProveedor(String(cuentasProveedorFiltradas[0].id));
+      setIdCuentaProveedor(
+        String(cuentasProveedorFiltradas[0].id_cuenta_bancaria),
+      );
     }
   }, [cuentasProveedorFiltradas, idCuentaProveedor, medioPago]);
 
@@ -584,23 +591,20 @@ export const ModalPagoProveedor = ({
 
           {/* Cuenta Destino del Proveedor */}
           {medioPago !== "Efectivo" && (
-            <Select
-              label={"Cuenta bancaria del proveedor"}
+            <SelectCuenta
+              label="Cuenta bancaria del proveedor"
               placeholder={
                 cuentasProveedorFiltradas.length > 0
                   ? "Seleccione cuenta del proveedor"
-                  : "El proveedor no tiene cuentas registradas para este tipo"
+                  : "Sin cuentas registradas para este tipo"
               }
-              data={cuentasProveedorFiltradas.map((c) => ({
-                value: String(c.id),
-                label: c.label,
-              }))}
+              cuentas={cuentasProveedorFiltradas}
+              destino="proveedor"
+              idEntidad={idProveedor}
               value={idCuentaProveedor}
               onChange={setIdCuentaProveedor}
-              classNames={inputClasses}
-              size="xs"
-              radius="lg"
-              searchable
+              disabled={guardando}
+              predeterminadoDetraccion={esParaDetraccion}
               required
             />
           )}
