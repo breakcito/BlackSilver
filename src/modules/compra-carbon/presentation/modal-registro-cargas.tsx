@@ -37,7 +37,10 @@ import { TipoCarbonService } from "../../tipo-carbon/service/tipo-carbon.service
 import { ProveedoresService } from "../../proveedores/service/proveedores.service";
 import { ClientesService } from "../../clientes/service/clientes.service";
 import { CompraCarbonService } from "../service/compra-carbon.service";
-import type { CargaFormItem } from "../service/compra-carbon.requests";
+import type {
+  ActualizarCargaRequest,
+  CargaFormItem,
+} from "../service/compra-carbon.requests";
 import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_Almacen } from "../../../service/responses/almacen";
@@ -56,11 +59,19 @@ import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { round2 } from "./components/input-classes";
 import type { RES_CalidadCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
-import type { CargaCompraCarbonItem } from "../service/compra-carbon.responses";
+import type {
+  CargaCompraCarbonItem,
+  CompraCarbonDetalleResponse,
+} from "../service/compra-carbon.responses";
 
 interface Props {
   compra: CompraCarbonResumen;
-  onSuccess: () => void;
+  /**
+   * Se llama tras guardar. En modo edicion se entrega el detalle actualizado
+   * de la compra (cabecera + carga) que devuelve la API, para que el listado
+   * lo refleje sin recargar la pagina. En modo registro no se entrega nada.
+   */
+  onSuccess: (detalle?: CompraCarbonDetalleResponse) => void;
   onCancel: () => void;
   /**
    * Si viene definida, el modal entra en modo edicion para esa carga.
@@ -500,7 +511,30 @@ export const ModalRegistroCargas = ({
 
       // Modo edicion: una sola carga, llamada directa a actualizarCarga.
       if (esEdicionCarga && cargaInicial) {
-        const payload = payloads[0];
+        const c = payloads[0];
+        // Se envia solo el contrato de edicion: los archivos van aparte (el
+        // endpoint de edicion no los reasigna) y no forman parte del DTO.
+        const payload: ActualizarCargaRequest = {
+          id_tipo_carbon: c.id_tipo_carbon,
+          id_lugar_extraccion: c.id_lugar_extraccion,
+          id_almacen_proveedor_recojo: c.id_almacen_proveedor_recojo,
+          id_almacen_empresa_llegada: c.id_almacen_empresa_llegada,
+          id_almacen_cliente_llegada: c.id_almacen_cliente_llegada,
+          id_tarifa_carbon: c.id_tarifa_carbon,
+          id_transportista: c.id_transportista,
+          tipo_despacho: c.tipo_despacho,
+          placa: c.placa,
+          fecha_hora_ingreso: c.fecha_hora_ingreso,
+          guia_remitente: c.guia_remitente,
+          guia_transportista: c.guia_transportista,
+          pagar_flete: c.pagar_flete,
+          codigo_ticket_balanza: c.codigo_ticket_balanza,
+          cantidad: c.cantidad,
+          porcentaje_ceniza: c.porcentaje_ceniza,
+          porcentaje_humedad: c.porcentaje_humedad,
+          precio_unitario: c.precio_unitario,
+          costo_flete_por_tonelada: c.costo_flete_por_tonelada,
+        };
         const res = await CompraCarbonService.actualizarCarga(
           compra.id_compra_carbon,
           cargaInicial.id_carga_compra_carbon,
@@ -508,7 +542,9 @@ export const ModalRegistroCargas = ({
         );
         if (res.success) {
           notifySuccess("Carga actualizada correctamente");
-          onSuccess();
+          // Se entrega el detalle actualizado para que el listado lo muestre
+          // sin recargar la pagina.
+          onSuccess(res.data);
         } else {
           setError(res.message || "Error al actualizar la carga");
           notifyError(res.message || "Error al actualizar la carga");

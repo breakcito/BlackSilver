@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
@@ -115,6 +115,12 @@ export const RegistroCompraCarbon = ({
 
   const esEdicion = Boolean(compraInicial);
 
+  /**
+   * Tipo de carbón con el que se precargó la compra en modo edición. Sirve
+   * para no pisar su tarifa ni su precio al auto-completar.
+   */
+  const tipoCarbonPrecargadoRef = useRef<string | null>(null);
+
   // Precarga de estado cuando llega una compra inicial (modo edicion).
   useEffect(() => {
     if (!compraInicial) return;
@@ -133,6 +139,9 @@ export const RegistroCompraCarbon = ({
       compraInicial.id_cuenta_proveedor
         ? String(compraInicial.id_cuenta_proveedor)
         : null,
+    );
+    tipoCarbonPrecargadoRef.current = String(
+      compraInicial.id_tipo_carbon_prometido,
     );
   }, [compraInicial]);
 
@@ -250,9 +259,13 @@ export const RegistroCompraCarbon = ({
             ? cuentasRes.data
             : [cuentasRes.data];
           setCuentasProveedor(list);
-          // Se preselecciona la primera cuenta que devuelve la API.
+          // Se preselecciona la primera cuenta que devuelve la API, pero solo
+          // si no hay ninguna elegida: en modo edicion la cuenta precargada
+          // de la compra no debe ser reemplazada.
           if (list.length > 0) {
-            setIdCuentaProveedor(String(list[0].id_cuenta_bancaria));
+            setIdCuentaProveedor((prev) =>
+              prev ?? String(list[0].id_cuenta_bancaria),
+            );
           }
         }
       } catch (err: unknown) {
@@ -274,6 +287,13 @@ export const RegistroCompraCarbon = ({
       setIdTarifaAuto(null);
       return;
     }
+
+    // En modo edicion la compra ya tiene su tarifa y su precio: no se
+    // sobreescriben hasta que el usuario cambie el tipo de carbón.
+    if (esEdicion && tipoCarbonPrecargadoRef.current === idTipoCarbon) {
+      return;
+    }
+    tipoCarbonPrecargadoRef.current = idTipoCarbon;
 
     let cancel = false;
     (async () => {
@@ -308,7 +328,7 @@ export const RegistroCompraCarbon = ({
     return () => {
       cancel = true;
     };
-  }, [idTipoCarbon]);
+  }, [idTipoCarbon, esEdicion]);
 
   // Proveedores filtrados con búsqueda tolerante
   const proveedoresVisibles = useMemo(() => {

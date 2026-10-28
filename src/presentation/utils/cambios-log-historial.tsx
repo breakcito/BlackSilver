@@ -62,6 +62,13 @@ import { parseCambiosLog } from "./parse-cambios-log";
 
 // ─── Sub-componente: una sola entrada de cambio (adenda/edición) ──────────────
 
+/** Fecha del log. Si no hay fecha o no es valida, se muestra un guion. */
+const fechaLog = (valor: string | null | undefined): string => {
+  if (!valor) return "-";
+  const d = dayjs(valor);
+  return d.isValid() ? d.format("DD/MM/YYYY [·] HH:mm") : "-";
+};
+
 interface EntradaCambioProps {
   log: RES_CambiosLog;
   index: number;
@@ -131,7 +138,7 @@ const EntradaCambio = ({
               <Group gap={4} wrap="nowrap">
                 <ClockIcon className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
                 <Text size="xs" className="text-zinc-500 font-mono">
-                  {dayjs(log.update_at).format("DD/MM/YYYY [·] HH:mm")}
+                  {fechaLog(log.update_at)}
                 </Text>
               </Group>
 

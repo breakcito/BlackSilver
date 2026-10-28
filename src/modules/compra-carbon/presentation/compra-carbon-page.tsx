@@ -8,8 +8,11 @@ import { useCompraCarbon } from "../hooks/useCompraCarbon";
 import { useControlComprasExcel } from "../hooks/useControlComprasExcel";
 import { RegistroCompraCarbon } from "./registro-compra-carbon";
 import { ModalRegistroCargas } from "./modal-registro-cargas";
-import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
-import type { CargaCompraCarbonItem } from "../service/compra-carbon.responses";
+import type {
+  CompraCarbonResumen,
+  CompraCarbonDetalleResponse,
+  CargaCompraCarbonItem,
+} from "../service/compra-carbon.responses";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { CompraCarbonFilter } from "./components/compra-carbon-filter";
 import { CompraCarbonListado } from "./components/compra-carbon-listado";
@@ -52,6 +55,13 @@ export const CompraCarbonPage = () => {
     carga: CargaCompraCarbonItem;
     compra: CompraCarbonResumen;
   } | null>(null);
+  /**
+   * Detalle de la compra devuelto por la API al editar una carga. Se pasa al
+   * listado para que "Cargas Recibidas" refleje el cambio al instante, sin
+   * recargar la pagina.
+   */
+  const [detalleActualizado, setDetalleActualizado] =
+    useState<CompraCarbonDetalleResponse | null>(null);
   /**
    * Cuando se registra una compra, el listado imprime automaticamente su PDF.
    * Se guarda el payload completo que devuelve el POST (cabecera + detalles)
@@ -115,6 +125,7 @@ export const CompraCarbonPage = () => {
             }
             setCargaEnEdicion({ carga: c, compra: compraCabecera });
           }}
+          detalleActualizado={detalleActualizado}
           onRefresh={recargarSilencioso}
         />
       )}
@@ -196,9 +207,15 @@ export const CompraCarbonPage = () => {
             compra={cargaEnEdicion.compra}
             cargaInicial={cargaEnEdicion.carga}
             onCancel={() => setCargaEnEdicion(null)}
-            onSuccess={() => {
+            onSuccess={(detalle) => {
               setCargaEnEdicion(null);
-              recargar();
+              if (detalle) {
+                // La cabecera del detalle ya trae los agregados recalculados
+                // (toneladas reales, neto real, etc.): se actualiza la fila
+                // del listado y el modal de "Cargas Recibidas" sin recargar.
+                updateCompraLocal(detalle.cabecera);
+                setDetalleActualizado(detalle);
+              }
             }}
           />
         </ModalEstandar>
