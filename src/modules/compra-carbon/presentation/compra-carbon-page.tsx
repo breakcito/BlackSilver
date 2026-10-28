@@ -5,6 +5,7 @@ import { Pencil } from "lucide-react";
 
 import { useTitlePage } from "../../../hooks/useTitlePage";
 import { useCompraCarbon } from "../hooks/useCompraCarbon";
+import { useControlComprasExcel } from "../hooks/useControlComprasExcel";
 import { RegistroCompraCarbon } from "./registro-compra-carbon";
 import { ModalRegistroCargas } from "./modal-registro-cargas";
 import type { CompraCarbonResumen } from "../service/compra-carbon.responses";
@@ -33,6 +34,9 @@ export const CompraCarbonPage = () => {
   } = useCompraCarbon();
 
   const [openRegistro, setOpenRegistro] = useState(false);
+
+  const { exportar: exportarControlCompras, exportando } =
+    useControlComprasExcel();
   /**
    * Compra que se esta editando desde la pagina. Cuando != null, el modal de
    * edicion esta abierto con el formulario precargado.
@@ -70,6 +74,8 @@ export const CompraCarbonPage = () => {
         cambiarPeriodo={cambiarPeriodo}
         recargar={recargar}
         loading={loading}
+        onExportarControlCompras={() => void exportarControlCompras(anio)}
+        exportandoControlCompras={exportando}
       />
 
       {loading && compras.length === 0 ? (

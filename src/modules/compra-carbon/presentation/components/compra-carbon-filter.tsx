@@ -3,6 +3,7 @@ import {
   CalendarDaysIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  TableCellsIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { MESES } from "../../../../shared/variables/meses";
@@ -17,6 +18,9 @@ interface Props {
   cambiarPeriodo: (mes: number, anio: number) => void;
   recargar: () => void;
   loading?: boolean;
+  /** Exporta el reporte "Registro de Compras" del año seleccionado. */
+  onExportarControlCompras: () => void;
+  exportandoControlCompras?: boolean;
 }
 
 const inputClasses = {
@@ -43,6 +47,8 @@ export const CompraCarbonFilter = ({
   cambiarPeriodo,
   recargar,
   loading,
+  onExportarControlCompras,
+  exportandoControlCompras,
 }: Props) => {
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end w-full animate-fade-in">
@@ -88,8 +94,20 @@ export const CompraCarbonFilter = ({
         />
       </div>
 
-      <div className="flex gap-2 items-center shrink-0">
+      <div className="flex gap-2 items-center shrink-0 flex-wrap">
         <BotonRecargar onReload={recargar} loading={loading} />
+        <Button
+          leftSection={<TableCellsIcon className="w-5 h-5" />}
+          onClick={onExportarControlCompras}
+          loading={exportandoControlCompras}
+          radius="lg"
+          size="sm"
+          variant="light"
+          color="cyan"
+          className="font-semibold shrink-0"
+        >
+          Registro de Compras
+        </Button>
         <Button
           leftSection={<PlusIcon className="w-5 h-5" />}
           onClick={openCreate}
