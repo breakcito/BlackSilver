@@ -16,22 +16,17 @@ import {
 } from "@tabler/icons-react";
 
 import { useNotify } from "../../../../hooks/useNotify";
-import { AuxService } from "../../../../service/auxiliar.service";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
-import { exigeSegundaPlaca } from "../../../../shared/enums/venta-carbon/tipo-vehiculo-carbon";
 import { inputClasses } from "../components/input-classes";
 import { useCatalogosCabeceraVenta } from "../../hooks/useCatalogosCabeceraVenta";
 import { useCatalogosDespacho } from "../../hooks/useCatalogosDespacho";
-import { ListaCargasVenta } from "./lista-cargas-venta";
+import { EditorCargasVenta } from "./editor-cargas-venta";
 import {
   esCargaVentaCompleta,
-  esCargaVentaVacia,
-  nuevaCargaVenta,
   type CargaVentaFormState,
 } from "./carga-venta-form-state";
 import { VentaCarbonService } from "../../service/venta-carbon.service";
 import type { VentaCarbonResumen } from "../../service/venta-carbon.responses";
-import type { RES_StockCarbon } from "../../../../service/responses/stock-carbon";
 
 interface Props {
   onCancel: () => void;
@@ -40,6 +35,11 @@ interface Props {
 
 /** Empresa vendedora por defecto (Cupper & Hannia). */
 const EMPRESA_POR_DEFECTO = 1;
+
+/** IGV por defecto de la venta de carbon. */
+const IGV_POR_DEFECTO = 18;
+/** Detraccion por defecto de la venta de carbon. */
+const DETRACCION_POR_DEFECTO = 10;
 
 export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
@@ -50,15 +50,7 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
     almacenesCliente,
     loading: loadingCabecera,
   } = useCatalogosCabeceraVenta();
-  const {
-    tipos,
-    calidades,
-    vehiculos,
-    marcas,
-    loading: loadingDespacho,
-    reloadVehiculos,
-    reloadMarcas,
-  } = useCatalogosDespacho();
+  const { tipos, calidades, loading: loadingDespacho } = useCatalogosDespacho();
 
   // Los selects se bloquean mientras carga su propio catalogo: la cabecera
   // no depende de los tipos ni de los vehiculos.
@@ -70,11 +62,9 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
   const [idAlmacenSalida, setIdAlmacenSalida] = useState<string | null>(null);
   const [idAlmacenLlegada, setIdAlmacenLlegada] = useState<string | null>(null);
 
-  const [cargas, setCargas] = useState<CargaVentaFormState[]>([
-    nuevaCargaVenta(),
-  ]);
+  const [cargas, setCargas] = useState<CargaVentaFormState[]>([]);
 
-  const [stock, setStock] = useState<RES_StockCarbon[]>([]);
+  const [stock, setStock] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,21 +91,27 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
     });
   }, [almacenesEmpresa]);
 
-  // Stock disponible del almacen de salida (para autocompletar cantidades).
+  // Stock despachable del almacen de salida (para autocompletar cantidades).
   useEffect(() => {
     if (!idAlmacenSalida) {
-      setStock([]);
+      setStock({});
       return;
     }
 
     let cancel = false;
     (async () => {
       try {
-        const res = await AuxService.get_stock_carbon({
-          id_almacen: Number(idAlmacenSalida),
-        });
+        const res = await VentaCarbonService.getStockDisponible(
+          Number(idAlmacenSalida),
+        );
         if (cancel) return;
-        if (res.success && res.data) setStock(res.data);
+        if (res.success && res.data) {
+          const mapa: Record<string, number> = {};
+          res.data.forEach((s) => {
+            mapa[`${s.id_tipo_carbon}|${s.calidad}`] = Number(s.disponible) || 0;
+          });
+          setStock(mapa);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -153,9 +149,8 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
 
   const stockPorClave = useMemo(() => {
     const mapa = new Map<string, number>();
-    stock.forEach((s) => {
-      if (!s.id_tipo_carbon || !s.calidad) return;
-      mapa.set(`${s.id_tipo_carbon}|${s.calidad}`, Number(s.stock_actual) || 0);
+    Object.entries(stock).forEach(([clave, valor]) => {
+      mapa.set(clave, valor);
     });
     return mapa;
   }, [stock]);
@@ -202,30 +197,12 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
       return;
     }
 
-    // Las cargas son opcionales: solo se guardan las que estan completas.
-    // Una carga a medio llenar no se descarta en silencio, se avisa para que
-    // el usuario la complete o la elimine.
-    const incompletas = cargas.filter(
-      (c) => !esCargaVentaVacia(c) && !esCargaVentaCompleta(c),
-    );
-
-    if (incompletas.length > 0) {
-      setError(
-        `Hay ${incompletas.length} carga(s) sin completar. Complete o elimine cada carga antes de guardar.`,
-      );
-      return;
-    }
-
+    // Las cargas son opcionales. El editor solo deja agregar cargas
+    // completas, asi que lo que llega aqui ya esta listo para guardar.
     const conCarga = cargas.filter(esCargaVentaCompleta);
-
-    for (let i = 0; i < conCarga.length; i++) {
-      const c = conCarga[i];
-      if (exigeSegundaPlaca(c.tipo_vehiculo) && !c.segunda_placa.trim()) {
-        setError(
-          `Carga #${i + 1}: el vehiculo ${c.tipo_vehiculo} requiere la segunda placa`,
-        );
-        return;
-      }
+    if (conCarga.length !== cargas.length) {
+      setError("Hay cargas sin completar. Reviselas antes de guardar.");
+      return;
     }
 
     setSaving(true);
@@ -236,13 +213,12 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
         id_cliente_destino: Number(idClienteDestino),
         id_almacen_empresa_salida: Number(idAlmacenSalida),
         id_almacen_cliente_llegada: Number(idAlmacenLlegada),
+        porcentaje_igv: IGV_POR_DEFECTO,
+        porcentaje_detraccion: DETRACCION_POR_DEFECTO,
         cargas: conCarga.map((c) => ({
           id_tipo_carbon: Number(c.id_tipo_carbon),
-          id_vehiculo_carbon: Number(c.id_vehiculo_carbon),
-          tipo_vehiculo: c.tipo_vehiculo,
           calidad: c.calidad,
           cantidad_toneladas: c.cantidad_toneladas,
-          segunda_placa: c.segunda_placa.trim() || null,
           fecha_hora_salida: c.fecha_hora_salida,
           archivos: c.archivos,
         })),
@@ -385,6 +361,44 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
             comboboxProps={{ withinPortal: true }}
             disabled={saving || (!idCliente && !idClienteDestino)}
           />
+
+          {/* <Tooltip
+            label="Se aplica a los importes de las liquidaciones de esta venta"
+            withArrow
+          >
+            <NumberInput
+              label="% IGV"
+              value={porcentajeIgv}
+              onChange={(val) => setPorcentajeIgv(Number(val) || 0)}
+              min={0}
+              max={100}
+              decimalScale={2}
+              hideControls
+              classNames={inputClasses}
+              size="xs"
+              radius="lg"
+              disabled={saving}
+            />
+          </Tooltip>
+
+          <Tooltip
+            label="Se aplica a los importes de las liquidaciones de esta venta"
+            withArrow
+          >
+            <NumberInput
+              label="% Detraccion"
+              value={porcentajeDetraccion}
+              onChange={(val) => setPorcentajeDetraccion(Number(val) || 0)}
+              min={0}
+              max={100}
+              decimalScale={2}
+              hideControls
+              classNames={inputClasses}
+              size="xs"
+              radius="lg"
+              disabled={saving}
+            />
+          </Tooltip> */}
         </SimpleGrid>
       </Paper>
 
@@ -394,16 +408,12 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <ListaCargasVenta
+        <EditorCargasVenta
           cargas={cargas}
           onChange={setCargas}
           tipos={tipos}
           calidades={calidades}
-          vehiculos={vehiculos}
-          marcas={marcas}
           stockPorClave={stockPorClave}
-          onVehiculoRegistrado={() => reloadVehiculos()}
-          onMarcaRegistrada={(marca) => reloadMarcas(marca)}
           loadingCatalogos={loadingCatalogos}
           saving={saving}
         />

@@ -59,6 +59,13 @@ export const useCompraCarbon = () => {
     );
   };
 
+  /**
+   * Recarga con spinner. OJO: no se expone `fetch` directo porque su primer
+   * parametro es `silent`: al pasarlo como `onClick` el evento del mouse
+   * entra como parametro y el loading nunca se activa.
+   */
+  const recargar = useCallback(() => fetch(false), [fetch]);
+
   const recargarSilencioso = useCallback(() => fetch(true), [fetch]);
 
   return {
@@ -69,7 +76,7 @@ export const useCompraCarbon = () => {
     mes,
     anio,
     cambiarPeriodo,
-    recargar: fetch,
+    recargar,
     recargarSilencioso,
     insertCompra,
     updateCompraLocal,

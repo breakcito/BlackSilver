@@ -2,18 +2,14 @@ import { useMemo } from "react";
 import {
   ActionIcon,
   Badge,
-  Button,
+  Divider,
   Group,
   Paper,
-  Stack,
-  Table,
   Text,
   Tooltip,
 } from "@mantine/core";
 import {
   ArrowUturnLeftIcon,
-  CheckCircleIcon,
-  DocumentIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
@@ -21,11 +17,12 @@ import dayjs from "dayjs";
 
 import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
-import { colorCalidadCarbon } from "../../../../shared/functions/calidad-carbon";
-import { EstadoCargaVentaCarbon } from "../../../../shared/enums/venta-carbon/estado-carga-venta-carbon";
 import { EstadoVentaCarbon } from "../../../../shared/enums/venta-carbon/estado-venta-carbon";
+import { VentaCarbonDetalle } from "./venta-carbon-detalle";
 import type {
   CargaVentaCarbonItem,
+  ComprobanteVentaCarbonItem,
+  LiquidacionVentaCarbonItem,
   VentaCarbonResumen,
 } from "../../service/venta-carbon.responses";
 
@@ -53,18 +50,57 @@ const colorEstadoVenta = (estado: EstadoVentaCarbon) => {
 interface Props {
   ventas: VentaCarbonResumen[];
   loading: boolean;
+  /** Ventas desplegadas (controlado: `trigger: "always"` ignora el estado). */
+  desplegadas: number[];
+  /** Detalle ya descargado de cada venta desplegada. */
+  detalles: Record<number, VentaCarbonResumen>;
+  /** Id de la venta cuyo detalle se esta descargando. */
+  detalleCargando: number | null;
+  onExpandedChange: (ids: number[]) => void;
   onConfirmarLlegada: (
     venta: VentaCarbonResumen,
     carga: CargaVentaCarbonItem,
   ) => void;
   onDespacharCargas: (venta: VentaCarbonResumen) => void;
+  onLiquidar: (venta: VentaCarbonResumen) => void;
+  onLiquidarGrupo: (
+    venta: VentaCarbonResumen,
+    idTipoCarbon: number,
+    idsCargas: number[],
+  ) => void;
+  onEditarLiquidacion: (
+    venta: VentaCarbonResumen,
+    liquidacion: LiquidacionVentaCarbonItem,
+  ) => void;
+  onConfirmarLiquidacion: (
+    venta: VentaCarbonResumen,
+    liquidacion: LiquidacionVentaCarbonItem,
+  ) => void;
+  onRegistrarComprobante: (
+    venta: VentaCarbonResumen,
+    liquidacion: LiquidacionVentaCarbonItem,
+  ) => void;
+  onRegistrarPago: (
+    venta: VentaCarbonResumen,
+    liquidacion: LiquidacionVentaCarbonItem,
+    comprobante: ComprobanteVentaCarbonItem,
+  ) => void;
 }
 
 export const VentaCarbonListado = ({
   ventas,
   loading,
+  desplegadas,
+  detalles,
+  detalleCargando,
+  onExpandedChange,
   onConfirmarLlegada,
   onDespacharCargas,
+  onLiquidarGrupo,
+  onEditarLiquidacion,
+  onConfirmarLiquidacion,
+  onRegistrarComprobante,
+  onRegistrarPago,
 }: Props) => {
   const columns: DataTableColumn<VentaCarbonResumen>[] = useMemo(
     () => [
@@ -78,21 +114,16 @@ export const VentaCarbonListado = ({
         accessor: "correlativo",
         title: "Venta",
         textAlign: "center",
-        width: 120,
+        width: 130,
         render: (r) => (
           <div className="flex flex-col gap-1">
             <Text size="xs" fw={800} className="text-white font-mono">
               {r.correlativo}
             </Text>
-            {r.codigo ? (
-              <Badge size="xs" variant="light" color="blue" radius="sm">
-                {r.codigo}
-              </Badge>
-            ) : (
-              <Text size="11px" c="gray" fs="italic">
-                Sin codigo del cliente
-              </Text>
-            )}
+            {/* <Badge size="xs" variant="light" color="gray" radius="sm">
+              IGV {formatNumber(r.porcentaje_igv)}% · Detr.{" "}
+              {formatNumber(r.porcentaje_detraccion)}%
+            </Badge> */}
           </div>
         ),
       },
@@ -120,14 +151,14 @@ export const VentaCarbonListado = ({
         render: (r) => (
           <Group gap={5} wrap="nowrap" justify="center">
             <ArrowUturnLeftIcon className="w-4 h-4 text-zinc-300 shrink-0 rotate-180" />
-            <Stack gap={2} align="start">
+            <Group gap={2} className="flex-col items-start">
               <Text size="xs" fw={600} c="zinc.300" truncate>
                 {r.almacen_empresa_salida ?? "—"}
               </Text>
               <Text size="xs" fw={600} c="indigo.3" truncate>
                 {r.almacen_cliente_llegada ?? "—"}
               </Text>
-            </Stack>
+            </Group>
           </Group>
         ),
       },
@@ -135,31 +166,34 @@ export const VentaCarbonListado = ({
         accessor: "cantidad_cargas",
         title: "Cargas",
         textAlign: "center",
-        width: 120,
+        width: 150,
         render: (r) => (
-          <Group gap={4} justify="center" wrap="nowrap">
-            <Group gap={4}>
-              <Badge variant="light" color="indigo" radius="md" size="sm">
+          <div className="flex flex-col gap-2 items-center">
+            <Group gap={6}>
+              <Badge variant="light" color="teal" radius="md" size="md">
                 {r.cantidad_cargas} cargas
               </Badge>
               <Tooltip label="Despachar mas cargas" withArrow>
                 <ActionIcon
                   variant="light"
-                  color="indigo"
+                  color="grape"
                   size="md"
                   radius="md"
-                  onClick={() => onDespacharCargas(r)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDespacharCargas(r);
+                  }}
                 >
                   <PlusIcon className="w-4 h-4" />
                 </ActionIcon>
               </Tooltip>
             </Group>
             {r.cantidad_cargas_confirmadas > 0 && (
-              <Badge variant="light" color="teal" radius="md" size="sm">
-                {r.cantidad_cargas_confirmadas}
+              <Badge variant="light" color="lime" radius="md" size="xs">
+                {r.cantidad_cargas_confirmadas} confirmadas
               </Badge>
             )}
-          </Group>
+          </div>
         ),
       },
       {
@@ -168,14 +202,17 @@ export const VentaCarbonListado = ({
         textAlign: "center",
         width: 120,
         render: (r) => (
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2">
             <Text size="xs" fw={700} c="zinc.100">
-              {formatNumber(r.total_toneladas)} TN
+              {formatNumber(r.total_toneladas)} TN despachadas
             </Text>
             {r.total_toneladas_confirmadas > 0 && (
-              <Text size="xs" c="teal.4" fw={800}>
-                {formatNumber(r.total_toneladas_confirmadas)} TN confirmadas
-              </Text>
+              <>
+                <Divider orientation="horizontal" />
+                <Text size="xs" c="teal.4" fw={800}>
+                  {formatNumber(r.total_toneladas_confirmadas)} TN confirmadas
+                </Text>
+              </>
             )}
           </div>
         ),
@@ -187,10 +224,45 @@ export const VentaCarbonListado = ({
         width: 120,
         render: (r) => (
           <Text size="xs" fw={800} c="lime">
-            {formatPEN(r.total_subtotal)}
+            {formatPEN(r.total_total)}
           </Text>
         ),
       },
+      // {
+      //   accessor: "cantidad_liquidaciones",
+      //   title: "Liquidaciones",
+      //   textAlign: "center",
+      //   width: 140,
+      //   render: (r) => {
+      //     const cantidad = r.cantidad_liquidaciones ?? 0;
+      //     return (
+      //       <Group gap={4} justify="center" wrap="nowrap">
+      //         <Badge
+      //           variant="light"
+      //           color={cantidad > 0 ? "blue" : "gray"}
+      //           radius="md"
+      //           size="sm"
+      //         >
+      //           {cantidad} liq.
+      //         </Badge>
+      //         <Tooltip label="Registrar liquidacion" withArrow>
+      //           <ActionIcon
+      //             variant="light"
+      //             color="blue"
+      //             size="md"
+      //             radius="md"
+      //             onClick={(e) => {
+      //               e.stopPropagation();
+      //               onLiquidar(r);
+      //             }}
+      //           >
+      //             <ScaleIcon className="w-4 h-4" />
+      //           </ActionIcon>
+      //         </Tooltip>
+      //       </Group>
+      //     );
+      //   },
+      // },
       {
         accessor: "estado",
         title: "Estado",
@@ -227,229 +299,6 @@ export const VentaCarbonListado = ({
     [onDespacharCargas],
   );
 
-  const renderCargas = (venta: VentaCarbonResumen) => {
-    if (!venta.cargas || venta.cargas.length === 0) {
-      return (
-        <div className="px-4 py-6 text-center">
-          <Text size="xs" c="dimmed" fs="italic">
-            Esta venta aun no tiene cargas despachadas.
-          </Text>
-        </div>
-      );
-    }
-
-    return (
-      <div className="px-4 py-3 bg-zinc-950/40">
-        <Table
-          highlightOnHover
-          withTableBorder={false}
-          verticalSpacing="xs"
-          horizontalSpacing="sm"
-        >
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th
-                ta={"center"}
-                w={60}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Carga
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={170}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Tipo / Calidad
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={170}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Vehiculo
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={160}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                TN
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={180}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Salida / Ingreso
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={160}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Guias / Ticket
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={160}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Subtotal
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={140}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Estado
-              </Table.Th>
-              <Table.Th
-                ta={"center"}
-                w={160}
-                className="text-zinc-400 text-xs font-semibold"
-              >
-                Accion
-              </Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {venta.cargas.map((carga, i) => (
-              <Table.Tr key={carga.id_carga_venta_carbon}>
-                <Table.Td ta={"center"}>
-                  <Badge size="xs" variant="light" color="indigo" radius="sm">
-                    #{i + 1}
-                  </Badge>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  <div className="flex flex-col gap-1 items-center">
-                    <Text size="xs" fw={600} c="zinc.100">
-                      {carga.tipo_carbon}
-                    </Text>
-                    <Badge
-                      size="xs"
-                      variant="light"
-                      color={colorCalidadCarbon(carga.calidad)}
-                      radius="sm"
-                    >
-                      {carga.calidad ?? "Sin calidad"}
-                    </Badge>
-                  </div>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  <div className="flex flex-col gap-2.5 items-center">
-                    <Group gap={4}>
-                      <Text
-                        size="xs"
-                        fw={600}
-                        c="zinc.200"
-                        className="font-mono"
-                      >
-                        {carga.vehiculo_placa ?? "—"}
-                      </Text>
-                      {carga.vehiculo_tipo && (
-                        <Badge size="xs" color="cyan">
-                          {carga.vehiculo_tipo}
-                        </Badge>
-                      )}
-                    </Group>
-                    {carga.segunda_placa && (
-                      <Text size="11px" c="gray" className="font-mono">
-                        2da: {carga.segunda_placa}
-                      </Text>
-                    )}
-                  </div>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  <div className="flex flex-col ">
-                    <Text size="xs" fw={700} c="zinc.100">
-                      {formatNumber(carga.cantidad_toneladas)}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  <div className="flex flex-col gap-0.5">
-                    <Text size="xs" c="zinc.400">
-                      {formatDateTime(carga.fecha_hora_salida)}
-                    </Text>
-                    <Text size="xs" c="indigo.3">
-                      {formatDateTime(carga.fecha_hora_ingreso)}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  <div className="flex flex-col gap-0.5">
-                    <Text size="xs" c="zinc.300" className="font-mono">
-                      {carga.guia_remitente || "—"}
-                    </Text>
-                    <Text size="11px" c="gray" className="font-mono">
-                      {carga.codigo_ticket_balanza
-                        ? `Ticket ${carga.codigo_ticket_balanza}`
-                        : "Sin ticket"}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td align="right" ta={"center"}>
-                  <Text size="xs" fw={700} c="lime">
-                    {formatPEN(carga.subtotal)}
-                  </Text>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  <div className="flex flex-col gap-2 items-center">
-                    <Badge
-                      size="md"
-                      variant={
-                        carga.estado === EstadoCargaVentaCarbon.EnCamino
-                          ? "filled"
-                          : "light"
-                      }
-                      color={
-                        carga.estado === EstadoCargaVentaCarbon.EnCamino
-                          ? "yellow"
-                          : "teal"
-                      }
-                      radius="md"
-                    >
-                      {carga.estado}
-                    </Badge>
-                    <Badge
-                      size="md"
-                      variant="light"
-                      color={carga.evidencias?.length ? "indigo" : "gray"}
-                      radius="md"
-                      leftSection={<DocumentIcon className="w-3 h-3" />}
-                    >
-                      {carga.evidencias?.length ?? 0} evid.
-                    </Badge>
-                  </div>
-                </Table.Td>
-                <Table.Td ta={"center"}>
-                  {carga.estado === EstadoCargaVentaCarbon.EnCamino ? (
-                    <Button
-                      size="xs"
-                      radius="md"
-                      color="teal"
-                      variant="light"
-                      leftSection={<CheckCircleIcon className="w-3.5 h-3.5" />}
-                      onClick={() => onConfirmarLlegada(venta, carga)}
-                      className="font-semibold"
-                    >
-                      Confirmar llegada
-                    </Button>
-                  ) : (
-                    <Text size="xs" c="dimmed">
-                      —
-                    </Text>
-                  )}
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </div>
-    );
-  };
-
   return (
     <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
       <DataTableEstandar
@@ -460,11 +309,29 @@ export const VentaCarbonListado = ({
         initialPageSize={10}
         noRecordsText="No se encontraron ventas de carbon."
         rowExpansion={{
-          trigger: "always",
-          expandable: ({ record }: { record: VentaCarbonResumen }) =>
-            (record.cargas?.length ?? 0) > 0,
-          content: ({ record }: { record: VentaCarbonResumen }) =>
-            renderCargas(record),
+          // `trigger: "always"` despliega TODAS las filas e ignora el
+          // estado controlado. Con "click" el despliegue lo maneja el padre
+          // y solo hay una venta abierta a la vez.
+          trigger: "click",
+          allowMultiple: false,
+          expanded: {
+            recordIds: desplegadas,
+            onRecordIdsChange: (ids: unknown[]) =>
+              onExpandedChange(ids.map((id) => Number(id))),
+          },
+          expandable: () => true,
+          content: ({ record }: { record: VentaCarbonResumen }) => (
+            <VentaCarbonDetalle
+              detalle={detalles[record.id_venta_carbon] ?? null}
+              loading={detalleCargando === record.id_venta_carbon}
+              onConfirmarLlegada={onConfirmarLlegada}
+              onLiquidarGrupo={onLiquidarGrupo}
+              onEditarLiquidacion={onEditarLiquidacion}
+              onConfirmarLiquidacion={onConfirmarLiquidacion}
+              onRegistrarComprobante={onRegistrarComprobante}
+              onRegistrarPago={onRegistrarPago}
+            />
+          ),
         }}
       />
     </Paper>

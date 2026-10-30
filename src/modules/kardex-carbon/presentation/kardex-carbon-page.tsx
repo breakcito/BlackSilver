@@ -1,18 +1,10 @@
-import {
-  Badge,
-  Text,
-  TextInput,
-  Select,
-  Group,
-  Paper,
-} from "@mantine/core";
+import { Badge, Text, TextInput, Select, Paper } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
   MagnifyingGlassIcon,
-  BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 
@@ -28,6 +20,7 @@ import { KardexCarbonService } from "../service/kardex-carbon.service";
 import type { MovimientoKardexCarbonItem } from "../service/kardex-carbon.responses";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_Almacen } from "../../../service/responses/almacen";
+import { Kardex_TipoMovimiento } from "../../../shared/enums/kardex";
 
 const formatDateTime = (iso: string | null | undefined): string => {
   if (!iso) return "—";
@@ -122,7 +115,6 @@ export const KardexCarbonPage = () => {
     );
   }, [movimientos, tipoMovimiento]);
 
-
   // Table Columns
   const columns: DataTableColumn<MovimientoKardexCarbonItem>[] = useMemo(
     () => [
@@ -135,7 +127,7 @@ export const KardexCarbonPage = () => {
       {
         accessor: "fecha_hora_movimiento",
         title: "Fecha y Hora",
-        width: 140,
+        width: 100,
         textAlign: "center",
         render: (r) => (
           <Text size="xs" fw={500} className="text-zinc-300">
@@ -146,21 +138,18 @@ export const KardexCarbonPage = () => {
       {
         accessor: "almacen_nombre",
         title: "Almacén",
-        width: 280,
+        width: 150,
         textAlign: "center",
         render: (r) => (
-          <Group gap={6} justify="center">
-            <BuildingStorefrontIcon className="w-4 h-4 text-zinc-500 shrink-0" />
-            <Text size="xs" fw={600} className="text-white truncate">
-              {r.almacen_nombre}
-            </Text>
-          </Group>
+          <Text size="xs" fw={600} className="text-white truncate">
+            {r.almacen_nombre}
+          </Text>
         ),
       },
       {
         accessor: "tipo_carbon_nombre",
         title: "Tipo de Carbón",
-        width: 140,
+        width: 120,
         textAlign: "center",
         render: (r) => (
           <div className="flex flex-col items-center justify-center gap-1.5">
@@ -176,7 +165,7 @@ export const KardexCarbonPage = () => {
       {
         accessor: "tipo_movimiento",
         title: "Movimiento",
-        width: 150,
+        width: 100,
         textAlign: "center",
         render: (r) => {
           const esIngreso = r.tipo_movimiento.toLowerCase() === "ingreso";
@@ -201,7 +190,7 @@ export const KardexCarbonPage = () => {
       {
         accessor: "stock_anterior",
         title: "Stock Anterior",
-        width: 130,
+        width: 100,
         textAlign: "center",
         render: (r) => (
           <Text size="xs" className="text-zinc-400">
@@ -212,7 +201,7 @@ export const KardexCarbonPage = () => {
       {
         accessor: "cantidad_movimiento",
         title: "Cantidad",
-        width: 130,
+        width: 100,
         textAlign: "center",
         render: (r) => {
           const esIngreso = r.tipo_movimiento.toLowerCase() === "ingreso";
@@ -231,7 +220,7 @@ export const KardexCarbonPage = () => {
       {
         accessor: "stock_resultante",
         title: "Stock Res.",
-        width: 130,
+        width: 100,
         textAlign: "center",
         render: (r) => (
           <Text size="xs" fw={600} className="text-white">
@@ -241,12 +230,21 @@ export const KardexCarbonPage = () => {
       },
       {
         accessor: "costo_total",
-        title: "Costo Total",
-        width: 120,
+        title: "Monto Total",
+        width: 100,
         textAlign: "center",
         render: (r) => (
-          <Text size="xs" fw={800} c={"lime"}>
-            {formatPEN(r.costo_total)}
+          <Text
+            size="xs"
+            fw={800}
+            c={
+              r.tipo_movimiento == Kardex_TipoMovimiento.Salida
+                ? "teal"
+                : "pink"
+            }
+          >
+            {r.tipo_movimiento == Kardex_TipoMovimiento.Salida ? "+" : "-"}{" "}
+            {formatPEN(r.costo_total_efectivo ?? r.costo_total)}
           </Text>
         ),
       },
@@ -254,8 +252,41 @@ export const KardexCarbonPage = () => {
         accessor: "referencia",
         title: "Referencia / Carga",
         textAlign: "center",
-        width: 200,
+        width: 250,
         render: (r) => {
+          // Salida: el movimiento viene de una carga de VENTA.
+          if (r.id_carga_venta_carbon) {
+            const referencia = r.venta_codigo_orden_compra
+              ? `OC: ${r.venta_codigo_orden_compra}`
+              : r.venta_correlativo
+                ? `Venta: ${r.venta_correlativo}`
+                : null;
+
+            return (
+              <div className="flex justify-center items-center">
+                <div className="flex flex-col justify-center items-start gap-1.5">
+                  {referencia && (
+                    <Text size="xs" fw={600} c={"blue"}>
+                      {referencia}
+                    </Text>
+                  )}
+                  {r.cliente_razon_social && (
+                    <Text size="xs" c="gray" fw={600}>
+                      Cliente: {r.cliente_razon_social}
+                    </Text>
+                  )}
+                  {(r.venta_codigo_ticket_balanza || r.venta_placa) && (
+                    <Text size="xs" fw={600}>
+                      Ticket: {r.venta_codigo_ticket_balanza ?? "—"}
+                      {r.venta_placa ? ` (${r.venta_placa})` : ""}
+                    </Text>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // Ingreso: el movimiento viene de una carga de COMPRA.
           if (!r.id_carga_compra_carbon && !r.compra_correlativo) {
             return (
               <Text size="xs" c="dimmed">

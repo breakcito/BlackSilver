@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
-  Divider,
   Group,
   Loader,
   NumberInput,
@@ -11,25 +11,36 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   Textarea,
+  Tooltip,
 } from "@mantine/core";
-import { IconCheck, IconScale } from "@tabler/icons-react";
+import { IconCheck, IconPlus, IconScale, IconTruck } from "@tabler/icons-react";
 import dayjs from "dayjs";
 
 import { useNotify } from "../../../../hooks/useNotify";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
-import { TipoCarbonService } from "../../../tipo-carbon/service/tipo-carbon.service";
+import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
 import { VentaCarbonService } from "../../service/venta-carbon.service";
 import { inputClasses } from "../components/input-classes";
-import { EstadoCargaVentaCarbon } from "../../../../shared/enums/venta-carbon/estado-carga-venta-carbon";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
+import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { FormVehiculoCarbon } from "../../../../presentation/utils/form-vehiculo-carbon";
+import { useCatalogosDespacho } from "../../hooks/useCatalogosDespacho";
+import {
+  exigeSegundaPlaca,
+  type TipoVehiculoCarbon,
+} from "../../../../shared/enums/venta-carbon/tipo-vehiculo-carbon";
+import {
+  esTipoCalidadCarbon,
+  type TipoCalidadCarbon,
+} from "../../../../shared/enums/carbon/tipo-calidad-carbon";
 import type {
   CargaVentaCarbonItem,
   VentaCarbonResumen,
 } from "../../service/venta-carbon.responses";
-import type { RES_TipoCarbon } from "../../../tipo-carbon/service/tipo-carbon.responses";
 
 interface Props {
   venta: VentaCarbonResumen;
@@ -48,12 +59,14 @@ export const ModalConfirmarLlegada = ({
   onConfirmed,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
-
-  const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
-  const [loadingTipos, setLoadingTipos] = useState(true);
+  const { tipos, calidades, vehiculos, marcas, reloadVehiculos, reloadMarcas } =
+    useCatalogosDespacho();
 
   const [idTipoConfirmado, setIdTipoConfirmado] = useState<string | null>(
     carga.id_tipo_carbon ? String(carga.id_tipo_carbon) : null,
+  );
+  const [calidad, setCalidad] = useState<TipoCalidadCarbon | null>(
+    carga.calidad ?? null,
   );
   const [cantidadConfirmada, setCantidadConfirmada] = useState<number>(
     Number(carga.cantidad_toneladas) || 0,
@@ -61,11 +74,14 @@ export const ModalConfirmarLlegada = ({
   const [fechaHoraIngreso, setFechaHoraIngreso] = useState(
     dayjs().format("YYYY-MM-DDTHH:mm"),
   );
+  const [idVehiculo, setIdVehiculo] = useState<string | null>(null);
+  const [segundaPlaca, setSegundaPlaca] = useState("");
+  const [vehiculoBusqueda, setVehiculoBusqueda] = useState("");
   const [guiaRemitente, setGuiaRemitente] = useState("");
   const [guiaTransportista, setGuiaTransportista] = useState("");
   const [codigoTicketBalanza, setCodigoTicketBalanza] = useState("");
-  const [codigoReporte, setCodigoReporte] = useState("");
-  const [observacion, setObservacion] = useState("");
+  const [fueAceptado, setFueAceptado] = useState(true);
+  const [observacion, setobservacion] = useState<string>("");
   const [porcentajeCeniza, setPorcentajeCeniza] = useState<number>(0);
   const [porcentajeHumedad, setPorcentajeHumedad] = useState<number>(0);
   const [porcentajeAzufre, setPorcentajeAzufre] = useState<number>(0);
@@ -73,49 +89,30 @@ export const ModalConfirmarLlegada = ({
   const [mayorAUno, setMayorAUno] = useState<number | string>("");
   const [menorAUno, setMenorAUno] = useState<number | string>("");
   const [unMedio, setUnMedio] = useState<number | string>("");
-  const [precioBase, setPrecioBase] = useState<number>(0);
-  const [descuento, setDescuento] = useState<number>(0);
-  const [bono, setBono] = useState<number>(0);
-  const [codigoVenta, setCodigoVenta] = useState(venta.codigo ?? "");
   const [archivos, setArchivos] = useState<File[]>([]);
 
+  const [openNuevoVehiculo, setOpenNuevoVehiculo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      try {
-        const res = await TipoCarbonService.getTipos();
-        if (cancel) return;
-        if (res.success && res.data) setTipos(res.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (!cancel) setLoadingTipos(false);
-      }
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, []);
+  const vehiculosVisibles = useMemo(() => {
+    const q = vehiculoBusqueda.trim();
+    if (!q) return vehiculos;
+    return getCoincidencias(vehiculos, q, {
+      keys: ["placa", "marca", "tipo_vehiculo"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [vehiculos, vehiculoBusqueda]);
 
-  // El precio base se propone con el de la ultima carga confirmada de la
-  // misma venta: mantiene la continuidad tarifaria de la operacion.
-  useEffect(() => {
-    const confirmadas = venta.cargas
-      .filter(
-        (c) =>
-          c.estado === EstadoCargaVentaCarbon.LlegadaConfirmada &&
-          c.id_carga_venta_carbon !== carga.id_carga_venta_carbon,
-      )
-      .sort((a, b) => b.id_carga_venta_carbon - a.id_carga_venta_carbon);
+  const vehiculoSeleccionado = useMemo(
+    () => vehiculos.find((v) => String(v.id_vehiculo_carbon) === idVehiculo),
+    [vehiculos, idVehiculo],
+  );
 
-    const ultima = confirmadas[0];
-    if (ultima && Number(ultima.precio_base) > 0) {
-      setPrecioBase(Number(ultima.precio_base));
-    }
-  }, [venta.cargas, carga.id_carga_venta_carbon]);
+  const tipoVehiculo = (vehiculoSeleccionado?.tipo_vehiculo ??
+    null) as TipoVehiculoCarbon | null;
+
+  const esTolva = exigeSegundaPlaca(tipoVehiculo);
 
   const tipoConfirmado = useMemo(
     () => tipos.find((t) => String(t.id_tipo_carbon) === idTipoConfirmado),
@@ -125,16 +122,23 @@ export const ModalConfirmarLlegada = ({
   const requiereAnalisis =
     tipoConfirmado?.nombre?.trim().toLowerCase() === TIPO_CON_ANALISIS;
 
-  const subtotalSinDescuento =
-    Math.round(cantidadConfirmada * precioBase * 100) / 100;
-  const subtotal =
-    Math.round((subtotalSinDescuento - descuento + bono) * 100) / 100;
+  useEffect(() => {
+    setobservacion(
+      fueAceptado
+        ? `ACEPTADO COMO ${tipoConfirmado?.nombre.toUpperCase() ?? "—"}`
+        : `RECHAZADO COMO ${tipoConfirmado?.nombre.toUpperCase() ?? "—"}`,
+    );
+  }, [fueAceptado, tipoConfirmado]);
 
   const handleSubmit = async () => {
     setError(null);
 
     if (!idTipoConfirmado) {
       setError("Debe seleccionar el tipo de carbon confirmado");
+      return;
+    }
+    if (!calidad) {
+      setError("Debe indicar la calidad del carbon que llego");
       return;
     }
     if (!cantidadConfirmada || cantidadConfirmada <= 0) {
@@ -145,12 +149,12 @@ export const ModalConfirmarLlegada = ({
       setError("Debe indicar la fecha y hora de ingreso al almacen");
       return;
     }
-    if (precioBase < 0) {
-      setError("El precio base no puede ser negativo");
+    if (!idVehiculo) {
+      setError("Debe indicar el vehiculo que transporto la carga");
       return;
     }
-    if (subtotal < 0) {
-      setError("El descuento no puede superar el subtotal");
+    if (esTolva && !segundaPlaca.trim()) {
+      setError("El vehiculo es Tolva, debe ingresar la segunda placa");
       return;
     }
 
@@ -161,13 +165,15 @@ export const ModalConfirmarLlegada = ({
         carga.id_carga_venta_carbon,
         {
           id_tipo_carbon: Number(idTipoConfirmado),
+          calidad,
           cantidad_toneladas: cantidadConfirmada,
           fecha_hora_ingreso: fechaHoraIngreso,
+          id_vehiculo_carbon: Number(idVehiculo),
+          segunda_placa: segundaPlaca.trim() || null,
           guia_remitente: guiaRemitente.trim() || null,
           guia_transportista: guiaTransportista.trim() || null,
           codigo_ticket_balanza: codigoTicketBalanza.trim() || null,
-          codigo_reporte: codigoReporte.trim() || null,
-          observacion: observacion.trim() || null,
+          observacion: fueAceptado ? null : observacion.trim() || null,
           porcentaje_ceniza: porcentajeCeniza,
           porcentaje_humedad: porcentajeHumedad,
           porcentaje_azufre: porcentajeAzufre,
@@ -179,10 +185,7 @@ export const ModalConfirmarLlegada = ({
                 un_medio: unMedio === "" ? null : Number(unMedio),
               }
             : null,
-          precio_base: precioBase,
-          descuento,
-          bono,
-          codigo_venta: codigoVenta.trim() || null,
+          fue_aceptado: fueAceptado,
           archivos,
         },
       );
@@ -218,35 +221,29 @@ export const ModalConfirmarLlegada = ({
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <Group justify="space-between" mb={4}>
-          <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-            Datos del despacho
-          </Text>
-          <Badge variant="light" color="yellow" radius="xl" size="sm">
-            En camino
-          </Badge>
-        </Group>
-        <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
-          <Text size="xs" c="gray">
+        <SimpleGrid cols={{ base: 2, md: 10 }} spacing="xs">
+          <Text size="xs" c="gray" style={{ gridColumn: "span 1" }}>
             Tipo:{" "}
             <span className="text-zinc-200 font-semibold">
               {carga.tipo_carbon ?? "—"}
             </span>
           </Text>
-          <Text size="xs" c="gray">
+
+          <Text size="xs" c="gray" style={{ gridColumn: "span 1" }}>
             Calidad:{" "}
             <span className="text-zinc-200 font-semibold">
               {carga.calidad ?? "—"}
             </span>
           </Text>
-          <Text size="xs" c="gray">
-            Vehiculo:{" "}
+
+          <Text size="xs" c="gray" style={{ gridColumn: "span 1" }}>
+            TN:{" "}
             <span className="text-zinc-200 font-semibold">
-              {carga.vehiculo_placa ?? "—"}
-              {carga.segunda_placa ? ` / ${carga.segunda_placa}` : ""}
+              {formatNumber(carga.cantidad_toneladas)}
             </span>
           </Text>
-          <Text size="xs" c="gray">
+
+          <Text size="xs" c="gray" style={{ gridColumn: "span 2" }}>
             Salida:{" "}
             <span className="text-zinc-200 font-semibold">
               {carga.fecha_hora_salida
@@ -254,28 +251,18 @@ export const ModalConfirmarLlegada = ({
                 : "—"}
             </span>
           </Text>
-          <Text size="xs" c="gray">
-            Estimado:{" "}
-            <span className="text-zinc-200 font-semibold">
-              {formatNumber(carga.cantidad_toneladas)} TN
-            </span>
-          </Text>
-          <Text size="xs" c="gray">
+
+          <Text size="xs" c="gray" style={{ gridColumn: "span 2" }}>
             Destino:{" "}
             <span className="text-zinc-200 font-semibold">
               {venta.cliente_destino ?? "—"}
             </span>
           </Text>
-          <Text size="xs" c="gray">
+
+          <Text size="xs" c="gray" style={{ gridColumn: "span 2" }}>
             Almacen llegada:{" "}
             <span className="text-zinc-200 font-semibold">
               {venta.almacen_cliente_llegada ?? "—"}
-            </span>
-          </Text>
-          <Text size="xs" c="gray">
-            Venta:{" "}
-            <span className="text-zinc-200 font-semibold">
-              {venta.correlativo}
             </span>
           </Text>
         </SimpleGrid>
@@ -287,11 +274,11 @@ export const ModalConfirmarLlegada = ({
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm">
+        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
           <Select
-            label="Tipo de carbon confirmado"
+            label="Tipo de carbon"
             placeholder={
-              loadingTipos ? "Cargando..." : "Seleccione el tipo confirmado"
+              tipos.length === 0 ? "Cargando..." : "Seleccione el tipo"
             }
             data={tipos.map((t) => ({
               value: String(t.id_tipo_carbon),
@@ -300,7 +287,9 @@ export const ModalConfirmarLlegada = ({
             value={idTipoConfirmado}
             onChange={setIdTipoConfirmado}
             rightSection={
-              loadingTipos ? <Loader size={14} color="indigo" /> : undefined
+              tipos.length === 0 ? (
+                <Loader size={14} color="indigo" />
+              ) : undefined
             }
             classNames={inputClasses}
             size="xs"
@@ -308,6 +297,20 @@ export const ModalConfirmarLlegada = ({
             searchable
             nothingFoundMessage="Sin tipos de carbon"
             comboboxProps={{ withinPortal: true }}
+            disabled={saving}
+          />
+
+          <Select
+            label="Calidad"
+            placeholder="Seleccione la calidad"
+            data={calidades.map((c) => ({ value: c.nombre, label: c.nombre }))}
+            value={calidad}
+            onChange={(val) =>
+              setCalidad(esTipoCalidadCarbon(val) ? val : null)
+            }
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
             disabled={saving}
           />
 
@@ -323,7 +326,7 @@ export const ModalConfirmarLlegada = ({
           />
 
           <NumberInput
-            label="Cantidad / peso confirmado (TN)"
+            label="Cantidad (TN)"
             placeholder="0.00"
             value={cantidadConfirmada}
             onChange={(val) => setCantidadConfirmada(Number(val) || 0)}
@@ -336,7 +339,99 @@ export const ModalConfirmarLlegada = ({
           />
         </SimpleGrid>
 
-        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm" mt="sm">
+        <SimpleGrid cols={{ base: 1, md: 6 }} spacing="sm" mt="sm">
+          <div className="col-span-1 md:col-span-2">
+            <Group gap="xs" align="flex-end" wrap="nowrap">
+              <Select
+                label="Vehiculo"
+                className="flex-1"
+                placeholder={
+                  vehiculos.length === 0 ? "Cargando..." : "Seleccione vehiculo"
+                }
+                data={vehiculosVisibles.map((v) => ({
+                  value: String(v.id_vehiculo_carbon),
+                  label: `${v.placa}${v.marca ? ` · ${v.marca}` : ""} (${v.tipo_vehiculo})`,
+                }))}
+                value={idVehiculo}
+                onChange={setIdVehiculo}
+                searchValue={vehiculoBusqueda}
+                onSearchChange={setVehiculoBusqueda}
+                leftSection={<IconTruck size={16} />}
+                classNames={inputClasses}
+                size="xs"
+                radius="lg"
+                searchable
+                clearable
+                nothingFoundMessage="Sin vehiculos registrados"
+                comboboxProps={{ withinPortal: true }}
+                // El filtrado lo hace `getCoincidencias` (Fuse + FlexSearch):
+                // el filtro por subcadena de Mantine descartaria las
+                // coincidencias difusas (placa mal escrita, marca parcial).
+                filter={({ options }) => options}
+                disabled={saving}
+              />
+              <Tooltip label="Registrar nuevo vehiculo" withArrow>
+                <ActionIcon
+                  size={32}
+                  variant="filled"
+                  color="indigo.6"
+                  radius="lg"
+                  onClick={() => setOpenNuevoVehiculo(true)}
+                  disabled={saving}
+                  className="mb-0.75"
+                >
+                  <IconPlus size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            {vehiculoSeleccionado && (
+              <Text size="xs" c="dimmed" mt={4}>
+                Tipo: {vehiculoSeleccionado.tipo_vehiculo}
+                {vehiculoSeleccionado.marca
+                  ? ` · Marca: ${vehiculoSeleccionado.marca}`
+                  : ""}
+              </Text>
+            )}
+          </div>
+
+          <TextInput
+            label={`Segunda placa ${esTolva ? "" : ""}`}
+            placeholder="Ej. A1B-234"
+            value={segundaPlaca}
+            onChange={(e) =>
+              setSegundaPlaca(e.currentTarget.value.toUpperCase())
+            }
+            disabled={!esTolva || saving}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+          />
+
+          <TextInput
+            label="Ticket de balanza"
+            placeholder="Ej. 5629"
+            value={codigoTicketBalanza}
+            onChange={(e) =>
+              setCodigoTicketBalanza(e.currentTarget.value.toUpperCase())
+            }
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            disabled={saving}
+          />
+
+          <Switch
+            label="Carga aceptada"
+            checked={fueAceptado}
+            onChange={(e) => setFueAceptado(e.currentTarget.checked)}
+            color="teal"
+            size="xs"
+            mt={32}
+            disabled={saving}
+          />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, md: 5 }} spacing="sm" mt="sm">
           <TextInput
             label="Guia de remitente"
             placeholder="Ej. EG07-1327"
@@ -361,43 +456,7 @@ export const ModalConfirmarLlegada = ({
             radius="lg"
             disabled={saving}
           />
-          <TextInput
-            label="Codigo de ticket de balanza"
-            placeholder="Ej. 5629"
-            value={codigoTicketBalanza}
-            onChange={(e) =>
-              setCodigoTicketBalanza(e.currentTarget.value.toUpperCase())
-            }
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            disabled={saving}
-          />
-          <TextInput
-            label="Codigo de reporte"
-            placeholder="Ej. REP-0001"
-            value={codigoReporte}
-            onChange={(e) =>
-              setCodigoReporte(e.currentTarget.value.toUpperCase())
-            }
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            disabled={saving}
-          />
-          <TextInput
-            label="Codigo de la venta (lo entrega el cliente)"
-            placeholder="Ej. F001-000123"
-            value={codigoVenta}
-            onChange={(e) => setCodigoVenta(e.currentTarget.value)}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            disabled={saving}
-          />
-        </SimpleGrid>
 
-        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm" mt="sm">
           <NumberInput
             label="% Ceniza"
             placeholder="0.00"
@@ -504,91 +563,34 @@ export const ModalConfirmarLlegada = ({
           </Paper>
         )}
 
-        <Textarea
-          label="Observacion"
-          placeholder="Notas del ingreso en destino..."
-          value={observacion}
-          onChange={(e) => setObservacion(e.currentTarget.value)}
-          mt="sm"
-          autosize
-          minRows={2}
-          maxRows={4}
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
-          disabled={saving}
-        />
-      </Paper>
-
-      {/* Valuacion */}
-      <Paper
-        p="md"
-        radius="lg"
-        className="bg-zinc-900/60 border border-zinc-800"
-      >
-        <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
-          Valuacion de la carga
-        </Text>
-        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
-          <NumberInput
-            label="Precio base (S/ x TN)"
-            placeholder="0.00"
-            value={precioBase}
-            onChange={(val) => setPrecioBase(Number(val) || 0)}
-            fixedDecimalScale
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            hideControls
-            disabled={saving}
-          />
-          <NumberInput
-            label="Descuento (S/)"
-            placeholder="0.00"
-            value={descuento}
-            onChange={(val) => setDescuento(Number(val) || 0)}
-            fixedDecimalScale
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            hideControls
-            disabled={saving}
-          />
-          <NumberInput
-            label="Bono (S/)"
-            placeholder="0.00"
-            value={bono}
-            onChange={(val) => setBono(Number(val) || 0)}
-            fixedDecimalScale
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            hideControls
-            disabled={saving}
-          />
-          <div className="flex flex-col justify-center items-end">
-            <Text size="xs" c="gray">
-              Subtotal
-            </Text>
-            <Text size="lg" fw={800} c={subtotal < 0 ? "red" : "teal"}>
-              S/ {formatNumber(subtotal)}
-            </Text>
-            <Text size="xs" c="dimmed">
-              {formatNumber(cantidadConfirmada)} TN × S/{" "}
-              {formatNumber(precioBase)}
-              {descuento > 0 ? ` - S/ ${formatNumber(descuento)}` : ""}
-              {bono > 0 ? ` + S/ ${formatNumber(bono)}` : ""}
-            </Text>
+        <div className="flex flex-row gap-4 items-baseline">
+          <div className="w-1/3">
+            <Textarea
+              label="Observacion"
+              placeholder="Notas del ingreso en destino..."
+              value={observacion}
+              onChange={(e) =>
+                setobservacion(e.currentTarget.value.toUpperCase())
+              }
+              mt="sm"
+              autosize
+              minRows={2}
+              maxRows={4}
+              classNames={inputClasses}
+              size="xs"
+              radius="lg"
+              disabled={saving}
+              w="100%"
+            />
           </div>
-        </SimpleGrid>
-
-        <Divider my="sm" variant="dashed" color="zinc.800" />
-
-        <MultiFilePicker
-          label="Evidencias de la llegada"
-          files={archivos}
-          onFilesChange={setArchivos}
-        />
+          <div className="w-2/3">
+            <MultiFilePicker
+              label="Adjuntar evidencia"
+              files={archivos}
+              onFilesChange={setArchivos}
+            />
+          </div>
+        </div>
       </Paper>
 
       <Group justify="flex-end" gap="sm">
@@ -612,6 +614,25 @@ export const ModalConfirmarLlegada = ({
           Confirmar llegada
         </Button>
       </Group>
+
+      <ModalEstandar
+        opened={openNuevoVehiculo}
+        close={() => setOpenNuevoVehiculo(false)}
+        validateClose
+        title="Nuevo Vehiculo"
+        size="md"
+      >
+        <FormVehiculoCarbon
+          marcas={marcas}
+          onSuccess={(nuevo) => {
+            reloadVehiculos();
+            setIdVehiculo(String(nuevo.id_vehiculo_carbon));
+            setOpenNuevoVehiculo(false);
+          }}
+          onMarcaRegistrada={(marca) => reloadMarcas(marca)}
+          onCancel={() => setOpenNuevoVehiculo(false)}
+        />
+      </ModalEstandar>
     </Stack>
   );
 };

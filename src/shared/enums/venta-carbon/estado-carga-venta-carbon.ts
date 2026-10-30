@@ -6,10 +6,13 @@
  * - EnCamino: la carga fue despachada (salió del almacén de la empresa) y
  *   todavía no se confirmó su llegada.
  * - LlegadaConfirmada: el cliente recibió la carga y quedó registrado el
- *   análisis, el peso confirmado y el precio.
+ *   análisis, el peso confirmado y el vehículo.
+ * - EnLiquidacion: la carga ya pertenece a una liquidación.
+ * - Pagado: su comprobante quedó pagado.
  */
 export enum EstadoCargaVentaCarbon {
   EnCamino = "En Camino",
   LlegadaConfirmada = "Llegada Confirmada",
   EnLiquidacion = "En Liquidación",
+  Pagado = "Pagado",
 }
