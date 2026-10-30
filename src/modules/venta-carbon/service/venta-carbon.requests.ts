@@ -22,7 +22,7 @@ export interface CrearVentaCarbonRequest {
 }
 
 export interface ConfirmarLlegadaPayload {
-  id_tipo_carbon_confirmado: number;
+  id_tipo_carbon: number;
   cantidad_toneladas: number;
   fecha_hora_ingreso: string;
   guia_remitente: string | null;

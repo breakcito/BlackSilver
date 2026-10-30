@@ -11,4 +11,5 @@
 export enum EstadoCargaVentaCarbon {
   EnCamino = "En Camino",
   LlegadaConfirmada = "Llegada Confirmada",
+  EnLiquidacion = "En Liquidación",
 }

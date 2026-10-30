@@ -324,7 +324,7 @@ export const VentaCarbonListado = ({
                 <Table.Td ta={"center"}>
                   <div className="flex flex-col gap-1 items-center">
                     <Text size="xs" fw={600} c="zinc.100">
-                      {carga.tipo_carbon_estimado ?? "—"}
+                      {carga.tipo_carbon}
                     </Text>
                     <Badge
                       size="xs"
@@ -334,13 +334,6 @@ export const VentaCarbonListado = ({
                     >
                       {carga.calidad ?? "Sin calidad"}
                     </Badge>
-                    {carga.tipo_carbon_confirmado &&
-                      carga.tipo_carbon_confirmado !==
-                        carga.tipo_carbon_estimado && (
-                        <Text size="11px" c="yellow.4" fw={600}>
-                          conf: {carga.tipo_carbon_confirmado}
-                        </Text>
-                      )}
                   </div>
                 </Table.Td>
                 <Table.Td ta={"center"}>

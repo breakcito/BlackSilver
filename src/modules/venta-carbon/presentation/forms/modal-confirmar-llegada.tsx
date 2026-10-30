@@ -53,9 +53,7 @@ export const ModalConfirmarLlegada = ({
   const [loadingTipos, setLoadingTipos] = useState(true);
 
   const [idTipoConfirmado, setIdTipoConfirmado] = useState<string | null>(
-    carga.id_tipo_carbon_estimado
-      ? String(carga.id_tipo_carbon_estimado)
-      : null,
+    carga.id_tipo_carbon ? String(carga.id_tipo_carbon) : null,
   );
   const [cantidadConfirmada, setCantidadConfirmada] = useState<number>(
     Number(carga.cantidad_toneladas) || 0,
@@ -162,7 +160,7 @@ export const ModalConfirmarLlegada = ({
         venta.id_venta_carbon,
         carga.id_carga_venta_carbon,
         {
-          id_tipo_carbon_confirmado: Number(idTipoConfirmado),
+          id_tipo_carbon: Number(idTipoConfirmado),
           cantidad_toneladas: cantidadConfirmada,
           fecha_hora_ingreso: fechaHoraIngreso,
           guia_remitente: guiaRemitente.trim() || null,
@@ -232,7 +230,7 @@ export const ModalConfirmarLlegada = ({
           <Text size="xs" c="gray">
             Tipo:{" "}
             <span className="text-zinc-200 font-semibold">
-              {carga.tipo_carbon_estimado ?? "—"}
+              {carga.tipo_carbon ?? "—"}
             </span>
           </Text>
           <Text size="xs" c="gray">

@@ -16,9 +16,9 @@ export interface CargaVentaCarbonItem {
   empleado_registro: string;
 
   /** Datos del despacho. */
-  id_tipo_carbon_estimado: number;
-  tipo_carbon_estimado: string | null;
-  tipo_carbon_estimado_codigo: string | null;
+  id_tipo_carbon: number;
+  tipo_carbon: string | null;
+  tipo_carbon_codigo: string | null;
   id_vehiculo_carbon: number | null;
   vehiculo_placa: string | null;
   vehiculo_tipo: string | null;
@@ -28,9 +28,6 @@ export interface CargaVentaCarbonItem {
   fecha_hora_salida: string | null;
 
   /** Datos de la llegada. */
-  id_tipo_carbon_confirmado: number | null;
-  tipo_carbon_confirmado: string | null;
-  tipo_carbon_confirmado_codigo: string | null;
   cantidad_toneladas: number;
   fecha_hora_ingreso: string | null;
   guia_remitente: string | null;

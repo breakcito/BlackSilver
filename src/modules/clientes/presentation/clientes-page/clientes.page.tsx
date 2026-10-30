@@ -171,10 +171,10 @@ export const ClientesPage = () => {
           <div className="flex flex-col md:flex-row items-end gap-4 flex-1 w-full">
             <Tabs.List>
               <Tabs.Tab
-                value="logistica"
+                value="mineral"
                 leftSection={<IconBuilding style={iconStyle} />}
               >
-                Logística
+                Mineral
               </Tabs.Tab>
               <Tabs.Tab
                 value="carbon"

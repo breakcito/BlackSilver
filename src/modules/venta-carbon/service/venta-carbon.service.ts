@@ -123,8 +123,8 @@ export const VentaCarbonService = {
     const formData = new FormData();
 
     formData.append(
-      "id_tipo_carbon_confirmado",
-      String(payload.id_tipo_carbon_confirmado),
+      "id_tipo_carbon",
+      String(payload.id_tipo_carbon),
     );
     formData.append("cantidad_toneladas", String(payload.cantidad_toneladas));
     formData.append("fecha_hora_ingreso", payload.fecha_hora_ingreso);
