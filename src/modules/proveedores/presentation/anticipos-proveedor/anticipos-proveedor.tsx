@@ -378,11 +378,27 @@ export const AnticiposProveedor = ({
                 Cambista {a.cambista_nombre}
               </Badge>
             ) : (
-              <Badge size="sm" color="cyan">
-                {a.cuenta_bancaria_numero
-                  ? `${a.cuenta_bancaria_moneda ?? ""} ${a.cuenta_bancaria_numero ? " - " + a.cuenta_bancaria_numero : ""}`.trim()
-                  : "sin cuenta"}
-              </Badge>
+              <div className="min-w-0 space-y-1">
+                <Text
+                  size="11px"
+                  c="gray.4"
+                  truncate
+                  title={a.cuenta_bancaria_banco ?? undefined}
+                >
+                  {a.cuenta_bancaria_banco ?? "Banco no registrado"}
+                </Text>
+                <Badge
+                  size="sm"
+                  color="cyan"
+                  variant="light"
+                  radius="sm"
+                  className="font-mono"
+                >
+                  {a.cuenta_bancaria_numero
+                    ? `${a.cuenta_bancaria_moneda ?? ""} ${a.cuenta_bancaria_numero}`.trim()
+                    : "sin cuenta"}
+                </Badge>
+              </div>
             )}
           </div>
         ),

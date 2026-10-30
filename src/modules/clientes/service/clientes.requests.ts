@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Moneda } from "../../../shared/enums/_generic/moneda";
 import { TipoEntidad } from "../../../shared/enums/_generic/tipo-entidad";
+import { MedioPago } from "../../../shared/enums/anticipo-cliente/medio-pago";
 
 /**
  * Registro de cliente.
@@ -198,3 +199,113 @@ export type CrearAlmacenCarbonClienteRequest = z.infer<
 export type ActualizarAlmacenCarbonClienteRequest = z.infer<
   typeof Schema_AlmacenCarbonCliente
 >;
+
+/**
+ * Registro de un anticipo RECIBIDO de un cliente de carbon.
+ *
+ * A diferencia del anticipo a proveedor, la plata ENTRA a la empresa:
+ * solo existe la cuenta bancaria de la EMPRESA (donde se recibio el
+ * dinero). No hay cuenta destino del cliente ni cambista.
+ *
+ * `id_cliente` NO viaja en el payload: sale de la ruta. `id_empleado_registro`
+ * tampoco: lo toma el backend del JWT.
+ *
+ * Los max coinciden con el VARCHAR declarado en la tabla `anticipo_cliente`:
+ * `numero_operacion` y `codigo_comprobante` son VARCHAR(128) y
+ * `observacion` es TEXT.
+ *
+ * `evidencias` NO entra en el schema a proposito: son los archivos
+ * binarios que viajan en el multipart y los valida el backend. Se anexa
+ * al tipo de transporte en `RegistrarAnticipoClienteRequest`.
+ */
+export const Schema_RegistrarAnticipoCliente = z
+  .object({
+    id_empresa: z.number().int().positive("La empresa es obligatoria"),
+    /** Cuenta de la empresa donde se recibio el dinero (opcional en efectivo). */
+    id_cuenta_bancaria_empresa: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional(),
+    medio_pago: z.nativeEnum(MedioPago, {
+      error: "Seleccione el medio de pago",
+    }),
+    fecha_hora_pago: z
+      .string()
+      .regex(
+        // El back acepta fecha sola o fecha+hora (con ` 00:00:00` si va sola).
+        /^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?$/,
+        "Formato de fecha invalido",
+      )
+      .nullable()
+      .optional(),
+    numero_operacion: z
+      .string()
+      .max(128, "El numero de operacion no puede superar 128 caracteres")
+      .nullable()
+      .optional(),
+    codigo_comprobante: z
+      .string()
+      .max(128, "El comprobante no puede superar 128 caracteres")
+      .nullable()
+      .optional(),
+    observacion: z
+      .string()
+      .max(65535, "La observacion es demasiado larga")
+      .nullable()
+      .optional(),
+    // DECIMAL(12,2) en la tabla: 10 enteros + 2 decimales.
+    saldo: z
+      .number()
+      .positive("El saldo debe ser mayor a 0")
+      .max(9999999999.99, "El saldo no puede superar S/ 9,999,999,999.99"),
+  })
+  .superRefine((data, ctx) => {
+    const requiereBanco =
+      data.medio_pago === MedioPago.Transferencia ||
+      data.medio_pago === MedioPago.Deposito;
+
+    if (requiereBanco) {
+      // Transferencia y Depósito provienen de una cuenta bancaria: sin
+      // cuenta, fecha y numero de operacion el anticipo no es trazable.
+      if (!data.id_cuenta_bancaria_empresa) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Selecciona la cuenta de la empresa donde se recibio el dinero",
+          path: ["id_cuenta_bancaria_empresa"],
+        });
+      }
+      if (!data.fecha_hora_pago) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Indica la fecha del pago",
+          path: ["fecha_hora_pago"],
+        });
+      }
+      if (!data.numero_operacion?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Indica el numero de operacion",
+          path: ["numero_operacion"],
+        });
+      }
+    }
+  });
+
+/** Campos de negocio del anticipo (los que valida el schema). */
+export type RegistrarAnticipoClienteData = z.infer<
+  typeof Schema_RegistrarAnticipoCliente
+>;
+
+/**
+ * Payload de transporte: los datos de negocio mas los adjuntos. El service
+ * lo arma como `multipart/form-data` y el backend guarda los archivos con
+ * `ArchivoHelper::guardarArchivos()`, que devuelve la metadata que se
+ * persiste en la columna JSON `evidencias`.
+ */
+export interface RegistrarAnticipoClienteRequest
+  extends RegistrarAnticipoClienteData {
+  evidencias?: File[] | null;
+}

@@ -1,5 +1,8 @@
 import type { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 import type { Moneda } from "../../../shared/enums/_generic/moneda";
+import type { EstadoAnticipo } from "../../../shared/enums/anticipo-cliente/estado-anticipo";
+import type { MedioPago } from "../../../shared/enums/anticipo-cliente/medio-pago";
+import type { IArchivo } from "../../../shared/interfaces/archivo";
 import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios-log";
 
 export interface AlmacenCarbonClienteResponse {
@@ -38,6 +41,14 @@ export interface ClienteResponse {
   cuentas_bancarias?: CuentaBancariaResponse[];
   cantidad_almacenes_carbon: number;
   almacenes_carbon?: AlmacenCarbonClienteResponse[];
+  /**
+   * Anticipos recibidos NO anulados (modulo carbon). Alimentan el badge
+   * de la columna "Anticipos". El backend excluye los anulados con
+   * `IFNULL(esta_anulado, 0) = 0`.
+   */
+  cantidad_anticipos: number;
+  /** Suma de `saldo_actual` de los anticipos no anulados. */
+  suma_saldo_anticipos: number;
 }
 
 export interface CuentaBancariaResponse {
@@ -50,4 +61,48 @@ export interface CuentaBancariaResponse {
   cci: string | null;
   es_para_detraccion: boolean | number;
   estado: EstadoBase;
+}
+
+/**
+ * Anticipo RECIBIDO de un cliente de carbon.
+ *
+ * A diferencia del anticipo a proveedor, aqui la plata ENTRA a la
+ * empresa: solo existe la cuenta bancaria de la EMPRESA (donde se recibio
+ * el dinero), no hay cuenta destino del cliente ni cambista.
+ *
+ * `saldo_inicial` y `saldo_actual` pueden divergir en el tiempo
+ * (consumos futuros); al registrar el form los guarda iguales.
+ */
+export interface AnticipoClienteResponse {
+  id_anticipo: number;
+  id_empresa: number;
+  empresa_nombre: string | null;
+  id_cliente: number;
+  cliente_nombre: string | null;
+  id_empleado_registro: number;
+  empleado_registro_nombre: string | null;
+  empleado_registro_apellido: string | null;
+  id_empleado_anulacion: number | null;
+  empleado_anulacion_nombre: string | null;
+  empleado_anulacion_apellido: string | null;
+  /** Cuenta de la EMPRESA donde se recibio el dinero. */
+  id_cuenta_bancaria_empresa: number | null;
+  cuenta_bancaria_numero: string | null;
+  cuenta_bancaria_moneda: Moneda | null;
+  /** Banco de la cuenta de la empresa (nombre completo y abreviatura). */
+  cuenta_bancaria_banco: string | null;
+  cuenta_bancaria_banco_abv: string | null;
+  medio_pago: MedioPago | null;
+  fecha_hora_pago: string | null;
+  numero_operacion: string | null;
+  /** Comprobante / factura que respalda el anticipo (texto libre). */
+  codigo_comprobante: string | null;
+  observacion: string | null;
+  saldo_inicial: number;
+  saldo_actual: number;
+  evidencias: IArchivo[] | null;
+  esta_anulado: boolean | number;
+  fecha_hora_anulacion: string | null;
+  created_at: string;
+  estado: EstadoAnticipo | string | null;
 }

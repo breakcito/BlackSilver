@@ -115,6 +115,9 @@ export interface AnticipoProveedorResponse {
   id_cuenta_bancaria_empresa: number | null;
   cuenta_bancaria_numero: string | null;
   cuenta_bancaria_moneda: Moneda | null;
+  /** Banco de la cuenta ORIGEN (nombre completo y abreviatura). */
+  cuenta_bancaria_banco: string | null;
+  cuenta_bancaria_banco_abv: string | null;
   /** Cuenta DESTINO: a que cuenta del proveedor llego el dinero. */
   id_cuenta_bancaria_proveedor: number | null;
   cuenta_proveedor_numero: string | null;

@@ -12,11 +12,13 @@ import { RegistroCliente } from "../registro-cliente/registro-cliente";
 import { RegistroClienteCarbon } from "../registro-cliente-carbon/registro-cliente-carbon";
 import { CuentasBancarias } from "../cuentas-bancarias/cuentas-bancarias";
 import { AlmacenesCarbonCliente } from "../almacenes-carbon-cliente/almacenes-carbon-cliente";
+import { AnticiposCliente } from "../anticipos-cliente/anticipos-cliente";
 import { EditarClienteModal } from "../components/editar-cliente-modal";
 import { HistorialClienteModal } from "../components/historial-cliente-modal";
 import { useState } from "react";
 import type {
   AlmacenCarbonClienteResponse,
+  AnticipoClienteResponse,
   ClienteResponse,
   CuentaBancariaResponse,
 } from "../../service/clientes.responses";
@@ -24,18 +26,28 @@ import { BotonRecargar } from "../../../../presentation/utils/boton-recargar";
 import { Cliente } from "./components/cliente";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 
-type ModoCliente = "logistica" | "carbon";
+/**
+ * Pestañas del listado de clientes.
+ *
+ * - "mineral": clientes de logística (`para_carbon = 0`).
+ * - "carbon": clientes del flujo de compra de carbón (`para_carbon = 1`).
+ *
+ * Los valores coinciden con los de las `Tabs.Tab` y los `Tabs.Panel`: si
+ * divergen, la pestaña activa no muestra ningun panel y la tabla queda
+ * vacia.
+ */
+type ModoCliente = "mineral" | "carbon";
 
 const iconStyle = { width: 16, height: 16 };
 
 export const ClientesPage = () => {
   useTitlePage("Clientes");
 
-  // `modo` controla el listado (Logística vs Carbón). La pestaña activa
-  // define automáticamente `para_carbon` al registrar: en logística
-  // para_carbon=false, en carbón para_carbon=true — patrón idéntico al
-  // de proveedores/almacenes.
-  const [modo, setModo] = useState<ModoCliente>("logistica");
+  // `modo` controla el listado (Mineral vs Carbón). La pestaña activa
+  // define automáticamente `para_carbon` al registrar: en la pestaña
+  // Mineral para_carbon=false, en Carbón para_carbon=true — patrón
+  // idéntico al de proveedores/almacenes.
+  const [modo, setModo] = useState<ModoCliente>("mineral");
   const modoCarbon = modo === "carbon";
   const [busqueda, setBusqueda] = useState("");
 
@@ -99,6 +111,19 @@ export const ClientesPage = () => {
   const [clienteAlmacenes, setClienteAlmacenes] =
     useState<ClienteResponse | null>(null);
 
+  // Anticipos recibidos (solo tab Carbon). El componente monta su propio
+  // `ModalEstandar` porque necesita inyectar los KPIs de resumen en el
+  // `rightSection` de la cabecera.
+  const [clienteAnticipos, setClienteAnticipos] =
+    useState<ClienteResponse | null>(null);
+
+  // Resolvemos el cliente desde la lista viva para que el modal siempre
+  // muestre los datos frescos (cuentas, almacenes) del cliente.
+  const clienteAnticiposEnGestion = clienteAnticipos
+    ? (clientes.find((c) => c.id_cliente === clienteAnticipos.id_cliente) ??
+      clienteAnticipos)
+    : null;
+
   const handleAlmacenesGuardados = (
     cliente: ClienteResponse,
     almacenes: AlmacenCarbonClienteResponse[],
@@ -154,11 +179,34 @@ export const ClientesPage = () => {
     setSelectedCliente(clienteActualizado);
   };
 
+  /**
+   * Refresca el badge de la columna "Anticipos" (conteo + saldo) tras
+   * registrar o anular un anticipo. Solo cuentan los NO anulados: el
+   * backend ya filtra `esta_anulado = 0` en el subquery de `get_clientes`.
+   */
+  const handleAnticiposGuardados = (
+    cliente: ClienteResponse,
+    anticipos: AnticipoClienteResponse[],
+  ) => {
+    const activos = anticipos.filter((a) => !a.esta_anulado);
+    // `Number(...)` es obligatorio: el backend devuelve DECIMAL como
+    // string ("25.00") por PDO; sin la coercion JS concatena y aparecen
+    // numeros raros en el badge.
+    updateCliente({
+      ...cliente,
+      cantidad_anticipos: activos.length,
+      suma_saldo_anticipos: activos.reduce(
+        (acc, a) => acc + Number(a.saldo_actual ?? 0),
+        0,
+      ),
+    });
+  };
+
   return (
     <div className="animate-fade-in space-y-6">
       <Tabs
         value={modo}
-        onChange={(v) => setModo((v as ModoCliente) ?? "logistica")}
+        onChange={(v) => setModo((v as ModoCliente) ?? "mineral")}
         variant="pills"
         color="indigo"
         classNames={{
@@ -223,7 +271,7 @@ export const ClientesPage = () => {
           </div>
         </div>
 
-        <Tabs.Panel value="logistica">
+        <Tabs.Panel value="mineral">
           <Cliente
             clientes={clientesFiltrados}
             loading={loading}
@@ -242,6 +290,7 @@ export const ClientesPage = () => {
             modoCarbon
             onOpenCuentas={(c) => setSelectedCliente(c)}
             onOpenAlmacenesCarbon={(c) => setClienteAlmacenes(c)}
+            onOpenAnticipos={(c) => setClienteAnticipos(c)}
             onEdit={handleOpenEdit}
             onHistory={handleOpenHistory}
             onDelete={(c) => void eliminarCliente(c.id_cliente)}
@@ -358,6 +407,20 @@ export const ClientesPage = () => {
           />
         )}
       </ModalEstandar>
+
+      {/* Anticipos recibidos del cliente (solo tab Carbon). El componente
+          monta su propio `ModalEstandar` porque necesita inyectar los KPIs
+          de resumen en el `rightSection` de la cabecera. */}
+      {clienteAnticiposEnGestion && (
+        <AnticiposCliente
+          cliente={clienteAnticiposEnGestion}
+          abierto={!!clienteAnticipos}
+          onClose={() => setClienteAnticipos(null)}
+          onChanged={(anticipos) =>
+            handleAnticiposGuardados(clienteAnticiposEnGestion, anticipos)
+          }
+        />
+      )}
     </div>
   );
 };

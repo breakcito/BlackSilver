@@ -3,6 +3,7 @@ import {
   Badge,
   Group,
   Menu,
+  Stack,
   Text,
   ThemeIcon,
   Tooltip,
@@ -12,12 +13,16 @@ import {
   IconUser,
   IconBuildingBank,
   IconBuildingWarehouse,
+  IconCash,
   IconDotsVertical,
+  IconMail,
   IconPencil,
+  IconPhone,
   IconHistory,
   IconTrash,
 } from "@tabler/icons-react";
 import { DataTableEstandar } from "../../../../../presentation/utils/datatable-estandar";
+import { formatMontoPEN } from "../../../../../shared/functions/format-monto-pen";
 import type { ClienteResponse } from "../../../service/clientes.responses";
 
 interface Props {
@@ -26,6 +31,11 @@ interface Props {
   modoCarbon?: boolean;
   onOpenCuentas: (cliente: ClienteResponse) => void;
   onOpenAlmacenesCarbon?: (cliente: ClienteResponse) => void;
+  /**
+   * Abre la gestion de anticipos recibidos del cliente. Solo se ofrece en
+   * el flujo de carbon: los anticipos son del modulo carbon.
+   */
+  onOpenAnticipos?: (cliente: ClienteResponse) => void;
   onEdit: (cliente: ClienteResponse) => void;
   onHistory: (cliente: ClienteResponse) => void;
   onDelete: (cliente: ClienteResponse) => void;
@@ -38,6 +48,7 @@ export const Cliente = ({
   modoCarbon = false,
   onOpenCuentas,
   onOpenAlmacenesCarbon,
+  onOpenAnticipos,
   onEdit,
   onHistory,
   onDelete,
@@ -158,38 +169,135 @@ export const Cliente = ({
                   </Group>
                 ),
               },
+              {
+                accessor: "cantidad_anticipos" as const,
+                title: "Anticipos",
+                width: 190,
+                textAlign: "center" as const,
+                render: (r: ClienteResponse) => {
+                  const n = r.cantidad_anticipos ?? 0;
+                  const total = r.suma_saldo_anticipos ?? 0;
+                  return (
+                    <Group gap="xs" justify="center" wrap="nowrap">
+                      <Stack gap={6} align="center">
+                        {n > 0 ? (
+                          <Badge
+                            color="indigo"
+                            variant="light"
+                            size="sm"
+                            radius="xl"
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            {n} anticipo{n === 1 ? "" : "s"}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            color="gray"
+                            variant="light"
+                            size="sm"
+                            radius="xl"
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            Sin anticipos
+                          </Badge>
+                        )}
+                        <Badge
+                          color={n > 0 ? "teal" : "gray"}
+                          variant="light"
+                          size="sm"
+                          radius="xl"
+                          style={{ whiteSpace: "nowrap" }}
+                        >
+                          {formatMontoPEN(total)}
+                        </Badge>
+                      </Stack>
+                      {onOpenAnticipos && (
+                        <Tooltip
+                          label="Gestionar anticipos"
+                          withArrow
+                          position="left"
+                        >
+                          <ActionIcon
+                            variant="subtle"
+                            color="indigo"
+                            radius="xl"
+                            size="sm"
+                            onClick={() => onOpenAnticipos(r)}
+                          >
+                            <IconCash size={16} stroke={1.5} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </Group>
+                  );
+                },
+              },
             ]
           : []),
         {
           accessor: "direccion",
           title: "Dirección",
+          width: 220,
           textAlign: "center",
           render: (r: ClienteResponse) => (
-            <Text
-              size="sm"
-              className="text-zinc-400 mx-3.5 text-center"
-              lineClamp={1}
+            // `lineClamp={2}` deja que la direccion se reparta en dos
+            // lineas ("Hola soy / la calle") en vez de desbordar la
+            // celda, y recorta con "..." cuando es mas larga. El tooltip
+            // conserva la direccion completa para poder leerla entera.
+            <Tooltip
+              label={r.direccion || "—"}
+              withArrow
+              multiline
+              w={300}
+              disabled={!r.direccion}
             >
-              {r.direccion || "—"}
-            </Text>
+              <Text
+                size="sm"
+                className="text-zinc-400 text-center mx-2"
+                lineClamp={2}
+              >
+                {r.direccion || "—"}
+              </Text>
+            </Tooltip>
           ),
         },
         {
-          accessor: "telefono",
-          title: "Teléfono",
+          accessor: "contacto",
+          title: "Contacto",
+          width: 150,
+          textAlign: "center",
           render: (r: ClienteResponse) => (
-            <Text size="sm" className="text-zinc-300">
-              {r.telefono || "—"}
-            </Text>
-          ),
-        },
-        {
-          accessor: "correo",
-          title: "Correo",
-          render: (r: ClienteResponse) => (
-            <Text size="sm" className="text-zinc-400">
-              {r.correo || "—"}
-            </Text>
+            <Stack gap={2}>
+              {r.correo && (
+                <Group gap={4} justify="center">
+                  <IconMail
+                    size={14}
+                    stroke={1.5}
+                    className="text-zinc-500 shrink-0"
+                  />
+                  <Text size="xs" className="text-zinc-300 truncate max-w-55">
+                    {r.correo}
+                  </Text>
+                </Group>
+              )}
+              {r.telefono && (
+                <Group gap={4} justify="center">
+                  <IconPhone
+                    size={14}
+                    stroke={1.5}
+                    className="text-zinc-500 shrink-0"
+                  />
+                  <Text size="xs" className="text-zinc-300 font-mono">
+                    {r.telefono}
+                  </Text>
+                </Group>
+              )}
+              {!r.correo && !r.telefono && (
+                <Text size="xs" c="dimmed" fs="italic">
+                  -
+                </Text>
+              )}
+            </Stack>
           ),
         },
         {
