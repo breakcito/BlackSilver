@@ -370,8 +370,12 @@ export const exportarLiquidacionFleteExcel = async (
     const subtotal = round2(totalSubtotalFlete);
     const igv = pctIgvFlete > 0 ? round2((subtotal * pctIgvFlete) / 100) : 0;
     const total = round2(subtotal + igv);
+    // La detraccion del flete se redondea a entero (sin decimales): es lo que
+    // se retiene al transportista y queda guardado en el comprobante.
     const detraccion =
-      pctDetraccionFlete > 0 ? round2((total * pctDetraccionFlete) / 100) : 0;
+      pctDetraccionFlete > 0
+        ? Math.round((total * pctDetraccionFlete) / 100)
+        : 0;
     const neto = round2(total - detraccion);
 
     const agregarFilaLiquidacion = (

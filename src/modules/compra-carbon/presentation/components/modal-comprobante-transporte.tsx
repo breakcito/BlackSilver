@@ -123,9 +123,11 @@ export const ModalComprobanteTransporte = ({
     return round2(totalFlete + montoIgv);
   }, [totalFlete, montoIgv]);
 
+  // La detraccion del flete se redondea a entero (sin decimales): es el monto
+  // que se retiene al transportista y es lo que queda guardado.
   const montoDetraccion = useMemo(() => {
     if (porcentajeDetraccionFlete <= 0) return 0;
-    return round2((importeTotal * porcentajeDetraccionFlete) / 100);
+    return Math.round((importeTotal * porcentajeDetraccionFlete) / 100);
   }, [importeTotal, porcentajeDetraccionFlete]);
 
   const totalNetoFlete = useMemo(() => {

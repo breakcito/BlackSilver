@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -96,6 +96,95 @@ const inputClasses = {
 interface CargaFormState extends CargaFormItem {
   id_almacen_tipo_destino: "empresa" | "cliente";
 }
+
+/**
+ * Costos derivados de una carga. Se calculan en un unico lugar para que el
+ * detalle por carga y el resumen del pie muestren exactamente los mismos
+ * montos, y para que coincidan con los que guarda el backend.
+ */
+interface CostosCarga {
+  precioMateriaPrima: number;
+  subtotalCarga: number;
+  montoIgv: number;
+  totalCarga: number;
+  montoDetraccion: number;
+  netoAPagar: number;
+  costoFleteTn: number;
+  fleteSubtotal: number;
+  fleteIgv: number;
+  fleteTotal: number;
+  fleteMontoDetraccion: number;
+  fleteNetoAPagar: number;
+}
+
+/**
+ * Calcula la cascada de costos de una carga.
+ *
+ * Carbon: subtotal -> IGV -> total -> detraccion -> neto a pagar.
+ * Transporte: subtotal -> IGV del flete -> total -> detraccion -> neto.
+ *
+ * La detraccion se guarda con 2 decimales: es el detalle por carga. El
+ * redondeo a entero ocurre en el resumen y en la liquidacion (comprobante),
+ * que es lo que se paga.
+ */
+const calcularCostosCarga = (
+  carga: Pick<
+    CargaFormState,
+    "cantidad" | "precio_unitario" | "pagar_flete" | "costo_flete_por_tonelada"
+  >,
+  pctIgv: number,
+  pctDetraccion: number,
+  pctIgvFlete: number,
+  pctDetraccionFlete: number,
+): CostosCarga => {
+  const cantidad = Number(carga.cantidad) || 0;
+  const precioUnitario = Number(carga.precio_unitario) || 0;
+  const costoFleteTn = carga.pagar_flete
+    ? Number(carga.costo_flete_por_tonelada) || 0
+    : 0;
+
+  // ── COSTOS DEL CARBON ──────────────────────────────────────────
+  // El flete lo asume la empresa, asi que sale del precio unitario que se
+  // le reconoce al proveedor por el carbon.
+  const precioMateriaPrima = Math.max(
+    0,
+    Math.round((precioUnitario - costoFleteTn) * 1e6) / 1e6,
+  );
+  const subtotalCarga = round2(precioMateriaPrima * cantidad);
+  const montoIgv = pctIgv > 0 ? round2((subtotalCarga * pctIgv) / 100) : 0;
+  const totalCarga = round2(subtotalCarga + montoIgv);
+  const montoDetraccion =
+    pctDetraccion > 0 ? round2((totalCarga * pctDetraccion) / 100) : 0;
+  const netoAPagar = round2(totalCarga - montoDetraccion);
+
+  // ── COSTOS DE TRANSPORTE ───────────────────────────────────────
+  const fleteSubtotal = carga.pagar_flete
+    ? round2(cantidad * costoFleteTn)
+    : 0;
+  const fleteIgv =
+    pctIgvFlete > 0 ? round2((fleteSubtotal * pctIgvFlete) / 100) : 0;
+  const fleteTotal = round2(fleteSubtotal + fleteIgv);
+  const fleteMontoDetraccion =
+    pctDetraccionFlete > 0
+      ? round2((fleteTotal * pctDetraccionFlete) / 100)
+      : 0;
+  const fleteNetoAPagar = round2(fleteTotal - fleteMontoDetraccion);
+
+  return {
+    precioMateriaPrima,
+    subtotalCarga,
+    montoIgv,
+    totalCarga,
+    montoDetraccion,
+    netoAPagar,
+    costoFleteTn,
+    fleteSubtotal,
+    fleteIgv,
+    fleteTotal,
+    fleteMontoDetraccion,
+    fleteNetoAPagar,
+  };
+};
 
 /**
  * Fila etiqueta/valor de los bloques de costo de una carga.
@@ -395,10 +484,12 @@ export const ModalRegistroCargas = ({
     index: number,
     field: K,
     val: CargaFormState[K],
+    /** Campos que cambian junto con el principal (mismo indice). */
+    extra?: Partial<CargaFormState>,
   ) => {
     setCargas((prev) => {
       const copia = [...prev];
-      const actual = { ...copia[index], [field]: val };
+      const actual = { ...copia[index], ...extra, [field]: val };
 
       // Si cambió porcentaje de ceniza o tipo de carbón, autoseleccionar tarifa
       if (field === "porcentaje_ceniza" || field === "id_tipo_carbon") {
@@ -580,14 +671,54 @@ export const ModalRegistroCargas = ({
   const pctIgvFlete = Number(compra.porcentaje_igv_flete) || 0;
   const pctDetraccionFlete = Number(compra.porcentaje_detraccion_flete) || 0;
 
+  /**
+   * Resumen agregado de todas las cargas. Es solo una vista previa: el
+   * resumen no se guarda. Lo que se guarda es el detalle de cada carga (a 2
+   * decimales) y, despues, la cascada de la liquidacion (comprobante), que
+   * es donde la detraccion se redondea a entero.
+   *
+   * El Total es la suma de los totales de las cargas. La detraccion se
+   * calcula sobre ese Total y ahi se redondea a entero, y de ahi sale el
+   * neto a pagar.
+   */
+  const resumen = useMemo(() => {
+    const carbon = { total: 0, detraccion: 0, neto: 0 };
+    const transporte = { total: 0, detraccion: 0, neto: 0 };
+
+    for (const c of cargas) {
+      const k = calcularCostosCarga(
+        c,
+        pctIgv,
+        pctDetraccion,
+        pctIgvFlete,
+        pctDetraccionFlete,
+      );
+      carbon.total += k.totalCarga;
+      transporte.total += k.fleteTotal;
+    }
+
+    carbon.total = round2(carbon.total);
+    carbon.detraccion =
+      pctDetraccion > 0
+        ? Math.round((carbon.total * pctDetraccion) / 100)
+        : 0;
+    carbon.neto = round2(carbon.total - carbon.detraccion);
+
+    transporte.total = round2(transporte.total);
+    transporte.detraccion =
+      pctDetraccionFlete > 0
+        ? Math.round((transporte.total * pctDetraccionFlete) / 100)
+        : 0;
+    transporte.neto = round2(transporte.total - transporte.detraccion);
+
+    return { carbon, transporte };
+  }, [cargas, pctIgv, pctDetraccion, pctIgvFlete, pctDetraccionFlete]);
+
+  /** Hay al menos una carga cuyo flete paga la empresa. */
+  const hayFlete = cargas.some((c) => c.pagar_flete);
+
   return (
     <Stack gap="md">
-      {error && (
-        <Alert color="red" variant="light" title="Atención" radius="md">
-          {error}
-        </Alert>
-      )}
-
       {/* Impuestos de la orden: se leen de la compra a la que pertenece la
           carga. No son un parametro del registro. */}
       <Group justify="space-between">
@@ -635,39 +766,26 @@ export const ModalRegistroCargas = ({
           // Mismo criterio que aplica el backend al registrar la carga
           // (CompraCarbonData::insert_cargas), con los porcentajes de la
           // compra a la que pertenece.
-          const cantidad = Number(carga.cantidad) || 0;
-          const precioUnitario = Number(carga.precio_unitario) || 0;
-          const costoFleteTn = carga.pagar_flete
-            ? Number(carga.costo_flete_por_tonelada) || 0
-            : 0;
-
-          // ── COSTOS DEL CARBON ──────────────────────────────────────
-          // El flete lo asume la empresa, asi que sale del precio unitario
-          // que se le reconoce al proveedor por el carbon.
-          const precioMateriaPrima = Math.max(
-            0,
-            Math.round((precioUnitario - costoFleteTn) * 1e6) / 1e6,
+          const {
+            precioMateriaPrima,
+            subtotalCarga,
+            montoIgv,
+            totalCarga,
+            montoDetraccion,
+            netoAPagar,
+            costoFleteTn,
+            fleteSubtotal,
+            fleteIgv,
+            fleteTotal,
+            fleteMontoDetraccion,
+            fleteNetoAPagar,
+          } = calcularCostosCarga(
+            carga,
+            pctIgv,
+            pctDetraccion,
+            pctIgvFlete,
+            pctDetraccionFlete,
           );
-          const subtotalCarga = round2(precioMateriaPrima * cantidad);
-          const montoIgv =
-            pctIgv > 0 ? round2((subtotalCarga * pctIgv) / 100) : 0;
-          const totalCarga = round2(subtotalCarga + montoIgv);
-          const montoDetraccion =
-            pctDetraccion > 0 ? round2((totalCarga * pctDetraccion) / 100) : 0;
-          const netoAPagar = round2(totalCarga - montoDetraccion);
-
-          // ── COSTOS DE TRANSPORTE ────────────────────────────────────
-          const fleteSubtotal = carga.pagar_flete
-            ? round2(cantidad * costoFleteTn)
-            : 0;
-          const fleteIgv =
-            pctIgvFlete > 0 ? round2((fleteSubtotal * pctIgvFlete) / 100) : 0;
-          const fleteTotal = round2(fleteSubtotal + fleteIgv);
-          const fleteMontoDetraccion =
-            pctDetraccionFlete > 0
-              ? round2((fleteTotal * pctDetraccionFlete) / 100)
-              : 0;
-          const fleteNetoAPagar = round2(fleteTotal - fleteMontoDetraccion);
 
           return (
             <Paper
@@ -796,9 +914,18 @@ export const ModalRegistroCargas = ({
                     },
                   ]}
                   value={carga.tipo_despacho}
-                  onChange={(val) =>
-                    handleChangeCarga(index, "tipo_despacho", val || "Envio")
-                  }
+                  onChange={(val) => {
+                    const tipo = val || "Envio";
+                    // En recojo la empresa asume el transporte: el flete se
+                    // activa solo. Al volver a Envio no se desactiva: puede
+                    // seguir siendo un flete pagado por la empresa.
+                    handleChangeCarga(
+                      index,
+                      "tipo_despacho",
+                      tipo,
+                      tipo === "Recojo" ? { pagar_flete: true } : undefined,
+                    );
+                  }}
                   classNames={inputClasses}
                   size="xs"
                   radius="lg"
@@ -1212,13 +1339,22 @@ export const ModalRegistroCargas = ({
                             size="xs"
                             label="Pagar flete"
                             checked={carga.pagar_flete}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const checked = e.currentTarget.checked;
                               handleChangeCarga(
                                 index,
                                 "pagar_flete",
-                                e.currentTarget.checked,
-                              )
-                            }
+                                checked,
+                                // Sin flete no hay monto por tonelada ni
+                                // transportista: se limpian ambos.
+                                checked
+                                  ? undefined
+                                  : {
+                                      costo_flete_por_tonelada: 0,
+                                      id_transportista: null,
+                                    },
+                              );
+                            }}
                             styles={{
                               label: {
                                 fontSize: "11px",
@@ -1350,6 +1486,90 @@ export const ModalRegistroCargas = ({
           );
         })}
       </Stack>
+
+      {/* Resumen agregado de los montos de todas las cargas */}
+      <Paper
+        p="md"
+        radius="lg"
+        className="bg-zinc-900/60 border border-zinc-800"
+      >
+        <Group justify="space-between" mb="xs">
+          <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+            Resumen de las cargas
+          </Text>
+          <Badge color="indigo" variant="light" size="sm">
+            {cargas.length} {cargas.length === 1 ? "carga" : "cargas"}
+          </Badge>
+        </Group>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <Paper
+            p="xs"
+            radius="md"
+            className="bg-zinc-950/60 border border-zinc-800"
+          >
+            <Text
+              size="10px"
+              fw={800}
+              c="zinc.400"
+              className="uppercase tracking-wider"
+            >
+              Costos del carbón
+            </Text>
+            <FilaCosto etiqueta="Total" valor={resumen.carbon.total} destacado />
+            <FilaCosto
+              etiqueta="Monto de detracción"
+              valor={resumen.carbon.detraccion}
+              color="orange.4"
+            />
+            <FilaCosto
+              etiqueta="Neto a pagar"
+              valor={resumen.carbon.neto}
+              destacado
+              color="teal.4"
+            />
+          </Paper>
+          {hayFlete && (
+            <Paper
+              p="xs"
+              radius="md"
+              className="bg-zinc-950/60 border border-blue-900/40"
+            >
+              <Text
+                size="10px"
+                fw={800}
+                c="blue.3"
+                className="uppercase tracking-wider"
+              >
+                Costos de transporte
+              </Text>
+              <FilaCosto
+                etiqueta="Total del flete"
+                valor={resumen.transporte.total}
+                destacado
+              />
+              <FilaCosto
+                etiqueta="Monto de detracción"
+                valor={resumen.transporte.detraccion}
+                color="orange.4"
+              />
+              <FilaCosto
+                etiqueta="Neto a pagar del flete"
+                valor={resumen.transporte.neto}
+                destacado
+                color="teal.4"
+              />
+            </Paper>
+          )}
+        </SimpleGrid>
+      </Paper>
+
+      {/* Los errores de validacion se muestran al pie del modal, junto a los
+          botones: son el ultimo dato que el usuario lee antes de corregir. */}
+      {error && (
+        <Alert color="red" variant="light" title="Atención" radius="md">
+          {error}
+        </Alert>
+      )}
 
       <Group justify="flex-end" gap="sm" mt="md">
         <Button

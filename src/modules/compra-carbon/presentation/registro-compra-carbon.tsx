@@ -65,9 +65,11 @@ const inputClasses = {
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
 
 /**
- * Detracción SUNAT sobre el carbón: 10%, y solo si la compra aplica IGV.
- * El valor viaja al backend y queda guardado en `compra_carbon`.
+ * Porcentajes por defecto de la cascada cotizada: IGV 18% y detracción SUNAT
+ * 10% sobre el carbón. El valor viaja al backend y queda guardado en
+ * `compra_carbon`. En modo edición se usan los de la compra precargada.
  */
+const PORCENTAJE_IGV = 18;
 const PORCENTAJE_DETRACCION = 10;
 
 export const RegistroCompraCarbon = ({
@@ -100,7 +102,6 @@ export const RegistroCompraCarbon = ({
     null,
   );
   const [aplicaIgv, setAplicaIgv] = useState<boolean>(false);
-  const [porcentajeIgv] = useState<number>(18);
 
   // Detalle prometido
   const [idTipoCarbon, setIdTipoCarbon] = useState<string | null>(null);
@@ -114,6 +115,25 @@ export const RegistroCompraCarbon = ({
   const [error, setError] = useState<string | null>(null);
 
   const esEdicion = Boolean(compraInicial);
+
+  /**
+   * Porcentajes de la cascada cotizada. En edición se leen de la compra
+   * precargada para no pisar los valores guardados; en registro se usan los
+   * por defecto. La detracción replica la misma regla del backend: 0 si la
+   * compra no aplica IGV, el porcentaje guardado si es > 0 y 10% en cualquier
+   * otro caso (ver CompraCarbonService::actualizar_compra).
+   */
+  const porcentajeIgv = Number(
+    compraInicial?.porcentaje_igv ?? PORCENTAJE_IGV,
+  );
+  const porcentajeDetraccionGuardado = Number(
+    compraInicial?.porcentaje_detraccion ?? 0,
+  );
+  const porcentajeDetraccion = !aplicaIgv
+    ? 0
+    : porcentajeDetraccionGuardado > 0
+      ? porcentajeDetraccionGuardado
+      : PORCENTAJE_DETRACCION;
 
   /**
    * Tipo de carbón con el que se precargó la compra en modo edición. Sirve
@@ -200,7 +220,10 @@ export const RegistroCompraCarbon = ({
   useEffect(() => {
     if (!idProveedor) {
       setTipos([]);
-      setIdTipoCarbon(null);
+      // NO se resetea idTipoCarbon: en modo edicion este efecto corre una vez
+      // en el montaje (cuando idProveedor todavia es null) y borraria el tipo
+      // precargado. El reset real ocurre en el onChange del Select de
+      // proveedor, solo cuando el usuario lo limpia o lo cambia.
       return;
     }
 
@@ -283,8 +306,12 @@ export const RegistroCompraCarbon = ({
   // Al seleccionar tipo de carbón, autocompletar con la tarifa más alta
   useEffect(() => {
     if (!idTipoCarbon) {
-      setPrecioUnitario(0);
-      setIdTarifaAuto(null);
+      // En edicion el precio y la tarifa son los de la compra precargada: no
+      // se resetean al montar, solo cuando el usuario limpia el Select.
+      if (!esEdicion) {
+        setPrecioUnitario(0);
+        setIdTarifaAuto(null);
+      }
       return;
     }
 
@@ -372,9 +399,9 @@ export const RegistroCompraCarbon = ({
   const montoDetraccionCotizado = useMemo(() => {
     if (!aplicaIgv) return 0;
     return (
-      Math.round(((totalConIgv * PORCENTAJE_DETRACCION) / 100) * 100) / 100
+      Math.round(((totalConIgv * porcentajeDetraccion) / 100) * 100) / 100
     );
-  }, [aplicaIgv, totalConIgv]);
+  }, [aplicaIgv, totalConIgv, porcentajeDetraccion]);
 
   const netoAPagarCotizado = useMemo(() => {
     return Math.round((totalConIgv - montoDetraccionCotizado) * 100) / 100;
@@ -533,6 +560,15 @@ export const RegistroCompraCarbon = ({
             onChange={(val) => {
               setIdProveedor(val);
               setIdCuentaProveedor(null);
+              // El tipo de carbón y el precio pertenecen a la tarifa del
+              // proveedor anterior: se limpian al cambiar o vaciar el
+              // proveedor.
+              if (!val) {
+                setIdTipoCarbon(null);
+                setPrecioUnitario(0);
+                setIdTarifaAuto(null);
+                tipoCarbonPrecargadoRef.current = null;
+              }
             }}
             searchValue={proveedorBusqueda}
             onSearchChange={setProveedorBusqueda}
@@ -600,7 +636,17 @@ export const RegistroCompraCarbon = ({
               label: `${t.nombre} ${t.codigo ? `(${t.codigo})` : ""}`,
             }))}
             value={idTipoCarbon}
-            onChange={setIdTipoCarbon}
+            onChange={(val) => {
+              setIdTipoCarbon(val);
+              if (!val) {
+                // Sin tipo de carbón no hay tarifa aplicable: se limpian el
+                // precio y la tarifa. Se olvida tambien el tipo precargado
+                // para que, si se vuelve a elegir, se consulte la tarifa.
+                setPrecioUnitario(0);
+                setIdTarifaAuto(null);
+                tipoCarbonPrecargadoRef.current = null;
+              }
+            }}
             leftSection={<IconFlame size={16} />}
             rightSection={
               loadingTipos ? <Loader size={14} color="indigo" /> : null
@@ -670,7 +716,7 @@ export const RegistroCompraCarbon = ({
           <div className="text-left">
             <Text size="xs" c="gray">
               {aplicaIgv
-                ? `Detracción (${PORCENTAJE_DETRACCION}%)`
+                ? `Detracción (${porcentajeDetraccion}%)`
                 : "Detracción (-)"}
             </Text>
             <Text size="md" fw={800} c="orange.4">

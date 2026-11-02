@@ -161,9 +161,11 @@ export const ModalComprobanteProveedor = ({
     return round2(baseImponible + montoIgv);
   }, [baseImponible, montoIgv]);
 
+  // La detraccion se redondea a entero (sin decimales): es el monto que se
+  // retiene al proveedor y es lo que queda guardado en el comprobante.
   const montoDetraccion = useMemo(() => {
     if (porcentajeDetraccion <= 0) return 0;
-    return round2((importeTotal * porcentajeDetraccion) / 100);
+    return Math.round((importeTotal * porcentajeDetraccion) / 100);
   }, [importeTotal, porcentajeDetraccion]);
 
   const totalNetoAPagar = useMemo(() => {

@@ -244,8 +244,10 @@ export const exportarLiquidacionExcel = async (
   const igvCalculado =
     pctIgv > 0 ? round2((baseImponible * pctIgv) / 100) : 0;
   const importeTotal = round2(baseImponible + igvCalculado);
+  // La detraccion se redondea a entero (sin decimales): es lo que se retiene
+  // y queda guardado en el comprobante.
   const detraccionCalculada =
-    pctDetraccion > 0 ? round2((importeTotal * pctDetraccion) / 100) : 0;
+    pctDetraccion > 0 ? Math.round((importeTotal * pctDetraccion) / 100) : 0;
   const netoAPagar = round2(importeTotal - detraccionCalculada);
 
   // Pagos netos ya realizados: con IGV se registran en los comprobantes, sin
