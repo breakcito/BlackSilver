@@ -3,6 +3,7 @@ import {
   ActionIcon,
   Badge,
   Button,
+  Checkbox,
   Group,
   Modal,
   Stack,
@@ -31,10 +32,12 @@ import { CompraCarbonService } from "../../service/compra-carbon.service";
 import { useNotify } from "../../../../hooks/useNotify";
 import { usePrint } from "../../../../hooks/usePrint";
 import { useAnularCompraCarbon } from "../../hooks/useAnularCompraCarbon";
+import { useExportarLiquidacionMultiple } from "../../hooks/useExportarLiquidacionMultiple";
 import { ModalRegistroCargas } from "../modal-registro-cargas";
 import { ModalLiquidacionPagos } from "../modal-liquidacion-pagos";
 import { exportarLiquidacionExcel } from "../excel/exportar-liquidacion-excel";
 import { exportarLiquidacionFleteExcel } from "../excel/exportar-liquidacion-flete-excel";
+import { round2 } from "./input-classes";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoCompraCarbon } from "../../../../shared/enums/compra-carbon/estado-compra-carbon";
 import type {
@@ -78,6 +81,39 @@ interface Props {
 }
 
 const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
+
+/**
+ * El historial de cambios esta oculto por ahora (sobra por ahora). Para
+ * volver a mostrar el boton, cambia este flag a true.
+ */
+const MOSTRAR_HISTORIAL_CAMBIOS = false;
+
+/**
+ * Neto a pagar de la compra, calculado con la misma cascada que usa la
+ * liquidacion (comprobante):
+ *
+ *   subtotal de las cargas -> IGV -> total -> detraccion -> neto
+ *
+ * La detraccion se redondea a entero, que es como se retiene y como queda
+ * guardado en el comprobante.
+ *
+ * `total_real_neto` (suma de los netos por carga) NO se usa porque cada
+ * carga calcula su detraccion con 2 decimales: al sumar, el neto no coincide
+ * con el del comprobante. Se muestra el del comprobante, que es el que se
+ * paga.
+ */
+const calcularNetoReal = (compra: CompraCarbonResumen): number => {
+  const subtotal = Number(compra.total_real_subtotal || 0);
+  const pctIgv = Number(compra.porcentaje_igv || 0);
+  const pctDetraccion = Number(compra.porcentaje_detraccion || 0);
+
+  const igv = pctIgv > 0 ? round2((subtotal * pctIgv) / 100) : 0;
+  const total = round2(subtotal + igv);
+  const detraccion =
+    pctDetraccion > 0 ? Math.round((total * pctDetraccion) / 100) : 0;
+
+  return round2(total - detraccion);
+};
 
 /**
  * Los cinco estados de `EstadoCompraCarbon`.
@@ -149,6 +185,38 @@ export const CompraCarbonListado = ({
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [exportingFleteId, setExportingFleteId] = useState<number | null>(null);
 
+  /**
+   * Compras marcadas para la exportacion masiva de liquidaciones. La
+   * seleccion vive en el listado porque la tabla pagina por su cuenta: las
+   * marcas deben sobrevivir al cambio de pagina.
+   */
+  const [idsSeleccionados, setIdsSeleccionados] = useState<number[]>([]);
+  const {
+    exportar: exportarLiquidacionMultiple,
+    exportando: exportandoLiquidacion,
+  } = useExportarLiquidacionMultiple();
+
+  /**
+   * Las compras pueden cambiar (periodo, recarga, edicion): se descartan las
+   * marcas que ya no existen en el listado.
+   */
+  useEffect(() => {
+    setIdsSeleccionados((prev) => {
+      const validas = prev.filter((id) =>
+        compras.some((c) => c.id_compra_carbon === id),
+      );
+      return validas.length === prev.length ? prev : validas;
+    });
+  }, [compras]);
+
+  const handleExportarLiquidacionMasiva = async () => {
+    const seleccionadas = compras.filter((c) =>
+      idsSeleccionados.includes(c.id_compra_carbon),
+    );
+    await exportarLiquidacionMultiple(seleccionadas);
+    setIdsSeleccionados([]);
+  };
+
   const handleExportarExcel = async (r: CompraCarbonResumen) => {
     try {
       setExportingId(r.id_compra_carbon);
@@ -219,6 +287,82 @@ export const CompraCarbonListado = ({
         );
     return base.slice().sort((a, b) => b.id_compra_carbon - a.id_compra_carbon);
   }, [compras, busqueda]);
+
+  // ── Seleccion para la exportacion masiva de liquidaciones ───────────
+  const seleccionadas = useMemo(
+    () => new Set(idsSeleccionados),
+    [idsSeleccionados],
+  );
+  const todasSeleccionadas =
+    ordenadas.length > 0 &&
+    ordenadas.every((c) => seleccionadas.has(c.id_compra_carbon));
+  const algunasSeleccionadas = seleccionadas.size > 0 && !todasSeleccionadas;
+
+  /**
+   * Columna de seleccion para la exportacion masiva. El boton de exportar
+   * todas las compras marcadas va en el encabezado, junto al check de
+   * "seleccionar todo".
+   */
+  const columnaSeleccion: DataTableColumn<CompraCarbonResumen> = {
+    accessor: "seleccion",
+    title: (
+      <Group gap={8} justify="center" wrap="nowrap">
+        <Checkbox
+          size="xs"
+          color="indigo"
+          checked={todasSeleccionadas}
+          indeterminate={algunasSeleccionadas}
+          onChange={(e) =>
+            setIdsSeleccionados(
+              e.currentTarget.checked
+                ? ordenadas.map((c) => c.id_compra_carbon)
+                : [],
+            )
+          }
+          aria-label="Seleccionar todas las compras"
+        />
+        <Tooltip
+          label={
+            idsSeleccionados.length > 0
+              ? `Exportar la liquidacion de ${idsSeleccionados.length} compra(s) seleccionadas en un solo archivo`
+              : "Seleccione las compras a exportar"
+          }
+          withArrow
+          position="top"
+        >
+          <ActionIcon
+            variant="light"
+            color="teal"
+            radius="xl"
+            size="sm"
+            onClick={() => void handleExportarLiquidacionMasiva()}
+            loading={exportandoLiquidacion}
+            disabled={idsSeleccionados.length === 0}
+            aria-label="Exportar la liquidacion de las compras seleccionadas"
+          >
+            <ArrowDownTrayIcon className="w-4 h-4" />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+    ),
+    width: 56,
+    textAlign: "center",
+    render: (r: CompraCarbonResumen) => (
+      <Checkbox
+        size="xs"
+        color="indigo"
+        checked={seleccionadas.has(r.id_compra_carbon)}
+        onChange={() =>
+          setIdsSeleccionados((prev) =>
+            prev.includes(r.id_compra_carbon)
+              ? prev.filter((id) => id !== r.id_compra_carbon)
+              : [...prev, r.id_compra_carbon],
+          )
+        }
+        aria-label={`Seleccionar la compra ${r.correlativo}`}
+      />
+    ),
+  };
 
   const handleAnular = async () => {
     if (!openAnularModal) return;
@@ -368,6 +512,9 @@ export const CompraCarbonListado = ({
       width: 50,
       textAlign: "center",
     },
+    // Seleccion para la exportacion masiva: va entre el numero de fila (#) y
+    // el correlativo.
+    columnaSeleccion,
     {
       accessor: "correlativo",
       title: "Correlativo",
@@ -523,7 +670,7 @@ export const CompraCarbonListado = ({
             {formatNumber(Number(r.total_toneladas_reales), 2)} TN
           </Text>
           <Text size="xs" c="white" className="font-mono" fw={800}>
-            S/. {formatNumber(r.total_real_neto)}
+            S/. {formatNumber(calcularNetoReal(r))}
           </Text>
           {(r.cantidad_cargas_con_flete ?? 0) > 0 && (
             <Text size="10px" c="blue.4" className="font-mono" fw={700}>
@@ -763,8 +910,9 @@ export const CompraCarbonListado = ({
               </ActionIcon>
             </Tooltip>
 
-            {/* 5. Historial de cambios */}
-            {tieneCambios && (
+            {/* 5. Historial de cambios (oculto por ahora: no se muestra el
+                boton. Para volver a habilitarlo, cambia el flag a true). */}
+            {MOSTRAR_HISTORIAL_CAMBIOS && tieneCambios && (
               <Tooltip label="Historial de cambios" withArrow position="top">
                 <ActionIcon
                   variant="light"
@@ -873,7 +1021,7 @@ export const CompraCarbonListado = ({
                 <Text size="xs" c="gray">
                   Total Neto:{" "}
                   <span className="text-emerald-400 font-bold font-mono">
-                    {formatPEN(Number(detallesModal.compra.total_real_neto))}
+                    {formatPEN(calcularNetoReal(detallesModal.compra))}
                   </span>
                 </Text>
               </Group>
