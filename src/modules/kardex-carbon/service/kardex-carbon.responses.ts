@@ -28,6 +28,15 @@ export interface MovimientoKardexCarbonItem {
 
   fecha_hora_movimiento: string;
   tipo_movimiento: "Ingreso" | "Salida" | string;
+  /** Calidad del carbon del movimiento: Baja | Intermedia | Alta. */
+  calidad?: string | null;
+  /**
+   * Tipo de socio comercial del movimiento: la carga de VENTA trae al
+   * cliente y la de COMPRA al proveedor.
+   */
+  socio_tipo?: "Cliente" | "Proveedor" | null;
+  /** Razon social del cliente (venta) o del proveedor (compra). */
+  socio_razon_social?: string | null;
   stock_anterior: number;
   cantidad_movimiento: number;
   stock_resultante: number;

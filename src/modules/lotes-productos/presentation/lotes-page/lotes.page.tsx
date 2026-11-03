@@ -1,7 +1,7 @@
-import { Stack, Text } from "@mantine/core";
+import { Alert, Button, Group, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
-import { InboxStackIcon } from "@heroicons/react/24/outline";
+import { InboxStackIcon, TrashIcon } from "@heroicons/react/24/outline";
 import QRCode from "qrcode";
 import dayjs from "dayjs";
 
@@ -41,8 +41,11 @@ export const LotesPage = () => {
     productosUnicos,
     addLote,
     updateLote,
-    eliminarLote,
     deletingId,
+    lotePorEliminar,
+    pedirEliminarLote,
+    cancelarEliminarLote,
+    confirmarEliminarLote,
     armarTicket,
     selectedLotes,
     setSelectedLotes,
@@ -128,7 +131,7 @@ export const LotesPage = () => {
     },
     onEdit: handleOpenEdit,
     onDelete: (record) => {
-      void eliminarLote(record.id_lote);
+      pedirEliminarLote(record);
     },
     onHistory: handleOpenHistory,
     deletingId,
@@ -205,6 +208,54 @@ export const LotesPage = () => {
           ))}
         </Stack>
       )}
+
+      {/* Modal de confirmacion de eliminacion */}
+      <ModalEstandar
+        opened={lotePorEliminar !== null}
+        close={cancelarEliminarLote}
+        title="Eliminar lote"
+        size="md"
+      >
+        <Stack gap="md">
+          <Alert
+            color="red"
+            variant="light"
+            title="Atención"
+            radius="md"
+            icon={<TrashIcon className="w-5 h-5" />}
+          >
+            ¿Está seguro de eliminar este lote? Esta acción lo desactivará del
+            almacén.
+            {lotePorEliminar && (
+              <Text size="xs" c="dimmed" mt={6}>
+                {lotePorEliminar.correlativo} · {lotePorEliminar.producto}
+              </Text>
+            )}
+          </Alert>
+
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="default"
+              radius="lg"
+              size="xs"
+              onClick={cancelarEliminarLote}
+              disabled={deletingId !== null}
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="red"
+              radius="lg"
+              size="xs"
+              loading={deletingId !== null}
+              onClick={() => void confirmarEliminarLote()}
+              leftSection={<TrashIcon className="w-4 h-4" />}
+            >
+              Sí, eliminar
+            </Button>
+          </Group>
+        </Stack>
+      </ModalEstandar>
 
       <ModalEstandar
         opened={openedCreate}
