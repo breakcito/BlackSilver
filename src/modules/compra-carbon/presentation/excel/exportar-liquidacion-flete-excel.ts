@@ -34,11 +34,10 @@ const C = {
   GUIA_TRANSPORTISTA: 12,
   PRODUCTO: 13,
   TM: 14,
-  P_BASE: 15,
-  FLETE: 16,
-  FACTURA_FECHA: 17,
-  FACTURA_NUMERO: 18,
-  FACTURA_SUBTOTAL: 19,
+  FLETE: 15,
+  FACTURA_FECHA: 16,
+  FACTURA_NUMERO: 17,
+  FACTURA_SUBTOTAL: 18,
 } as const;
 
 /**
@@ -217,7 +216,7 @@ export const exportarLiquidacionFleteExcel = async (
       [C.GUIA_REMISION, C.GUIA_TRANSPORTISTA, "N° Guía"],
       [C.PRODUCTO, C.PRODUCTO, "Producto"],
       [C.TM, C.TM, "TM"],
-      [C.P_BASE, C.FLETE, "Precios"],
+      [C.FLETE, C.FLETE, "Precios"],
       [C.FACTURA_FECHA, C.FACTURA_SUBTOTAL, "Factura"],
     ];
     nivel1.forEach(([desde, hasta, titulo]) => {
@@ -242,9 +241,8 @@ export const exportarLiquidacionFleteExcel = async (
       [C.PLACA, "Tracto"],
       [C.GUIA_REMISION, "Remisión"],
       [C.GUIA_TRANSPORTISTA, "Transportista"],
-      // "P. Base" es el precio del carbon transportado; el flete es lo que
-      // realmente paga la empresa al transportista.
-      [C.P_BASE, "P. Base (Carbón)"],
+      // Solo se liquida el flete: es lo que realmente paga la empresa al
+      // transportista.
       [C.FLETE, "Flete / TN"],
       [C.FACTURA_FECHA, "Fecha"],
       [C.FACTURA_NUMERO, "N° Factura"],
@@ -309,7 +307,6 @@ export const exportarLiquidacionFleteExcel = async (
       valores[C.GUIA_TRANSPORTISTA - 1] = c.guia_transportista || DASH;
       valores[C.PRODUCTO - 1] = c.tipo_carbon_nombre;
       valores[C.TM - 1] = Number(c.cantidad || 0);
-      valores[C.P_BASE - 1] = Number(c.precio_unitario || 0);
       valores[C.FLETE - 1] = Number(c.costo_flete_por_tonelada || 0);
       valores[C.FACTURA_FECHA - 1] = c.comprobante_transporte_fecha_emision
         ? dayjs(c.comprobante_transporte_fecha_emision).format("DD/MM/YYYY")
@@ -327,7 +324,7 @@ export const exportarLiquidacionFleteExcel = async (
           celda.alignment = { vertical: "middle", horizontal: "right" };
           if (idx + 1 === C.TM) {
             celda.numFmt = "#,##0.00";
-          } else if (idx + 1 >= C.P_BASE) {
+          } else if (idx + 1 >= C.FLETE) {
             celda.numFmt = "S/ #,##0.00";
           }
         } else {
@@ -354,9 +351,7 @@ export const exportarLiquidacionFleteExcel = async (
     filaTotales.getCell(C.TM).font = fontHeader;
     filaTotales.getCell(C.TM).numFmt = "#,##0.00";
     filaTotales.getCell(C.TM).border = borderThin;
-    for (let c = C.P_BASE; c <= C.FLETE; c++) {
-      filaTotales.getCell(c).border = borderThin;
-    }
+    filaTotales.getCell(C.FLETE).border = borderThin;
     filaTotales.getCell(C.FACTURA_SUBTOTAL).value = round2(totalSubtotalFlete);
     filaTotales.getCell(C.FACTURA_SUBTOTAL).font = fontHeader;
     filaTotales.getCell(C.FACTURA_SUBTOTAL).numFmt = "S/ #,##0.00";
@@ -384,8 +379,8 @@ export const exportarLiquidacionFleteExcel = async (
       opts: { bold?: boolean; verde?: boolean } = {},
     ) => {
       const fila = ws.getRow(linea);
-      ws.mergeCells(linea, C.P_BASE, linea, C.FACTURA_NUMERO);
-      const celdaLabel = fila.getCell(C.P_BASE);
+      ws.mergeCells(linea, C.FLETE, linea, C.FACTURA_NUMERO);
+      const celdaLabel = fila.getCell(C.FLETE);
       celdaLabel.value = label;
       celdaLabel.font = opts.verde
         ? { ...fontHeader, size: 10, color: { argb: "FFFFFFFF" } }
@@ -394,7 +389,7 @@ export const exportarLiquidacionFleteExcel = async (
           : fontData;
       celdaLabel.alignment = { vertical: "middle", horizontal: "right" };
       if (opts.verde) {
-        for (let c = C.P_BASE; c <= C.FACTURA_NUMERO; c++) {
+        for (let c = C.FLETE; c <= C.FACTURA_NUMERO; c++) {
           fila.getCell(c).fill = fillNeto;
         }
       }
@@ -437,7 +432,7 @@ export const exportarLiquidacionFleteExcel = async (
 
   // ── Anchos de columna ────────────────────────────────────────────────
   const anchos = [
-    6, 11, 10, 14, 26, 16, 12, 18, 12, 18, 14, 14, 14, 10, 12, 12, 12, 16, 14,
+    6, 11, 10, 14, 26, 16, 12, 18, 12, 18, 14, 14, 14, 10, 12, 12, 16, 14,
   ];
   anchos.forEach((w, idx) => {
     ws.getColumn(idx + 1).width = w;
