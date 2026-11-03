@@ -16,7 +16,14 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { IconCheck, IconPencil, IconPlus, IconScale, IconTrash } from "@tabler/icons-react";
+import {
+  IconCheck,
+  IconPencil,
+  IconPlus,
+  IconScale,
+  IconTrash,
+  IconTruck,
+} from "@tabler/icons-react";
 
 import { inputClasses } from "../components/input-classes";
 import {
@@ -25,22 +32,17 @@ import {
   type CargaVentaFormState,
 } from "./carga-venta-form-state";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
-import {
-  esTipoCalidadCarbon,
-  type TipoCalidadCarbon,
-} from "../../../../shared/enums/carbon/tipo-calidad-carbon";
-import type {
-  RES_CalidadCarbon,
-  RES_TipoCarbon,
-} from "../../../tipo-carbon/service/tipo-carbon.responses";
+import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
+import type { BlendingDespachable } from "../../service/venta-carbon.responses";
+import type { RES_VehiculoCarbon } from "../../../../service/responses/vehiculo-carbon";
 
 interface Props {
   cargas: CargaVentaFormState[];
   onChange: (cargas: CargaVentaFormState[]) => void;
-  tipos: RES_TipoCarbon[];
-  calidades: RES_CalidadCarbon[];
-  /** Stock despachable del almacen de salida: clave `"{idTipo}|{calidad}"`. */
-  stockPorClave: Map<string, number>;
+  /** Blendings despachables del almacen de salida. */
+  blendings: BlendingDespachable[];
+  /** Vehiculos de carbon. */
+  vehiculos: RES_VehiculoCarbon[];
   loadingCatalogos?: boolean;
   saving?: boolean;
 }
@@ -52,87 +54,118 @@ interface Props {
  * "Agregar" y cae en una tabla de abajo. Si quiere corregirla, la edita
  * desde la tabla y los campos vuelven a traerse al formulario. Asi el
  * formulario no crece con cada carga y no genera un scroll interminable.
+ *
+ * La carga sale de un BLENDING: al elegirlo se autocompletan el porcentaje
+ * de ceniza y las toneladas, que el usuario puede ajustar.
  */
 export const EditorCargasVenta = ({
   cargas,
   onChange,
-  tipos,
-  calidades,
-  stockPorClave,
+  blendings,
+  vehiculos,
   loadingCatalogos = false,
   saving = false,
 }: Props) => {
   const [borrador, setBorrador] = useState<CargaVentaFormState>(nuevaCargaVenta);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [vehiculoBusqueda, setVehiculoBusqueda] = useState("");
+  const [blendingBusqueda, setBlendingBusqueda] = useState("");
 
-  const tiposVisibles = useMemo(
+  const blendingsVisibles = useMemo(() => {
+    const q = blendingBusqueda.trim();
+    if (!q) return blendings;
+    return getCoincidencias(blendings, q, {
+      keys: ["correlativo", "tipo_carbon_nombre", "tipo_carbon_codigo"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [blendings, blendingBusqueda]);
+
+  const blendingsOptions = useMemo(
     () =>
-      tipos.map((t) => ({
-        value: String(t.id_tipo_carbon),
-        label: `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`,
+      blendingsVisibles.map((b) => ({
+        value: String(b.id_blending_carbon),
+        label: `${b.correlativo} · ${b.tipo_carbon_nombre ?? "Sin tipo"}`,
       })),
-    [tipos],
+    [blendingsVisibles],
   );
 
-  const calidadesVisibles = useMemo(
-    () => calidades.map((c) => ({ value: c.nombre, label: c.nombre })),
-    [calidades],
+  const vehiculosVisibles = useMemo(() => {
+    const q = vehiculoBusqueda.trim();
+    if (!q) return vehiculos;
+    return getCoincidencias(vehiculos, q, {
+      keys: ["placa", "marca", "tipo_vehiculo"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [vehiculos, vehiculoBusqueda]);
+
+  const vehiculoSeleccionado = useMemo(
+    () =>
+      vehiculos.find((v) => String(v.id_vehiculo_carbon) === borrador.id_vehiculo_carbon),
+    [vehiculos, borrador.id_vehiculo_carbon],
   );
 
   /**
-   * Stock que se puede asignar al borrador: el total del almacen menos lo
-   * que ya repartieron las OTRAS cargas con la misma combinacion
-   * tipo/calidad. La carga que se esta editando no cuenta.
+   * Stock que se puede asignar al borrador: lo que queda del blending menos
+   * lo que ya repartieron las OTRAS cargas con el mismo blending. La carga
+   * que se esta editando no cuenta.
    */
   const calcularDisponible = useCallback(
-    (
-      idTipo: number | null,
-      calidad: TipoCalidadCarbon | null,
-    ): number => {
-      if (!idTipo || !calidad) return 0;
+    (idBlending: number | null): number => {
+      if (!idBlending) return 0;
 
-      const stock = stockPorClave.get(`${idTipo}|${calidad}`) ?? 0;
+      const blending = blendings.find(
+        (b) => b.id_blending_carbon === idBlending,
+      );
+      const stock = blending?.disponible ?? 0;
 
       let asignadoPorOtras = 0;
       cargas.forEach((otra, i) => {
         if (i === indiceEdicion) return;
-        if (otra.id_tipo_carbon !== idTipo) return;
-        if (otra.calidad !== calidad) return;
+        if (otra.id_blending_carbon !== idBlending) return;
         asignadoPorOtras += Number(otra.cantidad_toneladas) || 0;
       });
 
       return Math.max(0, stock - asignadoPorOtras);
     },
-    [cargas, indiceEdicion, stockPorClave],
+    [blendings, cargas, indiceEdicion],
   );
 
   /**
-   * Al cambiar el tipo o la calidad se recalcula el stock de referencia y se
-   * autocompleta la cantidad con todo lo disponible.
+   * Al elegir el blending se autocompletan el % de ceniza y las toneladas
+   * con lo que hay del lote.
    */
-  const recalcularCantidad = (
-    idTipo: number | null,
-    calidad: TipoCalidadCarbon | null,
-  ) => {
-    const disponible = calcularDisponible(idTipo, calidad);
+  const seleccionarBlending = (idBlending: number | null) => {
+    if (!idBlending) {
+      setBorrador((prev) => ({
+        ...prev,
+        id_blending_carbon: null,
+        porcentaje_ceniza: 0,
+        cantidad_toneladas: 0,
+      }));
+      return;
+    }
+
+    const blending = blendings.find((b) => b.id_blending_carbon === idBlending);
+    const disponible = calcularDisponible(idBlending);
+
     setBorrador((prev) => ({
       ...prev,
-      id_tipo_carbon: idTipo,
-      calidad,
+      id_blending_carbon: idBlending,
+      porcentaje_ceniza: Number(blending?.porcentaje_ceniza) || 0,
       cantidad_toneladas:
         disponible > 0 ? Math.round(disponible * 10000) / 10000 : 0,
     }));
   };
 
-  const disponible = calcularDisponible(borrador.id_tipo_carbon, borrador.calidad);
+  const disponible = calcularDisponible(borrador.id_blending_carbon);
 
   const guardar = () => {
     setError(null);
 
     if (!esCargaVentaCompleta(borrador)) {
       setError(
-        "Complete el tipo de carbon, la calidad, las toneladas y la fecha/hora de salida",
+        "Complete el blending, las toneladas y la fecha/hora de salida",
       );
       return;
     }
@@ -168,8 +201,17 @@ export const EditorCargasVenta = ({
     if (indiceEdicion === index) cancelarEdicion();
   };
 
-  const nombreTipo = (idTipo: number | null) =>
-    tipos.find((t) => t.id_tipo_carbon === idTipo)?.nombre ?? "—";
+  const correlativoBlending = (idBlending: number | null) =>
+    blendings.find((b) => b.id_blending_carbon === idBlending)?.correlativo ??
+    "—";
+
+  const tipoBlending = (idBlending: number | null) =>
+    blendings.find((b) => b.id_blending_carbon === idBlending)
+      ?.tipo_carbon_nombre ?? "—";
+
+  const placaVehiculo = (idVehiculo: string | null) =>
+    vehiculos.find((v) => String(v.id_vehiculo_carbon) === idVehiculo)?.placa ??
+    "—";
 
   return (
     <Stack gap="md">
@@ -201,18 +243,22 @@ export const EditorCargasVenta = ({
 
         <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
           <Select
-            label="Tipo de carbon"
+            label="Blending a despachar"
             placeholder={
-              loadingCatalogos ? "Cargando..." : "Seleccione el tipo"
+              loadingCatalogos ? "Cargando..." : "Seleccione el blending"
             }
-            data={tiposVisibles}
-            value={borrador.id_tipo_carbon ? String(borrador.id_tipo_carbon) : null}
-            onChange={(val) =>
-              recalcularCantidad(
-                val ? Number(val) : null,
-                borrador.calidad,
-              )
+            data={blendingsOptions}
+            value={
+              borrador.id_blending_carbon
+                ? String(borrador.id_blending_carbon)
+                : null
             }
+            onChange={(val) => {
+              setBlendingBusqueda("");
+              seleccionarBlending(val ? Number(val) : null);
+            }}
+            searchValue={blendingBusqueda}
+            onSearchChange={setBlendingBusqueda}
             rightSection={
               loadingCatalogos ? (
                 <Loader size={14} color="indigo" />
@@ -223,25 +269,29 @@ export const EditorCargasVenta = ({
             size="xs"
             radius="lg"
             searchable
-            nothingFoundMessage="Sin tipos de carbon"
+            nothingFoundMessage="Sin blendings disponibles"
             comboboxProps={{ withinPortal: true }}
+            filter={({ options }) => options}
           />
 
-          <Select
-            label="Calidad a despachar"
-            placeholder="Seleccione la calidad"
-            data={calidadesVisibles}
-            value={borrador.calidad}
+          <NumberInput
+            label="% de ceniza"
+            placeholder="0.00"
+            value={borrador.porcentaje_ceniza}
             onChange={(val) =>
-              recalcularCantidad(
-                borrador.id_tipo_carbon,
-                esTipoCalidadCarbon(val) ? val : null,
-              )
+              setBorrador((prev) => ({
+                ...prev,
+                porcentaje_ceniza: Number(val) || 0,
+              }))
             }
-            disabled={loadingCatalogos || saving}
+            min={0}
+            max={100}
+            decimalScale={2}
+            hideControls
             classNames={inputClasses}
             size="xs"
             radius="lg"
+            disabled={saving}
           />
 
           <div>
@@ -262,10 +312,10 @@ export const EditorCargasVenta = ({
               disabled={saving}
               hideControls
             />
-            {borrador.id_tipo_carbon && borrador.calidad && (
+            {borrador.id_blending_carbon && (
               <Group gap={6} mt={4} wrap="nowrap">
                 <Tooltip
-                  label="Stock que se puede despachar: ya descuenta las cargas que salieron y siguen en camino"
+                  label="Stock del lote que se puede despachar: ya descuenta las cargas que salieron y siguen en camino"
                   withArrow
                 >
                   <Badge
@@ -298,8 +348,7 @@ export const EditorCargasVenta = ({
                 )}
               </Group>
             )}
-            {borrador.id_tipo_carbon &&
-              borrador.calidad &&
+            {borrador.id_blending_carbon &&
               borrador.cantidad_toneladas > disponible && (
                 <Text size="10px" c="red.4" mt={4} fw={600}>
                   La cantidad supera el stock disponible
@@ -322,6 +371,89 @@ export const EditorCargasVenta = ({
             radius="lg"
             disabled={saving}
           />
+        </SimpleGrid>
+
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm" mt="sm">
+          <Select
+            label="Vehículo (opcional)"
+            placeholder={
+              vehiculos.length === 0 ? "Sin vehículos" : "Seleccione vehículo"
+            }
+            data={vehiculosVisibles.map((v) => ({
+              value: String(v.id_vehiculo_carbon),
+              label: `${v.placa}${v.marca ? ` · ${v.marca}` : ""} (${v.tipo_vehiculo})`,
+            }))}
+            value={borrador.id_vehiculo_carbon}
+            onChange={(val) => {
+              setBorrador((prev) => ({ ...prev, id_vehiculo_carbon: val }));
+              setVehiculoBusqueda("");
+            }}
+            searchValue={vehiculoBusqueda}
+            onSearchChange={setVehiculoBusqueda}
+            leftSection={<IconTruck size={16} />}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            searchable
+            clearable
+            nothingFoundMessage="Sin vehículos registrados"
+            comboboxProps={{ withinPortal: true }}
+            filter={({ options }) => options}
+            disabled={saving}
+          />
+
+          <TextInput
+            label="Segunda placa (opcional)"
+            placeholder="Ej. A1B-234"
+            value={borrador.segunda_placa}
+            onChange={(e) =>
+              setBorrador((prev) => ({
+                ...prev,
+                segunda_placa: e.currentTarget.value.toUpperCase(),
+              }))
+            }
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            disabled={saving}
+          />
+
+          <div>
+            <Text size="xs" c="gray" fw={600} mb={4}>
+              Lote seleccionado
+            </Text>
+            <Paper
+              p="xs"
+              radius="lg"
+              className="bg-zinc-900/80 border border-zinc-800"
+            >
+              {borrador.id_blending_carbon ? (
+                <Group gap={6} wrap="nowrap">
+                  <Badge
+                    size="sm"
+                    variant="light"
+                    color="cyan"
+                    radius="sm"
+                    className="font-mono"
+                  >
+                    {correlativoBlending(borrador.id_blending_carbon)}
+                  </Badge>
+                  <Text size="xs" c="zinc.300" truncate>
+                    {tipoBlending(borrador.id_blending_carbon)}
+                  </Text>
+                </Group>
+              ) : (
+                <Text size="xs" c="dimmed" fs="italic">
+                  Elija un blending
+                </Text>
+              )}
+            </Paper>
+            {vehiculoSeleccionado && (
+              <Text size="10px" c="dimmed" mt={4}>
+                Tipo: {vehiculoSeleccionado.tipo_vehiculo}
+              </Text>
+            )}
+          </div>
         </SimpleGrid>
 
         <FileInput
@@ -407,19 +539,27 @@ export const EditorCargasVenta = ({
                   ta={"center"}
                   className="text-zinc-400 text-xs font-semibold"
                 >
-                  Tipo de carbon
+                  Blending
                 </Table.Th>
                 <Table.Th
                   ta={"center"}
+                  w={90}
                   className="text-zinc-400 text-xs font-semibold"
                 >
-                  Calidad
+                  % Ceniza
                 </Table.Th>
                 <Table.Th
                   ta={"center"}
                   className="text-zinc-400 text-xs font-semibold"
                 >
                   Toneladas
+                </Table.Th>
+                <Table.Th
+                  ta={"center"}
+                  w={130}
+                  className="text-zinc-400 text-xs font-semibold"
+                >
+                  Vehículo
                 </Table.Th>
                 <Table.Th
                   ta={"center"}
@@ -445,18 +585,37 @@ export const EditorCargasVenta = ({
                     </Badge>
                   </Table.Td>
                   <Table.Td ta={"center"}>
-                    <Text size="xs" fw={600} c="zinc.100">
-                      {nombreTipo(carga.id_tipo_carbon)}
-                    </Text>
+                    <div className="flex flex-col gap-1 items-center">
+                      <Badge
+                        size="xs"
+                        variant="light"
+                        color="cyan"
+                        radius="sm"
+                        className="font-mono"
+                      >
+                        {correlativoBlending(carga.id_blending_carbon)}
+                      </Badge>
+                      <Text size="10px" c="dimmed">
+                        {tipoBlending(carga.id_blending_carbon)}
+                      </Text>
+                    </div>
                   </Table.Td>
                   <Table.Td ta={"center"}>
-                    <Badge size="xs" variant="light" color="gray" radius="sm">
-                      {carga.calidad ?? "—"}
-                    </Badge>
+                    <Text size="xs" c="zinc.300">
+                      {formatNumber(carga.porcentaje_ceniza)}%
+                    </Text>
                   </Table.Td>
                   <Table.Td ta={"center"}>
                     <Text size="xs" fw={700} c="zinc.100">
                       {formatNumber(carga.cantidad_toneladas)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td ta={"center"}>
+                    <Text size="xs" c="zinc.300" className="font-mono">
+                      {placaVehiculo(carga.id_vehiculo_carbon)}
+                      {carga.segunda_placa
+                        ? ` · ${carga.segunda_placa}`
+                        : ""}
                     </Text>
                   </Table.Td>
                   <Table.Td ta={"center"}>

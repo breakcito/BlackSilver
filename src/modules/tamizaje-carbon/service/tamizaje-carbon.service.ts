@@ -2,11 +2,15 @@ import { api } from "../../../service/_api";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import type { IArchivo } from "../../../shared/interfaces/archivo";
 import type {
+  ActualizarBlendingRequest,
   ActualizarStockManualRequest,
+  BlendingDetallePayload,
+  RegistrarBlendingRequest,
   RegistrarGastoZarandeoPayload,
   RegistrarZarandeoRequest,
 } from "./tamizaje-carbon.requests";
 import type {
+  BlendingCarbonItem,
   GastoZarandeoItem,
   GrupoCargasItem,
   StockCarbonItem,
@@ -106,6 +110,147 @@ export const TamizajeCarbonService = {
   },
 
   /**
+   * Gastos de produccion de un blending.
+   */
+  getGastosBlending: async (
+    idBlendingCarbon: number,
+  ): Promise<IRespuesta<GastoZarandeoItem[]>> => {
+    const { data } = await api.get<IRespuesta<GastoZarandeoItem[]>>(
+      `${PATH}/gastos/blending/${idBlendingCarbon}`,
+    );
+    return data;
+  },
+
+  /**
+   * Lista los blendings (filtrable por mes, almacen y tipo de carbon).
+   */
+  getBlendings: async (filters?: {
+    id_almacen?: number;
+    id_tipo_carbon?: number;
+    mes?: number;
+    anio?: number;
+    filtros?: string;
+  }): Promise<IRespuesta<BlendingCarbonItem[]>> => {
+    const { data } = await api.get<IRespuesta<BlendingCarbonItem[]>>(
+      `${PATH}/blendings`,
+      { params: filters },
+    );
+    return data;
+  },
+
+  /**
+   * Registra un blending: toma stock de las calidades indicadas.
+   */
+  registrarBlending: async (
+    payload: RegistrarBlendingRequest,
+  ): Promise<IRespuesta<BlendingCarbonItem>> => {
+    const formData = new FormData();
+
+    if (payload.id_almacen)
+      formData.append("id_almacen", String(payload.id_almacen));
+    formData.append("id_empleado_supervisor", String(payload.id_empleado_supervisor));
+    formData.append("id_tipo_carbon", String(payload.id_tipo_carbon));
+    formData.append("porcentaje_ceniza", String(payload.porcentaje_ceniza));
+    formData.append("fecha_hora_blending", payload.fecha_hora_blending);
+    formData.append("detalles", JSON.stringify(payload.detalles));
+
+    if (payload.evidencias && payload.evidencias.length > 0) {
+      payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
+    }
+
+    const { data } = await api.post<IRespuesta<BlendingCarbonItem>>(
+      `${PATH}/blendings`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  /**
+   * Actualiza un blending y recalcula el stock que toma.
+   */
+  actualizarBlending: async (
+    idBlendingCarbon: number,
+    payload: ActualizarBlendingRequest,
+  ): Promise<IRespuesta<BlendingCarbonItem>> => {
+    const formData = new FormData();
+
+    if (payload.id_almacen)
+      formData.append("id_almacen", String(payload.id_almacen));
+    formData.append("id_empleado_supervisor", String(payload.id_empleado_supervisor));
+    formData.append("id_tipo_carbon", String(payload.id_tipo_carbon));
+    formData.append("porcentaje_ceniza", String(payload.porcentaje_ceniza));
+    formData.append("fecha_hora_blending", payload.fecha_hora_blending);
+    formData.append("detalles", JSON.stringify(payload.detalles));
+
+    if (payload.evidencias && payload.evidencias.length > 0) {
+      payload.evidencias.forEach((f) => formData.append("evidencias[]", f));
+    }
+
+    const { data } = await api.put<IRespuesta<BlendingCarbonItem>>(
+      `${PATH}/blendings/${idBlendingCarbon}`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  /**
+   * Agrega mas stock tomado a un blending ya registrado.
+   */
+  agregarStockBlending: async (
+    idBlendingCarbon: number,
+    detalles: BlendingDetallePayload[],
+  ): Promise<IRespuesta<BlendingCarbonItem>> => {
+    const formData = new FormData();
+    formData.append("detalles", JSON.stringify(detalles));
+
+    const { data } = await api.post<IRespuesta<BlendingCarbonItem>>(
+      `${PATH}/blendings/${idBlendingCarbon}/detalles`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  /**
+   * Agrega archivos a las evidencias de un blending ya registrado y devuelve
+   * la lista completa (las previas + las nuevas).
+   */
+  subirEvidenciasBlending: async (
+    idBlendingCarbon: number,
+    archivos: File[],
+  ): Promise<IRespuesta<IArchivo[]>> => {
+    const formData = new FormData();
+    archivos.forEach((file) => formData.append("evidencias[]", file));
+
+    const { data } = await api.post<IRespuesta<IArchivo[]>>(
+      `${PATH}/blendings/${idBlendingCarbon}/evidencias`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
+  /**
+   * Elimina una evidencia del blending (archivo fisico + registro).
+   */
+  eliminarEvidenciaBlending: async (
+    idBlendingCarbon: number,
+    pathRelativo: string,
+  ): Promise<IRespuesta<IArchivo[]>> => {
+    const { data } = await api.delete<IRespuesta<IArchivo[]>>(
+      `${PATH}/blendings/${idBlendingCarbon}/evidencias`,
+      {
+        data: {
+          path_relativo: pathRelativo,
+        },
+      },
+    );
+    return data;
+  },
+
+  /**
    * Sube archivos como evidencias del zarandeo y devuelve la lista completa
    * de evidencias (las previas + las nuevas).
    */
@@ -150,7 +295,8 @@ export const TamizajeCarbonService = {
     const { data } = await api.post<IRespuesta<GastoZarandeoItem>>(
       `${PATH}/gastos`,
       {
-        id_zarandeo_carbon: payload.id_zarandeo_carbon,
+        id_zarandeo_carbon: payload.id_zarandeo_carbon ?? null,
+        id_blending_carbon: payload.id_blending_carbon ?? null,
         gasto: payload.gasto,
         otro_gasto: payload.otro_gasto ?? null,
         id_proveedor: payload.id_proveedor ?? null,

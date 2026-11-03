@@ -54,6 +54,25 @@ export const getCoincidencias = <T>(
   const searchQuery = useNormalization ? normalizeText(query) : query;
   const isPlainList = typeof list[0] === "string";
 
+  // Sin claves explicitas se buscan TODOS los campos de texto del objeto.
+  // Fuse y FlexSearch necesitan al menos una clave: sin ella la busqueda no
+  // encuentra NADA (ni siquiera lo escrito tal cual).
+  const clavesBusqueda: string[] = isPlainList
+    ? []
+    : keys.length > 0
+      ? keys
+      : (() => {
+          const primero = list[0] as Record<string, unknown>;
+          const textos = Object.keys(primero).filter(
+            (k) => typeof primero[k] === "string",
+          );
+          // Si el objeto tiene `label`, ese es el texto que ve el usuario:
+          // el `value` (un id) solo generaria ruido.
+          return textos.includes("label")
+            ? textos.filter((k) => k !== "value")
+            : textos;
+        })();
+
   // 1. Preparar datos internamente (preservamos el índice original para mapear luego)
   const processedList: ProcessedItem[] = list.map((item, index) => {
     const processedItem: ProcessedItem = { _originalIndex: index };
@@ -65,8 +84,8 @@ export const getCoincidencias = <T>(
       }
     } else {
       Object.assign(processedItem, item);
-      if (useNormalization && keys.length > 0) {
-        keys.forEach((k) => {
+      if (useNormalization && clavesBusqueda.length > 0) {
+        clavesBusqueda.forEach((k) => {
           processedItem[`${k}_norm`] = normalizeText((item as any)[k]);
         });
       }
@@ -80,8 +99,8 @@ export const getCoincidencias = <T>(
       ? ["val_norm"]
       : ["val"]
     : useNormalization
-      ? keys.map((k) => `${k}_norm`)
-      : (keys as string[]);
+      ? clavesBusqueda.map((k) => `${k}_norm`)
+      : clavesBusqueda;
 
   // 2. Ejecutar Fuse.js (Captura errores ortográficos)
   const fuse = new Fuse(processedList, {
@@ -151,7 +170,7 @@ export const getCoincidencias = <T>(
     } else {
       list.forEach((item, idx) => {
         const obj = item as Record<string, unknown>;
-        const isMatch = keys.some((k) => {
+        const isMatch = clavesBusqueda.some((k) => {
           const val = obj[k];
           return typeof val === "string" && matchesBySubstring(val);
         });

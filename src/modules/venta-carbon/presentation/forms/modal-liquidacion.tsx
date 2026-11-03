@@ -31,7 +31,9 @@ import { VentaCarbonService } from "../../service/venta-carbon.service";
 import { inputClasses } from "../components/input-classes";
 import {
   calcularImportesCarga,
+  calcularImportesLiquidacion,
   sumarImportes,
+  type ImportesBaseCarga,
   type ImportesCarga,
 } from "./liquidacion-calculos";
 import type {
@@ -172,12 +174,22 @@ export const ModalLiquidacion = ({
     return mapa;
   }, [precios]);
 
+  /**
+   * Importes de cada carga del tipo seleccionado.
+   *
+   * La detraccion NO se calcula por carga: se calcula sobre el total de la
+   * liquidacion, se redondea a entero y se reparte entre las cargas. Es el
+   * mismo criterio que aplica la API, asi que lo que se ve es lo que se
+   * guarda.
+   */
   const importesPorCarga = useMemo(() => {
     const mapa = new Map<number, ImportesCarga>();
+
+    const base: Array<[number, ImportesBaseCarga]> = [];
     cargasDelTipo.forEach((c) => {
       const precio = preciosPorId.get(c.id_carga_venta_carbon);
       if (!precio) return;
-      mapa.set(
+      base.push([
         c.id_carga_venta_carbon,
         calcularImportesCarga(
           precio.precio_base,
@@ -185,10 +197,17 @@ export const ModalLiquidacion = ({
           precio.bono,
           Number(c.cantidad_toneladas) || 0,
           Number(venta.porcentaje_igv) || 0,
-          Number(venta.porcentaje_detraccion) || 0,
         ),
-      );
+      ]);
     });
+
+    const conDetraccion = calcularImportesLiquidacion(
+      base.map(([, i]) => i),
+      Number(venta.porcentaje_detraccion) || 0,
+    );
+
+    base.forEach(([id], idx) => mapa.set(id, conDetraccion[idx]));
+
     return mapa;
   }, [
     cargasDelTipo,
@@ -477,8 +496,8 @@ export const ModalLiquidacion = ({
                         {carga.codigo_ticket_balanza}
                       </Badge>
                       <Badge size="sm" color="teal">
-                        <span className="font-bold">Calidad:</span>{" "}
-                        {carga.calidad ?? "—"}
+                        <span className="font-bold">Blending:</span>{" "}
+                        {carga.blending_correlativo ?? "—"}
                       </Badge>
                       <Badge size="sm" color="grape">
                         {formatNumber(carga.cantidad_toneladas)} TN

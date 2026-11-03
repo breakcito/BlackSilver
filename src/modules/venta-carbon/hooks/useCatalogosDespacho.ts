@@ -5,18 +5,16 @@ import { useNotify } from "../../../hooks/useNotify";
 import type { RES_Marca } from "../../../service/responses/marca";
 import type { RES_VehiculoCarbon } from "../../../service/responses/vehiculo-carbon";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
-import type { RES_CalidadCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 
 /**
- * Catalogos del DESPACHO de una venta de carbon: tipos de carbon, calidades,
- * vehiculos y marcas.
+ * Catalogos del DESPACHO de una venta de carbon: tipos de carbon, vehiculos
+ * y marcas.
  *
  * Se cargan una sola vez al montar el formulario; `reloadVehiculos` refresca
  * el catalogo de vehiculos tras registrar uno nuevo desde el boton "+".
  */
 export const useCatalogosDespacho = () => {
   const [tipos, setTipos] = useState<RES_TipoCarbon[]>([]);
-  const [calidades, setCalidades] = useState<RES_CalidadCarbon[]>([]);
   const [vehiculos, setVehiculos] = useState<RES_VehiculoCarbon[]>([]);
   const [marcas, setMarcas] = useState<RES_Marca[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,15 +23,13 @@ export const useCatalogosDespacho = () => {
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [tiposRes, calRes, vehRes, marcasRes] = await Promise.all([
+      const [tiposRes, vehRes, marcasRes] = await Promise.all([
         TipoCarbonService.getTipos(),
-        TipoCarbonService.getCalidades(),
         AuxService.get_vehiculos_carbon(),
         AuxService.get_marcas(),
       ]);
 
       if (tiposRes.success && tiposRes.data) setTipos(tiposRes.data);
-      if (calRes.success && calRes.data) setCalidades(calRes.data);
       if (vehRes.success && vehRes.data) setVehiculos(vehRes.data);
       if (marcasRes.success && marcasRes.data) setMarcas(marcasRes.data);
     } catch (err) {
@@ -82,7 +78,6 @@ export const useCatalogosDespacho = () => {
 
   return {
     tipos,
-    calidades,
     vehiculos,
     marcas,
     loading,

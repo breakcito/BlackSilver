@@ -1,19 +1,24 @@
 import type { AnalisisGranulometria } from "./venta-carbon.responses";
-import type { TipoCalidadCarbon } from "../../../shared/enums/carbon/tipo-calidad-carbon";
 import type { MedioPagoVentaCarbon } from "../../../shared/enums/venta-carbon/medio-pago-venta-carbon";
 
 /**
  * Carga a despachar.
  *
- * Al despachar solo se indica el tipo de carbon, la calidad, la fecha y hora
- * de salida, las toneladas y las evidencias. El vehiculo y la segunda placa
- * se registran al confirmar la llegada.
+ * La carga cuelga de un BLENDING: el lote de carbon que sale del almacen.
+ * Al elegirlo se autocompletan el porcentaje de ceniza y las toneladas, pero
+ * el usuario puede ajustarlas.
+ *
+ * El vehiculo y la segunda placa se registran en el despacho (ya no hace
+ * falta esperarlos para confirmar la llegada). La segunda placa siempre es
+ * opcional.
  */
 export interface CargaVentaFormItem {
-  id_tipo_carbon: number;
-  calidad: TipoCalidadCarbon;
+  id_blending_carbon: number;
   cantidad_toneladas: number;
+  porcentaje_ceniza: number;
   fecha_hora_salida: string;
+  id_vehiculo_carbon: number | null;
+  segunda_placa: string | null;
   archivos: File[];
 }
 
@@ -28,12 +33,17 @@ export interface CrearVentaCarbonRequest {
   cargas: CargaVentaFormItem[];
 }
 
+/**
+ * Confirmacion de llegada.
+ *
+ * El tipo de carbon lo hereda el blending de la carga: no se elige aqui. El
+ * vehiculo y la segunda placa son opcionales (se pudieron registrar al
+ * despachar).
+ */
 export interface ConfirmarLlegadaPayload {
-  id_tipo_carbon: number;
-  calidad: TipoCalidadCarbon;
   cantidad_toneladas: number;
   fecha_hora_ingreso: string;
-  id_vehiculo_carbon: number;
+  id_vehiculo_carbon: number | null;
   segunda_placa: string | null;
   guia_remitente: string | null;
   guia_transportista: string | null;

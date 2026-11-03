@@ -5,12 +5,12 @@ import {
   Stack,
   Table,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 
 import { formatNumber } from "../../../../shared/functions/formatNumber";
-import { colorCalidadCarbon } from "../../../../shared/functions/calidad-carbon";
 import type { CargaVentaCarbonItem } from "../../service/venta-carbon.responses";
 
 interface Props {
@@ -75,10 +75,10 @@ export const TablaCargasVenta = ({
           </Table.Th>
           <Table.Th
             ta={"center"}
-            w={100}
+            w={130}
             className="text-zinc-400 text-xs font-semibold"
           >
-            Tipo / Calidad
+            Blending / Tipo
           </Table.Th>
           {mostrarRecepcion && (
             <Table.Th
@@ -168,17 +168,18 @@ export const TablaCargasVenta = ({
               </Table.Td>
               <Table.Td ta={"center"}>
                 <div className="flex flex-col gap-1 items-center">
-                  <Text size="xs" fw={600} c="zinc.100">
-                    {carga.tipo_carbon}
-                  </Text>
                   <Badge
                     size="xs"
                     variant="light"
-                    color={colorCalidadCarbon(carga.calidad)}
+                    color="cyan"
                     radius="sm"
+                    className="font-mono"
                   >
-                    {carga.calidad ?? "Sin calidad"}
+                    {carga.blending_correlativo ?? "—"}
                   </Badge>
+                  <Text size="xs" fw={600} c="zinc.100">
+                    {carga.tipo_carbon}
+                  </Text>
                 </div>
               </Table.Td>
               {mostrarRecepcion && (
@@ -356,17 +357,35 @@ export const TablaCargasVenta = ({
               )}
               <Table.Td ta={"center"}>
                 {onConfirmarLlegada ? (
-                  <Button
-                    size="xs"
-                    radius="md"
-                    color="teal"
-                    variant="light"
-                    leftSection={<CheckCircleIcon className="w-3.5 h-3.5" />}
-                    onClick={() => onConfirmarLlegada(carga)}
-                    className="font-semibold"
-                  >
-                    Confirmar llegada
-                  </Button>
+                  carga.id_blending_carbon ? (
+                    <Button
+                      size="xs"
+                      radius="md"
+                      color="teal"
+                      variant="light"
+                      leftSection={<CheckCircleIcon className="w-3.5 h-3.5" />}
+                      onClick={() => onConfirmarLlegada(carga)}
+                      className="font-semibold"
+                    >
+                      Confirmar llegada
+                    </Button>
+                  ) : (
+                    // Carga sin blending (registrada antes de que existiera
+                    // el blending): no hay lote del que descontar el stock.
+                    <Tooltip
+                      label="Esta carga no tiene blending: no se puede confirmar la llegada"
+                      withArrow
+                    >
+                      <Badge
+                        size="sm"
+                        variant="light"
+                        color="gray"
+                        radius="md"
+                      >
+                        Sin blending
+                      </Badge>
+                    </Tooltip>
+                  )
                 ) : (
                   <Text size="xs" c="dimmed">
                     —

@@ -26,7 +26,10 @@ import {
   type CargaVentaFormState,
 } from "./carga-venta-form-state";
 import { VentaCarbonService } from "../../service/venta-carbon.service";
-import type { VentaCarbonResumen } from "../../service/venta-carbon.responses";
+import type {
+  BlendingDespachable,
+  VentaCarbonResumen,
+} from "../../service/venta-carbon.responses";
 
 interface Props {
   onCancel: () => void;
@@ -50,10 +53,10 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
     almacenesCliente,
     loading: loadingCabecera,
   } = useCatalogosCabeceraVenta();
-  const { tipos, calidades, loading: loadingDespacho } = useCatalogosDespacho();
+  const { vehiculos, loading: loadingDespacho } = useCatalogosDespacho();
 
   // Los selects se bloquean mientras carga su propio catalogo: la cabecera
-  // no depende de los tipos ni de los vehiculos.
+  // no depende de los vehiculos ni de los blendings.
   const loadingCatalogos = loadingCabecera || loadingDespacho;
 
   const [idEmpresa, setIdEmpresa] = useState<string | null>(null);
@@ -64,7 +67,8 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
 
   const [cargas, setCargas] = useState<CargaVentaFormState[]>([]);
 
-  const [stock, setStock] = useState<Record<string, number>>({});
+  const [blendings, setBlendings] = useState<BlendingDespachable[]>([]);
+  const [loadingBlendings, setLoadingBlendings] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,29 +95,32 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
     });
   }, [almacenesEmpresa]);
 
-  // Stock despachable del almacen de salida (para autocompletar cantidades).
+  // Blendings despachables del almacen de salida (para autocompletar
+  // cantidades y porcentaje de ceniza).
   useEffect(() => {
     if (!idAlmacenSalida) {
-      setStock({});
+      setBlendings([]);
       return;
     }
 
     let cancel = false;
     (async () => {
+      setLoadingBlendings(true);
       try {
-        const res = await VentaCarbonService.getStockDisponible(
+        const res = await VentaCarbonService.getBlendings(
           Number(idAlmacenSalida),
         );
         if (cancel) return;
         if (res.success && res.data) {
-          const mapa: Record<string, number> = {};
-          res.data.forEach((s) => {
-            mapa[`${s.id_tipo_carbon}|${s.calidad}`] = Number(s.disponible) || 0;
-          });
-          setStock(mapa);
+          setBlendings(res.data);
+        } else {
+          setBlendings([]);
         }
       } catch (err) {
         console.error(err);
+        if (!cancel) setBlendings([]);
+      } finally {
+        if (!cancel) setLoadingBlendings(false);
       }
     })();
 
@@ -146,14 +153,6 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
       return sigueValido ? prev : null;
     });
   }, [almacenesDisponibles]);
-
-  const stockPorClave = useMemo(() => {
-    const mapa = new Map<string, number>();
-    Object.entries(stock).forEach(([clave, valor]) => {
-      mapa.set(clave, valor);
-    });
-    return mapa;
-  }, [stock]);
 
   const clientesVisibles = useMemo(() => {
     const q = clienteBusqueda.trim();
@@ -216,10 +215,14 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
         porcentaje_igv: IGV_POR_DEFECTO,
         porcentaje_detraccion: DETRACCION_POR_DEFECTO,
         cargas: conCarga.map((c) => ({
-          id_tipo_carbon: Number(c.id_tipo_carbon),
-          calidad: c.calidad,
+          id_blending_carbon: Number(c.id_blending_carbon),
           cantidad_toneladas: c.cantidad_toneladas,
+          porcentaje_ceniza: c.porcentaje_ceniza,
           fecha_hora_salida: c.fecha_hora_salida,
+          id_vehiculo_carbon: c.id_vehiculo_carbon
+            ? Number(c.id_vehiculo_carbon)
+            : null,
+          segunda_placa: c.segunda_placa.trim() || null,
           archivos: c.archivos,
         })),
       });
@@ -408,13 +411,26 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
+        {!loadingBlendings && blendings.length === 0 && (
+          <Alert
+            color="yellow"
+            variant="light"
+            title="Sin blendings"
+            radius="md"
+            mb="sm"
+          >
+            Este almacén no tiene blendings con stock disponible. Registra un
+            blending en Producción antes de despachar cargas. La venta se puede
+            guardar igual y despachar las cargas después.
+          </Alert>
+        )}
+
         <EditorCargasVenta
           cargas={cargas}
           onChange={setCargas}
-          tipos={tipos}
-          calidades={calidades}
-          stockPorClave={stockPorClave}
-          loadingCatalogos={loadingCatalogos}
+          blendings={blendings}
+          vehiculos={vehiculos}
+          loadingCatalogos={loadingCatalogos || loadingBlendings}
           saving={saving}
         />
       </Paper>

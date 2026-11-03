@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Badge,
   Button,
   Group,
   Loader,
   Paper,
+  Stack,
   Tabs,
   Text,
   Tooltip,
@@ -99,12 +100,12 @@ const TabConContador = ({
 /**
  * Detalle desplegado de una venta.
  *
- * Se carga bajo demanda: la fila del listado solo trae la cabecera, y el
- * arbol (cargas, liquidaciones, comprobantes y pagos) se pide cuando el
- * usuario despliega la venta.
+ * El arbol (cargas, liquidaciones, comprobantes y pagos) llega junto con el
+ * listado: desplegar una venta es instantaneo, sin una segunda consulta.
  *
- * Las tres secciones (en camino / por liquidar / liquidaciones) van en tabs:
- * asi el detalle no crece hacia abajo y el usuario elige que ver.
+ * Las tres secciones (en camino / por liquidar / liquidaciones) van en tabs
+ * CONTROLADOS: el usuario se queda en la ventana que estaba mirando aunque
+ * registre una liquidacion o confirme una llegada.
  *
  * Las cargas se muestran siempre con la misma tabla (`TablaCargasVenta`),
  * este donde este. Lo unico que cambia es la seccion: una carga nunca
@@ -120,6 +121,19 @@ export const VentaCarbonDetalle = ({
   onRegistrarComprobante,
   onRegistrarPago,
 }: Props) => {
+  const [tab, setTab] = useState("en-camino");
+
+  // La ventana activa pertenece a una venta concreta: al cambiar de venta se
+  // vuelve a la primera pestana. Se ajusta durante el render (no en un
+  // efecto) para no provocar renders en cascada.
+  const [ventaDeLaPestana, setVentaDeLaPestana] = useState(
+    detalle?.id_venta_carbon,
+  );
+  if (detalle?.id_venta_carbon !== ventaDeLaPestana) {
+    setVentaDeLaPestana(detalle?.id_venta_carbon);
+    setTab("en-camino");
+  }
+
   const cargas = useMemo(() => detalle?.cargas ?? [], [detalle]);
   const liquidaciones = useMemo(
     () => detalle?.liquidaciones ?? [],
@@ -186,7 +200,12 @@ export const VentaCarbonDetalle = ({
 
   return (
     <div className="px-4 py-3 bg-zinc-950/40">
-      <Tabs defaultValue="en-camino" variant="outline" color="indigo">
+      <Tabs
+        value={tab}
+        onChange={(valor) => setTab(valor ?? "en-camino")}
+        variant="outline"
+        color="indigo"
+      >
         <Tabs.List mb="md">
           <TabConContador
             valor="en-camino"
@@ -211,9 +230,23 @@ export const VentaCarbonDetalle = ({
         {/* EN CAMINO */}
         <Tabs.Panel value="en-camino">
           {cargasEnCamino.length === 0 ? (
-            <Text size="xs" c="dimmed" fs="italic" ta="center" py="md">
-              No hay cargas en camino.
-            </Text>
+            <Stack gap="xs" align="center" py="md">
+              <Text size="xs" c="dimmed" fs="italic" ta="center">
+                No hay cargas en camino.
+              </Text>
+              {liquidaciones.length > 0 && (
+                <Button
+                  variant="subtle"
+                  color="indigo"
+                  size="xs"
+                  radius="md"
+                  onClick={() => setTab("liquidaciones")}
+                >
+                  Ver las {liquidaciones.length} liquidacion
+                  {liquidaciones.length === 1 ? "" : "es"}
+                </Button>
+              )}
+            </Stack>
           ) : (
             <TablaCargasVenta
               cargas={cargasEnCamino}
@@ -225,11 +258,25 @@ export const VentaCarbonDetalle = ({
         {/* POR LIQUIDAR */}
         <Tabs.Panel value="por-liquidar">
           {gruposPorLiquidar.length === 0 ? (
-            <Text size="xs" c="dimmed" fs="italic" ta="center" py="md">
-              {cargas.length === 0
-                ? "Esta venta aun no tiene cargas despachadas."
-                : "No hay cargas pendientes de liquidacion."}
-            </Text>
+            <Stack gap="xs" align="center" py="md">
+              <Text size="xs" c="dimmed" fs="italic" ta="center">
+                {cargas.length === 0
+                  ? "Esta venta aun no tiene cargas despachadas."
+                  : "No hay cargas pendientes de liquidacion."}
+              </Text>
+              {liquidaciones.length > 0 && (
+                <Button
+                  variant="subtle"
+                  color="indigo"
+                  size="xs"
+                  radius="md"
+                  onClick={() => setTab("liquidaciones")}
+                >
+                  Ver las {liquidaciones.length} liquidacion
+                  {liquidaciones.length === 1 ? "" : "es"}
+                </Button>
+              )}
+            </Stack>
           ) : (
             <div className="flex flex-col gap-2">
               {gruposPorLiquidar.map((grupo) => (
@@ -293,9 +340,23 @@ export const VentaCarbonDetalle = ({
         {/* LIQUIDACIONES */}
         <Tabs.Panel value="liquidaciones">
           {liquidaciones.length === 0 ? (
-            <Text size="xs" c="dimmed" fs="italic" ta="center" py="md">
-              Esta venta aun no tiene liquidaciones.
-            </Text>
+            <Stack gap="xs" align="center" py="md">
+              <Text size="xs" c="dimmed" fs="italic" ta="center">
+                Esta venta aun no tiene liquidaciones.
+              </Text>
+              {gruposPorLiquidar.length > 0 && (
+                <Button
+                  variant="subtle"
+                  color="blue"
+                  size="xs"
+                  radius="md"
+                  onClick={() => setTab("por-liquidar")}
+                >
+                  Ver las {gruposPorLiquidar.length} grupo
+                  {gruposPorLiquidar.length === 1 ? "" : "s"} por liquidar
+                </Button>
+              )}
+            </Stack>
           ) : (
             <div className="flex flex-col gap-2">
               {liquidaciones.map((liquidacion) => (

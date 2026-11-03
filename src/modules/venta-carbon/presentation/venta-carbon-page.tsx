@@ -37,11 +37,9 @@ export const VentaCarbonPage = () => {
     recargar,
     insertVenta,
     updateVentaLocal,
-    detalles,
     detalleCargando,
     desplegadas,
     setDesplegadas,
-    cargarDetalle,
     cambiarDespliegue,
     refrescarDetalle,
   } = useVentaCarbon();
@@ -77,27 +75,26 @@ export const VentaCarbonPage = () => {
   const mostrarEmpty = !loading && ventas.length === 0 && !busqueda;
 
   /**
-   * Descarga el detalle de una venta y lo devuelve. Se usa antes de abrir
-   * un modal: los modales trabajan con las cargas, que solo llegan en el
-   * detalle.
+   * Busca una venta en el listado. El arbol (cargas, liquidaciones,
+   * comprobantes y pagos) ya viene en el listado: no hace falta pedirla.
    */
   const ventaConDetalle = useCallback(
-    async (idVentaCarbon: number): Promise<VentaCarbonResumen | null> =>
-      (await cargarDetalle(idVentaCarbon)) ?? detalles[idVentaCarbon] ?? null,
-    [cargarDetalle, detalles],
+    (idVentaCarbon: number): VentaCarbonResumen | null =>
+      ventas.find((v) => v.id_venta_carbon === idVentaCarbon) ?? null,
+    [ventas],
   );
 
   const abrirDespacho = useCallback(
-    async (idVentaCarbon: number) => {
-      const venta = await ventaConDetalle(idVentaCarbon);
+    (idVentaCarbon: number) => {
+      const venta = ventaConDetalle(idVentaCarbon);
       if (venta) setVentaDespachar(venta);
     },
     [ventaConDetalle],
   );
 
   const abrirLiquidacion = useCallback(
-    async (idVentaCarbon: number) => {
-      const venta = await ventaConDetalle(idVentaCarbon);
+    (idVentaCarbon: number) => {
+      const venta = ventaConDetalle(idVentaCarbon);
       if (venta) {
         setLiquidacion({
           venta,
@@ -116,12 +113,12 @@ export const VentaCarbonPage = () => {
    * alguna en el modal.
    */
   const abrirLiquidacionGrupo = useCallback(
-    async (
+    (
       idVentaCarbon: number,
       idTipoCarbon: number,
       idsCargas: number[],
     ) => {
-      const venta = await ventaConDetalle(idVentaCarbon);
+      const venta = ventaConDetalle(idVentaCarbon);
       if (venta) {
         setLiquidacion({
           venta,
@@ -204,7 +201,6 @@ export const VentaCarbonPage = () => {
           ventas={ventas}
           loading={loading}
           desplegadas={desplegadas}
-          detalles={detalles}
           detalleCargando={detalleCargando}
           onExpandedChange={(ids) => void cambiarDespliegue(ids)}
           onConfirmarLlegada={(venta, carga) => setLlegada({ venta, carga })}

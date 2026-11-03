@@ -1,5 +1,4 @@
 import type { IArchivo } from "../../../shared/interfaces/archivo";
-import type { TipoCalidadCarbon } from "../../../shared/enums/carbon/tipo-calidad-carbon";
 import type { EstadoCargaVentaCarbon } from "../../../shared/enums/venta-carbon/estado-carga-venta-carbon";
 import type { EstadoVentaCarbon } from "../../../shared/enums/venta-carbon/estado-venta-carbon";
 import type { EstadoLiquidacionVentaCarbon } from "../../../shared/enums/venta-carbon/estado-liquidacion-venta-carbon";
@@ -19,6 +18,14 @@ export interface CargaVentaCarbonItem {
   empleado_registro: string;
 
   /** Datos del despacho. */
+  /**
+   * Lote de carbon que se despacha. La carga cuelga de un blending: el tipo
+   * de carbon y el % de ceniza se heredan de el.
+   */
+  id_blending_carbon: number | null;
+  blending_correlativo: string | null;
+  blending_porcentaje_ceniza: number | null;
+  blending_stock_actual: number | null;
   id_tipo_carbon: number;
   tipo_carbon: string | null;
   tipo_carbon_codigo: string | null;
@@ -26,7 +33,6 @@ export interface CargaVentaCarbonItem {
   vehiculo_placa: string | null;
   vehiculo_tipo: string | null;
   vehiculo_marca: string | null;
-  calidad: TipoCalidadCarbon | null;
   segunda_placa: string | null;
   fecha_hora_salida: string | null;
 
@@ -182,10 +188,22 @@ export interface VentaCarbonResumen {
   liquidaciones: LiquidacionVentaCarbonItem[];
 }
 
-/** Stock de carbon disponible para despachar (ya descontando lo comprometido). */
-export interface StockDisponibleCarbon {
+/**
+ * Blending que se puede despachar desde un almacen.
+ *
+ * `disponible` ya descuenta lo que salio y sigue en camino.
+ */
+export interface BlendingDespachable {
+  id_blending_carbon: number;
+  correlativo: string;
+  id_almacen: number;
   id_tipo_carbon: number;
-  calidad: string;
+  tipo_carbon_nombre: string | null;
+  tipo_carbon_codigo: string | null;
+  porcentaje_ceniza: number;
   stock_actual: number;
+  fecha_hora_blending: string;
+  /** Toneladas comprometidas en cargas que aun no confirman su llegada. */
+  comprometido: number;
   disponible: number;
 }

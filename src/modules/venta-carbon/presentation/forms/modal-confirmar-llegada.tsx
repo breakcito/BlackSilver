@@ -5,7 +5,6 @@ import {
   Badge,
   Button,
   Group,
-  Loader,
   NumberInput,
   Paper,
   Select,
@@ -33,10 +32,6 @@ import {
   exigeSegundaPlaca,
   type TipoVehiculoCarbon,
 } from "../../../../shared/enums/venta-carbon/tipo-vehiculo-carbon";
-import {
-  esTipoCalidadCarbon,
-  type TipoCalidadCarbon,
-} from "../../../../shared/enums/carbon/tipo-calidad-carbon";
 import type {
   CargaVentaCarbonItem,
   VentaCarbonResumen,
@@ -59,30 +54,31 @@ export const ModalConfirmarLlegada = ({
   onConfirmed,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
-  const { tipos, calidades, vehiculos, marcas, reloadVehiculos, reloadMarcas } =
+  const { vehiculos, marcas, reloadVehiculos, reloadMarcas } =
     useCatalogosDespacho();
 
-  const [idTipoConfirmado, setIdTipoConfirmado] = useState<string | null>(
-    carga.id_tipo_carbon ? String(carga.id_tipo_carbon) : null,
-  );
-  const [calidad, setCalidad] = useState<TipoCalidadCarbon | null>(
-    carga.calidad ?? null,
-  );
+  // El tipo de carbon lo hereda el blending de la carga: no se elige aqui.
   const [cantidadConfirmada, setCantidadConfirmada] = useState<number>(
     Number(carga.cantidad_toneladas) || 0,
   );
   const [fechaHoraIngreso, setFechaHoraIngreso] = useState(
     dayjs().format("YYYY-MM-DDTHH:mm"),
   );
-  const [idVehiculo, setIdVehiculo] = useState<string | null>(null);
-  const [segundaPlaca, setSegundaPlaca] = useState("");
+  // El vehiculo y la segunda placa son opcionales: se pudieron registrar al
+  // despachar. Si ya vienen informedos, se muestran tal cual.
+  const [idVehiculo, setIdVehiculo] = useState<string | null>(
+    carga.id_vehiculo_carbon ? String(carga.id_vehiculo_carbon) : null,
+  );
+  const [segundaPlaca, setSegundaPlaca] = useState(carga.segunda_placa ?? "");
   const [vehiculoBusqueda, setVehiculoBusqueda] = useState("");
   const [guiaRemitente, setGuiaRemitente] = useState("");
   const [guiaTransportista, setGuiaTransportista] = useState("");
   const [codigoTicketBalanza, setCodigoTicketBalanza] = useState("");
   const [fueAceptado, setFueAceptado] = useState(true);
   const [observacion, setobservacion] = useState<string>("");
-  const [porcentajeCeniza, setPorcentajeCeniza] = useState<number>(0);
+  const [porcentajeCeniza, setPorcentajeCeniza] = useState<number>(
+    Number(carga.porcentaje_ceniza) || 0,
+  );
   const [porcentajeHumedad, setPorcentajeHumedad] = useState<number>(0);
   const [porcentajeAzufre, setPorcentajeAzufre] = useState<number>(0);
   const [porcentajePizarra, setPorcentajePizarra] = useState<number>(0);
@@ -114,47 +110,29 @@ export const ModalConfirmarLlegada = ({
 
   const esTolva = exigeSegundaPlaca(tipoVehiculo);
 
-  const tipoConfirmado = useMemo(
-    () => tipos.find((t) => String(t.id_tipo_carbon) === idTipoConfirmado),
-    [tipos, idTipoConfirmado],
-  );
+  // El tipo de carbon lo hereda el blending de la carga: ya viene en la carga.
+  const nombreTipoCarbon = carga.tipo_carbon ?? "—";
 
   const requiereAnalisis =
-    tipoConfirmado?.nombre?.trim().toLowerCase() === TIPO_CON_ANALISIS;
+    nombreTipoCarbon.trim().toLowerCase() === TIPO_CON_ANALISIS;
 
   useEffect(() => {
     setobservacion(
       fueAceptado
-        ? `ACEPTADO COMO ${tipoConfirmado?.nombre.toUpperCase() ?? "—"}`
-        : `RECHAZADO COMO ${tipoConfirmado?.nombre.toUpperCase() ?? "—"}`,
+        ? `ACEPTADO COMO ${nombreTipoCarbon.toUpperCase()}`
+        : `RECHAZADO COMO ${nombreTipoCarbon.toUpperCase()}`,
     );
-  }, [fueAceptado, tipoConfirmado]);
+  }, [fueAceptado, nombreTipoCarbon]);
 
   const handleSubmit = async () => {
     setError(null);
 
-    if (!idTipoConfirmado) {
-      setError("Debe seleccionar el tipo de carbon confirmado");
-      return;
-    }
-    if (!calidad) {
-      setError("Debe indicar la calidad del carbon que llego");
-      return;
-    }
     if (!cantidadConfirmada || cantidadConfirmada <= 0) {
       setError("La cantidad confirmada debe ser mayor a 0");
       return;
     }
     if (!fechaHoraIngreso) {
       setError("Debe indicar la fecha y hora de ingreso al almacen");
-      return;
-    }
-    if (!idVehiculo) {
-      setError("Debe indicar el vehiculo que transporto la carga");
-      return;
-    }
-    if (esTolva && !segundaPlaca.trim()) {
-      setError("El vehiculo es Tolva, debe ingresar la segunda placa");
       return;
     }
 
@@ -164,11 +142,9 @@ export const ModalConfirmarLlegada = ({
         venta.id_venta_carbon,
         carga.id_carga_venta_carbon,
         {
-          id_tipo_carbon: Number(idTipoConfirmado),
-          calidad,
           cantidad_toneladas: cantidadConfirmada,
           fecha_hora_ingreso: fechaHoraIngreso,
-          id_vehiculo_carbon: Number(idVehiculo),
+          id_vehiculo_carbon: idVehiculo ? Number(idVehiculo) : null,
           segunda_placa: segundaPlaca.trim() || null,
           guia_remitente: guiaRemitente.trim() || null,
           guia_transportista: guiaTransportista.trim() || null,
@@ -230,9 +206,16 @@ export const ModalConfirmarLlegada = ({
           </Text>
 
           <Text size="xs" c="gray" style={{ gridColumn: "span 1" }}>
-            Calidad:{" "}
+            Blending:{" "}
+            <span className="text-zinc-200 font-semibold font-mono">
+              {carga.blending_correlativo ?? "—"}
+            </span>
+          </Text>
+
+          <Text size="xs" c="gray" style={{ gridColumn: "span 1" }}>
+            % Ceniza:{" "}
             <span className="text-zinc-200 font-semibold">
-              {carga.calidad ?? "—"}
+              {formatNumber(carga.porcentaje_ceniza)}%
             </span>
           </Text>
 
@@ -274,46 +257,7 @@ export const ModalConfirmarLlegada = ({
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
-          <Select
-            label="Tipo de carbon"
-            placeholder={
-              tipos.length === 0 ? "Cargando..." : "Seleccione el tipo"
-            }
-            data={tipos.map((t) => ({
-              value: String(t.id_tipo_carbon),
-              label: `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`,
-            }))}
-            value={idTipoConfirmado}
-            onChange={setIdTipoConfirmado}
-            rightSection={
-              tipos.length === 0 ? (
-                <Loader size={14} color="indigo" />
-              ) : undefined
-            }
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            searchable
-            nothingFoundMessage="Sin tipos de carbon"
-            comboboxProps={{ withinPortal: true }}
-            disabled={saving}
-          />
-
-          <Select
-            label="Calidad"
-            placeholder="Seleccione la calidad"
-            data={calidades.map((c) => ({ value: c.nombre, label: c.nombre }))}
-            value={calidad}
-            onChange={(val) =>
-              setCalidad(esTipoCalidadCarbon(val) ? val : null)
-            }
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            disabled={saving}
-          />
-
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm">
           <TextInput
             label="Fecha y hora de ingreso"
             type="datetime-local"
@@ -337,6 +281,32 @@ export const ModalConfirmarLlegada = ({
             hideControls
             disabled={saving}
           />
+
+          <div>
+            <Text size="xs" c="gray" fw={600} mb={4}>
+              Lote recibido
+            </Text>
+            <Paper
+              p="xs"
+              radius="lg"
+              className="bg-zinc-900/80 border border-zinc-800"
+            >
+              <Group gap={6} wrap="nowrap">
+                <Badge
+                  size="sm"
+                  variant="light"
+                  color="cyan"
+                  radius="sm"
+                  className="font-mono"
+                >
+                  {carga.blending_correlativo ?? "—"}
+                </Badge>
+                <Text size="xs" c="zinc.300" truncate>
+                  {carga.tipo_carbon ?? "—"}
+                </Text>
+              </Group>
+            </Paper>
+          </div>
         </SimpleGrid>
 
         <SimpleGrid cols={{ base: 1, md: 6 }} spacing="sm" mt="sm">
@@ -394,18 +364,25 @@ export const ModalConfirmarLlegada = ({
             )}
           </div>
 
-          <TextInput
-            label={`Segunda placa ${esTolva ? "" : ""}`}
-            placeholder="Ej. A1B-234"
-            value={segundaPlaca}
-            onChange={(e) =>
-              setSegundaPlaca(e.currentTarget.value.toUpperCase())
-            }
-            disabled={!esTolva || saving}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-          />
+          <div>
+            <TextInput
+              label="Segunda placa (opcional)"
+              placeholder="Ej. A1B-234"
+              value={segundaPlaca}
+              onChange={(e) =>
+                setSegundaPlaca(e.currentTarget.value.toUpperCase())
+              }
+              classNames={inputClasses}
+              size="xs"
+              radius="lg"
+              disabled={saving}
+            />
+            {esTolva && (
+              <Text size="10px" c="yellow.4" mt={4} fw={600}>
+                El vehículo es Tolva: se recomienda la segunda placa
+              </Text>
+            )}
+          </div>
 
           <TextInput
             label="Ticket de balanza"

@@ -18,7 +18,7 @@ import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
 import { VentaCarbonService } from "../../service/venta-carbon.service";
 import { inputClasses } from "../components/input-classes";
-import { calcularImportesComprobante } from "./liquidacion-calculos";
+import { importesDesdeLiquidacion } from "./liquidacion-calculos";
 import type {
   LiquidacionVentaCarbonItem,
   VentaCarbonResumen,
@@ -34,7 +34,7 @@ interface Props {
 /**
  * Registro del comprobante de una liquidacion confirmada.
  *
- * Los importes no se capturan: se calculan a partir de la liquidacion. Por
+ * Los importes NO se capturan: se copian de la liquidacion tal cual. Por
  * ahora no se aplican anticipos, asi que `monto_pagado_anticipos` queda en 0.
  */
 export const ModalComprobante = ({
@@ -54,11 +54,7 @@ export const ModalComprobante = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const importes = calcularImportesComprobante(
-    Number(liquidacion.subtotal) || 0,
-    Number(venta.porcentaje_igv) || 0,
-    Number(venta.porcentaje_detraccion) || 0,
-  );
+  const importes = importesDesdeLiquidacion(liquidacion);
 
   const handleSubmit = async () => {
     setError(null);
@@ -171,6 +167,10 @@ export const ModalComprobante = ({
       >
         <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
           Importes del comprobante
+        </Text>
+        <Text size="10px" c="dimmed" mb={6}>
+          Se copian de la liquidación {liquidacion.id_liquidacion_venta_carbon}{" "}
+          sin recalcular: el comprobante nunca discrepa de su liquidación.
         </Text>
         <SimpleGrid cols={{ base: 2, md: 3 }} spacing="sm">
           <Text size="xs" c="gray">

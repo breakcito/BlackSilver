@@ -149,7 +149,7 @@ export const App = () => {
         {/* Operaciones con Carbón */}
         <Route path="/compra-carbon" element={<CompraCarbonPage />} />
         <Route path="/kardex-carbon" element={<KardexCarbonPage />} />
-        <Route path="/zarandeo-carbon" element={<TamizajeCarbonPage />} />
+        <Route path="/produccion-carbon" element={<TamizajeCarbonPage />} />
         <Route path="/venta-carbon" element={<VentaCarbonPage />} />
 
         {/* System module (oculto, solo URL directa) */}

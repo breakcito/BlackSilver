@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Group, Paper, Stack, Text } from "@mantine/core";
 import { IconTruck } from "@tabler/icons-react";
 
@@ -10,7 +10,10 @@ import {
   type CargaVentaFormState,
 } from "./carga-venta-form-state";
 import { VentaCarbonService } from "../../service/venta-carbon.service";
-import type { VentaCarbonResumen } from "../../service/venta-carbon.responses";
+import type {
+  BlendingDespachable,
+  VentaCarbonResumen,
+} from "../../service/venta-carbon.responses";
 
 interface Props {
   venta: VentaCarbonResumen;
@@ -22,8 +25,9 @@ interface Props {
  * Despacha cargas adicionales sobre una venta ya registrada.
  *
  * El stock no se descuenta al despachar: el asiento del Kardex se escribe al
- * confirmar la llegada. Aqui solo se reserva (el backend valida que haya
- * stock despachable una vez descontadas las cargas ya en camino).
+ * confirmar la llegada. Aqui solo se reserva (el backend valida que el
+ * blending tenga stock despachable una vez descontadas las cargas ya en
+ * camino).
  */
 export const ModalDespacharCargas = ({
   venta,
@@ -31,44 +35,39 @@ export const ModalDespacharCargas = ({
   onDispatched,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
-  const { tipos, calidades } = useCatalogosDespacho();
+  const { vehiculos, loading: loadingCatalogos } = useCatalogosDespacho();
 
   const [cargas, setCargas] = useState<CargaVentaFormState[]>([]);
-  const [stock, setStock] = useState<Record<string, number>>({});
+  const [blendings, setBlendings] = useState<BlendingDespachable[]>([]);
+  const [loadingBlendings, setLoadingBlendings] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancel = false;
     (async () => {
+      setLoadingBlendings(true);
       try {
-        const res = await VentaCarbonService.getStockDisponible(
+        const res = await VentaCarbonService.getBlendings(
           venta.id_almacen_empresa_salida,
         );
         if (cancel) return;
         if (res.success && res.data) {
-          const mapa: Record<string, number> = {};
-          res.data.forEach((s) => {
-            mapa[`${s.id_tipo_carbon}|${s.calidad}`] = Number(s.disponible) || 0;
-          });
-          setStock(mapa);
+          setBlendings(res.data);
+        } else {
+          setBlendings([]);
         }
       } catch (err) {
         console.error(err);
+        if (!cancel) setBlendings([]);
+      } finally {
+        if (!cancel) setLoadingBlendings(false);
       }
     })();
     return () => {
       cancel = true;
     };
   }, [venta.id_almacen_empresa_salida]);
-
-  const stockPorClave = useMemo(() => {
-    const mapa = new Map<string, number>();
-    Object.entries(stock).forEach(([clave, valor]) => {
-      mapa.set(clave, valor);
-    });
-    return mapa;
-  }, [stock]);
 
   const handleSubmit = async () => {
     setError(null);
@@ -91,10 +90,14 @@ export const ModalDespacharCargas = ({
       const res = await VentaCarbonService.registrarCargas(
         venta.id_venta_carbon,
         conCarga.map((c) => ({
-          id_tipo_carbon: Number(c.id_tipo_carbon),
-          calidad: c.calidad,
+          id_blending_carbon: Number(c.id_blending_carbon),
           cantidad_toneladas: c.cantidad_toneladas,
+          porcentaje_ceniza: c.porcentaje_ceniza,
           fecha_hora_salida: c.fecha_hora_salida,
+          id_vehiculo_carbon: c.id_vehiculo_carbon
+            ? Number(c.id_vehiculo_carbon)
+            : null,
+          segunda_placa: c.segunda_placa.trim() || null,
           archivos: c.archivos,
         })),
       );
@@ -141,12 +144,19 @@ export const ModalDespacharCargas = ({
         </Text>
       </Paper>
 
+      {!loadingBlendings && blendings.length === 0 && (
+        <Alert color="yellow" variant="light" title="Sin blendings" radius="md">
+          Este almacén no tiene blendings con stock disponible. Registra un
+          blending en Producción antes de despachar cargas.
+        </Alert>
+      )}
+
       <EditorCargasVenta
         cargas={cargas}
         onChange={setCargas}
-        tipos={tipos}
-        calidades={calidades}
-        stockPorClave={stockPorClave}
+        blendings={blendings}
+        vehiculos={vehiculos}
+        loadingCatalogos={loadingCatalogos || loadingBlendings}
         saving={saving}
       />
 

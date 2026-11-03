@@ -39,13 +39,29 @@ import { CustomDatePicker } from "../../../presentation/utils/date-picker-input"
 import type { RES_Proveedor } from "../../../service/responses/proveedor";
 import type { GastoZarandeoItem } from "../service/tamizaje-carbon.responses";
 
+/**
+ * Destino del gasto de produccion: un zarandeo o un blending.
+ *
+ * Los gastos de produccion son el mismo concepto en los dos casos (pala,
+ * lanza, agua, escogedores, otro): lo unico que cambia es la operacion a la
+ * que se cargan.
+ */
+export type DestinoGastoProduccion =
+  | { tipo: "zarandeo"; id: number }
+  | { tipo: "blending"; id: number };
+
 interface Props {
   opened: boolean;
   onClose: () => void;
-  idZarandeoCarbon: number;
-  /** Titulo del zarandeo, para contextualizar el modal. */
-  tituloZarandeo?: string;
-  onGuardado?: () => void;
+  /** Operacion a la que se cargan los gastos. */
+  destino: DestinoGastoProduccion;
+  /** Titulo del destino, para contextualizar el modal. */
+  tituloDestino?: string;
+  /**
+   * Se llama cuando se registra un gasto. Recibe el gasto ya persistido para
+   * que el panel actualice sus contadores sin volver a consultar la lista.
+   */
+  onGuardado?: (gasto: GastoZarandeoItem) => void;
 }
 
 const estilitos = {
@@ -64,11 +80,11 @@ const COLOR_POR_GASTO: Record<string, string> = {
   [TipoGastoZarandeo.Otro]: "gray",
 };
 
-export const ModalGastosZarandeo = ({
+export const ModalGastosProduccion = ({
   opened,
   onClose,
-  idZarandeoCarbon,
-  tituloZarandeo,
+  destino,
+  tituloDestino,
   onGuardado,
 }: Props) => {
   const { notifySuccess, notifyError } = useNotify();
@@ -94,10 +110,13 @@ export const ModalGastosZarandeo = ({
   const [formAbierto, setFormAbierto] = useState(false);
 
   const cargarGastos = useCallback(async () => {
-    if (!idZarandeoCarbon) return;
+    if (!destino.id) return;
     setLoading(true);
     try {
-      const resp = await TamizajeCarbonService.getGastos(idZarandeoCarbon);
+      const resp =
+        destino.tipo === "blending"
+          ? await TamizajeCarbonService.getGastosBlending(destino.id)
+          : await TamizajeCarbonService.getGastos(destino.id);
       setGastos(resp.success && resp.data ? resp.data : []);
     } catch (err) {
       console.error(err);
@@ -105,7 +124,7 @@ export const ModalGastosZarandeo = ({
     } finally {
       setLoading(false);
     }
-  }, [idZarandeoCarbon]);
+  }, [destino]);
 
   // Estado inicial del formulario al abrir el modal.
   const resetFormulario = useCallback(() => {
@@ -135,6 +154,9 @@ export const ModalGastosZarandeo = ({
     resetFormulario();
     setFormAbierto(false);
   }, [opened, cargarGastos, resetFormulario]);
+
+  /** Id del destino: el gasto se carga a una operacion o a la otra. */
+  const idDestino = destino.id;
 
   useEffect(() => {
     if (!opened) return;
@@ -194,7 +216,10 @@ export const ModalGastosZarandeo = ({
   const proveedoresVisibles = useMemo(() => {
     const q = proveedorBusqueda.trim();
     if (!q) return proveedoresOptions;
-    return getCoincidencias(proveedoresOptions, q, { fuseThreshold: 0.4 }).map(
+    return getCoincidencias(proveedoresOptions, q, {
+      keys: ["label"],
+      fuseThreshold: 0.4,
+    }).map(
       (r) => r.item,
     );
   }, [proveedoresOptions, proveedorBusqueda]);
@@ -229,7 +254,8 @@ export const ModalGastosZarandeo = ({
     setSubmitting(true);
     try {
       const resp = await TamizajeCarbonService.registrarGasto({
-        id_zarandeo_carbon: idZarandeoCarbon,
+        id_zarandeo_carbon: destino.tipo === "zarandeo" ? idDestino : undefined,
+        id_blending_carbon: destino.tipo === "blending" ? idDestino : undefined,
         gasto,
         otro_gasto: gasto === TipoGastoZarandeo.Otro ? otroGasto.trim() : null,
         id_proveedor: idProveedor ? Number(idProveedor) : null,
@@ -247,7 +273,7 @@ export const ModalGastosZarandeo = ({
         // El backend devuelve el gasto ya persistido con la misma forma que
         // el listado: se inserta en la lista local, sin volver a consultar.
         setGastos((prev) => ordenarGastos([...prev, resp.data]));
-        onGuardado?.();
+        onGuardado?.(resp.data);
         resetFormulario();
         setFormAbierto(false);
       } else {
@@ -269,11 +295,21 @@ export const ModalGastosZarandeo = ({
       size="55rem"
       validateClose
       rightSection={
-        tituloZarandeo && (
-          <Text size="xs" c="gray" fw={600}>
-            {tituloZarandeo}
-          </Text>
-        )
+        <Group gap={6}>
+          <Badge
+            variant="light"
+            color={destino.tipo === "blending" ? "cyan" : "teal"}
+            radius="xl"
+            size="sm"
+          >
+            {destino.tipo === "blending" ? "Blending" : "Zarandeo"}
+          </Badge>
+          {tituloDestino && (
+            <Text size="xs" c="gray" fw={600}>
+              {tituloDestino}
+            </Text>
+          )}
+        </Group>
       }
     >
       <Stack gap="md">

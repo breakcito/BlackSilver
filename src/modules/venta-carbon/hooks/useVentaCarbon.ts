@@ -6,6 +6,14 @@ import type { VentaCarbonResumen } from "../service/venta-carbon.responses";
 const MES_ACTUAL = new Date().getMonth() + 1;
 const ANIO_ACTUAL = new Date().getFullYear();
 
+/**
+ * Estado del modulo de venta de carbon.
+ *
+ * La API devuelve el arbol COMPLETO de cada venta (cargas, liquidaciones,
+ * comprobantes y pagos) con un numero fijo de consultas: asi el listado
+ * muestra todo desde el primer momento y desplegar una venta es instantaneo
+ * (no hay una segunda consulta ni un spinner).
+ */
 export const useVentaCarbon = () => {
   const [ventas, setVentas] = useState<VentaCarbonResumen[]>([]);
   const [loading, setLoading] = useState(false);
@@ -14,23 +22,21 @@ export const useVentaCarbon = () => {
   const [anio, setAnio] = useState<number>(ANIO_ACTUAL);
 
   /**
-   * Detalle (cargas, liquidaciones, comprobantes y pagos) de cada venta
-   * desplegada. El listado llega liviano: el arbol se pide bajo demanda y
-   * queda cacheado para no volver a descargarlo.
-   */
-  const [detalles, setDetalles] = useState<Record<number, VentaCarbonResumen>>({});
-  const [detalleCargando, setDetalleCargando] = useState<number | null>(null);
-
-  /**
    * Ventas desplegadas. Se controla de forma explicita porque
    * `trigger: "always"` de mantine-datatable ignora el estado controlado y
    * despliega todas las filas.
    */
   const [desplegadas, setDesplegadas] = useState<number[]>([]);
 
+  /**
+   * Id de la venta que se esta recargando porRefresh (tras liquidar, comprobar
+   * o pagar). Solo hay uno a la vez: el usuario trabaja sobre una venta.
+   */
+  const [detalleCargando, setDetalleCargando] = useState<number | null>(null);
+
   const { notifyError } = useNotify();
 
-  // Evita que un fetch viejo pise el detalle de una venta recargada.
+  // Evita que una respuesta vieja pise el detalle de una venta recargada.
   const detalleRequestRef = useRef(0);
 
   /**
@@ -75,57 +81,22 @@ export const useVentaCarbon = () => {
   };
 
   /**
-   * Vuelca los contadores de una venta en su fila del listado.
+   * Reemplaza una venta en el listado (con su arbol completo).
    *
-   * Asi la fila queda al dia (cargas, liquidaciones, toneladas, total) sin
-   * tener que volver a consultar toda la lista.
+   * Asi la fila queda al dia sin tener que volver a consultar toda la lista.
    */
-  const aplicarContadores = useCallback((detalle: VentaCarbonResumen) => {
+  const updateVentaLocal = useCallback((venta: VentaCarbonResumen) => {
     setVentas((prev) =>
-      prev.map((v) =>
-        v.id_venta_carbon === detalle.id_venta_carbon
-          ? {
-              ...v,
-              cantidad_cargas: detalle.cantidad_cargas,
-              cantidad_cargas_confirmadas: detalle.cantidad_cargas_confirmadas,
-              cantidad_liquidaciones: detalle.cantidad_liquidaciones,
-              total_toneladas: detalle.total_toneladas,
-              total_toneladas_confirmadas: detalle.total_toneladas_confirmadas,
-              total_subtotal: detalle.total_subtotal,
-              estado: detalle.estado,
-            }
-          : v,
-      ),
+      prev.map((v) => (v.id_venta_carbon === venta.id_venta_carbon ? venta : v)),
     );
   }, []);
 
   /**
    * Inserta la venta recien creada al inicio del listado.
-   *
-   * La venta viene con su arbol completo (la devuelve la API al crearla),
-   * asi que tambien se cachea como detalle para no volver a descargarla.
    */
-  const insertVenta = (venta: VentaCarbonResumen) => {
-    setVentas((prev) => [{ ...venta, cargas: [], liquidaciones: [] }, ...prev]);
-    setDetalles((prev) => ({
-      ...prev,
-      [venta.id_venta_carbon]: venta,
-    }));
-  };
-
-  /**
-   * Reemplaza la venta actualizada (por ejemplo, tras confirmar una llegada).
-   *
-   * La fila del listado solo recibe los contadores: el arbol se queda en el
-   * cache de detalles.
-   */
-  const updateVentaLocal = (venta: VentaCarbonResumen) => {
-    setDetalles((prev) => ({
-      ...prev,
-      [venta.id_venta_carbon]: venta,
-    }));
-    aplicarContadores(venta);
-  };
+  const insertVenta = useCallback((venta: VentaCarbonResumen) => {
+    setVentas((prev) => [venta, ...prev]);
+  }, []);
 
   /**
    * Recarga con spinner. OJO: no se expone `fetch` directo porque su primer
@@ -137,17 +108,18 @@ export const useVentaCarbon = () => {
   const recargarSilencioso = useCallback(() => fetch(true), [fetch]);
 
   /**
-   * Descarga (o reutiliza) el detalle de una venta.
+   * Descarga (o reutiliza) el arbol de una venta.
    *
-   * @param forzar Si es `true` vuelve a pedirlo aunque ya este cacheado.
+   * @param forzar Si es `true` vuelve a pedirlo aunque ya este en la lista.
    */
   const cargarDetalle = useCallback(
     async (
       idVentaCarbon: number,
       forzar = false,
     ): Promise<VentaCarbonResumen | null> => {
-      if (!forzar && detalles[idVentaCarbon]) {
-        return detalles[idVentaCarbon];
+      if (!forzar) {
+        const enLista = ventas.find((v) => v.id_venta_carbon === idVentaCarbon);
+        if (enLista) return enLista;
       }
 
       const request = ++detalleRequestRef.current;
@@ -163,8 +135,7 @@ export const useVentaCarbon = () => {
         }
 
         const detalle = resp.data as VentaCarbonResumen;
-        setDetalles((prev) => ({ ...prev, [idVentaCarbon]: detalle }));
-        aplicarContadores(detalle);
+        updateVentaLocal(detalle);
         return detalle;
       } catch (e) {
         console.error(e);
@@ -174,24 +145,17 @@ export const useVentaCarbon = () => {
         if (request === detalleRequestRef.current) setDetalleCargando(null);
       }
     },
-    [detalles, notifyError, aplicarContadores],
+    [ventas, notifyError, updateVentaLocal],
   );
 
   /**
-   * Cambia el juego de ventas desplegadas y descarga el detalle de la que
-   * acaba de abrirse.
+   * Cambia el juego de ventas desplegadas.
+   *
+   * No hace falta pedir el detalle: el arbol ya viene en el listado.
    */
-  const cambiarDespliegue = useCallback(
-    async (ids: number[]) => {
-      setDesplegadas(ids);
-
-      const id = ids[0];
-      if (!id) return;
-
-      await cargarDetalle(id);
-    },
-    [cargarDetalle],
-  );
+  const cambiarDespliegue = useCallback((ids: number[]) => {
+    setDesplegadas(ids);
+  }, []);
 
   /**
    * Por defecto se despliega la venta mas reciente.
@@ -208,15 +172,11 @@ export const useVentaCarbon = () => {
 
     const id = ventas[0].id_venta_carbon;
     setDesplegadas([id]);
-    void cargarDetalle(id);
-  }, [ventas, cargarDetalle]);
+  }, [ventas]);
 
   /**
-   * Tras un cambio (despachar, confirmar llegada, liquidar, pagar) se
-   * recarga SOLO el detalle de esa venta.
-   *
-   * No se vuelve a consultar toda la lista: los contadores de la fila se
-   * actualizan en local con los del detalle.
+   * Tras un cambio (liquidar, comprobar, pagar) se recarga SOLO la venta
+   * afectada: no se vuelve a consultar toda la lista.
    */
   const refrescarDetalle = useCallback(
     async (idVentaCarbon: number) => {
@@ -237,7 +197,6 @@ export const useVentaCarbon = () => {
     recargarSilencioso,
     insertVenta,
     updateVentaLocal,
-    detalles,
     detalleCargando,
     desplegadas,
     setDesplegadas,

@@ -10,8 +10,8 @@ import type {
   RegistrarPagoPayload,
 } from "./venta-carbon.requests";
 import type {
+  BlendingDespachable,
   LiquidacionVentaCarbonItem,
-  StockDisponibleCarbon,
   VentaCarbonResumen,
 } from "./venta-carbon.responses";
 
@@ -42,14 +42,14 @@ export const VentaCarbonService = {
   },
 
   /**
-   * Stock realmente despachable de un almacen: ya descuenta las cargas que
-   * salieron y siguen pendientes de confirmar.
+   * Blendings despachables desde un almacen: el stock ya descuenta lo que
+   * salio y sigue en camino.
    */
-  getStockDisponible: async (
+  getBlendings: async (
     idAlmacen: number,
-  ): Promise<IRespuesta<StockDisponibleCarbon[]>> => {
-    const { data } = await api.get<IRespuesta<StockDisponibleCarbon[]>>(
-      `${PATH}/stock-disponible`,
+  ): Promise<IRespuesta<BlendingDespachable[]>> => {
+    const { data } = await api.get<IRespuesta<BlendingDespachable[]>>(
+      `${PATH}/blendings`,
       { params: { id_almacen: idAlmacen } },
     );
     return data;
@@ -85,10 +85,12 @@ export const VentaCarbonService = {
         });
       }
       return {
-        id_tipo_carbon: c.id_tipo_carbon,
-        calidad: c.calidad,
+        id_blending_carbon: c.id_blending_carbon,
         cantidad_toneladas: c.cantidad_toneladas,
+        porcentaje_ceniza: c.porcentaje_ceniza,
         fecha_hora_salida: c.fecha_hora_salida,
+        id_vehiculo_carbon: c.id_vehiculo_carbon,
+        segunda_placa: c.segunda_placa,
       };
     });
 
@@ -118,10 +120,12 @@ export const VentaCarbonService = {
         });
       }
       return {
-        id_tipo_carbon: c.id_tipo_carbon,
-        calidad: c.calidad,
+        id_blending_carbon: c.id_blending_carbon,
         cantidad_toneladas: c.cantidad_toneladas,
+        porcentaje_ceniza: c.porcentaje_ceniza,
         fecha_hora_salida: c.fecha_hora_salida,
+        id_vehiculo_carbon: c.id_vehiculo_carbon,
+        segunda_placa: c.segunda_placa,
       };
     });
 
@@ -143,20 +147,19 @@ export const VentaCarbonService = {
   ): Promise<IRespuesta<VentaCarbonResumen>> => {
     const formData = new FormData();
 
-    formData.append("id_tipo_carbon", String(payload.id_tipo_carbon));
-    formData.append("calidad", String(payload.calidad));
     formData.append("cantidad_toneladas", String(payload.cantidad_toneladas));
     formData.append("fecha_hora_ingreso", payload.fecha_hora_ingreso);
-    formData.append(
-      "id_vehiculo_carbon",
-      String(payload.id_vehiculo_carbon),
-    );
     formData.append("porcentaje_ceniza", String(payload.porcentaje_ceniza));
     formData.append("porcentaje_humedad", String(payload.porcentaje_humedad));
     formData.append("porcentaje_azufre", String(payload.porcentaje_azufre));
     formData.append("porcentaje_pizarra", String(payload.porcentaje_pizarra));
     formData.append("fue_aceptado", payload.fue_aceptado ? "1" : "0");
 
+    if (payload.id_vehiculo_carbon)
+      formData.append(
+        "id_vehiculo_carbon",
+        String(payload.id_vehiculo_carbon),
+      );
     if (payload.segunda_placa)
       formData.append("segunda_placa", payload.segunda_placa);
     if (payload.guia_remitente)

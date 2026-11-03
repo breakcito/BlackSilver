@@ -11,6 +11,7 @@ import {
 import {
   ArrowUturnLeftIcon,
   PlusIcon,
+  ScaleIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 import dayjs from "dayjs";
@@ -52,9 +53,7 @@ interface Props {
   loading: boolean;
   /** Ventas desplegadas (controlado: `trigger: "always"` ignora el estado). */
   desplegadas: number[];
-  /** Detalle ya descargado de cada venta desplegada. */
-  detalles: Record<number, VentaCarbonResumen>;
-  /** Id de la venta cuyo detalle se esta descargando. */
+  /** Id de la venta que se esta recargando (spinner en su fila). */
   detalleCargando: number | null;
   onExpandedChange: (ids: number[]) => void;
   onConfirmarLlegada: (
@@ -91,11 +90,11 @@ export const VentaCarbonListado = ({
   ventas,
   loading,
   desplegadas,
-  detalles,
   detalleCargando,
   onExpandedChange,
   onConfirmarLlegada,
   onDespacharCargas,
+  onLiquidar,
   onLiquidarGrupo,
   onEditarLiquidacion,
   onConfirmarLiquidacion,
@@ -218,7 +217,7 @@ export const VentaCarbonListado = ({
         ),
       },
       {
-        accessor: "total_subtotal",
+        accessor: "total_total",
         title: "Total",
         textAlign: "center",
         width: 120,
@@ -228,41 +227,41 @@ export const VentaCarbonListado = ({
           </Text>
         ),
       },
-      // {
-      //   accessor: "cantidad_liquidaciones",
-      //   title: "Liquidaciones",
-      //   textAlign: "center",
-      //   width: 140,
-      //   render: (r) => {
-      //     const cantidad = r.cantidad_liquidaciones ?? 0;
-      //     return (
-      //       <Group gap={4} justify="center" wrap="nowrap">
-      //         <Badge
-      //           variant="light"
-      //           color={cantidad > 0 ? "blue" : "gray"}
-      //           radius="md"
-      //           size="sm"
-      //         >
-      //           {cantidad} liq.
-      //         </Badge>
-      //         <Tooltip label="Registrar liquidacion" withArrow>
-      //           <ActionIcon
-      //             variant="light"
-      //             color="blue"
-      //             size="md"
-      //             radius="md"
-      //             onClick={(e) => {
-      //               e.stopPropagation();
-      //               onLiquidar(r);
-      //             }}
-      //           >
-      //             <ScaleIcon className="w-4 h-4" />
-      //           </ActionIcon>
-      //         </Tooltip>
-      //       </Group>
-      //     );
-      //   },
-      // },
+      {
+        accessor: "cantidad_liquidaciones",
+        title: "Liquidaciones",
+        textAlign: "center",
+        width: 140,
+        render: (r) => {
+          const cantidad = r.cantidad_liquidaciones ?? 0;
+          return (
+            <Group gap={4} justify="center" wrap="nowrap">
+              <Badge
+                variant="light"
+                color={cantidad > 0 ? "blue" : "gray"}
+                radius="md"
+                size="sm"
+              >
+                {cantidad} liq.
+              </Badge>
+              <Tooltip label="Registrar liquidacion" withArrow>
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  size="md"
+                  radius="md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onLiquidar(r);
+                  }}
+                >
+                  <ScaleIcon className="w-4 h-4" />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          );
+        },
+      },
       {
         accessor: "estado",
         title: "Estado",
@@ -296,7 +295,7 @@ export const VentaCarbonListado = ({
         ),
       },
     ],
-    [onDespacharCargas],
+    [onDespacharCargas, onLiquidar],
   );
 
   return (
@@ -322,7 +321,7 @@ export const VentaCarbonListado = ({
           expandable: () => true,
           content: ({ record }: { record: VentaCarbonResumen }) => (
             <VentaCarbonDetalle
-              detalle={detalles[record.id_venta_carbon] ?? null}
+              detalle={record}
               loading={detalleCargando === record.id_venta_carbon}
               onConfirmarLlegada={onConfirmarLlegada}
               onLiquidarGrupo={onLiquidarGrupo}
