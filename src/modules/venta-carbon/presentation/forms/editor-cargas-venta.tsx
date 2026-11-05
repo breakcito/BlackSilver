@@ -33,16 +33,16 @@ import {
 } from "./carga-venta-form-state";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
+import { useCatalogosDespacho } from "../../hooks/useCatalogosDespacho";
+import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { FormVehiculoCarbon } from "../../../../presentation/utils/form-vehiculo-carbon";
 import type { BlendingDespachable } from "../../service/venta-carbon.responses";
-import type { RES_VehiculoCarbon } from "../../../../service/responses/vehiculo-carbon";
 
 interface Props {
   cargas: CargaVentaFormState[];
   onChange: (cargas: CargaVentaFormState[]) => void;
   /** Blendings despachables del almacen de salida. */
   blendings: BlendingDespachable[];
-  /** Vehiculos de carbon. */
-  vehiculos: RES_VehiculoCarbon[];
   loadingCatalogos?: boolean;
   saving?: boolean;
 }
@@ -57,20 +57,33 @@ interface Props {
  *
  * La carga sale de un BLENDING: al elegirlo se autocompletan el porcentaje
  * de ceniza y las toneladas, que el usuario puede ajustar.
+ *
+ * El catalogo de vehiculos lo carga el propio editor (con `useCatalogosDespacho`)
+ * para poder registrar uno nuevo desde el boton "+", igual que en la
+ * confirmacion de llegada.
  */
 export const EditorCargasVenta = ({
   cargas,
   onChange,
   blendings,
-  vehiculos,
   loadingCatalogos = false,
   saving = false,
 }: Props) => {
-  const [borrador, setBorrador] = useState<CargaVentaFormState>(nuevaCargaVenta);
+  const {
+    vehiculos,
+    marcas,
+    loading: loadingVehiculos,
+    reloadVehiculos,
+    reloadMarcas,
+  } = useCatalogosDespacho();
+
+  const [borrador, setBorrador] =
+    useState<CargaVentaFormState>(nuevaCargaVenta);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [vehiculoBusqueda, setVehiculoBusqueda] = useState("");
   const [blendingBusqueda, setBlendingBusqueda] = useState("");
+  const [openNuevoVehiculo, setOpenNuevoVehiculo] = useState(false);
 
   const blendingsVisibles = useMemo(() => {
     const q = blendingBusqueda.trim();
@@ -85,7 +98,7 @@ export const EditorCargasVenta = ({
     () =>
       blendingsVisibles.map((b) => ({
         value: String(b.id_blending_carbon),
-        label: `${b.correlativo} · ${b.tipo_carbon_nombre ?? "Sin tipo"}`,
+        label: `${b.correlativo} · ${b.tipo_carbon_nombre} · ${formatNumber(b.disponible)} TN · ${formatNumber(b.porcentaje_ceniza)}%`,
       })),
     [blendingsVisibles],
   );
@@ -101,9 +114,12 @@ export const EditorCargasVenta = ({
 
   const vehiculoSeleccionado = useMemo(
     () =>
-      vehiculos.find((v) => String(v.id_vehiculo_carbon) === borrador.id_vehiculo_carbon),
+      vehiculos.find(
+        (v) => String(v.id_vehiculo_carbon) === borrador.id_vehiculo_carbon,
+      ),
     [vehiculos, borrador.id_vehiculo_carbon],
   );
+
 
   /**
    * Stock que se puede asignar al borrador: lo que queda del blending menos
@@ -164,16 +180,12 @@ export const EditorCargasVenta = ({
     setError(null);
 
     if (!esCargaVentaCompleta(borrador)) {
-      setError(
-        "Complete el blending, las toneladas y la fecha/hora de salida",
-      );
+      setError("Complete el blending, las toneladas y la fecha/hora de salida");
       return;
     }
 
     if (indiceEdicion !== null) {
-      onChange(
-        cargas.map((c, i) => (i === indiceEdicion ? borrador : c)),
-      );
+      onChange(cargas.map((c, i) => (i === indiceEdicion ? borrador : c)));
     } else {
       onChange([...cargas, borrador]);
     }
@@ -260,15 +272,14 @@ export const EditorCargasVenta = ({
             searchValue={blendingBusqueda}
             onSearchChange={setBlendingBusqueda}
             rightSection={
-              loadingCatalogos ? (
-                <Loader size={14} color="indigo" />
-              ) : undefined
+              loadingCatalogos ? <Loader size={14} color="indigo" /> : undefined
             }
             disabled={loadingCatalogos || saving}
             classNames={inputClasses}
             size="xs"
             radius="lg"
             searchable
+            clearable
             nothingFoundMessage="Sin blendings disponibles"
             comboboxProps={{ withinPortal: true }}
             filter={({ options }) => options}
@@ -373,34 +384,65 @@ export const EditorCargasVenta = ({
           />
         </SimpleGrid>
 
-        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm" mt="sm">
-          <Select
-            label="Vehículo (opcional)"
-            placeholder={
-              vehiculos.length === 0 ? "Sin vehículos" : "Seleccione vehículo"
-            }
-            data={vehiculosVisibles.map((v) => ({
-              value: String(v.id_vehiculo_carbon),
-              label: `${v.placa}${v.marca ? ` · ${v.marca}` : ""} (${v.tipo_vehiculo})`,
-            }))}
-            value={borrador.id_vehiculo_carbon}
-            onChange={(val) => {
-              setBorrador((prev) => ({ ...prev, id_vehiculo_carbon: val }));
-              setVehiculoBusqueda("");
-            }}
-            searchValue={vehiculoBusqueda}
-            onSearchChange={setVehiculoBusqueda}
-            leftSection={<IconTruck size={16} />}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            searchable
-            clearable
-            nothingFoundMessage="Sin vehículos registrados"
-            comboboxProps={{ withinPortal: true }}
-            filter={({ options }) => options}
-            disabled={saving}
-          />
+        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm" mt="sm">
+          <div>
+            <Group gap="xs" align="flex-end" wrap="nowrap">
+              <Select
+                label="Vehículo (opcional)"
+                className="flex-1"
+                placeholder={
+                  loadingVehiculos
+                    ? "Cargando..."
+                    : vehiculos.length === 0
+                      ? "Sin vehículos"
+                      : "Seleccione vehículo"
+                }
+                data={vehiculosVisibles.map((v) => ({
+                  value: String(v.id_vehiculo_carbon),
+                  label: `${v.placa}${v.marca ? ` · ${v.marca}` : ""} (${v.tipo_vehiculo})`,
+                }))}
+                value={borrador.id_vehiculo_carbon}
+                onChange={(val) => {
+                  setBorrador((prev) => ({ ...prev, id_vehiculo_carbon: val }));
+                  setVehiculoBusqueda("");
+                }}
+                searchValue={vehiculoBusqueda}
+                onSearchChange={setVehiculoBusqueda}
+                leftSection={<IconTruck size={16} />}
+                classNames={inputClasses}
+                size="xs"
+                radius="lg"
+                searchable
+                clearable
+                nothingFoundMessage="Sin vehículos registrados"
+                comboboxProps={{ withinPortal: true }}
+                // El filtrado lo hace `getCoincidencias` (Fuse + FlexSearch).
+                filter={({ options }) => options}
+                disabled={saving}
+              />
+              <Tooltip label="Registrar nuevo vehículo" withArrow>
+                <ActionIcon
+                  size={32}
+                  variant="filled"
+                  color="indigo.6"
+                  radius="lg"
+                  onClick={() => setOpenNuevoVehiculo(true)}
+                  disabled={saving}
+                  className="mb-0.75"
+                >
+                  <IconPlus size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            {vehiculoSeleccionado && (
+              <Text size="xs" c="gray" mt={4}>
+                Tipo: {vehiculoSeleccionado.tipo_vehiculo}
+                {vehiculoSeleccionado.marca
+                  ? ` · Marca: ${vehiculoSeleccionado.marca}`
+                  : ""}
+              </Text>
+            )}
+          </div>
 
           <TextInput
             label="Segunda placa (opcional)"
@@ -417,60 +459,22 @@ export const EditorCargasVenta = ({
             radius="lg"
             disabled={saving}
           />
-
-          <div>
-            <Text size="xs" c="gray" fw={600} mb={4}>
-              Lote seleccionado
-            </Text>
-            <Paper
-              p="xs"
-              radius="lg"
-              className="bg-zinc-900/80 border border-zinc-800"
-            >
-              {borrador.id_blending_carbon ? (
-                <Group gap={6} wrap="nowrap">
-                  <Badge
-                    size="sm"
-                    variant="light"
-                    color="cyan"
-                    radius="sm"
-                    className="font-mono"
-                  >
-                    {correlativoBlending(borrador.id_blending_carbon)}
-                  </Badge>
-                  <Text size="xs" c="zinc.300" truncate>
-                    {tipoBlending(borrador.id_blending_carbon)}
-                  </Text>
-                </Group>
-              ) : (
-                <Text size="xs" c="dimmed" fs="italic">
-                  Elija un blending
-                </Text>
-              )}
-            </Paper>
-            {vehiculoSeleccionado && (
-              <Text size="10px" c="dimmed" mt={4}>
-                Tipo: {vehiculoSeleccionado.tipo_vehiculo}
-              </Text>
-            )}
-          </div>
+          <FileInput
+            label="Evidencias del despacho"
+            placeholder="Imágenes o documentos..."
+            multiple
+            value={borrador.archivos}
+            onChange={(files) =>
+              setBorrador((prev) => ({ ...prev, archivos: files }))
+            }
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            clearable
+            disabled={saving}
+            style={{ gridColumn: "span 2" }}
+          />
         </SimpleGrid>
-
-        <FileInput
-          label="Evidencias del despacho"
-          placeholder="Imágenes o documentos..."
-          multiple
-          value={borrador.archivos}
-          onChange={(files) =>
-            setBorrador((prev) => ({ ...prev, archivos: files }))
-          }
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
-          clearable
-          disabled={saving}
-          mt="sm"
-        />
 
         {error && (
           <Text size="xs" c="red.4" fw={600} mt="xs">
@@ -587,7 +591,7 @@ export const EditorCargasVenta = ({
                   <Table.Td ta={"center"}>
                     <div className="flex flex-col gap-1 items-center">
                       <Badge
-                        size="xs"
+                        size="sm"
                         variant="light"
                         color="cyan"
                         radius="sm"
@@ -595,7 +599,7 @@ export const EditorCargasVenta = ({
                       >
                         {correlativoBlending(carga.id_blending_carbon)}
                       </Badge>
-                      <Text size="10px" c="dimmed">
+                      <Text size="xs" c="gray">
                         {tipoBlending(carga.id_blending_carbon)}
                       </Text>
                     </div>
@@ -613,9 +617,7 @@ export const EditorCargasVenta = ({
                   <Table.Td ta={"center"}>
                     <Text size="xs" c="zinc.300" className="font-mono">
                       {placaVehiculo(carga.id_vehiculo_carbon)}
-                      {carga.segunda_placa
-                        ? ` · ${carga.segunda_placa}`
-                        : ""}
+                      {carga.segunda_placa ? ` · ${carga.segunda_placa}` : ""}
                     </Text>
                   </Table.Td>
                   <Table.Td ta={"center"}>
@@ -668,6 +670,31 @@ export const EditorCargasVenta = ({
           </Table>
         </Paper>
       )}
+
+      {/* Alta rapida de un vehiculo de carbon */}
+      <ModalEstandar
+        opened={openNuevoVehiculo}
+        close={() => setOpenNuevoVehiculo(false)}
+        validateClose
+        title="Nuevo Vehículo"
+        size="md"
+      >
+        <FormVehiculoCarbon
+          marcas={marcas}
+          onSuccess={async (nuevo) => {
+            // Se espera el refresco del catalogo para que la placa nueva
+            // ya aparezca con su nombre en el selector.
+            await reloadVehiculos();
+            setBorrador((prev) => ({
+              ...prev,
+              id_vehiculo_carbon: String(nuevo.id_vehiculo_carbon),
+            }));
+            setOpenNuevoVehiculo(false);
+          }}
+          onMarcaRegistrada={(marca) => reloadMarcas(marca)}
+          onCancel={() => setOpenNuevoVehiculo(false)}
+        />
+      </ModalEstandar>
     </Stack>
   );
 };

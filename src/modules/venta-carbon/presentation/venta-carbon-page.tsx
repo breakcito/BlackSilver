@@ -292,7 +292,7 @@ export const VentaCarbonPage = () => {
             En camino
           </Badge>
         }
-        size="62rem"
+        size="65rem"
       >
         {llegada && (
           <ModalConfirmarLlegada

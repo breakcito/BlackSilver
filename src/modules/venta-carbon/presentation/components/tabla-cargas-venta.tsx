@@ -169,7 +169,7 @@ export const TablaCargasVenta = ({
               <Table.Td ta={"center"}>
                 <div className="flex flex-col gap-1 items-center">
                   <Badge
-                    size="xs"
+                    size="sm"
                     variant="light"
                     color="cyan"
                     radius="sm"
@@ -177,7 +177,7 @@ export const TablaCargasVenta = ({
                   >
                     {carga.blending_correlativo ?? "—"}
                   </Badge>
-                  <Text size="xs" fw={600} c="zinc.100">
+                  <Text size="xs" fw={600} c="gray">
                     {carga.tipo_carbon}
                   </Text>
                 </div>

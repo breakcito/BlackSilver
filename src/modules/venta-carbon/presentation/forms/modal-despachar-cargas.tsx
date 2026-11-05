@@ -3,7 +3,6 @@ import { Alert, Button, Group, Paper, Stack, Text } from "@mantine/core";
 import { IconTruck } from "@tabler/icons-react";
 
 import { useNotify } from "../../../../hooks/useNotify";
-import { useCatalogosDespacho } from "../../hooks/useCatalogosDespacho";
 import { EditorCargasVenta } from "./editor-cargas-venta";
 import {
   esCargaVentaCompleta,
@@ -35,7 +34,6 @@ export const ModalDespacharCargas = ({
   onDispatched,
 }: Props) => {
   const { notifyError, notifySuccess } = useNotify();
-  const { vehiculos, loading: loadingCatalogos } = useCatalogosDespacho();
 
   const [cargas, setCargas] = useState<CargaVentaFormState[]>([]);
   const [blendings, setBlendings] = useState<BlendingDespachable[]>([]);
@@ -144,19 +142,11 @@ export const ModalDespacharCargas = ({
         </Text>
       </Paper>
 
-      {!loadingBlendings && blendings.length === 0 && (
-        <Alert color="yellow" variant="light" title="Sin blendings" radius="md">
-          Este almacén no tiene blendings con stock disponible. Registra un
-          blending en Producción antes de despachar cargas.
-        </Alert>
-      )}
-
       <EditorCargasVenta
         cargas={cargas}
         onChange={setCargas}
         blendings={blendings}
-        vehiculos={vehiculos}
-        loadingCatalogos={loadingCatalogos || loadingBlendings}
+        loadingCatalogos={loadingBlendings}
         saving={saving}
       />
 

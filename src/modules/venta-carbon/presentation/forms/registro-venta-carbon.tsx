@@ -19,7 +19,6 @@ import { useNotify } from "../../../../hooks/useNotify";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
 import { inputClasses } from "../components/input-classes";
 import { useCatalogosCabeceraVenta } from "../../hooks/useCatalogosCabeceraVenta";
-import { useCatalogosDespacho } from "../../hooks/useCatalogosDespacho";
 import { EditorCargasVenta } from "./editor-cargas-venta";
 import {
   esCargaVentaCompleta,
@@ -53,11 +52,10 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
     almacenesCliente,
     loading: loadingCabecera,
   } = useCatalogosCabeceraVenta();
-  const { vehiculos, loading: loadingDespacho } = useCatalogosDespacho();
 
   // Los selects se bloquean mientras carga su propio catalogo: la cabecera
   // no depende de los vehiculos ni de los blendings.
-  const loadingCatalogos = loadingCabecera || loadingDespacho;
+  const loadingCatalogos = loadingCabecera;
 
   const [idEmpresa, setIdEmpresa] = useState<string | null>(null);
   const [idCliente, setIdCliente] = useState<string | null>(null);
@@ -273,6 +271,7 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
             size="xs"
             radius="lg"
             searchable
+            clearable
             nothingFoundMessage="Sin empresas registradas"
             disabled={saving}
           />
@@ -411,25 +410,11 @@ export const RegistroVentaCarbon = ({ onCancel, onCreated }: Props) => {
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        {!loadingBlendings && blendings.length === 0 && (
-          <Alert
-            color="yellow"
-            variant="light"
-            title="Sin blendings"
-            radius="md"
-            mb="sm"
-          >
-            Este almacén no tiene blendings con stock disponible. Registra un
-            blending en Producción antes de despachar cargas. La venta se puede
-            guardar igual y despachar las cargas después.
-          </Alert>
-        )}
 
         <EditorCargasVenta
           cargas={cargas}
           onChange={setCargas}
           blendings={blendings}
-          vehiculos={vehiculos}
           loadingCatalogos={loadingCatalogos || loadingBlendings}
           saving={saving}
         />

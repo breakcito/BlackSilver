@@ -28,10 +28,7 @@ import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifil
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { FormVehiculoCarbon } from "../../../../presentation/utils/form-vehiculo-carbon";
 import { useCatalogosDespacho } from "../../hooks/useCatalogosDespacho";
-import {
-  exigeSegundaPlaca,
-  type TipoVehiculoCarbon,
-} from "../../../../shared/enums/venta-carbon/tipo-vehiculo-carbon";
+
 import type {
   CargaVentaCarbonItem,
   VentaCarbonResumen,
@@ -104,11 +101,6 @@ export const ModalConfirmarLlegada = ({
     () => vehiculos.find((v) => String(v.id_vehiculo_carbon) === idVehiculo),
     [vehiculos, idVehiculo],
   );
-
-  const tipoVehiculo = (vehiculoSeleccionado?.tipo_vehiculo ??
-    null) as TipoVehiculoCarbon | null;
-
-  const esTolva = exigeSegundaPlaca(tipoVehiculo);
 
   // El tipo de carbon lo hereda el blending de la carga: ya viene en la carga.
   const nombreTipoCarbon = carga.tipo_carbon ?? "—";
@@ -257,7 +249,7 @@ export const ModalConfirmarLlegada = ({
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="sm">
+        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="sm">
           <TextInput
             label="Fecha y hora de ingreso"
             type="datetime-local"
@@ -282,30 +274,24 @@ export const ModalConfirmarLlegada = ({
             disabled={saving}
           />
 
-          <div>
-            <Text size="xs" c="gray" fw={600} mb={4}>
+          <div className="mt-2">
+            <Text size="xs" c="gray" fw={600} mb={6}>
               Lote recibido
             </Text>
-            <Paper
-              p="xs"
-              radius="lg"
-              className="bg-zinc-900/80 border border-zinc-800"
-            >
-              <Group gap={6} wrap="nowrap">
-                <Badge
-                  size="sm"
-                  variant="light"
-                  color="cyan"
-                  radius="sm"
-                  className="font-mono"
-                >
-                  {carga.blending_correlativo ?? "—"}
-                </Badge>
-                <Text size="xs" c="zinc.300" truncate>
-                  {carga.tipo_carbon ?? "—"}
-                </Text>
-              </Group>
-            </Paper>
+            <Group gap={6} wrap="nowrap">
+              <Badge
+                size="sm"
+                variant="light"
+                color="cyan"
+                radius="sm"
+                className="font-mono"
+              >
+                {carga.blending_correlativo ?? "—"}
+              </Badge>
+              <Text size="xs" c="zinc.300" truncate>
+                {carga.tipo_carbon ?? "—"}
+              </Text>
+            </Group>
           </div>
         </SimpleGrid>
 
@@ -355,7 +341,7 @@ export const ModalConfirmarLlegada = ({
               </Tooltip>
             </Group>
             {vehiculoSeleccionado && (
-              <Text size="xs" c="dimmed" mt={4}>
+              <Text size="xs" c="gray" mt={4}>
                 Tipo: {vehiculoSeleccionado.tipo_vehiculo}
                 {vehiculoSeleccionado.marca
                   ? ` · Marca: ${vehiculoSeleccionado.marca}`
@@ -377,11 +363,6 @@ export const ModalConfirmarLlegada = ({
               radius="lg"
               disabled={saving}
             />
-            {esTolva && (
-              <Text size="10px" c="yellow.4" mt={4} fw={600}>
-                El vehículo es Tolva: se recomienda la segunda placa
-              </Text>
-            )}
           </div>
 
           <TextInput

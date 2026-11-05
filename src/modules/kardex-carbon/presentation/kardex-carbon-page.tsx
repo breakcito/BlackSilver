@@ -288,8 +288,8 @@ export const KardexCarbonPage = () => {
       {
         accessor: "referencia",
         title: "Referencia / Carga",
-        textAlign: "center",
-        width: 250,
+        textAlign: "left",
+        width: 200,
         render: (r) => {
           // Salida: el movimiento viene de una carga de VENTA.
           if (r.id_carga_venta_carbon) {
@@ -300,25 +300,23 @@ export const KardexCarbonPage = () => {
                 : null;
 
             return (
-              <div className="flex justify-center items-center">
-                <div className="flex flex-col justify-center items-start gap-1.5">
-                  {referencia && (
-                    <Text size="xs" fw={600} c={"blue"}>
-                      {referencia}
-                    </Text>
-                  )}
-                  {r.cliente_razon_social && (
-                    <Text size="xs" c="gray" fw={600}>
-                      Cliente: {r.cliente_razon_social}
-                    </Text>
-                  )}
-                  {(r.venta_codigo_ticket_balanza || r.venta_placa) && (
-                    <Text size="xs" fw={600}>
-                      Ticket: {r.venta_codigo_ticket_balanza ?? "—"}
-                      {r.venta_placa ? ` (${r.venta_placa})` : ""}
-                    </Text>
-                  )}
-                </div>
+              <div className="flex flex-col text-left gap-1.5">
+                {referencia && (
+                  <Text size="xs" fw={600} c={"blue"}>
+                    {referencia}
+                  </Text>
+                )}
+                {r.cliente_razon_social && (
+                  <Text size="xs" c="gray" fw={600}>
+                    Cliente: {r.cliente_razon_social}
+                  </Text>
+                )}
+                {(r.venta_codigo_ticket_balanza || r.venta_placa) && (
+                  <Text size="xs" fw={600}>
+                    Ticket: {r.venta_codigo_ticket_balanza ?? "—"}
+                    {r.venta_placa ? ` (${r.venta_placa})` : ""}
+                  </Text>
+                )}
               </div>
             );
           }
@@ -332,25 +330,23 @@ export const KardexCarbonPage = () => {
             );
           }
           return (
-            <div className="flex justify-center items-center">
-              <div className="flex flex-col justify-center items-start gap-1.5">
-                {r.compra_correlativo && (
-                  <Text size="xs" fw={600} c={"blue"}>
-                    OC: {r.compra_correlativo}
-                  </Text>
-                )}
-                {r.proveedor_razon_social && (
-                  <Text size="xs" c="gray" fw={600}>
-                    Prov: {r.proveedor_razon_social}
-                  </Text>
-                )}
-                {r.codigo_ticket_balanza && (
-                  <Text size="xs" fw={600}>
-                    Ticket: {r.codigo_ticket_balanza}{" "}
-                    {r.placa ? `(${r.placa})` : ""}
-                  </Text>
-                )}
-              </div>
+            <div className="flex flex-col  gap-1.5">
+              {r.compra_correlativo && (
+                <Text size="xs" fw={600} c={"blue"}>
+                  OC: {r.compra_correlativo}
+                </Text>
+              )}
+              {r.proveedor_razon_social && (
+                <Text size="xs" c="gray" fw={600}>
+                  Prov: {r.proveedor_razon_social}
+                </Text>
+              )}
+              {r.codigo_ticket_balanza && (
+                <Text size="xs" fw={600}>
+                  Ticket: {r.codigo_ticket_balanza}{" "}
+                  {r.placa ? `(${r.placa})` : ""}
+                </Text>
+              )}
             </div>
           );
         },

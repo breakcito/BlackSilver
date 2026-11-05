@@ -206,3 +206,13 @@ npm run dev
 5. **Respetar las "Reglas de código"**. Si una idea las rompe, plantear la alternativa antes de codear.
 6. **Cuestionar reusos forzados**. Si piden "un componente que sirva para X e Y", proponer separar antes.
 7. Después de cualquier cambio: `npm run build` (tsc + vite build; no confiar solo en `tsc --noEmit`).
+- No muestres lo que no aporta valor
+- Pon en practica los 9 principios de diseño con criterio segun aplique: Balance (Simetrico, asimetrico, radial), Contraste, Enfasis, Proporción, Repeticiones y patrones, Movimiento, Espacio en blanco, Variedad, Union y armonia
+- Sugerencias:
+  - Aplica el "uso" como el lenguaje humano: Las interfaces deben hablar como una persona, sin documentacion, algo claro, los humanos construyen palabras simples y claras
+  - Meno es mas: No muestres toda la informacion en un solo lugar o de una sola manera. Rompe el contenido en secciones que lo usuarios puedan rapidamente encontrar lo que mas les importa
+  - Errores al instante: Mostrar errores instantaneamente que los usuarios pueden arreglar al momento es mejor que hacerlos esperar por una validacion
+  - Usa CTAs claras: Usa etiquetas o textis que les diga a los usuarios lo que va a suceder despues. El texto orientado a resultados reduce las dudas.
+  - Siempre hazte la pregunta: Se ve bien pero, es usable? Buscando siempre una respuesta optima.
+- Pon en practicas los principios de usabilidad de Jakob Nielsen:
+  - Visibilidad del estado del sistema, Relación entre el sistema y el mundo real. Control y libertad del usuario, Consistencia y estándares, Prevención de errores, Reconocer antes que recordar, Flexibilidad y eficiencia de uso, Diseño estético y minimalista, Ayudar a los usuarios a reconocer, diagnosticar y corregir los errores, Ayuda y documentación. No satures la pantalla con demasiada informacion dispersa
