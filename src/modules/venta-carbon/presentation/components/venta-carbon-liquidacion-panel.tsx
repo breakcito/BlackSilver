@@ -7,11 +7,13 @@ import {
   SimpleGrid,
   Stack,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import {
   IconCheck,
   IconCoins,
   IconDeviceFloppy,
+  IconDownload,
   IconReceipt,
   IconWallet,
 } from "@tabler/icons-react";
@@ -21,6 +23,7 @@ import { useState } from "react";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { TablaCargasVenta } from "./tabla-cargas-venta";
 import { EstadoComprobanteVentaCarbon } from "../../../../shared/enums/venta-carbon/estado-comprobante-venta-carbon";
+import { useExportarLiquidacionVenta } from "../../hooks/useExportarLiquidacionVenta";
 import type {
   ComprobanteVentaCarbonItem,
   LiquidacionVentaCarbonItem,
@@ -90,6 +93,10 @@ export const VentaCarbonLiquidacionPanel = ({
    */
   const [confirmando, setConfirmando] = useState<number | null>(null);
   const enCurso = confirmando !== null;
+
+  /** Exporta la liquidacion a Excel. */
+  const { exportar: exportarLiquidacion, exportando: exportandoLiquidacion } =
+    useExportarLiquidacionVenta();
 
   return (
     <Paper p="sm" radius="lg" className="bg-zinc-900/60 border border-zinc-800">
@@ -175,6 +182,25 @@ export const VentaCarbonLiquidacionPanel = ({
         </Group>
 
         <Group gap={6} wrap="nowrap">
+          <Tooltip
+            label="Exportar liquidación"
+            withArrow
+            position="top"
+          >
+            <Button
+              size="xs"
+              radius="md"
+              variant="light"
+              color="teal"
+              leftSection={<IconDownload size={14} />}
+              loading={exportandoLiquidacion}
+              onClick={() =>
+                void exportarLiquidacion(venta, liquidacion)
+              }
+            >
+              Exportar
+            </Button>
+          </Tooltip>
           {!liquidacion.esta_confirmado ? (
             <>
               <Button

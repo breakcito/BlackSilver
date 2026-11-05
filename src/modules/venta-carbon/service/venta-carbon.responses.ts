@@ -76,6 +76,8 @@ export interface PagoVentaCarbonItem {
   /** Cuenta bancaria de la empresa donde ingresa el dinero. */
   id_cuenta_bancaria_empresa: number | null;
   empresa_numero_cuenta: string | null;
+  /** CCI de la cuenta bancaria de la empresa que recibe el pago. */
+  empresa_cci: string | null;
   empresa_banco: string | null;
   empresa_banco_abv: string | null;
   medio_pago: MedioPagoVentaCarbon | string;
@@ -89,19 +91,21 @@ export interface PagoVentaCarbonItem {
 }
 
 /**
- * Anticipo del cliente amortizado contra un comprobante.
+ * Anticipo del cliente aplicado a un comprobante de venta.
  *
- * Es el asiento que queda en `transaccion_anticipo_cliente`: dice de que
- * anticipo se desconto el monto y con que respaldo se recibio.
+ * Cada fila de `transaccion_anticipo_cliente` es el uso de un anticipo
+ * (`anticipo_cliente`) en un comprobante, con el monto que se tomo.
  */
-export interface AnticipoAplicadoComprobante {
+export interface TransaccionAnticipoClienteItem {
   id_transaccion: number;
-  id_anticipo: number;
+  id_anticipo_cliente: number;
+  id_comprobante_venta_carbon?: number | null;
   monto_retirado: number;
-  medio_pago: string | null;
+  medio_pago: string;
   numero_operacion: string | null;
   fecha_hora_pago: string | null;
   codigo_comprobante: string | null;
+  observacion?: string | null;
 }
 
 export interface ComprobanteVentaCarbonItem {
@@ -129,6 +133,8 @@ export interface ComprobanteVentaCarbonItem {
   /** Anticipos del cliente amortizados contra este comprobante. */
   anticipos_aplicados: AnticipoAplicadoComprobante[];
   pagos: PagoVentaCarbonItem[];
+  /** Anticipos del cliente aplicados a este comprobante. */
+  anticipos_utilizados: TransaccionAnticipoClienteItem[];
 }
 
 export interface LiquidacionVentaCarbonItem {
@@ -178,6 +184,7 @@ export interface VentaCarbonResumen {
   id_cliente_destino: number;
   cliente_destino: string | null;
   cliente_destino_ruc: string | null;
+  cliente_destino_dni: string | null;
 
   id_almacen_empresa_salida: number;
   almacen_empresa_salida: string | null;
@@ -225,4 +232,81 @@ export interface BlendingDespachable {
   /** Toneladas comprometidas en cargas que aun no confirman su llegada. */
   comprometido: number;
   disponible: number;
+}
+
+/**
+ * Analisis granulometrico de una carga.
+ *
+ * Viene del JSON de `carga_venta_carbon.analisis_granulometria` y solo se
+ * llena cuando el tipo de carbon es "Tipo A".
+ */
+export interface AnalisisGranulometriaFila {
+  mayor_a_uno: number | null;
+  menor_a_uno: number | null;
+  un_medio: number | null;
+}
+
+/**
+ * Una fila del reporte "Registro de Ventas".
+ *
+ * Es una carga de carbon con sus importes, la liquidacion que la respalda y
+ * el PRIMER pago que NO es para detraccion (el del neto).
+ */
+export interface RES_FilaControlVentas {
+  id_carga_venta_carbon: number;
+  fecha_hora_ingreso: string;
+  codigo_ticket_balanza: string | null;
+  /** Segunda placa (carreta): solo cuando el vehiculo es Tolva. */
+  segunda_placa: string | null;
+  guia_remitente: string | null;
+  guia_transportista: string | null;
+  cantidad_toneladas: number;
+  porcentaje_ceniza: number | null;
+  porcentaje_humedad: number | null;
+  porcentaje_azufre: number | null;
+  porcentaje_pizarra: number | null;
+  analisis_granulometria: AnalisisGranulometriaFila | null;
+  precio_base: number;
+  descuento: number;
+  bono: number;
+  precio_materia_prima: number;
+  subtotal: number;
+  monto_igv: number;
+  total: number;
+  neto_a_pagar: number;
+  observacion: string | null;
+  estado: string;
+  tipo_carbon_nombre: string | null;
+  tipo_carbon_codigo: string | null;
+  /** Primera placa: la del vehiculo con el que salio la carga. */
+  placa: string | null;
+  almacen_cliente_llegada: string | null;
+  /** Cliente destino: a donde llega realmente el carbon. */
+  cliente_destino: string | null;
+  cliente_destino_ruc: string | null;
+  cliente_destino_dni: string | null;
+  porcentaje_igv: number;
+  porcentaje_detraccion: number;
+  /** Empresa que emite la venta: manda el logo del reporte. */
+  id_empresa: number;
+  /** Orden de compra de la liquidacion de la carga. */
+  codigo_orden_compra: string | null;
+  /** Numero de reporte (transporte) de la liquidacion de la carga. */
+  numero_reporte: string | null;
+  /** Comprobante (factura) de la liquidacion de la carga. */
+  comprobante_codigo: string | null;
+  comprobante_fecha_emision: string | null;
+  comprobante_estado: string | null;
+  /** Primer pago que NO es para detraccion (el del neto). */
+  pago_fecha_hora: string | null;
+  pago_numero_operacion: string | null;
+  pago_medio: string | null;
+  pago_numero_cuenta: string | null;
+  pago_banco: string | null;
+}
+
+/** Reporte "Registro de Ventas" de un año. */
+export interface RES_ReporteControlVentas {
+  anio: number;
+  cargas: RES_FilaControlVentas[];
 }
