@@ -17,6 +17,7 @@ import { MESES } from "../../../shared/variables/meses";
 import { AuxService } from "../../../service/auxiliar.service";
 import { TipoCarbonService } from "../../tipo-carbon/service/tipo-carbon.service";
 import { KardexCarbonService } from "../service/kardex-carbon.service";
+import { ResumenSocios } from "./components/resumen-socios";
 import type { MovimientoKardexCarbonItem } from "../service/kardex-carbon.responses";
 import type { RES_TipoCarbon } from "../../tipo-carbon/service/tipo-carbon.responses";
 import type { RES_Almacen } from "../../../service/responses/almacen";
@@ -114,6 +115,56 @@ export const KardexCarbonPage = () => {
       (m) => m.tipo_movimiento.toLowerCase() === tipoMovimiento.toLowerCase(),
     );
   }, [movimientos, tipoMovimiento]);
+
+  /**
+   * Resumen del periodo: cuanto carbon trajo cada proveedor y cuanto se
+   * envio a cada cliente.
+   *
+   * Se calcula sobre los movimientos que devuelve el servidor (mes, anio,
+   * almacen y tipo de carbon ya filtrados) e IGNORA el filtro visual de
+   * tipo de movimiento, para que el indicador siempre muestre los dos lados
+   * del periodo.
+   */
+  const resumenSocios = useMemo(() => {
+    const proveedores = new Map<string, number>();
+    const clientes = new Map<string, number>();
+
+    for (const m of movimientos) {
+      if (!m.socio_tipo || !m.socio_razon_social) continue;
+      const esIngreso = m.tipo_movimiento.toLowerCase() === "ingreso";
+
+      // El proveedor se acumula con los ingresos y el cliente con las
+      // salidas (que es como se mueven fisicamente).
+      if (m.socio_tipo === "Proveedor" && esIngreso) {
+        proveedores.set(
+          m.socio_razon_social,
+          (proveedores.get(m.socio_razon_social) ?? 0) +
+            Number(m.cantidad_movimiento || 0),
+        );
+      } else if (m.socio_tipo === "Cliente" && !esIngreso) {
+        clientes.set(
+          m.socio_razon_social,
+          (clientes.get(m.socio_razon_social) ?? 0) +
+            Number(m.cantidad_movimiento || 0),
+        );
+      }
+    }
+
+    const aLista = (m: Map<string, number>) =>
+      Array.from(m.entries())
+        .map(([nombre, tn]) => ({ nombre, tn }))
+        .sort((a, b) => b.tn - a.tn);
+
+    const listaProveedores = aLista(proveedores);
+    const listaClientes = aLista(clientes);
+
+    return {
+      proveedores: listaProveedores,
+      clientes: listaClientes,
+      totalProveedores: listaProveedores.reduce((a, b) => a + b.tn, 0),
+      totalClientes: listaClientes.reduce((a, b) => a + b.tn, 0),
+    };
+  }, [movimientos]);
 
   // Table Columns
   const columns: DataTableColumn<MovimientoKardexCarbonItem>[] = useMemo(
@@ -391,7 +442,7 @@ export const KardexCarbonPage = () => {
     option: "text-zinc-300 hover:bg-zinc-800",
   };
   return (
-    <div className="space-y-6 animate-fade-in text-zinc-100">
+    <div className="space-y-4 animate-fade-in text-zinc-100">
       {/* Filtros Bar */}
       <div className="flex flex-col md:flex-row items-end gap-3 w-full">
         <Select
@@ -473,6 +524,31 @@ export const KardexCarbonPage = () => {
           classNames={estilitos}
         />
         <BotonRecargar onReload={cargarMovimientos} loading={loading} />
+      </div>
+
+      {/* Resumen del periodo: carbon por proveedor y por cliente.
+          Cada bloque ocupa la mitad del ancho y hace su propio scroll para
+          que uno no se mezcle con el otro. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ResumenSocios
+          titulo="Por Proveedor"
+          items={resumenSocios.proveedores}
+          total={resumenSocios.totalProveedores}
+          colorAcento="text-pink-400"
+          colorIcono="bg-pink-500/20 border-pink-500/30 text-pink-400"
+          icono={<ArrowDownTrayIcon className="w-3 h-3" />}
+          mensajeVacio="Ningún proveedor ingresa carbón en el periodo."
+        />
+
+        <ResumenSocios
+          titulo="Por Cliente"
+          items={resumenSocios.clientes}
+          total={resumenSocios.totalClientes}
+          colorAcento="text-grape-400"
+          colorIcono="bg-grape-500/20 border-grape-500/30 text-grape-400"
+          icono={<ArrowUpTrayIcon className="w-3 h-3" />}
+          mensajeVacio="Ningún cliente recibe carbón en el periodo."
+        />
       </div>
 
       {/* Table */}
