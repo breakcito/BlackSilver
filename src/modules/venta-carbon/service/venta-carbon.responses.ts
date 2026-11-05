@@ -88,6 +88,22 @@ export interface PagoVentaCarbonItem {
   created_at: string;
 }
 
+/**
+ * Anticipo del cliente amortizado contra un comprobante.
+ *
+ * Es el asiento que queda en `transaccion_anticipo_cliente`: dice de que
+ * anticipo se desconto el monto y con que respaldo se recibio.
+ */
+export interface AnticipoAplicadoComprobante {
+  id_transaccion: number;
+  id_anticipo: number;
+  monto_retirado: number;
+  medio_pago: string | null;
+  numero_operacion: string | null;
+  fecha_hora_pago: string | null;
+  codigo_comprobante: string | null;
+}
+
 export interface ComprobanteVentaCarbonItem {
   id_comprobante_venta_carbon: number;
   id_empleado_registro: number;
@@ -99,6 +115,7 @@ export interface ComprobanteVentaCarbonItem {
   observacion: string | null;
   evidencias: IArchivo[];
   subtotal: number;
+  /** Suma de los anticipos del cliente aplicados a esta factura. */
   monto_pagado_anticipos: number;
   base_imponible: number;
   monto_igv: number;
@@ -109,6 +126,8 @@ export interface ComprobanteVentaCarbonItem {
   avance_pago_detraccion: number;
   estado: EstadoComprobanteVentaCarbon | string;
   created_at: string;
+  /** Anticipos del cliente amortizados contra este comprobante. */
+  anticipos_aplicados: AnticipoAplicadoComprobante[];
   pagos: PagoVentaCarbonItem[];
 }
 

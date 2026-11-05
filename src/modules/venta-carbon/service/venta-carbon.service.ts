@@ -275,6 +275,12 @@ export const VentaCarbonService = {
     if (payload.observacion)
       formData.append("observacion", payload.observacion);
 
+    // Los anticipos a amortizar viajan como JSON: el request es multipart
+    // por las evidencias.
+    if (payload.anticipos && payload.anticipos.length > 0) {
+      formData.append("anticipos", JSON.stringify(payload.anticipos));
+    }
+
     if (payload.evidencias && payload.evidencias.length > 0) {
       payload.evidencias.forEach((file) => formData.append("evidencias[]", file));
     }

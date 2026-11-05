@@ -76,10 +76,26 @@ export interface RegistrarLiquidacionPayload {
   evidencias?: File[];
 }
 
+/**
+ * Anticipo del cliente que se amortiza contra el comprobante.
+ *
+ * `id_anticipo` es el anticipo recibido del cliente (modulo de Clientes) y
+ * `monto_retirado` es cuanto se usa de el en esta factura.
+ */
+export interface AnticipoAplicadoComprobante {
+  id_anticipo: number;
+  monto_retirado: number;
+}
+
 export interface RegistrarComprobantePayload {
   codigo_comprobante: string;
   fecha_emision: string;
   observacion?: string | null;
+  /**
+   * Anticipos del cliente a amortizar. Si viene vacio, el comprobante se
+   * registra con los importes de la liquidacion (sin anticipos).
+   */
+  anticipos?: AnticipoAplicadoComprobante[];
   evidencias?: File[];
 }
 

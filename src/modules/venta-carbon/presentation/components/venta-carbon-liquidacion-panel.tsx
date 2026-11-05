@@ -4,11 +4,13 @@ import {
   Divider,
   Group,
   Paper,
+  SimpleGrid,
   Stack,
   Text,
 } from "@mantine/core";
 import {
   IconCheck,
+  IconCoins,
   IconDeviceFloppy,
   IconReceipt,
   IconWallet,
@@ -77,6 +79,9 @@ export const VentaCarbonLiquidacionPanel = ({
   onRegistrarPago,
 }: Props) => {
   const comprobante = liquidacion.comprobante;
+
+  /** Anticipos del cliente amortizados contra el comprobante. */
+  const anticiposAplicados = comprobante?.anticipos_aplicados ?? [];
 
   /**
    * Id de la liquidacion que se esta confirmando. Mientras dura la
@@ -258,32 +263,38 @@ export const VentaCarbonLiquidacionPanel = ({
           className="bg-zinc-950/60 border border-zinc-700"
         >
           <Group justify="space-between" align="flex-start" wrap="wrap">
-            <div>
-              <Group gap="xs">
-                <IconReceipt size={14} className="text-indigo-400" />
-                <Text size="xs" fw={800} c="white">
-                  Comprobante {comprobante.codigo_comprobante}
-                </Text>
-                <Badge
-                  size="xs"
-                  variant="light"
-                  color={colorEstadoComprobante(String(comprobante.estado))}
-                  radius="xl"
-                >
-                  {comprobante.estado}
-                </Badge>
-              </Group>
-              <Text size="11px" c="gray" mt={2}>
-                Emision:{" "}
-                {comprobante.fecha_emision
-                  ? dayjs(comprobante.fecha_emision).format("DD/MM/YYYY")
-                  : "—"}{" "}
-                · Registrado por {comprobante.empleado_registro ?? "—"}
+            <Group gap="xs">
+              <IconReceipt size={14} className="text-indigo-400" />
+              <Text size="xs" fw={800} c="white">
+                Comprobante {comprobante.codigo_comprobante}
               </Text>
-            </div>
+              <Badge
+                size="xs"
+                variant="light"
+                color={colorEstadoComprobante(String(comprobante.estado))}
+                radius="xl"
+              >
+                {comprobante.estado}
+              </Badge>
+            </Group>
+            <Text size="11px" c="gray" mt={2}>
+              Emision:{" "}
+              {comprobante.fecha_emision
+                ? dayjs(comprobante.fecha_emision).format("DD/MM/YYYY")
+                : "—"}{" "}
+              · Registrado por {comprobante.empleado_registro ?? "—"}
+            </Text>
           </Group>
 
           <Group gap="lg" mt="xs" wrap="wrap">
+            {Number(comprobante.monto_pagado_anticipos) > 0 && (
+              <Text size="xs" c="gray">
+                Anticipos{" "}
+                <Text span size="xs" fw={700} c="yellow.3">
+                  -S/ {formatNumber(Number(comprobante.monto_pagado_anticipos))}
+                </Text>
+              </Text>
+            )}
             <Text size="xs" c="gray">
               Base{" "}
               <Text span size="xs" fw={700} c="zinc.200">
@@ -344,6 +355,47 @@ export const VentaCarbonLiquidacionPanel = ({
               </Text>
             </Text>
           </Group>
+
+          {/* Anticipos del cliente amortizados contra este comprobante */}
+          {anticiposAplicados.length > 0 && (
+            <Stack gap={4} mt="sm">
+              <Group gap="xs">
+                <IconCoins size={13} className="text-yellow-400" />
+                <Text size="xs" fw={700} c="white">
+                  Anticipos amortizados ({anticiposAplicados.length})
+                </Text>
+              </Group>
+              <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs">
+                {anticiposAplicados.map((ant) => (
+                  <Paper
+                    key={ant.id_transaccion}
+                    p="xs"
+                    radius="md"
+                    className="bg-zinc-800 border border-zinc-700 min-w-0"
+                  >
+                    <Group justify="space-between" wrap="nowrap" gap="xs">
+                      <Text size="11px" c="gray" truncate>
+                        {ant.codigo_comprobante
+                          ? `Doc: ${ant.codigo_comprobante}`
+                          : `Anticipo #${ant.id_anticipo}`}
+                        {ant.fecha_hora_pago
+                          ? ` · ${dayjs(ant.fecha_hora_pago).format("DD/MM/YYYY")}`
+                          : ""}
+                      </Text>
+                      <Text
+                        size="sm"
+                        fw={700}
+                        c="yellow.3"
+                        className="shrink-0"
+                      >
+                        S/ {formatNumber(Number(ant.monto_retirado))}
+                      </Text>
+                    </Group>
+                  </Paper>
+                ))}
+              </SimpleGrid>
+            </Stack>
+          )}
 
           {/* Pagos del comprobante */}
           {comprobante.pagos.length > 0 && (

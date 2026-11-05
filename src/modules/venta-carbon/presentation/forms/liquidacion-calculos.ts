@@ -220,3 +220,55 @@ export const importesDesdeLiquidacion = (liquidacion: {
   monto_detraccion: round2(Number(liquidacion.monto_detraccion) || 0),
   monto_neto: round2(Number(liquidacion.neto_a_pagar) || 0),
 });
+
+/**
+ * Importes del comprobante de una liquidacion CON anticipos aplicados.
+ *
+ * Mismo criterio que el backend (`VentaCarbonPagosData`):
+ * - SIN anticipos, los importes se COPIAN de la liquidacion (el
+ *   comprobante nunca discrepa de la liquidacion que lo respalda).
+ * - CON anticipos, la cascada se RECALCULA sobre la base imponible
+ *   restante: base imponible -> IGV -> importe total -> detraccion
+ *   (redondeada a ENTEROS) -> neto. Los porcentajes son los de la venta.
+ */
+export const importesComprobanteConAnticipos = (
+  liquidacion: {
+    subtotal: number | string;
+    monto_igv: number | string;
+    total: number | string;
+    monto_detraccion: number | string;
+    neto_a_pagar: number | string;
+  },
+  porcentajeIgv: number,
+  porcentajeDetraccion: number,
+  montoAnticipos: number,
+): ImportesComprobante => {
+  const anticipos = round2(montoAnticipos);
+
+  if (anticipos <= 0) {
+    return importesDesdeLiquidacion(liquidacion);
+  }
+
+  const subtotal = round2(Number(liquidacion.subtotal) || 0);
+  const baseImponible = round2(Math.max(0, subtotal - anticipos));
+
+  const montoIgv =
+    porcentajeIgv > 0 ? round2((baseImponible * porcentajeIgv) / 100) : 0;
+
+  const importeTotal = round2(baseImponible + montoIgv);
+
+  // La detraccion se cobra en soles enteros: el neto a pagar cambia en
+  // centimos respecto del total exacto.
+  const montoDetraccion =
+    porcentajeDetraccion > 0
+      ? roundDetraccion((importeTotal * porcentajeDetraccion) / 100)
+      : 0;
+
+  return {
+    base_imponible: baseImponible,
+    monto_igv: montoIgv,
+    importe_total: importeTotal,
+    monto_detraccion: montoDetraccion,
+    monto_neto: round2(importeTotal - montoDetraccion),
+  };
+};
