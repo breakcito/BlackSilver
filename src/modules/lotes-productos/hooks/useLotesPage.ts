@@ -9,6 +9,7 @@ import { AuxService } from "../../../service/auxiliar.service";
 import type { RES_Almacen } from "../../../service/responses/almacen";
 import { useAuthStore } from "../../../stores/auth.store";
 import { useAuditoriaStore } from "../../../stores/auditoria.store";
+import { EstadoBase } from "../../../shared/enums/_generic/estado-base";
 
 export const useLotesPage = () => {
   const { en_modo_auditable } = useAuditoriaStore();
@@ -25,6 +26,8 @@ export const useLotesPage = () => {
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  /** Lote pendiente de confirmar para eliminar. */
+  const [lotePorEliminar, setLotePorEliminar] = useState<RES_Lote | null>(null);
 
   // Filters
   const [idAlmacen, setIdAlmacen] = useState<string | null>(initialAlmacenId);
@@ -90,26 +93,35 @@ export const useLotesPage = () => {
     recargarLotes();
   }, [recargarLotes]);
 
+  // Lotes vigentes. Los inactivos (baja logica) no se muestran: al inactivar
+  // un lote desaparece de la tabla al instante, sin recargar la pagina.
+  const lotesVigentes = useMemo(
+    () => lotes.filter((l) => l.estado === EstadoBase.Activo),
+    [lotes],
+  );
+
   // Derived Data (Filtros)
   const categoriasUnicas = useMemo(() => {
-    const unique = new Set(lotes.map((l) => l.categoria).filter(Boolean));
+    const unique = new Set(
+      lotesVigentes.map((l) => l.categoria).filter(Boolean),
+    );
     return Array.from(unique)
       .sort()
       .map((c) => ({ value: String(c), label: String(c) }));
-  }, [lotes]);
+  }, [lotesVigentes]);
 
   const productosUnicos = useMemo(() => {
     const source = filtroCategoria
-      ? lotes.filter((l) => l.categoria === filtroCategoria)
-      : lotes;
+      ? lotesVigentes.filter((l) => l.categoria === filtroCategoria)
+      : lotesVigentes;
     const unique = new Set(source.map((l) => l.producto).filter(Boolean));
     return Array.from(unique)
       .sort()
       .map((p) => ({ value: String(p), label: String(p) }));
-  }, [lotes, filtroCategoria]);
+  }, [lotesVigentes, filtroCategoria]);
 
   const filteredRecords = useMemo(() => {
-    return lotes.filter((l) => {
+    return lotesVigentes.filter((l) => {
       // Filtro modo auditoría
       if (en_modo_auditable && l.es_auditable) return false;
 
@@ -125,7 +137,13 @@ export const useLotesPage = () => {
         (l.categoria || "").toLowerCase().includes(q);
       return matchCategoria && matchProducto && matchBusqueda;
     });
-  }, [lotes, busqueda, filtroCategoria, filtroProducto, en_modo_auditable]);
+  }, [
+    lotesVigentes,
+    busqueda,
+    filtroCategoria,
+    filtroProducto,
+    en_modo_auditable,
+  ]);
 
   // LÓGICA DE SELECCIÓN CRÍTICA (Memorizada como en ProductGroupSelection)
   const visibleIds = useMemo(
@@ -146,6 +164,56 @@ export const useLotesPage = () => {
     () => selectedVisibleCount > 0 && !isAllSelected,
     [selectedVisibleCount, isAllSelected],
   );
+
+  /**
+   * Desactiva un lote (baja logica). La confirmacion la pide la UI con el
+   * modal de confirmacion: aqui solo se ejecuta la accion.
+   */
+  const eliminarLote = useCallback(
+    async (id_lote: number): Promise<boolean> => {
+      setDeletingId(id_lote);
+      try {
+        const resp = await LotesService.eliminar(id_lote);
+        if (resp.success) {
+          notifySuccess(resp.message);
+          // Reemplazamos la fila por la versión devuelta (estado=Inactivo)
+          setLotes((prev) =>
+            prev.map((l) =>
+              l.id_lote === id_lote ? resp.data : l,
+            ),
+          );
+          return true;
+        }
+        notifyError(resp.message);
+        return false;
+      } catch (err) {
+        console.error(err);
+        notifyError("Error inesperado al eliminar el lote.");
+        return false;
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [notifySuccess, notifyError],
+  );
+
+  /** Abre la confirmacion de eliminacion de un lote. */
+  const pedirEliminarLote = useCallback((lote: RES_Lote) => {
+    setLotePorEliminar(lote);
+  }, []);
+
+  /** Cierra la confirmacion sin eliminar. */
+  const cancelarEliminarLote = useCallback(() => {
+    setLotePorEliminar(null);
+  }, []);
+
+  /** Confirma la eliminacion: el lote queda inactivo y deja de listarse. */
+  const confirmarEliminarLote = useCallback(async (): Promise<boolean> => {
+    if (!lotePorEliminar) return false;
+    const ok = await eliminarLote(lotePorEliminar.id_lote);
+    if (ok) setLotePorEliminar(null);
+    return ok;
+  }, [eliminarLote, lotePorEliminar]);
 
   return {
     almacenes,
@@ -184,38 +252,12 @@ export const useLotesPage = () => {
         prev.map((l) => (l.id_lote === lote.id_lote ? lote : l)),
       );
     },
-    eliminarLote: useCallback(
-      async (id_lote: number): Promise<boolean> => {
-        const confirmar = window.confirm(
-          "¿Está seguro de eliminar este lote? Esta acción lo desactivará del almacén (soft-delete).",
-        );
-        if (!confirmar) return false;
-
-        setDeletingId(id_lote);
-        try {
-          const resp = await LotesService.eliminar(id_lote);
-          if (resp.success) {
-            notifySuccess(resp.message);
-            // Reemplazamos la fila por la versión devuelta (estado=Inactivo)
-            setLotes((prev) =>
-              prev.map((l) =>
-                l.id_lote === id_lote ? resp.data : l,
-              ),
-            );
-            return true;
-          }
-          notifyError(resp.message);
-          return false;
-        } catch (err) {
-          console.error(err);
-          notifyError("Error inesperado al eliminar el lote.");
-          return false;
-        } finally {
-          setDeletingId(null);
-        }
-      },
-      [notifySuccess, notifyError],
-    ),
+    eliminarLote,
+    /** Lote pendiente de confirmar para eliminar. */
+    lotePorEliminar,
+    pedirEliminarLote,
+    cancelarEliminarLote,
+    confirmarEliminarLote,
     deletingId,
     selectedLotes,
     setSelectedLotes,

@@ -446,7 +446,9 @@ export const OrdenCompraPDF = ({
             </View>
             <View style={styles.signatureBox}>
               <View style={styles.signatureLine} />
-              <Text style={styles.signatureName}>Yosi Henriquez</Text>
+              <Text style={styles.signatureName}>
+                Jhoselyn Henriquez Acosta
+              </Text>
               <Text style={styles.signatureRole}>Jefe de Logística</Text>
             </View>
           </View>
@@ -458,11 +460,9 @@ export const OrdenCompraPDF = ({
             <View style={styles.signatureBox}>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureName}>
-                {orden.empleado_registro || "Ana Haro Culquitante"}
+                Ana Cecilia Haro Culquitante
               </Text>
-              <Text style={styles.signatureRole}>
-                {orden.cargo_empleado_registro || "Contabilidad"}
-              </Text>
+              <Text style={styles.signatureRole}>Contabilidad</Text>
             </View>
           </View>
         </View>

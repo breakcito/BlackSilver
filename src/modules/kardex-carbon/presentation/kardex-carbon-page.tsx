@@ -1,4 +1,4 @@
-import { Badge, Text, TextInput, Select, Paper } from "@mantine/core";
+import { Badge, Stack, Text, TextInput, Select, Paper } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
@@ -161,6 +161,43 @@ export const KardexCarbonPage = () => {
             </Badge>
           </div>
         ),
+      },
+      {
+        accessor: "socio_comercial",
+        title: "Socio Comercial",
+        textAlign: "center",
+        width: 190,
+        render: (r) => {
+          if (!r.socio_tipo) {
+            return (
+              <Text size="xs" c="dimmed">
+                —
+              </Text>
+            );
+          }
+          const esCliente = r.socio_tipo === "Cliente";
+          return (
+            <Stack gap={2} align="center">
+              <Text
+                size="xs"
+                fw={700}
+                c="zinc.100"
+                className="truncate"
+                maw={170}
+              >
+                {r.socio_razon_social || "—"}
+              </Text>
+              <Badge
+                size="xs"
+                variant="light"
+                color={esCliente ? "grape" : "pink"}
+                radius="sm"
+              >
+                {r.socio_tipo}
+              </Badge>
+            </Stack>
+          );
+        },
       },
       {
         accessor: "tipo_movimiento",

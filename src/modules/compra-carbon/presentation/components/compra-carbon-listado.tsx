@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon,
   Badge,
@@ -16,7 +16,6 @@ import {
   BanknotesIcon,
   ClockIcon,
   DocumentArrowDownIcon,
-  EyeIcon,
   LockClosedIcon,
   PlusIcon,
   PencilSquareIcon,
@@ -35,6 +34,7 @@ import { useAnularCompraCarbon } from "../../hooks/useAnularCompraCarbon";
 import { useExportarLiquidacionMultiple } from "../../hooks/useExportarLiquidacionMultiple";
 import { ModalRegistroCargas } from "../modal-registro-cargas";
 import { ModalLiquidacionPagos } from "../modal-liquidacion-pagos";
+import { CompraCarbonDetalle } from "./compra-carbon-detalle";
 import { exportarLiquidacionExcel } from "../excel/exportar-liquidacion-excel";
 import { exportarLiquidacionFleteExcel } from "../excel/exportar-liquidacion-flete-excel";
 import { round2 } from "./input-classes";
@@ -79,8 +79,6 @@ interface Props {
   detalleActualizado?: CompraCarbonDetalleResponse | null;
   onRefresh?: () => void;
 }
-
-const formatPEN = (n: number) => `S/ ${formatNumber(n)}`;
 
 /**
  * El historial de cambios esta oculto por ahora (sobra por ahora). Para
@@ -175,11 +173,20 @@ export const CompraCarbonListado = ({
     correlativo: string;
   } | null>(null);
   const [loadingCerrar, setLoadingCerrar] = useState(false);
-  const [detallesModal, setDetallesModal] = useState<{
-    compra: CompraCarbonResumen;
-    data: CompraCarbonDetalleResponse | null;
-    loading: boolean;
-  } | null>(null);
+  /**
+   * Compras desplegadas (filas abiertas). Se controla de forma explicita para
+   * que solo haya una abierta a la vez y para poder autodesplegar la mas
+   * reciente cuando llega una lista nueva.
+   */
+  const [desplegadas, setDesplegadas] = useState<number[]>([]);
+  /**
+   * Cache del detalle de cada compra desplegada. El listado no trae las
+   * cargas: se piden al desplegar la fila.
+   */
+  const [detalles, setDetalles] = useState<
+    Record<number, CompraCarbonDetalleResponse>
+  >({});
+  const [detalleCargando, setDetalleCargando] = useState<number | null>(null);
   const [motivoAnular, setMotivoAnular] = useState("");
   const [printingId, setPrintingId] = useState<number | null>(null);
   const [exportingId, setExportingId] = useState<number | null>(null);
@@ -261,9 +268,6 @@ export const CompraCarbonListado = ({
       if (res.success) {
         notifySuccess("Orden de compra de carbón cerrada satisfactoriamente");
         setOpenCerrarModal(null);
-        if (detallesModal) {
-          setDetallesModal(null);
-        }
         onRefresh?.();
       } else {
         notifyError(res.message || "Error al cerrar la compra");
@@ -352,13 +356,15 @@ export const CompraCarbonListado = ({
         size="xs"
         color="indigo"
         checked={seleccionadas.has(r.id_compra_carbon)}
-        onChange={() =>
+        onChange={(e) => {
+          // La fila se despliega al hacer clic: marcar no debe desplegarla.
+          e.stopPropagation();
           setIdsSeleccionados((prev) =>
             prev.includes(r.id_compra_carbon)
               ? prev.filter((id) => id !== r.id_compra_carbon)
               : [...prev, r.id_compra_carbon],
-          )
-        }
+          );
+        }}
         aria-label={`Seleccionar la compra ${r.correlativo}`}
       />
     ),
@@ -380,53 +386,70 @@ export const CompraCarbonListado = ({
     setOpenAnularModal(null);
   };
 
-  const handleVerDetalles = async (compra: CompraCarbonResumen) => {
-    setDetallesModal({ compra, data: null, loading: true });
-    try {
-      const resp = await CompraCarbonService.getCompraConDetalles(
-        compra.id_compra_carbon,
-      );
-      if (!resp.success) {
-        notifyError(resp.message || "No se pudo cargar el detalle");
-        setDetallesModal(null);
-        return;
+  /**
+   * Descarga (y cachea) el detalle de una compra: cabecera + cargas.
+   */
+  const cargarDetalle = useCallback(
+    async (idCompra: number) => {
+      if (detalleCargando === idCompra) return;
+      setDetalleCargando(idCompra);
+      try {
+        const resp = await CompraCarbonService.getCompraConDetalles(idCompra);
+        if (!resp.success || !resp.data) {
+          notifyError(resp.message || "No se pudo cargar el detalle");
+          return;
+        }
+        setDetalles((prev) => ({ ...prev, [idCompra]: resp.data }));
+      } catch (e) {
+        console.error(e);
+        notifyError("Error al cargar el detalle de la compra");
+      } finally {
+        setDetalleCargando((prev) => (prev === idCompra ? null : prev));
       }
-      setDetallesModal({ compra, data: resp.data, loading: false });
-    } catch (e) {
-      console.error(e);
-      notifyError("Error al cargar el detalle de la compra");
-      setDetallesModal(null);
-    }
-  };
+    },
+    [detalleCargando, notifyError],
+  );
 
   /**
-   * Determina si una carga individual puede editarse. Regla: la cabecera NO
-   * debe estar Pagado/Cerrado/Anulado, y la carga NO debe estar Anulada,
-   * Pagada, ni tener comprobante/pago/comprobante de transporte asignado.
-   * Esto refleja las validaciones del backend.
+   * Cambia el juego de compras desplegadas y descarga el detalle de la que
+   * acaba de abrirse.
    */
-  const puedeEditarCarga = (
-    carga: CargaCompraCarbonItem,
-    cabecera: CompraCarbonDetalleResponse["cabecera"],
-  ): boolean => {
-    if (!cabecera) return false;
-    if (
-      cabecera.estado === EstadoCompraCarbon.Pagado ||
-      cabecera.estado === EstadoCompraCarbon.Cerrado ||
-      cabecera.estado === EstadoCompraCarbon.Anulado
-    ) {
-      return false;
-    }
-    if (carga.estado === "Anulado" || carga.estado === "Pagado") return false;
-    if (
-      carga.id_comprobante_compra_carbon ||
-      carga.id_pago_compra_carbon ||
-      carga.id_comprobante_transporte_carbon
-    ) {
-      return false;
-    }
-    return true;
-  };
+  const cambiarDespliegue = useCallback(
+    async (ids: number[]) => {
+      setDesplegadas(ids);
+      const id = ids[0];
+      if (!id) return;
+      await cargarDetalle(id);
+    },
+    [cargarDetalle],
+  );
+
+  /**
+   * Firma de la lista actual. Sirve para distinguir "llego una lista nueva"
+   * de "la lista es la misma": asi el auto-despliegue de la compra mas
+   * reciente solo se aplica cuando la lista cambia de verdad y el usuario
+   * puede replegarla sin que se vuelva a abrir sola.
+   */
+  const firmaListaRef = useRef<string>("");
+
+  /**
+   * Por defecto se despliega la compra mas reciente.
+   */
+  useEffect(() => {
+    if (compras.length === 0) return;
+
+    const firma = compras.map((c) => c.id_compra_carbon).join(",");
+    if (firma === firmaListaRef.current) return;
+    firmaListaRef.current = firma;
+
+    const id = compras.reduce(
+      (max, c) => (c.id_compra_carbon > max ? c.id_compra_carbon : max),
+      0,
+    );
+    if (!id) return;
+    setDesplegadas([id]);
+    void cargarDetalle(id);
+  }, [compras, cargarDetalle]);
 
   // Auto-imprimir la compra recién registrada.
   useEffect(() => {
@@ -436,21 +459,13 @@ export const CompraCarbonListado = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPrint]);
 
-  // Refleja en "Cargas Recibidas" la carga recien editada: el detalle llega
+  // Refleja en la fila desplegada la carga recien editada: el detalle llega
   // desde la API (cabecera + cargas), asi que no hace falta recargar nada.
   useEffect(() => {
     if (!detalleActualizado) return;
-    setDetallesModal((prev) => {
-      if (!prev) return prev;
-      const idCompra = detalleActualizado.cabecera?.id_compra_carbon;
-      if (idCompra !== prev.compra.id_compra_carbon) return prev;
-      return {
-        ...prev,
-        compra: detalleActualizado.cabecera,
-        data: detalleActualizado,
-        loading: false,
-      };
-    });
+    const idCompra = detalleActualizado.cabecera?.id_compra_carbon;
+    if (!idCompra) return;
+    setDetalles((prev) => ({ ...prev, [idCompra]: detalleActualizado }));
   }, [detalleActualizado]);
 
   const [empresasCache, setEmpresasCache] = useState<
@@ -649,7 +664,7 @@ export const CompraCarbonListado = ({
             {formatNumber(r.toneladas_prometidas)} TN
           </Text>
           <Text size="xs" c="gray" className="font-mono" fw={800}>
-            S/. {formatNumber(r.total_cotizado)}
+            Total: S/. {formatNumber(r.total_cotizado)}
           </Text>
           {r.aplica_igv == 1 && (
             <Badge variant="light" color="indigo" radius="md" size="sm">
@@ -670,7 +685,7 @@ export const CompraCarbonListado = ({
             {formatNumber(Number(r.total_toneladas_reales), 2)} TN
           </Text>
           <Text size="xs" c="white" className="font-mono" fw={800}>
-            S/. {formatNumber(calcularNetoReal(r))}
+            Neto: S/. {formatNumber(calcularNetoReal(r))}
           </Text>
           {(r.cantidad_cargas_con_flete ?? 0) > 0 && (
             <Text size="10px" c="blue.4" className="font-mono" fw={700}>
@@ -701,20 +716,6 @@ export const CompraCarbonListado = ({
             <Badge variant="light" color="cyan" radius="md" size="md">
               {r.cantidad_cargas ?? 0}
             </Badge>
-            <Tooltip label="Ver cargas" withArrow position="top">
-              <ActionIcon
-                variant="light"
-                color="cyan"
-                radius="xl"
-                size="md"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleVerDetalles(r);
-                }}
-              >
-                <EyeIcon className="w-4 h-4" />
-              </ActionIcon>
-            </Tooltip>
             {/* 1. Registrar Carga */}
             {puedeRegistrarCarga && (
               <Tooltip label="Registrar carga" withArrow position="top">
@@ -978,396 +979,27 @@ export const CompraCarbonListado = ({
         records={ordenadas}
         loading={false}
         initialPageSize={15}
-        // onRowClick={({ record }: { record: CompraCarbonResumen }) =>
-        //   handleVerDetalles(record)
-        // }
+        // Las cargas se despliegan dentro de la fila, como en venta de carbon.
+        rowExpansion={{
+          trigger: "click",
+          allowMultiple: false,
+          expanded: {
+            recordIds: desplegadas,
+            onRecordIdsChange: (ids: unknown[]) =>
+              void cambiarDespliegue(ids.map((id) => Number(id))),
+          },
+          expandable: () => true,
+          content: ({ record }: { record: CompraCarbonResumen }) => (
+            <CompraCarbonDetalle
+              compra={record}
+              detalle={detalles[record.id_compra_carbon] ?? null}
+              loading={detalleCargando === record.id_compra_carbon}
+              onEditarCarga={onEditarCarga}
+            />
+          ),
+        }}
       />
 
-      {/* Modal de detalle (al click en fila o en el ojo) */}
-      <ModalEstandar
-        opened={detallesModal !== null}
-        close={() => setDetallesModal(null)}
-        title={
-          detallesModal
-            ? `Cargas de ${detallesModal.compra.correlativo}`
-            : "Cargas"
-        }
-        size="95rem"
-        rightSection={
-          detallesModal != null && (
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              <Group gap="md">
-                {detallesModal.data != null &&
-                  detallesModal.data.cargas.length > 0 &&
-                  detallesModal.compra.estado !== EstadoCompraCarbon.Anulado &&
-                  detallesModal.compra.estado !== EstadoCompraCarbon.Pagado &&
-                  detallesModal.compra.estado !==
-                    EstadoCompraCarbon.Cerrado && (
-                    <Button
-                      size="compact-xs"
-                      variant="light"
-                      color="indigo"
-                      radius="md"
-                      leftSection={<TruckIcon className="w-3.5 h-3.5" />}
-                      onClick={() => {
-                        const comp = detallesModal.compra;
-                        setDetallesModal(null);
-                        setModalCargas(comp);
-                      }}
-                    >
-                      Añadir carga
-                    </Button>
-                  )}{" "}
-                <Text size="xs" c="gray">
-                  Total Neto:{" "}
-                  <span className="text-emerald-400 font-bold font-mono">
-                    {formatPEN(calcularNetoReal(detallesModal.compra))}
-                  </span>
-                </Text>
-              </Group>
-            </div>
-          )
-        }
-      >
-        {detallesModal && (
-          <div className="space-y-4">
-            {detallesModal.loading && (
-              <Stack align="center" gap="md" py="xl">
-                <div className="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-                <Text
-                  size="xs"
-                  c="dimmed"
-                  className="uppercase tracking-widest"
-                >
-                  Cargando cargas...
-                </Text>
-              </Stack>
-            )}
-
-            {!detallesModal.loading && detallesModal.data && (
-              <div className="space-y-2">
-                <Group justify="space-between" align="center" mb="xs">
-                  <Group gap="xs">
-                    <Text
-                      size="xs"
-                      fw={800}
-                      c="zinc.4"
-                      className="uppercase tracking-widest"
-                    >
-                      Cargas Recibidas ({detallesModal.data.cargas.length})
-                    </Text>
-                    {detallesModal.compra.estado ===
-                      EstadoCompraCarbon.Cerrado && (
-                      <Badge
-                        color="orange"
-                        variant="light"
-                        size="xs"
-                        radius="sm"
-                      >
-                        Compra Cerrada
-                      </Badge>
-                    )}
-                  </Group>
-
-                  {detallesModal.data.cargas.length > 0 &&
-                    detallesModal.compra.estado !==
-                      EstadoCompraCarbon.Anulado &&
-                    detallesModal.compra.estado !== EstadoCompraCarbon.Pagado &&
-                    detallesModal.compra.estado !==
-                      EstadoCompraCarbon.Cerrado && (
-                      <Button
-                        size="compact-xs"
-                        variant="light"
-                        color="indigo"
-                        radius="md"
-                        leftSection={<TruckIcon className="w-3.5 h-3.5" />}
-                        onClick={() => {
-                          const comp = detallesModal.compra;
-                          setDetallesModal(null);
-                          setModalCargas(comp);
-                        }}
-                      >
-                        Añadir carga
-                      </Button>
-                    )}
-                </Group>
-
-                {detallesModal.data.cargas.length === 0 ? (
-                  <div className="border border-dashed border-zinc-800 rounded-2xl p-10 text-center bg-zinc-900/30">
-                    <Stack align="center" gap="sm">
-                      <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 text-indigo-400">
-                        <TruckIcon className="w-7 h-7" />
-                      </div>
-                      <Text size="sm" fw={700} c="zinc.100">
-                        Sin cargas registradas
-                      </Text>
-                      <Text size="xs" c="dimmed" maw={480}>
-                        Esta orden preliminar aún no tiene cargas o camiones
-                        despachados por el proveedor. Puedes registrar cada
-                        cargamento que vaya ingresando a planta con el botón
-                        inferior.
-                      </Text>
-                      {detallesModal.compra.estado !==
-                        EstadoCompraCarbon.Anulado &&
-                        detallesModal.compra.estado !==
-                          EstadoCompraCarbon.Pagado &&
-                        detallesModal.compra.estado !==
-                          EstadoCompraCarbon.Cerrado && (
-                          <Button
-                            size="xs"
-                            color="indigo"
-                            radius="lg"
-                            leftSection={<TruckIcon className="w-4 h-4" />}
-                            onClick={() => {
-                              const comp = detallesModal.compra;
-                              setDetallesModal(null);
-                              setModalCargas(comp);
-                            }}
-                            mt="xs"
-                          >
-                            Registrar primera carga
-                          </Button>
-                        )}
-                    </Stack>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-zinc-800 overflow-hidden">
-                    <table className="w-full text-xs text-zinc-300">
-                      <thead className="bg-zinc-900 text-zinc-400 text-[11px] font-medium uppercase tracking-wider">
-                        <tr>
-                          <th className="px-3 py-2 text-center w-8">#</th>
-                          <th className="py-2 text-center w-24">Tipo</th>
-                          <th className="px-3 py-2 text-center w-16">Ticket</th>
-                          <th className="px-3 py-2 text-center w-28">
-                            Lugar Ext.
-                          </th>
-                          <th className="px-3 py-2 text-center w-32">
-                            Transportista
-                          </th>
-                          <th className="px-3 py-2 text-center w-24">
-                            GR / GT
-                          </th>
-                          <th className="px-3 py-2 text-center w-24">Leyes</th>
-                          <th className="px-3 py-2 text-center w-24">
-                            Toneladas
-                          </th>
-                          <th className="px-3 py-2 text-center w-24">
-                            Flete x TN
-                          </th>
-                          <th className="px-3 py-2 text-center w-24">
-                            Subtotal
-                          </th>
-                          <th className="px-3 py-2 text-center w-24">IGV</th>
-                          <th className="px-3 py-2 text-center w-24">Detr.</th>
-                          <th className="px-3 py-2 text-center w-24">Neto</th>
-                          <th className="px-3 py-2 text-center w-32">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800 bg-zinc-900/40">
-                        {detallesModal.data.cargas.map(
-                          (d: CargaCompraCarbonItem, idx: number) => {
-                            return (
-                              <tr
-                                key={d.id_carga_compra_carbon}
-                                className="hover:bg-white/5 transition-colors"
-                              >
-                                <td className="px-3 py-2 text-center text-zinc-500">
-                                  {idx + 1}
-                                </td>
-                                <td className="px-3 py-2 flex justify-center">
-                                  <Stack
-                                    gap={4}
-                                    justify="center"
-                                    align="center"
-                                  >
-                                    <Text fw={700} c="zinc.100" size="xs">
-                                      {d.tipo_carbon_nombre}
-                                    </Text>
-                                    {d.tipo_carbon_codigo && (
-                                      <Badge
-                                        size="xs"
-                                        color="cyan"
-                                        variant="filled"
-                                        radius="sm"
-                                      >
-                                        {d.tipo_carbon_codigo}
-                                      </Badge>
-                                    )}
-                                  </Stack>
-                                </td>
-                                <td className="px-3 py-2 font-mono text-zinc-300 text-center">
-                                  {d.codigo_ticket_balanza || (
-                                    <Text c="dimmed">—</Text>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-center text-zinc-300">
-                                  {d.lugar_extraccion_direccion || (
-                                    <Text c="dimmed">—</Text>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-zinc.100 text-center">
-                                  {d.transportista_razon_social || (
-                                    <Text c="dimmed">—</Text>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 flex flex-row justify-center">
-                                  <div className="flex flex-col items-start justify-center gap-1.5">
-                                    <Text
-                                      className="font-mono text-zinc-300"
-                                      size="xs"
-                                    >
-                                      GR: {d.guia_remitente || "—"}
-                                    </Text>
-                                    <Text
-                                      className="font-mono text-zinc-300"
-                                      size="xs"
-                                    >
-                                      GT: {d.guia_transportista || "—"}
-                                    </Text>
-                                  </div>
-                                </td>
-
-                                <td className="px-3 py-2 text-center">
-                                  <div className="flex flex-col gap-2 items-center justify-center">
-                                    {d.porcentaje_ceniza > 0 ? (
-                                      <Badge
-                                        variant="light"
-                                        color="grape"
-                                        size="sm"
-                                        radius="md"
-                                      >
-                                        {formatNumber(
-                                          Number(d.porcentaje_ceniza),
-                                        )}{" "}
-                                        %Ce
-                                      </Badge>
-                                    ) : (
-                                      <Text c="dimmed">—</Text>
-                                    )}
-                                    {d.porcentaje_humedad > 0 ? (
-                                      <Badge
-                                        variant="light"
-                                        color="blue"
-                                        size="sm"
-                                        radius="md"
-                                      >
-                                        {formatNumber(
-                                          Number(d.porcentaje_humedad),
-                                        )}{" "}
-                                        %H2O
-                                      </Badge>
-                                    ) : (
-                                      <Text c="dimmed">—</Text>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 text-center font-mono font-bold text-white">
-                                  <Text size="xs" c={"teal"} fw={800}>
-                                    {formatNumber(Number(d.cantidad))} TN
-                                  </Text>
-                                  <Text
-                                    size="11px"
-                                    mt={5}
-                                    c={"yellow"}
-                                    fw={600}
-                                  >
-                                    {formatPEN(Number(d.precio_unitario))} x TN
-                                  </Text>
-                                </td>
-
-                                <td className="px-3 py-2 text-center">
-                                  <Text size="xs" fw={700} c={"blue.3"}>
-                                    {Number(d.costo_flete_por_tonelada) > 0
-                                      ? formatPEN(
-                                          Number(d.costo_flete_por_tonelada),
-                                        )
-                                      : "—"}
-                                  </Text>
-                                </td>
-
-                                <td className="px-3 py-2 text-center">
-                                  <Text size="xs" fw={800} c={"teal"}>
-                                    {formatPEN(Number(d.subtotal))}
-                                  </Text>
-                                  <Text
-                                    size="11px"
-                                    mt={5}
-                                    c={"yellow"}
-                                    fw={600}
-                                  >
-                                    {formatPEN(Number(d.precio_materia_prima))}{" "}
-                                    M. PRIMA
-                                  </Text>
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  <Text size="xs" fw={700} c={"gray.4"}>
-                                    {formatPEN(Number(d.monto_igv))}
-                                  </Text>
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  <Text size="xs" fw={700} c={"orange.4"}>
-                                    {formatPEN(Number(d.monto_detraccion))}
-                                  </Text>
-                                </td>
-                                <td className="px-3 py-2 text-center font-mono text-emerald-400 font-bold">
-                                  {formatPEN(Number(d.neto_a_pagar))}
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <Badge
-                                      size="xs"
-                                      variant="light"
-                                      color={
-                                        d.estado === "Pagado"
-                                          ? "emerald"
-                                          : d.estado === "Anulado"
-                                            ? "red"
-                                            : "blue"
-                                      }
-                                    >
-                                      {d.estado || "En Liquidación"}
-                                    </Badge>
-                                    {/* Lapicito para editar la carga individual. Solo
-                                        se muestra si la cabecera y la carga lo permiten. */}
-                                    {detallesModal.data &&
-                                      puedeEditarCarga(
-                                        d,
-                                        detallesModal.data.cabecera,
-                                      ) && (
-                                        <Tooltip
-                                          label="Editar carga"
-                                          withArrow
-                                          position="top"
-                                        >
-                                          <ActionIcon
-                                            variant="subtle"
-                                            color="indigo"
-                                            radius="xl"
-                                            size="sm"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              onEditarCarga?.(d);
-                                            }}
-                                          >
-                                            <PencilSquareIcon className="w-3.5 h-3.5" />
-                                          </ActionIcon>
-                                        </Tooltip>
-                                      )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          },
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </ModalEstandar>
 
       {/* Modal Registrar Cargas */}
       {modalCargas && (
@@ -1396,6 +1028,10 @@ export const CompraCarbonListado = ({
               const compraACerrar = modalCargas;
               setModalCargas(null);
               setModalLiquidacion(compraACerrar);
+              // El detalle cacheado de esta compra quedo desactualizado (las
+              // cargas son nuevas): se recarga para que la fila desplegada
+              // muestre el estado real.
+              void cargarDetalle(compraACerrar.id_compra_carbon);
               onRefresh?.();
             }}
           />
