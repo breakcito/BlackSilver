@@ -403,7 +403,7 @@ export const VentaCarbonLiquidacionPanel = ({
                       <Text size="11px" c="gray" truncate>
                         {ant.codigo_comprobante
                           ? `Doc: ${ant.codigo_comprobante}`
-                          : `Anticipo #${ant.id_anticipo}`}
+                          : ``}
                         {ant.fecha_hora_pago
                           ? ` · ${dayjs(ant.fecha_hora_pago).format("DD/MM/YYYY")}`
                           : ""}

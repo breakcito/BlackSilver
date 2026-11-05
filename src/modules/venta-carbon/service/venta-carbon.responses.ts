@@ -131,7 +131,7 @@ export interface ComprobanteVentaCarbonItem {
   estado: EstadoComprobanteVentaCarbon | string;
   created_at: string;
   /** Anticipos del cliente amortizados contra este comprobante. */
-  anticipos_aplicados: AnticipoAplicadoComprobante[];
+  anticipos_aplicados: TransaccionAnticipoClienteItem[];
   pagos: PagoVentaCarbonItem[];
   /** Anticipos del cliente aplicados a este comprobante. */
   anticipos_utilizados: TransaccionAnticipoClienteItem[];
