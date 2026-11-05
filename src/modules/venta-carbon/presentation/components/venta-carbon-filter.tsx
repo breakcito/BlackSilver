@@ -1,5 +1,6 @@
 import { Button, Select, TextInput } from "@mantine/core";
 import {
+  ArrowDownTrayIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
   PlusIcon,
@@ -18,6 +19,9 @@ interface Props {
   cambiarPeriodo: (mes: number, anio: number) => void;
   recargar: () => void;
   loading?: boolean;
+  /** Exporta el "Registro de Ventas" del año seleccionado. */
+  onExportarRegistroVentas: () => void;
+  exportandoRegistroVentas?: boolean;
 }
 
 const YEARS = Array.from({ length: 5 }, (_, i) => ({
@@ -34,6 +38,8 @@ export const VentaCarbonFilter = ({
   cambiarPeriodo,
   recargar,
   loading,
+  onExportarRegistroVentas,
+  exportandoRegistroVentas,
 }: Props) => {
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end w-full animate-fade-in">
@@ -81,6 +87,18 @@ export const VentaCarbonFilter = ({
 
       <div className="flex gap-2 items-center shrink-0">
         <BotonRecargar onReload={recargar} loading={loading} />
+        <Button
+          leftSection={<ArrowDownTrayIcon className="w-5 h-5" />}
+          onClick={onExportarRegistroVentas}
+          loading={exportandoRegistroVentas}
+          radius="lg"
+          size="sm"
+          variant="light"
+          color="cyan"
+          className="font-semibold shrink-0"
+        >
+          Registro de Ventas
+        </Button>
         <Button
           leftSection={<PlusIcon className="w-5 h-5" />}
           onClick={openCreate}

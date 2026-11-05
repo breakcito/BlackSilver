@@ -12,6 +12,7 @@ import type {
 import type {
   BlendingDespachable,
   LiquidacionVentaCarbonItem,
+  RES_ReporteControlVentas,
   VentaCarbonResumen,
 } from "./venta-carbon.responses";
 
@@ -37,6 +38,21 @@ export const VentaCarbonService = {
   ): Promise<IRespuesta<VentaCarbonResumen>> => {
     const { data } = await api.get<IRespuesta<VentaCarbonResumen>>(
       `${PATH}/${idVentaCarbon}`,
+    );
+    return data;
+  },
+
+  /**
+   * Reporte "Registro de Ventas" de un año: todas las cargas de carbón que
+   * ingresaron al almacén de destino en ese año, con sus importes, su
+   * liquidación, su comprobante y el primer pago del neto.
+   */
+  getReporteRegistroVentas: async (
+    anio: number,
+  ): Promise<IRespuesta<RES_ReporteControlVentas>> => {
+    const { data } = await api.get<IRespuesta<RES_ReporteControlVentas>>(
+      `${PATH}/reporte`,
+      { params: { anio } },
     );
     return data;
   },

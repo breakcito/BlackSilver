@@ -4,6 +4,7 @@ import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { useTitlePage } from "../../../hooks/useTitlePage";
 import { useNotify } from "../../../hooks/useNotify";
 import { useVentaCarbon } from "../hooks/useVentaCarbon";
+import { useRegistroVentasExcel } from "../hooks/useRegistroVentasExcel";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { VentaCarbonFilter } from "./components/venta-carbon-filter";
 import { VentaCarbonListado } from "./components/venta-carbon-listado";
@@ -43,6 +44,12 @@ export const VentaCarbonPage = () => {
     cambiarDespliegue,
     refrescarDetalle,
   } = useVentaCarbon();
+
+  /** Exportacion del "Registro de Ventas" del anio seleccionado. */
+  const {
+    exportar: exportarRegistroVentas,
+    exportando: exportandoRegistroVentas,
+  } = useRegistroVentasExcel();
 
   const [openRegistro, setOpenRegistro] = useState(false);
   const [ventaDespachar, setVentaDespachar] =
@@ -178,6 +185,8 @@ export const VentaCarbonPage = () => {
         cambiarPeriodo={cambiarPeriodo}
         recargar={recargar}
         loading={loading}
+        onExportarRegistroVentas={() => void exportarRegistroVentas(anio)}
+        exportandoRegistroVentas={exportandoRegistroVentas}
       />
 
       {loading && ventas.length === 0 ? (
