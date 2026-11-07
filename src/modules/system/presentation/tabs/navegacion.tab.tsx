@@ -14,8 +14,8 @@ import { useMenuSystem } from "../../hooks/useMenuSystem";
 import type { RES_MenuArbol, RES_SubmenuMenu, RES_ModuloMenu } from "../../service/menu.responses";
 
 type EditTarget =
-  | { tipo: "menu"; id: number; nombre: string; path: string; numero_orden: number; es_desplegable: boolean }
-  | { tipo: "submenu"; id: number; id_menu: number; nombre: string; path: string; numero_orden: number; es_desplegable: boolean }
+  | { tipo: "menu"; id: number; nombre: string; path: string | null; numero_orden: number; es_desplegable: boolean }
+  | { tipo: "submenu"; id: number; id_menu: number; nombre: string; path: string | null; numero_orden: number; es_desplegable: boolean }
   | { tipo: "modulo"; id: number; id_submenu: number; nombre: string; path: string; numero_orden: number }
   | null;
 
@@ -37,16 +37,23 @@ const NodoForm = ({
   initialNumero,
   initialDesplegable,
   showDesplegable,
+  forzarHoja = false,
   onSubmit,
   onCancel,
   saving,
   title,
 }: {
   initialNombre?: string;
-  initialPath?: string;
+  initialPath?: string | null;
   initialNumero?: number;
   initialDesplegable?: boolean;
   showDesplegable?: boolean;
+  /**
+   * Los MODULOS son siempre hojas: no se pueden desplegar y su path es
+   * obligatorio (es la ruta de la vista). Sin este flag, el formulario los
+   * trataria como contenedores y vaciaria el path.
+   */
+  forzarHoja?: boolean;
   onSubmit: (data: { nombre: string; path: string | null; numero_orden: number; es_desplegable?: boolean }) => void;
   onCancel: () => void;
   saving: boolean;
@@ -55,10 +62,12 @@ const NodoForm = ({
   const [nombre, setNombre] = useState(initialNombre ?? "");
   const [path, setPath] = useState(initialPath ?? "");
   const [numero, setNumero] = useState<number | string>(initialNumero ?? 10);
-  const [esDesplegable, setEsDesplegable] = useState(initialDesplegable ?? true);
+  const [esDesplegable, setEsDesplegable] = useState(forzarHoja ? false : (initialDesplegable ?? true));
 
-  // Cuando es desplegable, el path es irrelevante: lo limpiamos automaticamente.
-  const effectivePath = esDesplegable ? "" : path;
+  // Un nodo hoja (o un modulo) SIEMPRE tiene path. Si es desplegable
+  // (contenedor) el path es irrelevante y se limpia automaticamente.
+  const esHoja = forzarHoja || !esDesplegable;
+  const effectivePath = esHoja ? path : "";
 
   return (
     <div className="space-y-3">
@@ -68,9 +77,15 @@ const NodoForm = ({
         label="Path (sin /)"
         value={effectivePath}
         onChange={(e) => setPath(e.currentTarget.value)}
-        required={!esDesplegable}
-        disabled={esDesplegable}
-        description={esDesplegable ? "No requiere path porque es un contenedor." : undefined}
+        required={esHoja}
+        disabled={!esHoja}
+        description={
+          forzarHoja
+            ? "Ruta de la vista. Ej: venta-mineral"
+            : esDesplegable
+              ? "No requiere path porque es un contenedor."
+              : "Ruta de la vista. Ej: trabajadores"
+        }
         classNames={fieldClasses}
         radius="lg"
         placeholder="ej: trabajadores"
@@ -92,10 +107,10 @@ const NodoForm = ({
           onClick={() =>
             onSubmit({
               nombre,
-              // Si es desplegable, enviamos null. Si no, enviamos el path.
-              path: esDesplegable ? null : path,
+              // Un contenedor no tiene ruta (null). Una hoja o un modulo, si.
+              path: esHoja ? path : null,
               numero_orden: Number(numero),
-              es_desplegable: esDesplegable,
+              es_desplegable: forzarHoja ? false : esDesplegable,
             })
           }
         >
@@ -214,7 +229,9 @@ export const NavegacionTab = () => {
                     <span className="font-semibold text-sm text-white">
                       {menu.nombre}
                     </span>
-                    <span className="text-xs text-zinc-500">/{menu.path}</span>
+                    {menu.path && (
+                      <span className="text-xs text-zinc-500">/{menu.path}</span>
+                    )}
                     {menu.es_desplegable ? (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
                         CONT
@@ -289,9 +306,11 @@ export const NavegacionTab = () => {
                             <span className="text-sm text-zinc-200">
                               {sub.nombre}
                             </span>
-                            <span className="text-xs text-zinc-500">
-                              /{sub.path}
-                            </span>
+                            {sub.path && (
+                              <span className="text-xs text-zinc-500">
+                                /{sub.path}
+                              </span>
+                            )}
                             {sub.es_desplegable ? (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
                                 CONT
@@ -418,6 +437,7 @@ export const NavegacionTab = () => {
           <NodoForm
             title=""
             showDesplegable={createTarget.tipo !== "modulo"}
+            forzarHoja={createTarget.tipo === "modulo"}
             onSubmit={handleCreate}
             onCancel={() => setCreateTarget(null)}
             saving={saving}
@@ -448,6 +468,7 @@ export const NavegacionTab = () => {
               "es_desplegable" in editTarget ? editTarget.es_desplegable : true
             }
             showDesplegable={editTarget.tipo !== "modulo"}
+            forzarHoja={editTarget.tipo === "modulo"}
             onSubmit={handleEdit}
             onCancel={() => setEditTarget(null)}
             saving={saving}

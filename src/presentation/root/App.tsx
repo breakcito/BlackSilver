@@ -47,6 +47,7 @@ import { CompraCarbonPage } from "../../modules/compra-carbon/presentation/compr
 import { KardexCarbonPage } from "../../modules/kardex-carbon/presentation/kardex-carbon-page.tsx";
 import { TamizajeCarbonPage } from "../../modules/tamizaje-carbon/presentation/tamizaje-carbon-page.tsx";
 import { VentaCarbonPage } from "../../modules/venta-carbon/presentation/venta-carbon-page";
+import { VentaMineralPage } from "../../modules/venta-mineral/presentation/venta-mineral.page.tsx";
 
 export const App = () => {
   const { setModoAuditoria } = useAuditoriaStore();
@@ -138,6 +139,7 @@ export const App = () => {
         <Route path="/mantenimiento" element={<MantenimientoPage />} />
         <Route path="/consumo" element={<ControlConsumoPage />} />
         <Route path="/lote-mineral" element={<LoteMineralPage />} />
+        <Route path="/venta-mineral" element={<VentaMineralPage />} />
         <Route path="/produccion-mineral" element={<ProduccionMineralPage />} />
         <Route
           path="/programacion-horarios"

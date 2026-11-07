@@ -17,7 +17,8 @@ export interface RES_SubmenuMenu {
   id: number;
   id_menu: number;
   nombre: string;
-  path: string;
+  /** `null` cuando el submenu es un contenedor (es_desplegable). */
+  path: string | null;
   numero_orden: number;
   es_desplegable: boolean;
   estado: string;
@@ -27,7 +28,8 @@ export interface RES_SubmenuMenu {
 export interface RES_MenuArbol {
   id: number;
   nombre: string;
-  path: string;
+  /** `null` cuando el menu es un contenedor (es_desplegable). */
+  path: string | null;
   numero_orden: number;
   es_desplegable: boolean;
   estado: string;

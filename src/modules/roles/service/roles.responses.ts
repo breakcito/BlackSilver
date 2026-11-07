@@ -12,7 +12,6 @@ export interface RES_Modulo {
   id_submenu: number;
   nombre: string;
   path: string;
-  es_desplegable: boolean;
   estado: EstadoBase;
 }
 
@@ -20,7 +19,8 @@ export interface RES_Submenu {
   id: number;
   id_menu: number;
   nombre: string;
-  path: string;
+  /** `null` cuando el submenu es un contenedor (es_desplegable). */
+  path: string | null;
   es_desplegable: boolean;
   estado: EstadoBase;
   modulos: RES_Modulo[];
@@ -29,7 +29,8 @@ export interface RES_Submenu {
 export interface RES_MenuEstructura {
   id: number;
   nombre: string;
-  path: string;
+  /** `null` cuando el menu es un contenedor (es_desplegable). */
+  path: string | null;
   es_desplegable: boolean;
   estado: EstadoBase;
   submenus: RES_Submenu[];

@@ -1,14 +1,27 @@
-import { Button, TextInput, Skeleton, Badge, Stack, Text, Divider, Group, Loader } from "@mantine/core";
+import {
+  Button,
+  TextInput,
+  Skeleton,
+  Badge,
+  Stack,
+  Text,
+  Divider,
+  Group,
+  Loader,
+  ActionIcon,
+  Tooltip,
+} from "@mantine/core";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
   Squares2X2Icon,
-  UserIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { RegistroLoteMineral } from "./registro-lote-mineral";
+import { EditarCantidadSacosLote } from "./editar-cantidad-sacos-lote";
 import { useLotesMineral } from "../hooks/useLoteMineral";
 import { useDisclosure } from "@mantine/hooks";
 import { useState, useMemo } from "react";
@@ -17,6 +30,75 @@ import { EstadoLoteMineral } from "../../../shared/enums/lote-mineral";
 import type { LoteMineralResumen } from "../service/lote-mineral.responses";
 import { useTitlePage } from "../../../hooks/useTitlePage";
 import { BotonRecargar } from "../../../presentation/utils/boton-recargar";
+import { formatNumber } from "../../../shared/functions/formatNumber";
+
+/**
+ * Umbral de despacho del lote: ~450 sacos (cada saco ~50 kg) es el punto en
+ * que el lote se manda a molienda. Se usa solo como referencia visual.
+ */
+const SACOS_POR_LOTE = 450;
+
+/**
+ * Indicador de sacos acumulados del lote, con la accion de edicion pegada a
+ * la cifra. El valor lo mantiene el backend: se actualiza desde los controles
+ * de uso de la maquinaria que retiran sacos del lote.
+ */
+const IndicadorSacos = ({
+  sacos,
+  onEditar,
+}: {
+  sacos: number;
+  onEditar?: () => void;
+}) => {
+  const porcentaje = Math.min(100, Math.round((sacos / SACOS_POR_LOTE) * 100));
+  const listoParaDespacho = sacos >= SACOS_POR_LOTE;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-zinc-500 text-xs font-medium">Sacos</span>
+
+        <div className="flex items-center gap-1">
+          <span
+            className={`text-xs font-bold tabular-nums ${
+              listoParaDespacho ? "text-emerald-400" : "text-zinc-300"
+            }`}
+          >
+            {formatNumber(sacos)}
+            <span className="text-zinc-500 font-medium">
+              {" "}
+              / {SACOS_POR_LOTE}
+            </span>
+          </span>
+
+          {onEditar && (
+            <Tooltip label="Editar cantidad de sacos" withArrow>
+              <ActionIcon
+                size="md"
+                variant="light"
+                color="indigo"
+                radius="md"
+                onClick={onEditar}
+                className="border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
+              >
+                <PencilSquareIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </div>
+      </div>
+
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/60">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            listoParaDespacho ? "bg-emerald-500" : "bg-indigo-500"
+          }`}
+          style={{ width: `${porcentaje}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export const LoteMineralPage = () => {
   useTitlePage("Lotes de Mineral");
@@ -29,6 +111,7 @@ export const LoteMineralPage = () => {
     isLoading,
     refetch,
     addLote,
+    updateLoteLocal,
     finalizarLote,
     submitting,
   } = useLotesMineral();
@@ -37,6 +120,21 @@ export const LoteMineralPage = () => {
   const [finalizarModalOpen, setFinalizarModalOpen] = useState(false);
   const [loteAFinalizar, setLoteAFinalizar] =
     useState<LoteMineralResumen | null>(null);
+
+  // Modal: Editar cantidad de sacos del lote
+  const [editarSacosOpen, setEditarSacosOpen] = useState(false);
+  const [loteAEditar, setLoteAEditar] = useState<LoteMineralResumen | null>(
+    null,
+  );
+
+  const handleAbrirEditarSacos = (lote: LoteMineralResumen) => {
+    setLoteAEditar(lote);
+    setEditarSacosOpen(true);
+  };
+
+  const handleSacosGuardados = (loteActualizado: LoteMineralResumen) => {
+    updateLoteLocal(loteActualizado.id_lote_mineral, loteActualizado);
+  };
 
   const handleConfirmarFinalizar = async () => {
     if (!loteAFinalizar) return;
@@ -225,6 +323,16 @@ export const LoteMineralPage = () => {
                     </span>
                   </div>
                 )}
+
+                {/* Sacos acumulados: se llenan desde el control de uso */}
+                <IndicadorSacos
+                  sacos={lote.cantidad_sacos ?? 0}
+                  onEditar={
+                    lote.estado !== EstadoLoteMineral.Finalizado
+                      ? () => handleAbrirEditarSacos(lote)
+                      : undefined
+                  }
+                />
               </div>
 
               <div className="mt-4 pt-3 border-t border-zinc-800/40 flex flex-col gap-2 px-1">
@@ -240,38 +348,34 @@ export const LoteMineralPage = () => {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-indigo-500/5 border border-indigo-500/10 w-fit group-hover:bg-indigo-500/10 transition-colors">
-                  <UserIcon
-                    className="size-3 text-indigo-400"
-                    strokeWidth={2}
-                  />
+                <div className="flex items-center justify-between gap-1.5 ">
                   <span className="text-[10px] font-semibold text-zinc-400">
                     Registrado por:{" "}
                     <span className="text-indigo-200 ml-0.5">
                       {lote.empleado_registro}
                     </span>
                   </span>
-                </div>
-              </div>
 
-              {/* Accion: Finalizar (mismo patron que Produccion de Mineral) */}
-              <div className="px-1 flex justify-end">
-                {lote.estado === EstadoLoteMineral.EnProduccion && (
-                  <Button
-                    leftSection={<CheckCircleIcon className="size-3" />}
-                    size="compact-xs"
-                    radius="md"
-                    variant="light"
-                    color="green"
-                    className="font-semibold h-6 px-2.5 border border-green-500/20 hover:bg-green-500/20"
-                    onClick={() => {
-                      setLoteAFinalizar(lote);
-                      setFinalizarModalOpen(true);
-                    }}
-                  >
-                    Finalizar
-                  </Button>
-                )}
+                  {/* Accion: Finalizar (mismo patron que Produccion de Mineral) */}
+                  <div className="px-1 flex justify-end">
+                    {lote.estado === EstadoLoteMineral.EnProduccion && (
+                      <Button
+                        leftSection={<CheckCircleIcon className="size-3" />}
+                        size="compact-xs"
+                        radius="md"
+                        variant="light"
+                        color="green"
+                        className="font-semibold h-6 px-2.5 border border-green-500/20 hover:bg-green-500/20"
+                        onClick={() => {
+                          setLoteAFinalizar(lote);
+                          setFinalizarModalOpen(true);
+                        }}
+                      >
+                        Finalizar
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -298,6 +402,14 @@ export const LoteMineralPage = () => {
           onCancel={closeCreate}
         />
       </ModalEstandar>
+
+      {/* MODAL: EDITAR CANTIDAD DE SACOS DEL LOTE */}
+      <EditarCantidadSacosLote
+        opened={editarSacosOpen}
+        close={() => setEditarSacosOpen(false)}
+        lote={loteAEditar}
+        onSuccess={handleSacosGuardados}
+      />
 
       {/* MODAL: CONFIRMAR FINALIZACION DE LOTE */}
       <ModalEstandar
@@ -328,7 +440,11 @@ export const LoteMineralPage = () => {
             {loteAFinalizar && (
               <div className="space-y-2">
                 <div className="flex justify-between items-start gap-2">
-                  <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                    className="font-semibold uppercase"
+                  >
                     Código
                   </Text>
                   <Badge color="indigo" variant="light" size="sm">
@@ -336,7 +452,11 @@ export const LoteMineralPage = () => {
                   </Badge>
                 </div>
                 <div className="flex justify-between items-start gap-2">
-                  <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                    className="font-semibold uppercase"
+                  >
                     Contratista
                   </Text>
                   <Text size="xs" fw={600} className="text-zinc-200">
@@ -344,7 +464,11 @@ export const LoteMineralPage = () => {
                   </Text>
                 </div>
                 <div className="flex justify-between items-start gap-2">
-                  <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                    className="font-semibold uppercase"
+                  >
                     Mina
                   </Text>
                   <Text size="xs" fw={600} className="text-emerald-400">
@@ -353,7 +477,11 @@ export const LoteMineralPage = () => {
                 </div>
                 {loteAFinalizar.labor && (
                   <div className="flex justify-between items-start gap-2">
-                    <Text size="xs" c="dimmed" className="font-semibold uppercase">
+                    <Text
+                      size="xs"
+                      c="dimmed"
+                      className="font-semibold uppercase"
+                    >
                       Labor
                     </Text>
                     <Text size="xs" fw={600} className="text-violet-300">

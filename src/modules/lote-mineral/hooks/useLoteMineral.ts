@@ -5,7 +5,10 @@ import { useNotify } from "../../../hooks/useNotify";
 import { loteMineralService } from "../service/lote-mineral.service";
 import { ProduccionService } from "../../produccion-mineral/service/produccion.service";
 import { EstadoLoteMineral } from "../../../shared/enums/lote-mineral";
-import type { RegistrarLoteMineralRequest } from "../service/lote-mineral.requests";
+import type {
+  DTO_ActualizarCantidadSacos,
+  RegistrarLoteMineralRequest,
+} from "../service/lote-mineral.requests";
 
 export const useLotesMineral = (mes?: number, anio?: number) => {
   const { notifySuccess, notifyError } = useNotify();
@@ -133,6 +136,45 @@ export const useRegistrarLoteMineralResumen = () => {
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       notifyError(err?.response?.data?.message || "Error de conexión");
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutate, isPending };
+};
+
+/**
+ * Edita la cantidad de sacos de un lote.
+ */
+export const useActualizarCantidadSacosLoteMineral = () => {
+  const { notifySuccess, notifyError } = useNotify();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutate = async (
+    id_lote_mineral: number,
+    request: DTO_ActualizarCantidadSacos,
+  ): Promise<LoteMineralResumen | null> => {
+    setIsPending(true);
+    try {
+      const response = await loteMineralService.actualizarCantidadSacos(
+        id_lote_mineral,
+        request,
+      );
+      if (response.success && response.data) {
+        notifySuccess(
+          response.message || "Cantidad de sacos actualizada correctamente",
+        );
+        return response.data;
+      }
+      notifyError(
+        response.message || "No se pudo actualizar la cantidad de sacos",
+      );
+      return null;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      notifyError(err?.response?.data?.message || "Error de conexión");
+      return null;
     } finally {
       setIsPending(false);
     }

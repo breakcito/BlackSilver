@@ -16,4 +16,6 @@ export interface LoteMineralResumen {
   labor_prefijo: string | null;
   id_empleado_registro: number;
   empleado_registro: string;
+  // Cantidad de sacos del lote.
+  cantidad_sacos: number | null;
 }
