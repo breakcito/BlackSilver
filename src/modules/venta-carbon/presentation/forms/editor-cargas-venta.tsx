@@ -371,12 +371,16 @@ export const EditorCargasVenta = ({
             label="Fecha y hora de salida"
             type="datetime-local"
             value={borrador.fecha_hora_salida}
-            onChange={(e) =>
+            onChange={(e) => {
+              // El valor se lee de forma sincronica: dentro del updater de
+              // `setBorrador` el evento ya no es valido (React lo libera al
+              // terminar el handler) y `e.currentTarget` es null.
+              const valor = e.currentTarget.value;
               setBorrador((prev) => ({
                 ...prev,
-                fecha_hora_salida: e.currentTarget.value,
-              }))
-            }
+                fecha_hora_salida: valor,
+              }));
+            }}
             classNames={inputClasses}
             size="xs"
             radius="lg"
@@ -448,12 +452,17 @@ export const EditorCargasVenta = ({
             label="Segunda placa (opcional)"
             placeholder="Ej. A1B-234"
             value={borrador.segunda_placa}
-            onChange={(e) =>
+            onChange={(e) => {
+              // El valor se lee de forma sincronica: dentro del updater de
+              // `setBorrador` el evento ya no es valido (React lo libera al
+              // terminar el handler) y `e.currentTarget` es null, lo que
+              // tumbaba la pantalla al escribir el 2.er caracter.
+              const valor = e.currentTarget.value.toUpperCase();
               setBorrador((prev) => ({
                 ...prev,
-                segunda_placa: e.currentTarget.value.toUpperCase(),
-              }))
-            }
+                segunda_placa: valor,
+              }));
+            }}
             classNames={inputClasses}
             size="xs"
             radius="lg"

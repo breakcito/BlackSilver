@@ -3557,12 +3557,16 @@ export const RegistroUso = ({
               label="Comentario (opcional)"
               placeholder="Notas del consumo..."
               value={consumoForm.comentario}
-              onChange={(e) =>
+              onChange={(e) => {
+                // El valor se lee de forma sincronica: dentro del updater de
+                // `setConsumoForm` el evento ya no es valido (React lo libera
+                // al terminar el handler) y `e.currentTarget` es null.
+                const comentario = e.currentTarget.value;
                 setConsumoForm((prev) => ({
                   ...prev,
-                  comentario: e.currentTarget.value,
-                }))
-              }
+                  comentario,
+                }));
+              }}
               classNames={fieldClasses}
               radius="lg"
               size="sm"

@@ -51,13 +51,21 @@ const COLOR_TITULO = "FF1F4E79";
 const COLOR_FILA_TOTALES = "FFFCE4D6";
 
 const FMT_MONEDA = '"S/."#,##0.00';
+/** La detraccion se cobra en soles enteros: sin centavos. */
+const FMT_MONEDA_ENTERO = '"S/."#,##0';
 const FMT_NUMERO = "#,##0.00";
 const FMT_ENTERO = "0";
 const FMT_PORCENTAJE = '0.00"%"';
 
 type ValorCelda = string | number | null | undefined;
 
-type Formato = "texto" | "moneda" | "numero" | "porcentaje" | "entero";
+type Formato =
+  | "texto"
+  | "moneda"
+  | "moneda_entero"
+  | "numero"
+  | "porcentaje"
+  | "entero";
 
 interface Columna {
   /** Titulo de la columna (siempre va en la fila de nivel 3). */
@@ -71,6 +79,31 @@ interface Columna {
   fmt?: Formato;
   /** Formula de la celda de la fila de TOTALES (sin el signo "="). */
   total?: (ctx: ContextoTotales) => string;
+  /**
+   * Formula de la celda de la fila de DATOS (sin el signo "=").
+   *
+   * La formula se escribe en la hoja para que el calculo quede a la vista
+   * del usuario; `resultado` guarda el valor ya calculado para que el
+   * archivo muestre la cifra correcta sin depender de un recalculo.
+   */
+  formula?: (ctx: ContextoFormula) => string;
+  /** Valor calculado de la formula de la celda de datos. */
+  resultado?: (fila: RES_FilaControlVentas, index: number) => number;
+}
+
+/**
+ * Contexto para construir la formula de una celda de la fila de DATOS.
+ */
+export interface ContextoFormula {
+  /** Numero de la fila de datos en la hoja (1-based). */
+  fila: number;
+  /**
+   * Letra de la columna del reporte indicada por su titulo (nivel 3).
+   *
+   * El titulo debe ser unico en el reporte: "TOTAL", "% DETRACCION" y
+   * "NETO A PAGAR" lo son.
+   */
+  letra: (titulo: string) => string;
 }
 
 interface Grupo {
@@ -120,6 +153,22 @@ const texto = (valor: string | null | undefined): string =>
 const numero = (valor: number | null | undefined): number | "" =>
   valor === null || valor === undefined ? "" : Number(valor);
 
+/**
+ * Detraccion de una carga: el 10% del TOTAL de la fila, redondeado a
+ * soles enteros.
+ *
+ * Regla de negocio: la detraccion se cobra en soles enteros (mismo criterio
+ * que aplica el backend en la liquidacion de venta de carbon). El neto a
+ * pagar sale de restar esa detraccion YA redondeada al total de la fila,
+ * por eso hay una diferencia de centimos con el 10% exacto.
+ */
+const detraccionDeFila = (fila: RES_FilaControlVentas): number =>
+  Math.round(num(fila.total) * 0.1);
+
+/** Neto a pagar de una fila: TOTAL menos la detraccion ya redondeada. */
+const netoDeFila = (fila: RES_FilaControlVentas): number =>
+  Math.round((num(fila.total) - detraccionDeFila(fila)) * 100) / 100;
+
 /** Condicion de pago: PAGADO si el comprobante ya esta pagado. */
 const condicionPago = (fila: RES_FilaControlVentas): string => {
   if (fila.comprobante_estado) {
@@ -163,6 +212,8 @@ const numFmtDe = (fmt?: Formato): string | undefined => {
   switch (fmt) {
     case "moneda":
       return FMT_MONEDA;
+    case "moneda_entero":
+      return FMT_MONEDA_ENTERO;
     case "entero":
       return FMT_ENTERO;
     case "porcentaje":
@@ -423,15 +474,24 @@ const GRUPOS: Grupo[] = [
       {
         titulo: "% DETRACCION",
         ancho: 14,
-        fmt: "porcentaje",
-        valor: (f) => numero(f.porcentaje_detraccion),
-        total: (ctx) => `IFERROR(AVERAGE(${ctx.propio}),0)`,
+        fmt: "moneda_entero",
+        // La detraccion ya no es la de la carga: es el 10% del TOTAL de la
+        // fila, redondeado a soles enteros.
+        valor: (f) => detraccionDeFila(f),
+        formula: (ctx) =>
+          `ROUND(${ctx.letra("TOTAL")}${ctx.fila}*0.1,0)`,
+        resultado: (f) => detraccionDeFila(f),
+        total: (ctx) => `SUM(${ctx.propio})`,
       },
       {
         titulo: "NETO A PAGAR",
         ancho: 17,
         fmt: "moneda",
-        valor: (f) => num(f.neto_a_pagar),
+        // Neto = TOTAL - detraccion (la detraccion ya redondeada).
+        valor: (f) => netoDeFila(f),
+        formula: (ctx) =>
+          `${ctx.letra("TOTAL")}${ctx.fila}-${ctx.letra("% DETRACCION")}${ctx.fila}`,
+        resultado: (f) => netoDeFila(f),
         total: (ctx) => `SUM(${ctx.propio})`,
       },
     ],
@@ -698,6 +758,21 @@ export const construirExcelRegistroVentas = (
 
     // ── Filas de datos ─────────────────────────────────────────────────
     const cargas = reporte.cargas ?? [];
+
+    // Letra de cada columna por su titulo (nivel 3): la necesitan las
+    // formulas de datos para referenciar a otras columnas de la misma fila.
+    const letraPorTitulo = new Map<string, string>();
+    let idxCol = 1;
+    GRUPOS.forEach((grupo) => {
+      grupo.columnas.forEach((col) => {
+        if (!letraPorTitulo.has(col.titulo)) {
+          letraPorTitulo.set(col.titulo, letraColumna(idxCol));
+        }
+        idxCol++;
+      });
+    });
+    const letra = (titulo: string): string => letraPorTitulo.get(titulo) ?? "A";
+
     cargas.forEach((fila, index) => {
       const nFila = FILA_DATOS + index;
       const row = ws.getRow(nFila);
@@ -718,6 +793,17 @@ export const construirExcelRegistroVentas = (
           } else {
             celda.alignment = { vertical: "middle", horizontal: "center" };
           }
+
+          // Las celdas con formula muestran el calculo en la hoja; el
+          // resultado ya calculado se guarda para que el archivo muestre la
+          // cifra sin depender de un recalculo.
+          if (col.formula) {
+            celda.value = {
+              formula: col.formula({ fila: nFila, letra }),
+              result: col.resultado ? col.resultado(fila, index) : valor,
+            };
+          }
+
           c++;
         });
       });
