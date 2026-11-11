@@ -13,6 +13,7 @@ import type {
   BlendingCarbonItem,
   GastoZarandeoItem,
   GrupoCargasItem,
+  RES_GastoProduccionExport,
   StockCarbonItem,
   ZarandeoCarbonItem,
 } from "./tamizaje-carbon.responses";
@@ -308,6 +309,64 @@ export const TamizajeCarbonService = {
         cantidad: payload.cantidad ?? 0,
         precio_unitario: payload.precio_unitario,
       },
+    );
+    return data;
+  },
+
+  /**
+   * Gastos de produccion listos para exportar, por rango de fechas.
+   *
+   * El rango se aplica sobre la fecha inicio del destino (zarandeo o
+   * blending). `tipo` acota a una sola vista ("blending" o "zarandeo").
+   */
+  getGastosExportarRango: async (
+    fechaInicio: string,
+    fechaFin: string,
+    tipo: "blending" | "zarandeo",
+  ): Promise<IRespuesta<RES_GastoProduccionExport[]>> => {
+    const { data } = await api.get<IRespuesta<RES_GastoProduccionExport[]>>(
+      `${PATH}/gastos/exportar/rango`,
+      { params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin, tipo } },
+    );
+    return data;
+  },
+
+  /**
+   * Gastos de produccion de un zarandeo, listos para exportar.
+   */
+  getGastosExportarZarandeo: async (
+    idZarandeoCarbon: number,
+  ): Promise<IRespuesta<RES_GastoProduccionExport[]>> => {
+    const { data } = await api.get<IRespuesta<RES_GastoProduccionExport[]>>(
+      `${PATH}/gastos/exportar/zarandeo/${idZarandeoCarbon}`,
+    );
+    return data;
+  },
+
+  /**
+   * Gastos de produccion de un blending, listos para exportar.
+   */
+  getGastosExportarBlending: async (
+    idBlendingCarbon: number,
+  ): Promise<IRespuesta<RES_GastoProduccionExport[]>> => {
+    const { data } = await api.get<IRespuesta<RES_GastoProduccionExport[]>>(
+      `${PATH}/gastos/exportar/blending/${idBlendingCarbon}`,
+    );
+    return data;
+  },
+
+  /**
+   * Confirma el pago de un gasto de produccion.
+   *
+   * La fecha de pago puede ser retroactiva.
+   */
+  confirmarPagoGasto: async (
+    idGasto: number,
+    fechaPago: string,
+  ): Promise<IRespuesta<GastoZarandeoItem>> => {
+    const { data } = await api.post<IRespuesta<GastoZarandeoItem>>(
+      `${PATH}/gastos/${idGasto}/pagar`,
+      { fecha_pago: fechaPago },
     );
     return data;
   },

@@ -98,7 +98,42 @@ export interface GastoZarandeoItem {
   cantidad: number;
   precio_unitario: number;
   total: number;
+  /** El gasto ya fue pagado al proveedor. */
+  esta_pagado?: number | boolean;
+  /** Fecha en la que se pago (puede ser retroactiva). */
+  fecha_pago?: string | null;
   created_at?: string;
+}
+
+/**
+ * Gasto de producción en el formato del reporte exportable.
+ *
+ * Ademas de los datos del gasto, trae lo que vive en otras tablas: la fecha
+ * inicio del destino (zarandeo o blending), el mes de esa fecha, el registro
+ * al que pertenece y el RUC del proveedor.
+ */
+export interface RES_GastoProduccionExport {
+  id_gasto_produccion_carbon: number;
+  /** Zarandeo o blending. */
+  origen: "zarandeo" | "blending";
+  /** Correlativo del blending o "Zarandeo #id". */
+  registro: string | null;
+  /** Fecha y hora del zarandeo o del blending al que se carga el gasto. */
+  fecha_inicio: string | null;
+  gasto: TipoGastoZarandeo;
+  otro_gasto?: string | null;
+  descripcion?: string | null;
+  numero_reporte?: string | null;
+  /** Fecha en la que se efectuo el gasto. */
+  fecha?: string | null;
+  proveedor_ruc?: string | null;
+  proveedor_dni?: string | null;
+  proveedor_razon_social?: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  total: number;
+  esta_pagado?: number | boolean;
+  fecha_pago?: string | null;
 }
 
 /**

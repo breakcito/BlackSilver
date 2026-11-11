@@ -14,12 +14,14 @@ import {
   TextInput,
   Textarea,
   Tooltip,
+  ActionIcon,
 } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   ChevronDownIcon,
+  CheckCircleIcon,
   ClockIcon,
   PlusIcon,
   XMarkIcon,
@@ -108,6 +110,12 @@ export const ModalGastosProduccion = ({
   const [proveedorBusqueda, setProveedorBusqueda] = useState("");
   // El formulario de alta se despliega bajo demanda (accordion).
   const [formAbierto, setFormAbierto] = useState(false);
+
+  // Confirmacion del pago de un gasto: se despliega bajo la fila que se
+  // esta pagando.
+  const [gastoAPagar, setGastoAPagar] = useState<number | null>(null);
+  const [fechaPago, setFechaPago] = useState<Date | null>(null);
+  const [guardandoPago, setGuardandoPago] = useState(false);
 
   const cargarGastos = useCallback(async () => {
     if (!destino.id) return;
@@ -233,8 +241,65 @@ export const ModalGastosProduccion = ({
     }
   };
 
-  const handleSubmit = async () => {
-    if (gasto === TipoGastoZarandeo.Otro && !otroGasto.trim()) {
+  /** El gasto ya esta pagado: no se puede volver a confirmar. */
+  const estaPagado = (g: GastoZarandeoItem): boolean =>
+    Boolean(Number(g.esta_pagado) === 1);
+
+  /**
+   * Abre el formulario de pago del gasto. La fecha por defecto es hoy, pero
+   * se puede cambiar por una anterior: el pago puede ser retroactivo.
+   */
+  const handleAbrirPago = (idGasto: number) => {
+    setGastoAPagar(idGasto);
+    setFechaPago(dayjs().toDate());
+  };
+
+  const handleCancelarPago = () => {
+    setGastoAPagar(null);
+    setFechaPago(null);
+  };
+
+  /** Confirma el pago del gasto con la fecha indicada. */
+  const handleGuardarPago = async () => {
+    if (gastoAPagar === null) return;
+    if (!fechaPago) {
+      notifyError("Indique la fecha de pago");
+      return;
+    }
+
+    setGuardandoPago(true);
+    try {
+      const resp = await TamizajeCarbonService.confirmarPagoGasto(
+        gastoAPagar,
+        dayjs(fechaPago).format("YYYY-MM-DD"),
+      );
+
+      if (resp.success && resp.data) {
+        notifySuccess("Pago del gasto registrado");
+        setGastos((prev) =>
+          prev.map((g) =>
+            g.id_gasto_produccion_carbon === gastoAPagar
+              ? {
+                  ...g,
+                  esta_pagado: 1,
+                  fecha_pago: dayjs(fechaPago).format("YYYY-MM-DD"),
+                }
+              : g,
+          ),
+        );
+        handleCancelarPago();
+      } else {
+        notifyError(resp.message || "No se pudo registrar el pago");
+      }
+    } catch (err) {
+      console.error(err);
+      notifyError("Ocurrió un error al registrar el pago");
+    } finally {
+      setGuardandoPago(false);
+    }
+  };
+
+  const handleSubmit = async () => {    if (gasto === TipoGastoZarandeo.Otro && !otroGasto.trim()) {
       notifyError("Describa el concepto");
       return;
     }
@@ -601,6 +666,13 @@ export const ModalGastosProduccion = ({
                   >
                     Total
                   </Table.Th>
+                  <Table.Th
+                    className="text-zinc-400 text-xs font-semibold"
+                    ta={"center"}
+                    w={170}
+                  >
+                    Condición
+                  </Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -655,17 +727,104 @@ export const ModalGastosProduccion = ({
                         <Text size="xs" c="zinc.300">
                           {formatNumber(g.cantidad)}
                         </Text>
-                        <Badge size="sm" color="grape" variant="filled">
-                          {g.hora_inicio && g.hora_fin
-                            ? `${dayjs(`1970-01-01 ${g.hora_inicio}`).format("HH:mm")} - ${dayjs(`1970-01-01 ${g.hora_fin}`).format("HH:mm")}`
-                            : ""}
-                        </Badge>
+                        {/* El rango de horas solo se muestra si el gasto
+                            las tiene: si no, el badge queda vacio. */}
+                        {g.hora_inicio && g.hora_fin && (
+                          <Badge size="sm" color="grape" variant="filled">
+                            {`${dayjs(`1970-01-01 ${g.hora_inicio}`).format("HH:mm")} - ${dayjs(`1970-01-01 ${g.hora_fin}`).format("HH:mm")}`}
+                          </Badge>
+                        )}
                       </Stack>
                     </Table.Td>
                     <Table.Td ta={"center"}>
                       <Text size="xs" fw={700} c="red">
                         S/ {formatNumber(g.total)}
                       </Text>
+                    </Table.Td>
+                    <Table.Td ta={"center"} w={170}>
+                      <Stack gap={4} justify="center" align="center" w={170}>
+                        {estaPagado(g) ? (
+                          <Group gap={6} justify="center" wrap="nowrap">
+                            <Badge
+                              size="sm"
+                              color="green"
+                              variant="light"
+                              radius="xl"
+                            >
+                              PAGADO
+                            </Badge>
+                            <Text size="10px" c="gray" fw={600}>
+                              {g.fecha_pago
+                                ? dayjs(g.fecha_pago).format("DD/MM/YYYY")
+                                : ""}
+                            </Text>
+                          </Group>
+                        ) : (
+                          <Group gap={8} justify="center" wrap="nowrap">
+                            <Badge
+                              size="sm"
+                              color="yellow"
+                              variant="light"
+                              radius="xl"
+                            >
+                              PENDIENTE
+                            </Badge>
+                            <Tooltip
+                              label="Confirmar el pago de este gasto"
+                              withArrow
+                            >
+                              <ActionIcon
+                                variant="filled"
+                                color="green"
+                                onClick={() =>
+                                  handleAbrirPago(g.id_gasto_produccion_carbon)
+                                }
+                                disabled={guardandoPago}
+                              >
+                                <CheckCircleIcon className="size-5 text-white" />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
+                        )}
+
+                        {/* Confirmacion del pago: se despliega bajo la celda */}
+                        <Collapse
+                          in={gastoAPagar === g.id_gasto_produccion_carbon}
+                          transitionDuration={200}
+                        >
+                          <Stack gap={4} mt={4} w={160}>
+                            <CustomDatePicker
+                              label="Fecha de pago"
+                              value={fechaPago}
+                              onChange={setFechaPago}
+                              radius="lg"
+                              size="xs"
+                              required
+                            />
+                            <Group gap={4} justify="center" wrap="nowrap">
+                              <Button
+                                variant="default"
+                                radius="lg"
+                                size="xs"
+                                onClick={handleCancelarPago}
+                                disabled={guardandoPago}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                color="green"
+                                radius="lg"
+                                size="xs"
+                                onClick={handleGuardarPago}
+                                loading={guardandoPago}
+                                disabled={!fechaPago}
+                              >
+                                Pagar
+                              </Button>
+                            </Group>
+                          </Stack>
+                        </Collapse>
+                      </Stack>
                     </Table.Td>
                   </Table.Tr>
                 ))}

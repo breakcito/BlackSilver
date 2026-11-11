@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Group,
+  Loader,
   Paper,
   Select,
   Stack,
@@ -14,6 +15,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
+  ArrowDownTrayIcon,
   BuildingStorefrontIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
@@ -36,10 +38,12 @@ import { MESES } from "../../../../shared/variables/meses";
 import { AuxService } from "../../../../service/auxiliar.service";
 import { TipoCarbonService } from "../../../tipo-carbon/service/tipo-carbon.service";
 import { TamizajeCarbonService } from "../../service/tamizaje-carbon.service";
+import { useExportarGastosProduccion } from "../../hooks/useExportarGastosProduccion";
 import { ModalRegistrarBlending } from "../modal-registrar-blending";
 import { ModalAgregarStockBlending } from "../modal-agregar-stock-blending";
 import { ModalGastosProduccion } from "../modal-gastos-produccion";
 import { ModalEvidenciasBlending } from "../modal-evidencias-blending";
+import { ModalRangoFechasExportar } from "../modal-rango-fechas-exportar";
 import type { BlendingCarbonItem } from "../../service/tamizaje-carbon.responses";
 import type { RES_Almacen } from "../../../../service/responses/almacen";
 import type { RES_TipoCarbon } from "../../../tipo-carbon/service/tipo-carbon.responses";
@@ -81,6 +85,13 @@ export const PanelBlending = () => {
   const [loading, setLoading] = useState(false);
 
   const [openNuevo, setOpenNuevo] = useState(false);
+  const [openExportarGastos, setOpenExportarGastos] = useState(false);
+  const {
+    exportarPorRango,
+    exportarBlending,
+    exportando,
+    idExportando,
+  } = useExportarGastosProduccion();
   const [blendingEditar, setBlendingEditar] =
     useState<BlendingCarbonItem | null>(null);
   const [blendingStock, setBlendingStock] =
@@ -380,6 +391,27 @@ export const PanelBlending = () => {
                 <CurrencyDollarIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
+            <Tooltip
+              label="Exportar los gastos de este blending a Excel"
+              withArrow
+            >
+              <ActionIcon
+                variant="light"
+                color="green"
+                size="md"
+                radius="md"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportarBlending(r.id_blending_carbon, r.correlativo);
+                }}
+              >
+                {idExportando === r.id_blending_carbon ? (
+                  <Loader size={14} color="green" />
+                ) : (
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                )}
+              </ActionIcon>
+            </Tooltip>
           </Group>
         ),
       },
@@ -421,8 +453,7 @@ export const PanelBlending = () => {
               >
                 <PaperClipIcon className="w-4 h-4" />
               </ActionIcon>
-            </Tooltip>
-            {/* <Tooltip label="Ver detalle de la mezcla" withArrow>
+            </Tooltip>            {/* <Tooltip label="Ver detalle de la mezcla" withArrow>
               <ActionIcon
                 variant="light"
                 color="cyan"
@@ -468,7 +499,7 @@ export const PanelBlending = () => {
         ),
       },
     ],
-    [],
+    [exportarBlending, idExportando],
   );
 
   return (
@@ -578,6 +609,17 @@ export const PanelBlending = () => {
             tooltip="Recargar los blendings"
           />
           <Button
+            variant="light"
+            color="indigo"
+            radius="lg"
+            size="xs"
+            leftSection={<ArrowDownTrayIcon className="w-4 h-4" />}
+            onClick={() => setOpenExportarGastos(true)}
+            className="font-semibold"
+          >
+            Exportar gastos
+          </Button>
+          <Button
             color="cyan"
             radius="lg"
             size="xs"
@@ -601,9 +643,22 @@ export const PanelBlending = () => {
         />
       </Paper>
 
+      {/* Modal Exportar gastos por periodo */}
+      {openExportarGastos && (
+        <ModalRangoFechasExportar
+          opened={openExportarGastos}
+          onClose={() => setOpenExportarGastos(false)}
+          loading={exportando}
+          textoBoton="Exportar gastos"
+          onExportar={async (desde, hasta) => {
+            await exportarPorRango(desde, hasta, "blending");
+            setOpenExportarGastos(false);
+          }}
+        />
+      )}
+
       {/* Modal Nuevo / Editar Blending */}
-      <ModalRegistrarBlending
-        opened={openNuevo || Boolean(blendingEditar)}
+      <ModalRegistrarBlending        opened={openNuevo || Boolean(blendingEditar)}
         blending={blendingEditar}
         onClose={() => {
           setOpenNuevo(false);

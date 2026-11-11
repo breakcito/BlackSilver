@@ -19,12 +19,17 @@ import {
   IconInfoCircle,
   IconScale,
 } from "@tabler/icons-react";
+import { StarIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 
 import { useNotify } from "../../../hooks/useNotify";
 import { formatNumber } from "../../../shared/functions/formatNumber";
 import { colorCalidadCarbon } from "../../../shared/functions/calidad-carbon";
 import { getCoincidencias } from "../../../shared/functions/get-coincidencias";
+import {
+  esTipoCarbonPrincipal,
+  ordenarTiposCarbonPrincipales,
+} from "../../../shared/functions/tipos-carbon-principales";
 import { TipoCalidadCarbon } from "../../../shared/enums/carbon/tipo-calidad-carbon";
 import { AuxService } from "../../../service/auxiliar.service";
 import { TipoCarbonService } from "../../tipo-carbon/service/tipo-carbon.service";
@@ -296,12 +301,30 @@ export const ModalRegistrarBlending = ({
     [almacenes],
   );
 
+  /**
+   * Tipos de carbón: primero los PRINCIPALES (Cisco y Tipo A), con una
+   * estrella para distinguirlos, y despues el resto.
+   */
+  const tiposPrincipales = useMemo(
+    () =>
+      tipos.filter((t) => esTipoCarbonPrincipal(t.nombre, t.codigo)).map((t) => t.id_tipo_carbon),
+    [tipos],
+  );
+
+  const idsTiposPrincipales = useMemo(
+    () => new Set(tiposPrincipales),
+    [tiposPrincipales],
+  );
+
   const tiposOptions = useMemo(
     () =>
-      tipos.map((t) => ({
-        value: String(t.id_tipo_carbon),
-        label: `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`,
-      })),
+      ordenarTiposCarbonPrincipales(tipos).map((t) => {
+        const base = `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`;
+        return {
+          value: String(t.id_tipo_carbon),
+          label: esTipoCarbonPrincipal(t.nombre, t.codigo) ? `★ ${base}` : base,
+        };
+      }),
     [tipos],
   );
 
@@ -556,6 +579,37 @@ export const ModalRegistrarBlending = ({
               comboboxProps={{ withinPortal: true }}
               filter={({ options }) => options}
               disabled={saving || editando}
+              /**
+               * Los tipos principales (Cisco y Tipo A) se resaltan en ambar
+               * y con su estrella: se distinguen de un vistazo del resto.
+               */
+              renderOption={({ option }) => {
+                const esPrincipal = idsTiposPrincipales.has(Number(option.value));
+                const texto = String(option.label).replace(/^★\s*/, "");
+
+                return (
+                  <Group
+                    gap={8}
+                    wrap="nowrap"
+                    className={
+                      esPrincipal
+                        ? "bg-yellow-500/10 -mx-2 px-2 py-1 rounded-md"
+                        : ""
+                    }
+                  >
+                    <Text
+                      size="sm"
+                      fw={400}
+                      className={esPrincipal ? "text-yellow-300" : "text-zinc-300"}
+                    >
+                      {texto}
+                    </Text>
+                    {esPrincipal && (
+                      <StarIcon className="w-4 h-4 text-yellow-400 shrink-0" />
+                    )}
+                  </Group>
+                );
+              }}
             />
 
             <NumberInput
