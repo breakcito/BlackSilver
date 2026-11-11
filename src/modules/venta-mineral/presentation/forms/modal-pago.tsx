@@ -239,8 +239,6 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
           value={montoPagado}
           onChange={setMontoPagado}
           fixedDecimalScale
-          decimalScale={2}
-          min={0}
           hideControls
           leftSection={<IconCash size={16} />}
           disabled={saving}

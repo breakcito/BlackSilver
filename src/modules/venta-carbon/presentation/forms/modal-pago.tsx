@@ -278,7 +278,6 @@ export const ModalPago = ({
             value={montoPagado}
             onChange={setMontoPagado}
             fixedDecimalScale
-            min={0}
             hideControls
             leftSection={<IconCash size={16} />}
             classNames={inputClasses}

@@ -20,7 +20,6 @@ import type {
 import { ComprobanteFormPanel } from "../components/comprobante-form-panel";
 import {
   calcularImportes,
-  DETRACCION_ESTANDAR_POR_DEFECTO,
   IGV_POR_DEFECTO,
 } from "./calculos-despacho";
 
@@ -67,7 +66,7 @@ export const ModalComprobanteAnalisis = ({
     () => comprobante?.con_detraccion ?? true,
   );
   const [porcentajeDetraccion, setPorcentajeDetraccion] = useState<number | string>(
-    () => comprobante?.porcentaje_detraccion ?? DETRACCION_ESTANDAR_POR_DEFECTO,
+    () => comprobante?.porcentaje_detraccion ?? 10,
   );
   const [porcentajeIgv, setPorcentajeIgv] = useState<number | string>(
     () => comprobante?.porcentaje_igv ?? IGV_POR_DEFECTO,

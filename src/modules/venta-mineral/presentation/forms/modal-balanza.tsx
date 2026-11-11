@@ -105,21 +105,34 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
         <Text size="xs" c="dimmed">
           Flete {flete.placa ?? "sin placa"} ·{" "}
           {flete.transportista ?? "sin transportista"}
-          {flete.guia_remitente ? ` · guia ${flete.guia_remitente}` : ""}
+          {/* {flete.guia_remitente ? ` · guia ${flete.guia_remitente}` : ""} */}
         </Text>
       )}
 
-      <TextInput
-        label="Codigo del ticket de balanza"
-        placeholder="TB-000123"
-        value={codigoTicket}
-        onChange={(e) => setCodigoTicket(e.currentTarget.value.toUpperCase())}
-        disabled={saving}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-        required
-      />
+      <Group grow>
+        <TextInput
+          label="Codigo del ticket"
+          placeholder="TB-000123"
+          value={codigoTicket}
+          onChange={(e) => setCodigoTicket(e.currentTarget.value.toUpperCase())}
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required
+        />
+
+        <TextInput
+          label="Guía de Remisión (2da)"
+          placeholder="GRR-000123"
+          value={""}
+          // onChange={""}
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+      </Group>
 
       <TextInput
         label="Fecha y hora del pesaje"
@@ -197,11 +210,9 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
           radius="lg"
           leftSection={<IconDeviceFloppy size={16} />}
         >
-          Registrar peso de balanza
+          Registrar ticket
         </Button>
       </Group>
-
- 
     </Stack>
   );
 };

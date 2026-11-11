@@ -135,7 +135,6 @@ export const ModalComprobanteLiquidacion = ({
       <Select
         label="Liquidacion"
         placeholder="Selecciona la liquidacion"
-        description="El comprobante copia los importes de la liquidacion"
         data={liquidacionesDisponibles.map((l) => ({
           value: String(l.id_liquidacion_mineral),
           label: `${l.codigo_liquidacion ?? "Sin codigo"} · ${l.elemento_quimico} · ${l.cliente ?? "sin cliente"}`,

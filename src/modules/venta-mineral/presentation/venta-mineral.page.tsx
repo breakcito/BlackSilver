@@ -364,7 +364,7 @@ export const VentaMineralPage = () => {
       <ModalEstandar
         opened={modalBalanza !== null}
         close={() => setModalBalanza(null)}
-        title="Peso de balanza"
+        title="Ticket de balanza"
         size="md"
       >
         {modalBalanza && (

@@ -340,7 +340,7 @@ export const GastosExtraSection = ({
               placeholder="0.00"
               value={monto}
               onChange={setMonto}
-              step={0.01}
+         
               fixedDecimalScale
               hideControls
               required

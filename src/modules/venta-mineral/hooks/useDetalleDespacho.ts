@@ -137,7 +137,7 @@ export const useDetalleDespacho = (
       ejecutar(
         idDespacho,
         () => VentaMineralService.registrarBalanza(idFlete, payload),
-        "Peso de balanza registrado correctamente",
+        "Ticket de balanza registrado correctamente",
       ),
     [ejecutar],
   );

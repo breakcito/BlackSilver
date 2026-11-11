@@ -104,9 +104,7 @@ export const ModalGasto = ({ close, gasto, onGuardar }: Props) => {
         label="Monto (S/)"
         value={monto}
         onChange={setMonto}
-        min={0}
         fixedDecimalScale
-        decimalScale={2}
         hideControls
         disabled={saving}
         classNames={inputClasses}

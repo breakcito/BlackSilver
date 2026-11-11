@@ -271,7 +271,7 @@ export const ModalAnalisis = ({
               label="Codigo del cliente del analisis"
               placeholder="Codigo que entrega el cliente"
               value={codigoCliente}
-              onChange={(e) => setCodigoCliente(e.currentTarget.value)}
+              onChange={(e) => setCodigoCliente(e.currentTarget.value.toUpperCase())}
               disabled={saving}
               classNames={inputClasses}
               size="xs"
@@ -285,7 +285,7 @@ export const ModalAnalisis = ({
           label="Codigo del laboratorio"
           placeholder="Codigo que asigna el laboratorio"
           value={codigoLaboratorio}
-          onChange={(e) => setCodigoLaboratorio(e.currentTarget.value)}
+          onChange={(e) => setCodigoLaboratorio(e.currentTarget.value.toUpperCase())}
           disabled={saving}
           classNames={inputClasses}
           size="xs"

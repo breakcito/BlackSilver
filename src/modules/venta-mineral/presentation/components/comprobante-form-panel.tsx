@@ -76,7 +76,6 @@ export const ComprobanteFormPanel = ({
         max={100}
         fixedDecimalScale
         hideControls
-        disabled={disabled || !setPorcentajeIgv}
         readOnly={!setPorcentajeIgv}
         classNames={inputClasses}
         size="xs"
@@ -102,7 +101,6 @@ export const ComprobanteFormPanel = ({
           max={100}
           fixedDecimalScale
           hideControls
-          disabled={disabled || !setPorcentajeDetraccion}
           readOnly={!setPorcentajeDetraccion}
           classNames={inputClasses}
           size="xs"

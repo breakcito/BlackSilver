@@ -113,7 +113,7 @@ export const ModalLiquidacion = ({
   const [porcentajeDetraccion, setPorcentajeDetraccion] = useState<
     number | string
   >(
-    () => liquidacion?.porcentaje_detraccion ?? DETRACCION_ESTANDAR_POR_DEFECTO,
+    () => liquidacion?.porcentaje_detraccion ?? 10,
   );
   const [observaciones, setObservaciones] = useState(
     () => liquidacion?.observaciones ?? "",
@@ -403,7 +403,7 @@ export const ModalLiquidacion = ({
           radius="lg"
         />
         <NumberInput
-          label="Valor por tonelada TMS (S/)"
+          label="Valor por tonelada"
           value={valorPorTonelada}
           onChange={setValorPorTonelada}
           min={0}
@@ -419,7 +419,6 @@ export const ModalLiquidacion = ({
           label="IGV (%)"
           value={porcentajeIgv}
           onChange={setPorcentajeIgv}
-          min={0}
           max={100}
           fixedDecimalScale
           hideControls

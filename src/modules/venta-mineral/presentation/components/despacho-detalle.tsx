@@ -127,26 +127,28 @@ export const DespachoDetalle = ({
     (detalle.total_pagado_liquidacion ?? 0);
 
   /**
- * Indicador compacto de la cabecera: etiqueta y valor en una sola linea.
- */
-const Pill = ({
-  etiqueta,
-  valor,
-  color,
-}: {
-  etiqueta: string;
-  valor: string;
-  color?: string;
-}) => (
-  <span className="inline-flex items-baseline gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5">
-    <span className="text-[10px] uppercase tracking-wide text-zinc-500">
-      {etiqueta}
+   * Indicador compacto de la cabecera: etiqueta y valor en una sola linea.
+   */
+  const Pill = ({
+    etiqueta,
+    valor,
+    color,
+  }: {
+    etiqueta: string;
+    valor: string;
+    color?: string;
+  }) => (
+    <span className="inline-flex items-baseline gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5">
+      <span className="text-[10px] uppercase tracking-wide text-zinc-300">
+        {etiqueta}
+      </span>
+      <span className={`text-xs font-bold ${color ?? "text-zinc-200"}`}>
+        {valor}
+      </span>
     </span>
-    <span className={`text-xs font-bold ${color ?? "text-zinc-200"}`}>{valor}</span>
-  </span>
-);
+  );
 
-const colorEstado = (estado: EstadoDespachoMineral) => {
+  const colorEstado = (estado: EstadoDespachoMineral) => {
     if (estado === EstadoDespachoMineral.Liquidado) return "green";
     if (estado === EstadoDespachoMineral.EnProceso) return "yellow";
     return "gray";
@@ -239,7 +241,7 @@ const colorEstado = (estado: EstadoDespachoMineral) => {
             valor={`${formatNumber(detalle.peso_neto_total)} t`}
           />
           <Pill
-            etiqueta="Gastado"
+            etiqueta="Gastos"
             valor={`S/ ${formatNumber(totalGastado)}`}
             color="orange.3"
           />
@@ -489,8 +491,8 @@ const colorEstado = (estado: EstadoDespachoMineral) => {
                             leftSection={<IconScale size={12} />}
                           >
                             {flete.codigo_ticket_balanza
-                              ? "Editar peso de balanza"
-                              : "Registrar peso de balanza"}
+                              ? "Editar ticket de balanza"
+                              : "Registrar ticket de balanza"}
                           </Button>
                           <Button
                             variant="subtle"

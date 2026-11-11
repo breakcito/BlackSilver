@@ -197,22 +197,21 @@ export const ModalFlete = ({
         />
       </SimpleGrid>
 
-      <NumberInput
-        label="Peso de la guia (tn)"
-        value={pesoGuia}
-        onChange={setPesoGuia}
-        min={0}
-        decimalScale={3}
-        fixedDecimalScale
-        hideControls
-        disabled={saving}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-        required
-      />
-
-      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+      <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="sm">
+        <NumberInput
+          label="Peso de la guia (tn)"
+          value={pesoGuia}
+          onChange={setPesoGuia}
+          min={0}
+          decimalScale={3}
+          fixedDecimalScale
+          hideControls
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required
+        />
         <NumberInput
           label="Largo (m)"
           value={largo}
