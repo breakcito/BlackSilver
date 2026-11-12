@@ -126,17 +126,38 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
   /**
    * Solo se listan las cuentas de la moneda del pago: las del comprobante
    * para el neto y las de soles para la detraccion.
+   *
+   * En la liquidacion el pago de detraccion va a una cuenta de DETRACCION de
+   * la empresa; si no hay ninguna habilitada, se listan las cuentas en
+   * dolares.
    */
-  const cuentasVisibles = useMemo(
-    () =>
-      cuentas
-        .filter((c) => (c.moneda ?? Moneda.Soles) === monedaPago)
-        .map((c) => ({
-          value: String(c.id_cuenta_bancaria),
-          label: `${c.banco} · ${c.numero_cuenta} (${c.moneda ?? Moneda.Soles})`,
-        })),
-    [cuentas, monedaPago],
-  );
+  const esLiquidacion = comprobante.id_liquidacion_mineral !== null;
+
+  const cuentasVisibles = useMemo(() => {
+    const mapear = (lista: RES_CuentaEmpresa[]) =>
+      lista.map((c) => ({
+        value: String(c.id_cuenta_bancaria),
+        label: `${c.banco} · ${c.numero_cuenta} (${c.moneda ?? Moneda.Soles})`,
+      }));
+
+    if (esParaDetraccion && esLiquidacion) {
+      const cuentasDetraccion = cuentas.filter((c) =>
+        Boolean(c.es_para_detraccion),
+      );
+
+      if (cuentasDetraccion.length > 0) {
+        return mapear(cuentasDetraccion);
+      }
+
+      return mapear(
+        cuentas.filter((c) => (c.moneda ?? Moneda.Soles) === Moneda.Dolares),
+      );
+    }
+
+    return mapear(
+      cuentas.filter((c) => (c.moneda ?? Moneda.Soles) === monedaPago),
+    );
+  }, [cuentas, esParaDetraccion, esLiquidacion, monedaPago]);
 
   const montoNum = Number(montoPagado) || 0;
 

@@ -6,4 +6,9 @@
 export enum ElementoQuimicoMineral {
   Oro = "Oro",
   Plata = "Plata",
+  Cobre = "Cobre",
+  Zinc = "Zinc",
+  Arsenico = "Arsenico",
+  Hierro = "Hierro",
+  Plomo = "Plomo",
 }

@@ -3,7 +3,9 @@ import {
   Alert,
   Button,
   Group,
+  NumberInput,
   Select,
+  SimpleGrid,
   Stack,
   Text,
 } from "@mantine/core";
@@ -19,6 +21,9 @@ import { ComprobanteFormPanel } from "../components/comprobante-form-panel";
 import { inputClasses } from "../components/input-classes";
 import { calcularImportes } from "./calculos-despacho";
 
+/** El comprobante de liquidacion es SIEMPRE en dolares. */
+const SIMBOLO = "$";
+
 interface Props {
   close: () => void;
   /** Liquidaciones del despacho que todavia no tienen comprobante. */
@@ -28,6 +33,7 @@ interface Props {
   onGuardar: (payload: {
     codigo_comprobante: string;
     fecha_emision: string;
+    tipo_cambio: number;
     con_detraccion: boolean;
     porcentaje_detraccion: number;
     porcentaje_igv: number;
@@ -41,6 +47,9 @@ interface Props {
  *
  * El comprobante COPIA los importes de la liquidacion que lo respalda: no se
  * capturan a mano. Si la liquidacion cambia, el comprobante se recalcula.
+ *
+ * El comprobante va en DOLARES: el tipo de cambio indica a cuanto se cobra
+ * la detraccion, que siempre se cobra en soles.
  */
 export const ModalComprobanteLiquidacion = ({
   close,
@@ -57,6 +66,9 @@ export const ModalComprobanteLiquidacion = ({
     comprobante?.fecha_emision
       ? dayjs(comprobante.fecha_emision).format("YYYY-MM-DD")
       : dayjs().format("YYYY-MM-DD"),
+  );
+  const [tipoCambio, setTipoCambio] = useState<number | string>(
+    () => comprobante?.tipo_cambio ?? 1,
   );
   const [conDetraccion, setConDetraccion] = useState(
     () => comprobante?.con_detraccion ?? true,
@@ -83,14 +95,23 @@ export const ModalComprobanteLiquidacion = ({
   const porcentajeIgv = liquidacionSeleccionada?.porcentaje_igv ?? 18;
   const porcentajeDetraccion = liquidacionSeleccionada?.porcentaje_detraccion ?? 12;
 
+  const tipoCambioNum = Number(tipoCambio) || 0;
+
   const importes = useMemo(
     () =>
       calcularImportes(
         Number(liquidacionSeleccionada?.subtotal) || 0,
         Number(porcentajeIgv) || 0,
         conDetraccion ? Number(porcentajeDetraccion) || 0 : 0,
+        tipoCambioNum,
       ),
-    [liquidacionSeleccionada, porcentajeIgv, porcentajeDetraccion, conDetraccion],
+    [
+      liquidacionSeleccionada,
+      porcentajeIgv,
+      porcentajeDetraccion,
+      conDetraccion,
+      tipoCambioNum,
+    ],
   );
 
   const handleSubmit = async () => {
@@ -108,11 +129,16 @@ export const ModalComprobanteLiquidacion = ({
       setError("Selecciona la liquidacion que respalda este comprobante");
       return;
     }
+    if (tipoCambioNum <= 0) {
+      setError("Ingresa el tipo de cambio");
+      return;
+    }
 
     setSaving(true);
     const ok = await onGuardar({
       codigo_comprobante: codigo.trim().toUpperCase(),
       fecha_emision: fecha,
+      tipo_cambio: tipoCambioNum,
       con_detraccion: conDetraccion,
       porcentaje_detraccion: Number(porcentajeDetraccion) || 0,
       porcentaje_igv: Number(porcentajeIgv) || 0,
@@ -153,11 +179,31 @@ export const ModalComprobanteLiquidacion = ({
 
       {liquidacionSeleccionada && (
         <Text size="xs" c="dimmed">
-          Neto de la liquidacion: S/{" "}
+          Neto de la liquidacion: {SIMBOLO}{" "}
           {formatNumber(liquidacionSeleccionada.neto)} · peso neto{" "}
           {formatNumber(liquidacionSeleccionada.peso_neto)} t
         </Text>
       )}
+
+      {/* Tipo de cambio: el comprobante es en dolares y la detraccion se
+          cobra en soles. */}
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        <NumberInput
+          label="Tipo de cambio"
+          value={tipoCambio}
+          onChange={setTipoCambio}
+          hideControls
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required
+        />
+        <Text size="xs" c="dimmed" style={{ alignSelf: "end" }}>
+          1 {SIMBOLO} = S/ {formatNumber(tipoCambioNum)} · la detraccion se
+          cobra en soles.
+        </Text>
+      </SimpleGrid>
 
       <ComprobanteFormPanel
         codigo={codigo}
@@ -170,6 +216,8 @@ export const ModalComprobanteLiquidacion = ({
         porcentajeIgv={porcentajeIgv}
         importes={importes}
         disabled={saving}
+        simbolo={SIMBOLO}
+        mostrarDetraccionEnSoles
       />
 
       <MultiFilePicker

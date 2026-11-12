@@ -213,8 +213,8 @@ export interface LiquidacionMineralItem {
   peso_neto: number;
   ley_elemento: number;
   porcentaje_recuperacion: number;
-  maquila: number;
-  penalidad: number;
+  /** Total de deducciones de la liquidacion (S/ USD). */
+  total_deducciones: number;
   valor_por_tonelada: number;
   porcentaje_igv: number;
   porcentaje_detraccion: number;

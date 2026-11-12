@@ -81,6 +81,225 @@ interface Props {
 }
 
 /**
+ * Simbolo y color de cada elemento quimico. El color es el mismo que el
+ * de los inputs del modal de analisis.
+ */
+const ELEMENTO_QUIMICO = {
+  Oro: { sigla: "Au", color: "border-yellow-400/60 text-yellow-400" },
+  Plata: { sigla: "Ag", color: "border-pink-300/60 text-pink-300" },
+  Cobre: { sigla: "Cu", color: "border-orange-400/60 text-orange-400" },
+  Zinc: { sigla: "Zn", color: "border-teal-300/60 text-teal-300" },
+  Arsenico: { sigla: "As", color: "border-purple-400/60 text-purple-400" },
+  Hierro: { sigla: "Fe", color: "border-sky-400/60 text-sky-400" },
+  Plomo: { sigla: "Pb", color: "border-indigo-400/60 text-indigo-400" },
+} as const;
+
+/**
+ * Cuadradito con el simbolo del elemento quimico, como en la tabla
+ * periodica.
+ */
+const CuadroElemento = ({
+  elemento,
+}: {
+  elemento: string;
+}) => {
+  const datos =
+    ELEMENTO_QUIMICO[elemento as keyof typeof ELEMENTO_QUIMICO] ??
+    ELEMENTO_QUIMICO.Oro;
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center w-7 h-7 rounded border text-[11px] font-bold leading-none ${datos.color}`}
+    >
+      {datos.sigla}
+    </span>
+  );
+};
+
+/**
+ * Color de cada elemento quimico en el listado de liquidaciones.
+ */
+const COLOR_ELEMENTO_QUIMICO = {
+  Oro: "yellow",
+  Plata: "gray",
+  Cobre: "orange",
+  Zinc: "teal",
+  Arsenico: "grape",
+  Hierro: "blue",
+  Plomo: "indigo",
+} as const;
+
+/**
+ * Tarjeta de una liquidacion de mineral.
+ *
+ * Los datos van en una sola linea con el criterio de la cabecera del
+ * despacho: etiqueta gris, valor con color y divisores verticales.
+ */
+const TarjetaLiquidacion = ({
+  liquidacion,
+  onEditar,
+  onEliminar,
+  onToggleFactura,
+  facturaAbierta,
+  factura,
+}: {
+  liquidacion: LiquidacionMineralItem;
+  onEditar: () => void;
+  onEliminar: () => void;
+  /** Abre u oculta la factura (comprobante) de la liquidacion. */
+  onToggleFactura?: () => void;
+  facturaAbierta?: boolean;
+  /** Factura de la liquidacion (se muestra al desplegar). */
+  factura?: React.ReactNode;
+}) => (
+  <Paper
+    p="sm"
+    radius="md"
+    className="bg-zinc-900/60 border border-zinc-800/70"
+  >
+    <Group justify="space-between" wrap="nowrap" align="flex-start">
+      <div className="min-w-0">
+        {/* Elemento, codigo, estado y cliente */}
+        <Group gap="xs" align="center" wrap="wrap">
+          <CuadroElemento elemento={liquidacion.elemento_quimico} />
+          <Text size="sm" fw={700} c="zinc.100" className="font-mono">
+            {liquidacion.codigo_liquidacion ?? "Sin codigo"}
+          </Text>
+          <Badge
+            color={
+              COLOR_ELEMENTO_QUIMICO[
+                liquidacion.elemento_quimico as keyof typeof COLOR_ELEMENTO_QUIMICO
+              ] ?? "gray"
+            }
+            variant="light"
+            size="xs"
+            radius="sm"
+          >
+            {liquidacion.elemento_quimico}
+          </Badge>
+          <Badge
+            color={
+              liquidacion.estado === EstadoLiquidacionMineral.Pagada
+                ? "green"
+                : liquidacion.estado === EstadoLiquidacionMineral.Aprobada
+                  ? "indigo"
+                  : "gray"
+            }
+            variant="light"
+            size="xs"
+            radius="sm"
+          >
+            {liquidacion.estado}
+          </Badge>
+          <Text size="xs" c="zinc.600">
+            |
+          </Text>
+          <Text size="xs" c="zinc.300" truncate>
+            {liquidacion.cliente ?? "Sin cliente"}
+            {liquidacion.fecha_liquidacion ? (
+              <>
+                {" · "}
+                <Text span size="xs" fw={600} c="teal.3">
+                  {dayjs(liquidacion.fecha_liquidacion).format("DD/MM/YYYY")}
+                </Text>
+              </>
+            ) : null}
+          </Text>
+        </Group>
+
+        {/* Pesos, ley, valor y deducciones en una sola linea */}
+        <Group gap="xs" mt={8} align="center" wrap="wrap">
+          <Text size="xs" c="gray">
+            TMS{" "}
+            <Text span size="xs" fw={700} c="blue">
+              {formatNumber(liquidacion.peso_seco)} t
+            </Text>
+          </Text>
+          <Divider orientation="vertical" />
+          <Text size="xs" c="gray">
+            Neto{" "}
+            <Text span size="xs" fw={700} c="pink">
+              {formatNumber(liquidacion.peso_neto)} t
+            </Text>
+          </Text>
+          <Divider orientation="vertical" />
+          <Text size="xs" c="gray">
+            Ley{" "}
+            <Text span size="xs" fw={700} c="cyan">
+              {formatNumber(liquidacion.ley_elemento)}
+            </Text>
+          </Text>
+          <Divider orientation="vertical" />
+          <Text size="xs" c="gray">
+            Valor{" "}
+            <Text span size="xs" fw={700} c="orange.3">
+              $ {formatNumber(liquidacion.valor_por_tonelada)}/t
+            </Text>
+          </Text>
+          <Divider orientation="vertical" />
+          <Text size="xs" c="gray">
+            Deducciones{" "}
+            <Text span size="xs" fw={700} c="lime.3">
+              $ {formatNumber(liquidacion.total_deducciones)}
+            </Text>
+          </Text>
+        </Group>
+      </div>
+
+      <Group gap={4} wrap="nowrap">
+        <Text size="sm" fw={700} c="lime.3">
+          $ {formatNumber(liquidacion.neto)}
+        </Text>
+        <Button
+          variant="subtle"
+          color="indigo"
+          size="compact-xs"
+          onClick={onEditar}
+          leftSection={<IconPencil size={12} />}
+        >
+          Editar
+        </Button>
+        <Button
+          variant="subtle"
+          color="red"
+          size="compact-xs"
+          onClick={onEliminar}
+          leftSection={<IconTrash size={12} />}
+        >
+          Eliminar
+        </Button>
+        {onToggleFactura && (
+          <Tooltip
+            label={facturaAbierta ? "Ocultar factura" : "Ver factura"}
+            withArrow
+          >
+            <ActionIcon
+              variant="subtle"
+              color="teal"
+              size="md"
+              radius="md"
+              onClick={onToggleFactura}
+            >
+              <IconChevronDown
+                size={16}
+                className={
+                  facturaAbierta
+                    ? "rotate-180 transition-transform"
+                    : "transition-transform"
+                }
+              />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+    </Group>
+
+    {/* La factura de la liquidacion se despliega desde aqui. */}
+    {factura && facturaAbierta && <div className="mt-3">{factura}</div>}
+  </Paper>
+);
+
+/**
  * Ley de un metal: la sigla y el valor en un recuadro horizontal, con su
  * borde coloreado (como en la tabla periodica).
  *
@@ -317,6 +536,11 @@ export const DespachoDetalle = ({
 
   /** Comprobantes de analisis cuya factura esta desplegada. */
   const [comprobantesAbiertos, setComprobantesAbiertos] = useState<number[]>([]);
+
+  /** Comprobante de liquidacion cuya factura esta desplegada. */
+  const [facturaDesplegada, setFacturaDesplegada] = useState<number | null>(
+    null,
+  );
 
   /** Despliega u oculta la factura de un comprobante de analisis. */
   const alternarComprobante = useCallback((idComprobante: number) => {
@@ -1198,130 +1422,83 @@ export const DespachoDetalle = ({
 
               {detalle.liquidaciones.length === 0 ? (
                 <Text size="xs" c="gray" ta="center" py="md">
-                  Sin liquidaciones. Se registran por elemento quimico (oro o
-                  plata) con las leyes acordadas con el cliente.
+                  Sin liquidaciones. Se registran por elemento quimico (oro,
+                  plata, cobre, zinc, arsenico, hierro o plomo) con las leyes
+                  acordadas con el cliente.
                 </Text>
               ) : (
                 <Stack gap="xs">
-                  {detalle.liquidaciones.map((liquidacion) => (
-                    <Paper
-                      key={liquidacion.id_liquidacion_mineral}
-                      p="sm"
-                      radius="md"
-                      className="bg-zinc-900/60 border border-zinc-800/70"
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <div className="min-w-0">
-                          <Group gap="xs">
-                            <Text
-                              size="sm"
-                              fw={700}
-                              c="zinc.100"
-                              className="font-mono"
-                            >
-                              {liquidacion.codigo_liquidacion ?? "Sin codigo"}
-                            </Text>
-                            <Badge
-                              color={
-                                liquidacion.elemento_quimico === "Oro"
-                                  ? "yellow"
-                                  : "gray"
-                              }
-                              variant="light"
-                              size="xs"
-                              radius="sm"
-                            >
-                              {liquidacion.elemento_quimico}
-                            </Badge>
-                            <Badge
-                              color={
-                                liquidacion.estado ===
-                                EstadoLiquidacionMineral.Pagada
-                                  ? "green"
-                                  : liquidacion.estado ===
-                                      EstadoLiquidacionMineral.Aprobada
-                                    ? "indigo"
-                                    : "gray"
-                              }
-                              variant="light"
-                              size="xs"
-                              radius="sm"
-                            >
-                              {liquidacion.estado}
-                            </Badge>
-                          </Group>
-                          <Text size="xs" c="gray" mt={2}>
-                            {liquidacion.cliente ?? "Sin cliente"} ·{" "}
-                            {liquidacion.fecha_liquidacion
-                              ? dayjs(liquidacion.fecha_liquidacion).format(
-                                  "DD/MM/YYYY",
+                  {detalle.liquidaciones.map((liquidacion) => {
+                    const comprobante = detalle.comprobantes_liquidacion.find(
+                      (c) =>
+                        c.id_liquidacion_mineral ===
+                        liquidacion.id_liquidacion_mineral,
+                    );
+                    const abierta =
+                      facturaDesplegada === liquidacion.id_liquidacion_mineral;
+
+                    return (
+                      <TarjetaLiquidacion
+                        key={liquidacion.id_liquidacion_mineral}
+                        liquidacion={liquidacion}
+                        onEditar={() => onEditarLiquidacion(liquidacion)}
+                        onEliminar={() =>
+                          setAEliminar({
+                            titulo: "Eliminar liquidacion",
+                            descripcion:
+                              "Se eliminara la liquidacion y su comprobante (si no tiene pagos).",
+                            accion: () =>
+                              onEliminarLiquidacion(liquidacion),
+                          })
+                        }
+                        onToggleFactura={
+                          comprobante
+                            ? () =>
+                                setFacturaDesplegada(
+                                  abierta
+                                    ? null
+                                    : liquidacion.id_liquidacion_mineral,
                                 )
-                              : "sin fecha"}
-                          </Text>
-                          <Text size="xs" c="gray">
-                            TMS {formatNumber(liquidacion.peso_seco)} t · Neto{" "}
-                            {formatNumber(liquidacion.peso_neto)} t · Ley{" "}
-                            {formatNumber(liquidacion.ley_elemento)} · S/{" "}
-                            {formatNumber(liquidacion.valor_por_tonelada)}/t
-                          </Text>
-                        </div>
-                        <Group gap={4} wrap="nowrap">
-                          <Text size="sm" fw={700} c="lime.3">
-                            S/ {formatNumber(liquidacion.neto)}
-                          </Text>
-                          <Button
-                            variant="subtle"
-                            color="indigo"
-                            size="compact-xs"
-                            onClick={() => onEditarLiquidacion(liquidacion)}
-                            leftSection={<IconPencil size={12} />}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="subtle"
-                            color="red"
-                            size="compact-xs"
-                            onClick={() =>
-                              setAEliminar({
-                                titulo: "Eliminar liquidacion",
-                                descripcion:
-                                  "Se eliminara la liquidacion y su comprobante (si no tiene pagos).",
-                                accion: () =>
-                                  onEliminarLiquidacion(liquidacion),
-                              })
-                            }
-                            leftSection={<IconTrash size={12} />}
-                          >
-                            Eliminar
-                          </Button>
-                        </Group>
-                      </Group>
-                    </Paper>
-                  ))}
+                            : undefined
+                        }
+                        facturaAbierta={abierta}
+                        factura={
+                          comprobante ? (
+                            <ComprobanteCard
+                              comprobante={comprobante}
+                              etiqueta={
+                                comprobante.codigo_liquidacion ?? "Liquidacion"
+                              }
+                              onEditar={() =>
+                                onEditarComprobante(
+                                  "liquidacion",
+                                  comprobante,
+                                )
+                              }
+                              onRegistrarPago={() =>
+                                onRegistrarPago("liquidacion", comprobante)
+                              }
+                              onEliminar={() =>
+                                setAEliminar({
+                                  titulo: "Eliminar comprobante de liquidacion",
+                                  descripcion:
+                                    "Se eliminara el comprobante y sus pagos.",
+                                  accion: () =>
+                                    onEliminarComprobante(
+                                      "liquidacion",
+                                      comprobante,
+                                    ),
+                                })
+                              }
+                            />
+                          ) : null
+                        }
+                      />
+                    );
+                  })}
                 </Stack>
               )}
             </Paper>
-
-            {detalle.comprobantes_liquidacion.map((comprobante) => (
-              <ComprobanteCard
-                key={comprobante.id_comprobante}
-                comprobante={comprobante}
-                etiqueta={comprobante.codigo_liquidacion ?? "Liquidacion"}
-                onEditar={() => onEditarComprobante("liquidacion", comprobante)}
-                onRegistrarPago={() =>
-                  onRegistrarPago("liquidacion", comprobante)
-                }
-                onEliminar={() =>
-                  setAEliminar({
-                    titulo: "Eliminar comprobante de liquidacion",
-                    descripcion: "Se eliminara el comprobante y sus pagos.",
-                    accion: () =>
-                      onEliminarComprobante("liquidacion", comprobante),
-                  })
-                }
-              />
-            ))}
           </Stack>
         </Tabs.Panel>
       </Tabs>

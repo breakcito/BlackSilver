@@ -491,6 +491,10 @@ export const VentaMineralPage = () => {
           <ModalLiquidacion
             close={() => setModalLiquidacion(null)}
             clientes={clientesCatalogo}
+            flete={
+              detalleDe(modalLiquidacion.despacho.id_despacho_mineral)
+                ?.fletes?.[0] ?? null
+            }
             liquidacion={modalLiquidacion.liquidacion}
             onGuardar={async (payload) => {
               const idDespacho = modalLiquidacion.despacho.id_despacho_mineral;

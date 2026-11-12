@@ -32,7 +32,9 @@ export interface RegistrarDespachoRequest {
 export const Schema_Despacho = z.object({
   id_lote_mineral: z.number({ error: "Selecciona el lote a despachar" }).int(),
   id_molino: z.number({ error: "Selecciona el molino de destino" }).int(),
-  fecha_despacho: z.string({ error: "Indica la fecha del despacho" }).min(1),
+  fecha_despacho: z
+    .string({ error: "Indica la fecha del despacho" })
+    .min(1, "Indica la fecha del despacho"),
   cantidad_sacos: z
     .number({ error: "Ingresa la cantidad de sacos" })
     .int("La cantidad de sacos debe ser un número entero")
@@ -81,7 +83,9 @@ export interface RegistrarGastoRequest {
 }
 
 export const Schema_Gasto = z.object({
-  tipo_gasto: z.string({ error: "Selecciona el tipo de gasto" }).min(1),
+  tipo_gasto: z
+    .string({ error: "Selecciona el tipo de gasto" })
+    .min(1, "Selecciona el tipo de gasto"),
   descripcion: z.string().max(500, "Máximo 500 caracteres").nullish(),
   monto: z
     .number({ error: "Ingresa el monto" })
@@ -183,7 +187,9 @@ export const Schema_Analisis = z
       .number({ error: "Selecciona el laboratorio" })
       .int(),
     id_cliente: z.number().int().nullish(),
-    asumido_por: z.string({ error: "Indica quién asume el análisis" }).min(1),
+    asumido_por: z
+    .string({ error: "Indica quién asume el análisis" })
+    .min(1, "Indica quién asume el análisis"),
     codigo_laboratorio: z.string().max(100, "Máximo 100 caracteres").nullish(),
     codigo_cliente: z.string().max(100, "Máximo 100 caracteres").nullish(),
     fecha_analisis: z.string().nullish(),
@@ -237,8 +243,8 @@ export interface RegistrarLiquidacionRequest {
   merma?: number | null;
   ley_elemento?: number | null;
   porcentaje_recuperacion?: number | null;
-  maquila?: number | null;
-  penalidad?: number | null;
+  /** Total de deducciones de la liquidacion. */
+  total_deducciones?: number | null;
   valor_por_tonelada: number;
   porcentaje_igv?: number | null;
   porcentaje_detraccion?: number | null;
@@ -249,13 +255,13 @@ export const Schema_Liquidacion = z.object({
   id_cliente: z.number({ error: "Selecciona el cliente" }).int(),
   codigo_liquidacion: z
     .string({ error: "Ingresa el código de la liquidación" })
-    .min(1),
+    .min(1, "Ingresa el código de la liquidación"),
   elemento_quimico: z
     .string({ error: "Selecciona el elemento químico" })
-    .min(1),
+    .min(1, "Selecciona el elemento químico"),
   fecha_liquidacion: z
     .string({ error: "Indica la fecha de la liquidación" })
-    .min(1),
+    .min(1, "Indica la fecha de la liquidación"),
   peso_humedo: z
     .number({ error: "Ingresa el peso húmedo" })
     .positive("El peso húmedo debe ser mayor a 0"),
@@ -272,8 +278,7 @@ export const Schema_Liquidacion = z.object({
     .min(0, "Entre 0 y 100")
     .max(100, "Entre 0 y 100")
     .nullish(),
-  maquila: z.number().min(0, "No puede ser negativo").nullish(),
-  penalidad: z.number().min(0, "No puede ser negativo").nullish(),
+  total_deducciones: z.number().min(0, "No puede ser negativo").nullish(),
   valor_por_tonelada: z
     .number({ error: "Ingresa el valor por tonelada" })
     .positive("El valor por tonelada debe ser mayor a 0"),
@@ -342,11 +347,13 @@ export interface RegistrarPagoRequest {
 }
 
 export const Schema_Pago = z.object({
-  medio_pago: z.string({ error: "Selecciona el medio de pago" }).min(1),
+  medio_pago: z
+    .string({ error: "Selecciona el medio de pago" })
+    .min(1, "Selecciona el medio de pago"),
   numero_operacion: z.string().max(100, "Máximo 100 caracteres").nullish(),
   fecha_hora_pago: z
     .string({ error: "Indica la fecha y hora del pago" })
-    .min(1),
+    .min(1, "Indica la fecha y hora del pago"),
   monto_pagado: z
     .number({ error: "Ingresa el monto pagado" })
     .positive("El monto debe ser mayor a 0"),

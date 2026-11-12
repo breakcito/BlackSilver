@@ -18,16 +18,28 @@ import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { ElementoQuimicoMineral } from "../../../../shared/enums/venta-mineral/elemento-quimico-mineral";
 import { Schema_Liquidacion } from "../../service/venta-mineral.requests";
-import type { LiquidacionMineralItem } from "../../service/venta-mineral.responses";
+import type {
+  FleteDespachoItem,
+  LiquidacionMineralItem,
+} from "../../service/venta-mineral.responses";
 import { inputClasses } from "../components/input-classes";
 import {
   calcularImportesLiquidacion,
+  DETRACCION_ESTANDAR_POR_DEFECTO,
   IGV_POR_DEFECTO,
 } from "./calculos-despacho";
+
+/** La liquidacion se registra en DOLARES. */
+const SIMBOLO = "$";
 
 interface Props {
   close: () => void;
   clientes: { id_cliente: number; razon_social: string }[];
+  /**
+   * Flete del despacho. Sus pesos de balanza (bruto y tara) precargan los
+   * pesos de la liquidacion: el usuario puede modificarlos.
+   */
+  flete?: FleteDespachoItem | null;
   /** Si viene informada, el modal edita esa liquidacion. */
   liquidacion?: LiquidacionMineralItem | null;
   onGuardar: (payload: {
@@ -36,16 +48,15 @@ interface Props {
     elemento_quimico: string;
     fecha_liquidacion: string;
     peso_humedo: number;
-    tara: number;
-    porcentaje_humedad: number;
-    merma: number;
-    ley_elemento: number;
-    porcentaje_recuperacion: number;
-    maquila: number;
-    penalidad: number;
+    tara: number | null;
+    porcentaje_humedad: number | null;
+    merma: number | null;
+    ley_elemento: number | null;
+    porcentaje_recuperacion: number | null;
+    total_deducciones: number | null;
     valor_por_tonelada: number;
-    porcentaje_igv: number;
-    porcentaje_detraccion: number;
+    porcentaje_igv: number | null;
+    porcentaje_detraccion: number | null;
     observaciones: string | null;
   }) => Promise<boolean>;
 }
@@ -53,13 +64,16 @@ interface Props {
 /**
  * Registro y edicion de una liquidacion de mineral.
  *
- * La liquidacion se registra POR ELEMENTO QUIMICO (oro o plata). Los pesos y
- * los importes se derivan en vivo: el backend los recalcula al guardar con
- * el mismo criterio.
+ * La liquidacion se registra POR ELEMENTO QUIMICO (oro, plata, cobre, zinc,
+ * arsenico, hierro o plomo). Los pesos se precargan con los del ticket de
+ * balanza del flete y el usuario puede ajustarlos.
+ *
+ * Todos los importes van en DOLARES.
  */
 export const ModalLiquidacion = ({
   close,
   clientes,
+  flete,
   liquidacion,
   onGuardar,
 }: Props) => {
@@ -79,12 +93,21 @@ export const ModalLiquidacion = ({
       ? dayjs(liquidacion.fecha_liquidacion).format("YYYY-MM-DD")
       : dayjs().format("YYYY-MM-DD"),
   );
-  const [pesoHumedo, setPesoHumedo] = useState<number | string>(
-    () => liquidacion?.peso_humedo ?? 0,
-  );
-  const [tara, setTara] = useState<number | string>(
-    () => liquidacion?.tara ?? 0,
-  );
+
+  /* ---------------- Pesos ----------------
+   *
+   * Se precargan con el ticket de balanza del flete (peso bruto y tara).
+   * El peso neto siempre se deriva: es el bruto menos la tara (y la humedad
+   * y la merma, si el usuario las digita).
+   */
+  const [pesoHumedo, setPesoHumedo] = useState<number | string>(() => {
+    if (liquidacion) return liquidacion.peso_humedo ?? 0;
+    return Number(flete?.peso_bruto ?? 0);
+  });
+  const [tara, setTara] = useState<number | string>(() => {
+    if (liquidacion) return liquidacion.tara ?? 0;
+    return Number(flete?.tara ?? 0);
+  });
   const [porcentajeHumedad, setPorcentajeHumedad] = useState<number | string>(
     () => liquidacion?.porcentaje_humedad ?? 0,
   );
@@ -97,11 +120,10 @@ export const ModalLiquidacion = ({
   const [porcentajeRecuperacion, setPorcentajeRecuperacion] = useState<
     number | string
   >(() => liquidacion?.porcentaje_recuperacion ?? 0);
-  const [maquila, setMaquila] = useState<number | string>(
-    () => liquidacion?.maquila ?? 0,
-  );
-  const [penalidad, setPenalidad] = useState<number | string>(
-    () => liquidacion?.penalidad ?? 0,
+
+  /* ---------------- Valor ---------------- */
+  const [totalDeducciones, setTotalDeducciones] = useState<number | string>(
+    () => liquidacion?.total_deducciones ?? 0,
   );
   const [valorPorTonelada, setValorPorTonelada] = useState<number | string>(
     () => liquidacion?.valor_por_tonelada ?? 0,
@@ -111,16 +133,13 @@ export const ModalLiquidacion = ({
   );
   const [porcentajeDetraccion, setPorcentajeDetraccion] = useState<
     number | string
-  >(
-    () => liquidacion?.porcentaje_detraccion ?? 10,
-  );
+  >(() => liquidacion?.porcentaje_detraccion ?? DETRACCION_ESTANDAR_POR_DEFECTO);
   const [observaciones, setObservaciones] = useState(
     () => liquidacion?.observaciones ?? "",
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Importes en vivo: el backend aplica exactamente el mismo criterio.
   const importes = useMemo(
     () =>
       calcularImportesLiquidacion({
@@ -128,8 +147,7 @@ export const ModalLiquidacion = ({
         tara: Number(tara) || 0,
         porcentaje_humedad: Number(porcentajeHumedad) || 0,
         merma: Number(merma) || 0,
-        maquila: Number(maquila) || 0,
-        penalidad: Number(penalidad) || 0,
+        total_deducciones: Number(totalDeducciones) || 0,
         valor_por_tonelada: Number(valorPorTonelada) || 0,
         porcentaje_igv: Number(porcentajeIgv) || 0,
         porcentaje_detraccion: Number(porcentajeDetraccion) || 0,
@@ -139,8 +157,7 @@ export const ModalLiquidacion = ({
       tara,
       porcentajeHumedad,
       merma,
-      maquila,
-      penalidad,
+      totalDeducciones,
       valorPorTonelada,
       porcentajeIgv,
       porcentajeDetraccion,
@@ -152,7 +169,7 @@ export const ModalLiquidacion = ({
 
     const payload = {
       id_cliente: Number(idCliente),
-      codigo_liquidacion: codigo.trim(),
+      codigo_liquidacion: codigo.trim().toUpperCase(),
       elemento_quimico: elemento,
       fecha_liquidacion: fecha,
       peso_humedo: Number(pesoHumedo) || 0,
@@ -161,8 +178,7 @@ export const ModalLiquidacion = ({
       merma: Number(merma) || 0,
       ley_elemento: Number(ley) || 0,
       porcentaje_recuperacion: Number(porcentajeRecuperacion) || 0,
-      maquila: Number(maquila) || 0,
-      penalidad: Number(penalidad) || 0,
+      total_deducciones: Number(totalDeducciones) || 0,
       valor_por_tonelada: Number(valorPorTonelada) || 0,
       porcentaje_igv: Number(porcentajeIgv) || 0,
       porcentaje_detraccion: Number(porcentajeDetraccion) || 0,
@@ -257,12 +273,20 @@ export const ModalLiquidacion = ({
         labelPosition="left"
       />
 
+      {flete && !esEdicion && (
+        <Text size="xs" c="dimmed">
+          Pesos precargados del ticket de balanza del flete
+          {flete.placa ? ` ${flete.placa}` : ""}: bruto{" "}
+          {formatNumber(flete.peso_bruto)} t, tara{" "}
+          {formatNumber(flete.tara)} t. Puedes ajustarlos.
+        </Text>
+      )}
+
       <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
         <NumberInput
           label="Peso humedo (t)"
           value={pesoHumedo}
           onChange={setPesoHumedo}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -274,7 +298,6 @@ export const ModalLiquidacion = ({
           label="Tara (t)"
           value={tara}
           onChange={setTara}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -286,7 +309,6 @@ export const ModalLiquidacion = ({
           value={porcentajeHumedad}
           onChange={setPorcentajeHumedad}
           max={100}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -297,7 +319,6 @@ export const ModalLiquidacion = ({
           label="Peso seco TMS (t)"
           value={importes.peso_seco}
           onChange={() => {}}
-          fixedDecimalScale
           hideControls
           readOnly
           disabled
@@ -309,7 +330,6 @@ export const ModalLiquidacion = ({
           label="Merma (t)"
           value={merma}
           onChange={setMerma}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -320,7 +340,6 @@ export const ModalLiquidacion = ({
           label="Peso neto (t)"
           value={importes.peso_neto}
           onChange={() => {}}
-          fixedDecimalScale
           hideControls
           readOnly
           disabled
@@ -332,10 +351,9 @@ export const ModalLiquidacion = ({
 
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <NumberInput
-          label="Ley acordada"
+          label="Ley del elemento (oz)"
           value={ley}
           onChange={setLey}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -347,7 +365,6 @@ export const ModalLiquidacion = ({
           value={porcentajeRecuperacion}
           onChange={setPorcentajeRecuperacion}
           max={100}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -366,12 +383,11 @@ export const ModalLiquidacion = ({
         labelPosition="left"
       />
 
-      <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
+      <SimpleGrid cols={{ base: 2, md: 3 }} spacing="sm">
         <NumberInput
-          label="Maquila (S/)"
-          value={maquila}
-          onChange={setMaquila}
-          fixedDecimalScale
+          label={`Total de deducciones (${SIMBOLO})`}
+          value={totalDeducciones}
+          onChange={setTotalDeducciones}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -379,33 +395,9 @@ export const ModalLiquidacion = ({
           radius="lg"
         />
         <NumberInput
-          label="Penalidad (S/)"
-          value={penalidad}
-          onChange={setPenalidad}
-          fixedDecimalScale
-          hideControls
-          disabled={saving}
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
-        />
-        <NumberInput
-          label="Total de deducciones"
-          value={importes.total_deducciones}
-          onChange={() => {}}
-          fixedDecimalScale
-          hideControls
-          readOnly
-          disabled
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
-        />
-        <NumberInput
-          label="Valor por tonelada"
+          label={`Valor por tonelada (${SIMBOLO})`}
           value={valorPorTonelada}
           onChange={setValorPorTonelada}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -418,7 +410,6 @@ export const ModalLiquidacion = ({
           value={porcentajeIgv}
           onChange={setPorcentajeIgv}
           max={100}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -427,11 +418,9 @@ export const ModalLiquidacion = ({
         />
         <NumberInput
           label="Detraccion (%)"
-         
           value={porcentajeDetraccion}
           onChange={setPorcentajeDetraccion}
           max={100}
-          fixedDecimalScale
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -451,32 +440,38 @@ export const ModalLiquidacion = ({
         <SimpleGrid cols={{ base: 2, md: 4 }} spacing="sm">
           <Text size="xs" c="gray">
             Subtotal
-            <Text size="sm" fw={700} c="zinc.200">
-              S/ {formatNumber(importes.subtotal)}
+            <Text size="sm" fw={600} c="zinc.200">
+              {SIMBOLO} {formatNumber(importes.subtotal)}
             </Text>
           </Text>
           <Text size="xs" c="gray">
             IGV
-            <Text size="sm" fw={700} c="zinc.200">
-              S/ {formatNumber(importes.igv)}
+            <Text size="sm" fw={600} c="zinc.200">
+              {SIMBOLO} {formatNumber(importes.igv)}
             </Text>
           </Text>
           <Text size="xs" c="gray">
             Total
             <Text size="sm" fw={700} c="indigo.3">
-              S/ {formatNumber(importes.total)}
+              {SIMBOLO} {formatNumber(importes.total)}
+            </Text>
+          </Text>
+          <Text size="xs" c="gray">
+            Deducciones
+            <Text size="sm" fw={600} c="orange.3">
+              {SIMBOLO} {formatNumber(importes.total_deducciones)}
             </Text>
           </Text>
           <Text size="xs" c="gray">
             Detraccion
-            <Text size="sm" fw={700} c="orange.3">
-              S/ {formatNumber(importes.detraccion)}
+            <Text size="sm" fw={600} c="orange.3">
+              {SIMBOLO} {formatNumber(importes.detraccion)}
             </Text>
           </Text>
           <Text size="xs" c="gray">
             Neto
             <Text size="sm" fw={800} c="lime.3">
-              S/ {formatNumber(importes.neto)}
+              {SIMBOLO} {formatNumber(importes.neto)}
             </Text>
           </Text>
         </SimpleGrid>
@@ -486,9 +481,7 @@ export const ModalLiquidacion = ({
         label="Observaciones"
         placeholder="Notas de la liquidacion..."
         value={observaciones}
-        onChange={(e) =>
-          setObservaciones(e.currentTarget.value.toUpperCase())
-        }
+        onChange={(e) => setObservaciones(e.currentTarget.value.toUpperCase())}
         autosize
         minRows={2}
         maxRows={4}

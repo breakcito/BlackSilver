@@ -193,14 +193,15 @@ export interface ImportesLiquidacion {
  * peso_neto        = peso seco - merma
  * subtotal         = (peso neto x valor por tonelada) - deducciones
  * detraccion       = round(total x %detraccion)   <- ENTEROS
+ *
+ * La liquidacion se registra en DOLARES.
  */
 export const calcularImportesLiquidacion = (params: {
   peso_humedo: number;
   tara: number;
   porcentaje_humedad: number;
   merma: number;
-  maquila: number;
-  penalidad: number;
+  total_deducciones: number;
   valor_por_tonelada: number;
   porcentaje_igv: number;
   porcentaje_detraccion: number;
@@ -224,9 +225,8 @@ export const calcularImportesLiquidacion = (params: {
   const pesoNetoMil = Math.max(0, pesoSecoMil - mermaMil);
   const pesoNeto = pesoNetoMil / 1000;
 
-  const maquilaCentavos = aCentavos(Number(params.maquila) || 0);
-  const penalidadCentavos = aCentavos(Number(params.penalidad) || 0);
-  const totalDeducciones = (maquilaCentavos + penalidadCentavos) / 100;
+  const totalDeducciones = Number(params.total_deducciones) || 0;
+  const deduccionesCentavos = aCentavos(totalDeducciones);
 
   const valorPorTonelada = Number(params.valor_por_tonelada) || 0;
 
@@ -235,10 +235,7 @@ export const calcularImportesLiquidacion = (params: {
   const valorCentavos = aCentavos(valorPorTonelada);
   const productoCentavos = Math.round((pesoNetoMil * valorCentavos) / 1000);
 
-  const subtotalCentavos = Math.max(
-    0,
-    productoCentavos - maquilaCentavos - penalidadCentavos,
-  );
+  const subtotalCentavos = Math.max(0, productoCentavos - deduccionesCentavos);
   const subtotal = subtotalCentavos / 100;
 
   const igv = calcularIgv(subtotal, Number(params.porcentaje_igv) || 0);
