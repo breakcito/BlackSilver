@@ -187,6 +187,8 @@ export interface AnalisisLaboratorioItem {
   ley_cobre: number;
   ley_zinc: number;
   ley_arsenico: number;
+  ley_hierro: number;
+  ley_plomo: number;
   costo_servicio: number;
   created_at: string | null;
   laboratorio: string | null;

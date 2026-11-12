@@ -11,7 +11,14 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconDeviceFloppy, IconPlus, IconX } from "@tabler/icons-react";
+import {
+  IconCash,
+  IconDeviceFloppy,
+  IconDroplet,
+  IconFlask,
+  IconPlus,
+  IconX,
+} from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
@@ -47,6 +54,8 @@ interface Props {
     ley_cobre: number;
     ley_zinc: number;
     ley_arsenico: number;
+    ley_hierro: number;
+    ley_plomo: number;
     costo_servicio: number;
     evidencias?: File[];
   }) => Promise<boolean>;
@@ -110,6 +119,12 @@ export const ModalAnalisis = ({
   const [leyArsenico, setLeyArsenico] = useState<number | string>(
     () => analisis?.ley_arsenico ?? 0,
   );
+  const [leyHierro, setLeyHierro] = useState<number | string>(
+    () => analisis?.ley_hierro ?? 0,
+  );
+  const [leyPlomo, setLeyPlomo] = useState<number | string>(
+    () => analisis?.ley_plomo ?? 0,
+  );
   const [costoServicio, setCostoServicio] = useState<number | string>(
     () => analisis?.costo_servicio ?? 0,
   );
@@ -153,6 +168,8 @@ export const ModalAnalisis = ({
       ley_cobre: Number(leyCobre) || 0,
       ley_zinc: Number(leyZinc) || 0,
       ley_arsenico: Number(leyArsenico) || 0,
+      ley_hierro: Number(leyHierro) || 0,
+      ley_plomo: Number(leyPlomo) || 0,
       costo_servicio: Number(costoServicio) || 0,
     };
 
@@ -304,12 +321,15 @@ export const ModalAnalisis = ({
         />
       </SimpleGrid>
 
+      {/* Leyes: van en onzas y cada una con su icono (la botellita del
+          laboratorio) en un color distinto para distinguirlas de un vistazo.
+          Al final van la humedad y el costo del servicio. */}
       <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
         <NumberInput
-          label="Ley de oro"
+          label="Ley de oro (oz)"
           value={leyOro}
           onChange={setLeyOro}
-          fixedDecimalScale
+          leftSection={<IconFlask size={14} className="text-yellow-400" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -317,10 +337,10 @@ export const ModalAnalisis = ({
           radius="lg"
         />
         <NumberInput
-          label="Ley de plata"
+          label="Ley de plata (oz)"
           value={leyPlata}
           onChange={setLeyPlata}
-          fixedDecimalScale
+          leftSection={<IconFlask size={14} className="text-pink-300" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -328,10 +348,10 @@ export const ModalAnalisis = ({
           radius="lg"
         />
         <NumberInput
-          label="Ley de cobre"
+          label="Ley de cobre (oz)"
           value={leyCobre}
           onChange={setLeyCobre}
-          fixedDecimalScale
+          leftSection={<IconFlask size={14} className="text-orange-400" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -339,10 +359,10 @@ export const ModalAnalisis = ({
           radius="lg"
         />
         <NumberInput
-          label="Ley de zinc"
+          label="Ley de zinc (oz)"
           value={leyZinc}
           onChange={setLeyZinc}
-          fixedDecimalScale
+          leftSection={<IconFlask size={14} className="text-teal-300" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -350,10 +370,32 @@ export const ModalAnalisis = ({
           radius="lg"
         />
         <NumberInput
-          label="Ley de arsenico"
+          label="Ley de arsenico (oz)"
           value={leyArsenico}
           onChange={setLeyArsenico}
-          fixedDecimalScale
+          leftSection={<IconFlask size={14} className="text-purple-400" />}
+          hideControls
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+        <NumberInput
+          label="Ley de hierro (oz)"
+          value={leyHierro}
+          onChange={setLeyHierro}
+          leftSection={<IconFlask size={14} className="text-sky-400" />}
+          hideControls
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+        <NumberInput
+          label="Ley de plomo (oz)"
+          value={leyPlomo}
+          onChange={setLeyPlomo}
+          leftSection={<IconFlask size={14} className="text-indigo-400" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -364,8 +406,19 @@ export const ModalAnalisis = ({
           label="% de humedad"
           value={porcentajeHumedad}
           onChange={setPorcentajeHumedad}
+          leftSection={<IconDroplet size={14} className="text-cyan-400" />}
           max={100}
-          fixedDecimalScale
+          hideControls
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+        <NumberInput
+          label="Costo del servicio (S/)"
+          value={costoServicio}
+          onChange={setCostoServicio}
+          leftSection={<IconCash size={14} className="text-emerald-400" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}
@@ -373,20 +426,6 @@ export const ModalAnalisis = ({
           radius="lg"
         />
       </SimpleGrid>
-
-      <NumberInput
-        label="Costo del servicio (S/)"
-        value={costoServicio}
-        onChange={setCostoServicio}
-        
-        fixedDecimalScale
-        
-        hideControls
-        disabled={saving}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-      />
 
       <MultiFilePicker
         label="Evidencias del analisis"

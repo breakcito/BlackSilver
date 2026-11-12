@@ -114,19 +114,6 @@ export const ModalComprobanteMolienda = ({
         </Alert>
       )}
 
-      <NumberInput
-        label="Monto de la molienda (S/)"
-        value={monto}
-        onChange={setMonto}
-        fixedDecimalScale
-        hideControls
-        disabled={saving}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-        required
-      />
-
       <ComprobanteFormPanel
         codigo={codigo}
         setCodigo={setCodigo}
@@ -140,6 +127,20 @@ export const ModalComprobanteMolienda = ({
         setPorcentajeIgv={setPorcentajeIgv}
         importes={importes}
         disabled={saving}
+        igvEnFila2
+        campoFila1={
+          <NumberInput
+            label="Monto de la molienda (S/)"
+            value={monto}
+            onChange={setMonto}
+            hideControls
+            disabled={saving}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            required
+          />
+        }
       />
 
       <MultiFilePicker

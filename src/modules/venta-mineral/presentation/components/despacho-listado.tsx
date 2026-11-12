@@ -53,6 +53,8 @@ interface Props {
   onRegistrarComprobante: (
     despacho: DespachoMineralResumen,
     tipo: TipoComprobanteDespacho,
+    /** Analisis concretos a facturar (opcional). */
+    analisis?: AnalisisLaboratorioItem[],
   ) => void;
   onEditarComprobante: (
     despacho: DespachoMineralResumen,
@@ -400,8 +402,8 @@ export const DespachoListado = ({
                 onEditarFlete={(flete) => onEditarFlete(record, flete)}
                 onRegistrarBalanza={(flete) => onRegistrarBalanza(record, flete)}
                 onEliminarFlete={(flete) => onEliminarFlete(record, flete)}
-                onRegistrarComprobante={(tipo) =>
-                  onRegistrarComprobante(record, tipo)
+                onRegistrarComprobante={(tipo, analisis) =>
+                  onRegistrarComprobante(record, tipo, analisis)
                 }
                 onEditarComprobante={(tipo, comprobante) =>
                   onEditarComprobante(record, tipo, comprobante)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -16,6 +16,8 @@ import {
 } from "@mantine/core";
 import {
   IconArrowLeft,
+  IconChevronDown,
+  IconDroplet,
   IconFlask,
   IconPencil,
   IconPlus,
@@ -53,7 +55,11 @@ interface Props {
   onEditarFlete: (flete: FleteDespachoItem) => void;
   onRegistrarBalanza: (flete: FleteDespachoItem) => void;
   onEliminarFlete: (flete: FleteDespachoItem) => void;
-  onRegistrarComprobante: (tipo: TipoComprobanteDespacho) => void;
+  onRegistrarComprobante: (
+    tipo: TipoComprobanteDespacho,
+    /** Analisis concretos a facturar (opcional). */
+    analisis?: AnalisisLaboratorioItem[],
+  ) => void;
   onEditarComprobante: (
     tipo: TipoComprobanteDespacho,
     comprobante: ComprobanteDespachoItem,
@@ -73,6 +79,201 @@ interface Props {
   onEditarLiquidacion: (liquidacion: LiquidacionMineralItem) => void;
   onEliminarLiquidacion: (liquidacion: LiquidacionMineralItem) => void;
 }
+
+/**
+ * Ley de un metal: la sigla y el valor en un recuadro horizontal, con su
+ * borde coloreado (como en la tabla periodica).
+ *
+ * Los colores son los mismos que los de los inputs del modal de analisis.
+ * Una ley en cero no se dibuja: solo ocupa espacio.
+ */
+const LeyCuadro = ({
+  sigla,
+  valor,
+  color,
+}: {
+  sigla: string;
+  valor: number;
+  color: string;
+}) => {
+  if (!valor) return null;
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center gap-1 h-7 px-2 rounded border text-[10px] font-bold leading-none ${color}`}
+    >
+      <span>{sigla}</span>
+      <span className="font-mono">{formatNumber(valor)}</span>
+    </span>
+  );
+};
+
+/**
+ * Tarjeta de un analisis dentro del listado del despacho.
+ */
+const TarjetaAnalisis = ({
+  analisis,
+  comprobante,
+  onEditar,
+  onEliminar,
+  onVerFactura,
+  facturaAbierta,
+}: {
+  analisis: AnalisisLaboratorioItem;
+  /** Comprobante que lo cubre (si ya esta facturado). */
+  comprobante?: ComprobanteDespachoItem | null;
+  onEditar: () => void;
+  onEliminar: () => void;
+  /** Abre la factura del comprobante que lo cubre (solo si ya esta facturado). */
+  onVerFactura?: () => void;
+  facturaAbierta?: boolean;
+}) => (
+  <Paper
+    p="sm"
+    radius="md"
+    className="bg-zinc-900/60 border border-zinc-800/70"
+  >
+    <Group justify="space-between" wrap="nowrap" align="flex-start">
+      <div className="min-w-0">
+        {/* Codigo, badges y datos del laboratorio en la misma linea */}
+        <Group gap="xs" align="center" wrap="wrap">
+          <Text size="sm" fw={700} c="zinc.100" className="font-mono">
+            {analisis.codigo_cliente ?? "Sin codigo"}
+          </Text>
+          <Badge
+            color={analisis.asumido_por === "Propio" ? "indigo" : "gray"}
+            variant="light"
+            size="xs"
+            radius="sm"
+          >
+            {analisis.asumido_por === "Propio"
+              ? "Asume la empresa"
+              : "Asume el cliente"}
+          </Badge>
+          {analisis.id_comprobante_analisis_despacho && (
+            <Badge color="teal" variant="light" size="xs" radius="sm">
+              Facturado
+            </Badge>
+          )}
+          {comprobante?.codigo_comprobante && (
+            <Badge color="pink" variant="light" size="xs" radius="sm">
+              {comprobante.codigo_comprobante}
+            </Badge>
+          )}
+          <Text size="xs" c="zinc.600">
+            |
+          </Text>
+          <Text size="xs" c="zinc.300" truncate>
+            {analisis.laboratorio ?? "Sin laboratorio"} · Cod. lab.{" "}
+            <Text span size="xs" c="gray">
+              {analisis.codigo_laboratorio ?? "-"}
+            </Text>
+            {analisis.fecha_analisis ? (
+              <>
+                {" · "}
+                <Text span size="xs" fw={600} c="teal.3">
+                  {dayjs(analisis.fecha_analisis).format("DD/MM/YYYY")}
+                </Text>
+              </>
+            ) : null}
+          </Text>
+        </Group>
+
+        {/* Leyes: una sigla por cuadradito, con su color */}
+        <Group gap="xs" mt={8} align="center" wrap="wrap">
+          <LeyCuadro
+            sigla="Au"
+            valor={Number(analisis.ley_oro ?? 0)}
+            color="border-yellow-400/60 text-yellow-400"
+          />
+          <LeyCuadro
+            sigla="Ag"
+            valor={Number(analisis.ley_plata ?? 0)}
+            color="border-pink-300/60 text-pink-300"
+          />
+          <LeyCuadro
+            sigla="Cu"
+            valor={Number(analisis.ley_cobre ?? 0)}
+            color="border-orange-400/60 text-orange-400"
+          />
+          <LeyCuadro
+            sigla="Zn"
+            valor={Number(analisis.ley_zinc ?? 0)}
+            color="border-teal-300/60 text-teal-300"
+          />
+          <LeyCuadro
+            sigla="As"
+            valor={Number(analisis.ley_arsenico ?? 0)}
+            color="border-purple-400/60 text-purple-400"
+          />
+          <LeyCuadro
+            sigla="Fe"
+            valor={Number(analisis.ley_hierro ?? 0)}
+            color="border-sky-400/60 text-sky-400"
+          />
+          <LeyCuadro
+            sigla="Pb"
+            valor={Number(analisis.ley_plomo ?? 0)}
+            color="border-indigo-400/60 text-indigo-400"
+          />
+          {Number(analisis.porcentaje_humedad) > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-400">
+              <IconDroplet size={14} className="text-cyan-400" />
+              Humedad {formatNumber(analisis.porcentaje_humedad)}%
+            </span>
+          )}
+        </Group>
+      </div>
+
+      <Group gap={4} wrap="nowrap">
+        <Text size="sm" fw={700} c="orange.3">
+          S/ {formatNumber(analisis.costo_servicio)}
+        </Text>
+        <Button
+          variant="subtle"
+          color="indigo"
+          size="compact-xs"
+          onClick={onEditar}
+          leftSection={<IconPencil size={12} />}
+        >
+          Editar
+        </Button>
+        <Button
+          variant="subtle"
+          color="red"
+          size="compact-xs"
+          onClick={onEliminar}
+          leftSection={<IconTrash size={12} />}
+        >
+          Eliminar
+        </Button>
+        {onVerFactura && (
+          <Tooltip
+            label={facturaAbierta ? "Ocultar factura" : "Ver factura"}
+            withArrow
+          >
+            <ActionIcon
+              variant="subtle"
+              color="teal"
+              size="md"
+              radius="md"
+              onClick={onVerFactura}
+            >
+              <IconChevronDown
+                size={16}
+                className={
+                  facturaAbierta
+                    ? "rotate-180 transition-transform"
+                    : "transition-transform"
+                }
+              />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+    </Group>
+  </Paper>
+);
 
 /**
  * Detalle de un despacho de mineral.
@@ -114,11 +315,72 @@ export const DespachoDetalle = ({
     null,
   );
 
+  /** Comprobantes de analisis cuya factura esta desplegada. */
+  const [comprobantesAbiertos, setComprobantesAbiertos] = useState<number[]>([]);
+
+  /** Despliega u oculta la factura de un comprobante de analisis. */
+  const alternarComprobante = useCallback((idComprobante: number) => {
+    setComprobantesAbiertos((prev) =>
+      prev.includes(idComprobante)
+        ? prev.filter((id) => id !== idComprobante)
+        : [...prev, idComprobante],
+    );
+  }, []);
+
   /**
    * Flete del despacho. El mineral se lleva en una sola unidad, asi que el
    * despacho tiene un unico flete.
    */
   const flete = detalle.fletes[0] ?? null;
+
+  /* ---------------- Agrupacion de analisis ----------------
+   *
+   * Los analisis se separan en tres grupos: los de la empresa que aun no se
+   * facturan (los unicos facturables), los de la empresa ya facturados (por
+   * comprobante) y los que asume el cliente (no se facturan).
+   */
+
+  const analisisEmpresa = useMemo(
+    () => detalle.analisis.filter((a) => a.asumido_por === "Propio"),
+    [detalle.analisis],
+  );
+
+  const analisisCliente = useMemo(
+    () => detalle.analisis.filter((a) => a.asumido_por !== "Propio"),
+    [detalle.analisis],
+  );
+
+  const analisisSinFacturar = useMemo(
+    () =>
+      analisisEmpresa.filter((a) => !a.id_comprobante_analisis_despacho),
+    [analisisEmpresa],
+  );
+
+  const analisisFacturados = useMemo(
+    () => analisisEmpresa.filter((a) => !!a.id_comprobante_analisis_despacho),
+    [analisisEmpresa],
+  );
+
+  /** Analisis de la empresa agrupados por el comprobante que los factura. */
+  const analisisPorComprobante = useMemo(() => {
+    const porComprobante = new Map<number, AnalisisLaboratorioItem[]>();
+
+    analisisFacturados.forEach((analisis) => {
+      const id = analisis.id_comprobante_analisis_despacho as number;
+      porComprobante.set(id, [...(porComprobante.get(id) ?? []), analisis]);
+    });
+
+    return Array.from(porComprobante.entries());
+  }, [analisisFacturados]);
+
+  /** Comprobante que factura un grupo de analisis. */
+  const comprobanteDeAnalisis = useCallback(
+    (idComprobante: number) =>
+      detalle.comprobantes_analisis.find(
+        (c) => c.id_comprobante === idComprobante,
+      ),
+    [detalle.comprobantes_analisis],
+  );
 
   const totalGastado =
     (detalle.total_gastos ?? 0) +
@@ -665,31 +927,16 @@ export const DespachoDetalle = ({
                 <Text size="sm" fw={700} c="white">
                   Analisis de laboratorio
                 </Text>
-                <Group gap="xs">
-                  <Button
-                    size="compact-xs"
-                    radius="md"
-                    variant="light"
-                    color="indigo"
-                    leftSection={<IconPlus size={12} />}
-                    onClick={onRegistrarAnalisis}
-                  >
-                    Registrar analisis
-                  </Button>
-                  {detalle.comprobantes_analisis.length === 0 &&
-                    detalle.analisis.length > 0 && (
-                      <Button
-                        size="compact-xs"
-                        radius="md"
-                        variant="light"
-                        color="teal"
-                        leftSection={<IconReceipt size={12} />}
-                        onClick={() => onRegistrarComprobante("analisis")}
-                      >
-                        Facturar analisis
-                      </Button>
-                    )}
-                </Group>
+                <Button
+                  size="compact-xs"
+                  radius="md"
+                  variant="light"
+                  color="indigo"
+                  leftSection={<IconPlus size={12} />}
+                  onClick={onRegistrarAnalisis}
+                >
+                  Registrar analisis
+                </Button>
               </Group>
 
               {detalle.analisis.length === 0 ? (
@@ -698,84 +945,55 @@ export const DespachoDetalle = ({
                   leyes y el costo del servicio.
                 </Text>
               ) : (
-                <Stack gap="xs">
-                  {detalle.analisis.map((analisis) => (
-                    <Paper
-                      key={analisis.id_analisis_laboratorio}
-                      p="sm"
-                      radius="md"
-                      className="bg-zinc-900/60 border border-zinc-800/70"
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <div className="min-w-0">
-                          <Group gap="xs">
-                            <Text
-                              size="sm"
-                              fw={700}
-                              c="zinc.100"
-                              className="font-mono"
-                            >
-                              {analisis.codigo_cliente ?? "Sin codigo"}
-                            </Text>
-                            <Badge
-                              color={
-                                analisis.asumido_por === "Propio"
-                                  ? "indigo"
-                                  : "gray"
-                              }
-                              variant="light"
-                              size="xs"
-                              radius="sm"
-                            >
-                              {analisis.asumido_por === "Propio"
-                                ? "Asume la empresa"
-                                : "Asume el cliente"}
-                            </Badge>
-                            {analisis.id_comprobante_analisis_despacho && (
-                              <Badge
-                                color="teal"
-                                variant="light"
-                                size="xs"
-                                radius="sm"
-                              >
-                                Facturado
-                              </Badge>
-                            )}
-                          </Group>
-                          <Text size="xs" c="gray" mt={2}>
-                            {analisis.laboratorio ?? "Sin laboratorio"} · Cod.
-                            lab. {analisis.codigo_laboratorio ?? "-"}
-                            {analisis.fecha_analisis
-                              ? ` · ${dayjs(analisis.fecha_analisis).format("DD/MM/YYYY")}`
-                              : ""}
-                          </Text>
-                          <Text size="xs" c="gray">
-                            Au {formatNumber(analisis.ley_oro)} · Ag{" "}
-                            {formatNumber(analisis.ley_plata)} · Cu{" "}
-                            {formatNumber(analisis.ley_cobre)} · Zn{" "}
-                            {formatNumber(analisis.ley_zinc)} · As{" "}
-                            {formatNumber(analisis.ley_arsenico)} · Humedad{" "}
-                            {formatNumber(analisis.porcentaje_humedad)}%
-                          </Text>
-                        </div>
-                        <Group gap={4} wrap="nowrap">
-                          <Text size="sm" fw={700} c="orange.3">
-                            S/ {formatNumber(analisis.costo_servicio)}
-                          </Text>
-                          <Button
-                            variant="subtle"
-                            color="indigo"
-                            size="compact-xs"
-                            onClick={() => onEditarAnalisis(analisis)}
-                            leftSection={<IconPencil size={12} />}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="subtle"
-                            color="red"
-                            size="compact-xs"
-                            onClick={() =>
+                <Stack gap="md">
+                  {/* GRUPO 1: analisis de la empresa sin facturar */}
+                  <Paper
+                    p="sm"
+                    radius="md"
+                    className="bg-zinc-950/40 border border-zinc-800"
+                  >
+                    <Group justify="space-between" mb="xs">
+                      <Group gap="xs">
+                        <Text size="xs" fw={700} c="indigo.3">
+                          De la empresa · sin facturar
+                        </Text>
+                        <Badge
+                          color="indigo"
+                          variant="light"
+                          size="xs"
+                          radius="sm"
+                        >
+                          {analisisSinFacturar.length}
+                        </Badge>
+                      </Group>
+                      {analisisSinFacturar.length > 0 && (
+                        <Button
+                          size="compact-xs"
+                          radius="md"
+                          variant="light"
+                          color="teal"
+                          leftSection={<IconReceipt size={12} />}
+                          onClick={() =>
+                            onRegistrarComprobante("analisis", analisisSinFacturar)
+                          }
+                        >
+                          Facturar analisis
+                        </Button>
+                      )}
+                    </Group>
+
+                    {analisisSinFacturar.length === 0 ? (
+                      <Text size="xs" c="dimmed">
+                        No hay analisis de la empresa pendientes de facturar.
+                      </Text>
+                    ) : (
+                      <Stack gap="xs">
+                        {analisisSinFacturar.map((analisis) => (
+                          <TarjetaAnalisis
+                            key={analisis.id_analisis_laboratorio}
+                            analisis={analisis}
+                            onEditar={() => onEditarAnalisis(analisis)}
+                            onEliminar={() =>
                               setAEliminar({
                                 titulo: "Eliminar analisis",
                                 descripcion:
@@ -783,36 +1001,158 @@ export const DespachoDetalle = ({
                                 accion: () => onEliminarAnalisis(analisis),
                               })
                             }
-                            leftSection={<IconTrash size={12} />}
-                          >
-                            Eliminar
-                          </Button>
-                        </Group>
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                  </Paper>
+
+                  {/* GRUPO 2: analisis de la empresa ya facturados */}
+                  {analisisFacturados.length > 0 && (
+                    <Paper
+                      p="sm"
+                      radius="md"
+                      className="bg-zinc-950/40 border border-zinc-800"
+                    >
+                      <Group gap="xs" mb="xs">
+                        <Text size="xs" fw={700} c="teal.3">
+                          De la empresa · facturados
+                        </Text>
+                        <Badge
+                          color="teal"
+                          variant="light"
+                          size="xs"
+                          radius="sm"
+                        >
+                          {analisisFacturados.length}
+                        </Badge>
                       </Group>
+
+                      <Stack gap="xs">
+                        {analisisPorComprobante.map(
+                          ([idComprobante, lista]) => {
+                            const comprobante = comprobanteDeAnalisis(
+                              idComprobante,
+                            );
+                            const abierto =
+                              comprobantesAbiertos.includes(idComprobante);
+
+                            return (
+                              <div key={idComprobante}>
+                                <Stack gap="xs">
+                                  {lista.map((analisis) => (
+                                    <TarjetaAnalisis
+                                      key={
+                                        analisis.id_analisis_laboratorio
+                                      }
+                                      analisis={analisis}
+                                      comprobante={comprobante}
+                                      onEditar={() =>
+                                        onEditarAnalisis(analisis)
+                                      }
+                                      onEliminar={() =>
+                                        setAEliminar({
+                                          titulo: "Eliminar analisis",
+                                          descripcion:
+                                            "Se eliminara el analisis del despacho.",
+                                          accion: () =>
+                                            onEliminarAnalisis(analisis),
+                                        })
+                                      }
+                                      onVerFactura={() =>
+                                        alternarComprobante(idComprobante)
+                                      }
+                                      facturaAbierta={abierto}
+                                    />
+                                  ))}
+                                </Stack>
+
+                                {/* La factura del comprobante se despliega
+                                    desde el analisis que la cubre. */}
+                                {abierto && comprobante && (
+                                  <div className="mt-2">
+                                    <ComprobanteCard
+                                      comprobante={comprobante}
+                                      etiqueta={`${comprobante.analisis?.length ?? lista.length} analisis`}
+                                      onEditar={() =>
+                                        onEditarComprobante(
+                                          "analisis",
+                                          comprobante,
+                                        )
+                                      }
+                                      onRegistrarPago={() =>
+                                        onRegistrarPago(
+                                          "analisis",
+                                          comprobante,
+                                        )
+                                      }
+                                      onEliminar={() =>
+                                        setAEliminar({
+                                          titulo:
+                                            "Eliminar comprobante de analisis",
+                                          descripcion:
+                                            "Se eliminara el comprobante y sus pagos. Los analisis quedaran libres para facturar de nuevo.",
+                                          accion: () =>
+                                            onEliminarComprobante(
+                                              "analisis",
+                                              comprobante,
+                                            ),
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          },
+                        )}
+                      </Stack>
                     </Paper>
-                  ))}
+                  )}
+
+                  {/* GRUPO 3: analisis asumidos por el cliente */}
+                  {analisisCliente.length > 0 && (
+                    <Paper
+                      p="sm"
+                      radius="md"
+                      className="bg-zinc-950/40 border border-zinc-800"
+                    >
+                      <Group gap="xs" mb="xs">
+                        <Text size="xs" fw={700} c="zinc.300">
+                          Asumidos por el cliente
+                        </Text>
+                        <Badge
+                          color="gray"
+                          variant="light"
+                          size="xs"
+                          radius="sm"
+                        >
+                          {analisisCliente.length}
+                        </Badge>
+                      </Group>
+
+                      <Stack gap="xs">
+                        {analisisCliente.map((analisis) => (
+                          <TarjetaAnalisis
+                            key={analisis.id_analisis_laboratorio}
+                            analisis={analisis}
+                            onEditar={() => onEditarAnalisis(analisis)}
+                            onEliminar={() =>
+                              setAEliminar({
+                                titulo: "Eliminar analisis",
+                                descripcion:
+                                  "Se eliminara el analisis del despacho.",
+                                accion: () => onEliminarAnalisis(analisis),
+                              })
+                            }
+                          />
+                        ))}
+                      </Stack>
+                    </Paper>
+                  )}
                 </Stack>
               )}
             </Paper>
-
-            {detalle.comprobantes_analisis.map((comprobante) => (
-              <ComprobanteCard
-                key={comprobante.id_comprobante}
-                comprobante={comprobante}
-                etiqueta={`${comprobante.analisis?.length ?? 0} analisis`}
-                onEditar={() => onEditarComprobante("analisis", comprobante)}
-                onRegistrarPago={() => onRegistrarPago("analisis", comprobante)}
-                onEliminar={() =>
-                  setAEliminar({
-                    titulo: "Eliminar comprobante de analisis",
-                    descripcion:
-                      "Se eliminara el comprobante y sus pagos. Los analisis quedaran libres para facturar de nuevo.",
-                    accion: () =>
-                      onEliminarComprobante("analisis", comprobante),
-                  })
-                }
-              />
-            ))}
           </Stack>
         </Tabs.Panel>
 

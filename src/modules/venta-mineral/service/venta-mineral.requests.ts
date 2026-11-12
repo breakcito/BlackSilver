@@ -171,6 +171,8 @@ export interface RegistrarAnalisisRequest {
   ley_cobre?: number | null;
   ley_zinc?: number | null;
   ley_arsenico?: number | null;
+  ley_hierro?: number | null;
+  ley_plomo?: number | null;
   costo_servicio?: number | null;
   evidencias?: File[];
 }
@@ -195,6 +197,8 @@ export const Schema_Analisis = z
     ley_cobre: z.number().min(0, "No puede ser negativo").nullish(),
     ley_zinc: z.number().min(0, "No puede ser negativo").nullish(),
     ley_arsenico: z.number().min(0, "No puede ser negativo").nullish(),
+    ley_hierro: z.number().min(0, "No puede ser negativo").nullish(),
+    ley_plomo: z.number().min(0, "No puede ser negativo").nullish(),
     costo_servicio: z.number().min(0, "No puede ser negativo").nullish(),
   })
   .superRefine((data, ctx) => {

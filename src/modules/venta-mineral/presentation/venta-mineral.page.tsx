@@ -97,6 +97,8 @@ export const VentaMineralPage = () => {
     despacho: DespachoMineralResumen;
     tipo: TipoComprobanteDespacho;
     comprobante: ComprobanteDespachoItem | null;
+    /** Analisis concretos a facturar (opcional). */
+    analisisDisponibles?: AnalisisLaboratorioItem[];
   } | null>(null);
   const [modalPago, setModalPago] = useState<{
     despacho: DespachoMineralResumen;
@@ -263,8 +265,13 @@ export const VentaMineralPage = () => {
               flete.id_flete_despacho,
             )
           }
-          onRegistrarComprobante={(despacho, tipo) =>
-            setModalComprobante({ despacho, tipo, comprobante: null })
+          onRegistrarComprobante={(despacho, tipo, analisis) =>
+            setModalComprobante({
+              despacho,
+              tipo,
+              comprobante: null,
+              analisisDisponibles: analisis,
+            })
           }
           onEditarComprobante={(despacho, tipo, comprobante) =>
             setModalComprobante({ despacho, tipo, comprobante })
@@ -583,6 +590,7 @@ export const VentaMineralPage = () => {
           <ModalComprobanteAnalisis
             close={() => setModalComprobante(null)}
             analisisDisponibles={
+              modalComprobante.analisisDisponibles ??
               detalleDe(modalComprobante.despacho.id_despacho_mineral)?.analisis ??
               []
             }

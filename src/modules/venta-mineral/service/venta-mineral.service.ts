@@ -354,6 +354,8 @@ export const VentaMineralService = {
     formData.append("ley_cobre", String(payload.ley_cobre ?? 0));
     formData.append("ley_zinc", String(payload.ley_zinc ?? 0));
     formData.append("ley_arsenico", String(payload.ley_arsenico ?? 0));
+    formData.append("ley_hierro", String(payload.ley_hierro ?? 0));
+    formData.append("ley_plomo", String(payload.ley_plomo ?? 0));
     formData.append("costo_servicio", String(payload.costo_servicio ?? 0));
 
     (payload.evidencias ?? []).forEach((file) =>
@@ -392,6 +394,8 @@ export const VentaMineralService = {
     formData.append("ley_cobre", String(payload.ley_cobre ?? 0));
     formData.append("ley_zinc", String(payload.ley_zinc ?? 0));
     formData.append("ley_arsenico", String(payload.ley_arsenico ?? 0));
+    formData.append("ley_hierro", String(payload.ley_hierro ?? 0));
+    formData.append("ley_plomo", String(payload.ley_plomo ?? 0));
     formData.append("costo_servicio", String(payload.costo_servicio ?? 0));
 
     (payload.evidencias ?? []).forEach((file) =>
