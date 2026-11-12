@@ -16,10 +16,12 @@ import dayjs from "dayjs";
 import { AuxService } from "../../../../service/auxiliar.service";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
+import { Moneda } from "../../../../shared/enums/_generic/moneda";
 import {
   MEDIO_PAGO_DESPACHO_EXIGE_OPERACION,
   MedioPagoDespacho,
 } from "../../../../shared/enums/venta-mineral/medio-pago-despacho";
+import { simboloMoneda } from "./calculos-despacho";
 import type { RES_CuentaEmpresa } from "../../../../service/responses/cuenta-empresa";
 import type { ComprobanteDespachoItem } from "../../service/venta-mineral.responses";
 import { inputClasses } from "../components/input-classes";
@@ -82,10 +84,20 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
     };
   }, []);
 
+  /** Moneda del comprobante: solo el de flete puede estar en dolares. */
+  const monedaComprobante = comprobante.moneda ?? Moneda.Soles;
+
+  /**
+   * La detraccion SIEMPRE se cobra en soles: en ese caso el saldo y el
+   * monto van en soles. El neto va en la moneda del comprobante.
+   */
+  const monedaPago = esParaDetraccion ? Moneda.Soles : monedaComprobante;
+  const simbolo = simboloMoneda(monedaPago);
+
   /** Saldo pendiente del bucket elegido (neto o detraccion). */
   const pendiente = useMemo(() => {
     const saldo = esParaDetraccion
-      ? Number(comprobante.monto_detraccion) -
+      ? Number(comprobante.monto_detraccion_soles) -
         Number(comprobante.avance_detraccion)
       : Number(comprobante.neto_a_pagar) - Number(comprobante.avance_neto);
 
@@ -101,13 +113,29 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
 
   const exigeOperacion = MEDIO_PAGO_DESPACHO_EXIGE_OPERACION(medioPago);
 
+  // La cuenta elegida debe ser de la moneda del pago: si cambia el bucket
+  // (neto o detraccion), la seleccion se limpia. El ajuste se hace durante
+  // el render (no en un efecto) para no provocar renders en cascada.
+  const [monedaAnterior, setMonedaAnterior] = useState(monedaPago);
+
+  if (monedaAnterior !== monedaPago) {
+    setMonedaAnterior(monedaPago);
+    setIdCuenta(null);
+  }
+
+  /**
+   * Solo se listan las cuentas de la moneda del pago: las del comprobante
+   * para el neto y las de soles para la detraccion.
+   */
   const cuentasVisibles = useMemo(
     () =>
-      cuentas.map((c) => ({
-        value: String(c.id_cuenta_bancaria),
-        label: `${c.banco} · ${c.numero_cuenta}`,
-      })),
-    [cuentas],
+      cuentas
+        .filter((c) => (c.moneda ?? Moneda.Soles) === monedaPago)
+        .map((c) => ({
+          value: String(c.id_cuenta_bancaria),
+          label: `${c.banco} · ${c.numero_cuenta} (${c.moneda ?? Moneda.Soles})`,
+        })),
+    [cuentas, monedaPago],
   );
 
   const montoNum = Number(montoPagado) || 0;
@@ -133,7 +161,7 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
     }
     if (montoNum - pendiente > 0.01) {
       setError(
-        `El monto supera el saldo pendiente (S/ ${formatNumber(pendiente)})`,
+        `El monto supera el saldo pendiente (${simbolo} ${formatNumber(pendiente)})`,
       );
       return;
     }
@@ -237,7 +265,7 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
 
       <Group grow align="flex-start">
         <NumberInput
-          label="Monto pagado (S/)"
+          label={`Monto pagado (${simbolo})`}
           value={montoPagado}
           onChange={setMontoPagado}
           fixedDecimalScale
@@ -253,7 +281,7 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
           <Text size="xs" c="gray">
             Saldo pendiente
             <Text size="sm" fw={700} c="orange.3">
-              S/ {formatNumber(pendiente)}
+              {simbolo} {formatNumber(pendiente)}
             </Text>
           </Text>
         </div>

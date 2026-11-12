@@ -329,7 +329,6 @@ export const ModalDespacho = ({
           value={cantidadSacos}
           onChange={handleSacosChange}
           min={1}
-          step={1}
           hideControls
           fixedDecimalScale
           disabled={saving}

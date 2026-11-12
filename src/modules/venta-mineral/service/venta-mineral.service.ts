@@ -47,6 +47,9 @@ const appendComprobanteComunes = (
       "id_transportista_mineral",
       String(payload.id_transportista_mineral),
     );
+  if (payload.moneda) formData.append("moneda", payload.moneda);
+  if (payload.tipo_cambio !== undefined && payload.tipo_cambio !== null)
+    formData.append("tipo_cambio", String(payload.tipo_cambio));
   if (payload.toneladas_cobradas !== undefined)
     formData.append(
       "toneladas_cobradas",

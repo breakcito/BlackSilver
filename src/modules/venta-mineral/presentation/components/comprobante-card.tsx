@@ -8,6 +8,8 @@ import {
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoComprobanteDespacho } from "../../../../shared/enums/venta-mineral/estado-comprobante-despacho";
+import { Moneda } from "../../../../shared/enums/_generic/moneda";
+import { simboloMoneda } from "../forms/calculos-despacho";
 import type { ComprobanteDespachoItem } from "../../service/venta-mineral.responses";
 
 /**
@@ -21,6 +23,8 @@ import type { ComprobanteDespachoItem } from "../../service/venta-mineral.respon
 interface Props {
   comprobante: ComprobanteDespachoItem;
   etiqueta: string;
+  /** Se dibuja dentro de otra tarjeta (sin borde ni fondo propios). */
+  embebido?: boolean;
   onEditar?: () => void;
   onEliminar?: () => void;
   onRegistrarPago?: () => void;
@@ -36,6 +40,7 @@ const colorEstado = (estado: EstadoComprobanteDespacho) => {
 export const ComprobanteCard = ({
   comprobante,
   etiqueta,
+  embebido,
   onEditar,
   onEliminar,
   onRegistrarPago,
@@ -47,22 +52,47 @@ export const ComprobanteCard = ({
   );
   const pendienteDetraccion = Math.max(
     0,
-    Number(comprobante.monto_detraccion) - Number(comprobante.avance_detraccion),
+    Number(comprobante.monto_detraccion_soles) -
+      Number(comprobante.avance_detraccion),
   );
   const hayPagos = (comprobante.pagos?.length ?? 0) > 0;
 
-  return (
-    <Paper
-      p="md"
-      radius="lg"
-      className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-colors"
-    >
-      <Group justify="space-between" align="flex-start" wrap="nowrap">
+  /** Moneda del comprobante: solo el de flete puede estar en dolares. */
+  const moneda = comprobante.moneda ?? Moneda.Soles;
+  const esDolar = moneda === Moneda.Dolares;
+  const simbolo = simboloMoneda(moneda);
+  const tipoCambio = Number(comprobante.tipo_cambio ?? 1) || 1;
+
+  /**
+   * Saldo pendiente TOTAL, en la moneda del comprobante: el neto que falta
+   * mas la detraccion que falta.
+   *
+   * La detraccion se cobra en soles, asi que en un comprobante en dolares
+   * lo ya pagado de detraccion (que esta en soles) se convierte a dolares
+   * para restarlo del monto de la detraccion del comprobante. Asi el saldo
+   * pendiente es una sola cifra, coherente con los importes de arriba.
+   */
+  const pendienteTotal = Math.round(
+    (pendienteNeto +
+      (esDolar
+        ? Number(comprobante.monto_detraccion) -
+          Number(comprobante.avance_detraccion) / tipoCambio
+        : pendienteDetraccion)) *
+      100,
+  ) / 100;
+
+  const contenido = (
+    <>
+      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
         <div className="min-w-0">
-          <Group gap="xs">
+          {/* Codigo | estado | detalle: todo en una sola linea */}
+          <Group gap="xs" wrap="wrap" align="center">
             <IconReceipt size={16} className="text-indigo-400 shrink-0" />
             <Text size="sm" fw={700} c="white" truncate>
               {comprobante.codigo_comprobante || "Sin codigo"}
+            </Text>
+            <Text size="xs" c="zinc.600">
+              |
             </Text>
             <Badge
               color={colorEstado(comprobante.estado)}
@@ -72,18 +102,33 @@ export const ComprobanteCard = ({
             >
               {comprobante.estado}
             </Badge>
+            <Text size="xs" c="zinc.600">
+              |
+            </Text>
+            <Text size="xs" c="dimmed" truncate>
+              {etiqueta && (
+                <Text span size="xs" fw={700} c="pink.3">
+                  {etiqueta}
+                </Text>
+              )}
+              {comprobante.transportista && (
+                <>
+                  {" · "}
+                  <Text span size="xs" fw={600} c="grape.4">
+                    {comprobante.transportista}
+                  </Text>
+                </>
+              )}
+              {comprobante.fecha_emision && (
+                <>
+                  {" · "}
+                  <Text span size="xs" fw={600} c="teal.3">
+                    {dayjs(comprobante.fecha_emision).format("DD/MM/YYYY")}
+                  </Text>
+                </>
+              )}
+            </Text>
           </Group>
-
-          <Text size="xs" c="dimmed" mt={2}>
-            {etiqueta}
-            {comprobante.transportista
-              ? ` · ${comprobante.transportista}`
-              : ""}
-            {comprobante.cliente ? ` · ${comprobante.cliente}` : ""}
-            {comprobante.fecha_emision
-              ? ` · ${dayjs(comprobante.fecha_emision).format("DD/MM/YYYY")}`
-              : ""}
-          </Text>
         </div>
 
         <Group gap={4} wrap="nowrap" className="shrink-0">
@@ -134,13 +179,17 @@ export const ComprobanteCard = ({
         </Group>
       </Group>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+      <div
+        className={`grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 ${
+          esDolar ? "lg:grid-cols-7" : "lg:grid-cols-6"
+        }`}
+      >
         <div>
           <Text size="xs" c="dimmed">
             Subtotal
           </Text>
           <Text size="sm" fw={600} c="zinc.200">
-            S/ {formatNumber(comprobante.subtotal)}
+            {simbolo} {formatNumber(comprobante.subtotal)}
           </Text>
         </div>
         <div>
@@ -148,7 +197,7 @@ export const ComprobanteCard = ({
             IGV ({formatNumber(comprobante.porcentaje_igv)}%)
           </Text>
           <Text size="sm" fw={600} c="zinc.200">
-            S/ {formatNumber(comprobante.igv)}
+            {simbolo} {formatNumber(comprobante.igv)}
           </Text>
         </div>
         <div>
@@ -156,7 +205,7 @@ export const ComprobanteCard = ({
             Total
           </Text>
           <Text size="sm" fw={700} c="indigo.3">
-            S/ {formatNumber(comprobante.total)}
+            {simbolo} {formatNumber(comprobante.total)}
           </Text>
         </div>
         <div>
@@ -164,15 +213,27 @@ export const ComprobanteCard = ({
             Detraccion ({formatNumber(comprobante.porcentaje_detraccion)}%)
           </Text>
           <Text size="sm" fw={600} c="orange.3">
-            S/ {formatNumber(comprobante.monto_detraccion)}
+            {esDolar
+              ? `${simbolo} ${formatNumber(comprobante.monto_detraccion)}`
+              : `S/ ${formatNumber(comprobante.monto_detraccion_soles)}`}
           </Text>
         </div>
+        {esDolar && (
+          <div>
+            <Text size="xs" c="dimmed">
+              Detraccion en soles
+            </Text>
+            <Text size="sm" fw={600} c="orange.3">
+              S/ {formatNumber(comprobante.monto_detraccion_soles)}
+            </Text>
+          </div>
+        )}
         <div>
           <Text size="xs" c="dimmed">
             Neto a pagar
           </Text>
           <Text size="sm" fw={700} c="lime.3">
-            S/ {formatNumber(comprobante.neto_a_pagar)}
+            {simbolo} {formatNumber(comprobante.neto_a_pagar)}
           </Text>
         </div>
         <div>
@@ -182,9 +243,9 @@ export const ComprobanteCard = ({
           <Text
             size="sm"
             fw={700}
-            c={pendienteNeto + pendienteDetraccion > 0 ? "yellow.3" : "green.3"}
+            c={pendienteTotal > 0 ? "yellow.3" : "green.3"}
           >
-            S/ {formatNumber(pendienteNeto + pendienteDetraccion)}
+            {simbolo} {formatNumber(pendienteTotal)}
           </Text>
         </div>
       </div>
@@ -212,12 +273,27 @@ export const ComprobanteCard = ({
                 className="text-zinc-200 font-semibold shrink-0"
                 style={{ color: undefined }}
               >
-                S/ {formatNumber(pago.monto_pagado)}
+                {pago.es_para_detraccion ? "S/" : simbolo}{" "}
+                {formatNumber(pago.monto_pagado)}
               </span>
             </div>
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embebido) {
+    return <div className="min-w-0">{contenido}</div>;
+  }
+
+  return (
+    <Paper
+      p="md"
+      radius="lg"
+      className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-colors"
+    >
+      {contenido}
     </Paper>
   );
 };

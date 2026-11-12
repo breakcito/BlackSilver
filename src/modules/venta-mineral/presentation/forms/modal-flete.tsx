@@ -202,8 +202,6 @@ export const ModalFlete = ({
           label="Peso de la guia (tn)"
           value={pesoGuia}
           onChange={setPesoGuia}
-          min={0}
-          decimalScale={3}
           fixedDecimalScale
           hideControls
           disabled={saving}
@@ -216,8 +214,6 @@ export const ModalFlete = ({
           label="Largo (m)"
           value={largo}
           onChange={setLargo}
-          min={0}
-          decimalScale={3}
           fixedDecimalScale
           hideControls
           disabled={saving}
@@ -229,8 +225,6 @@ export const ModalFlete = ({
           label="Ancho (m)"
           value={ancho}
           onChange={setAncho}
-          min={0}
-          decimalScale={3}
           fixedDecimalScale
           hideControls
           disabled={saving}
@@ -242,8 +236,6 @@ export const ModalFlete = ({
           label="Alto (m)"
           value={alto}
           onChange={setAlto}
-          min={0}
-          decimalScale={3}
           fixedDecimalScale
           hideControls
           disabled={saving}

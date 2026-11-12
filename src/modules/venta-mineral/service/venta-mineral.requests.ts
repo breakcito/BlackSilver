@@ -309,6 +309,10 @@ export interface RegistrarComprobanteRequest {
   id_transportista_mineral?: number;
   toneladas_cobradas?: number;
   precio_por_tonelada?: number;
+  /** Moneda del comprobante (solo el de flete). */
+  moneda?: string;
+  /** Tipo de cambio a soles: 1 cuando la moneda es Soles. */
+  tipo_cambio?: number;
   // Molienda
   monto?: number;
   // Analisis

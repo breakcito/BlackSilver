@@ -90,6 +90,8 @@ export interface ImportesComprobante {
   igv: number;
   total: number;
   monto_detraccion: number;
+  /** Detraccion en soles: la detraccion SIEMPRE se cobra en soles. */
+  monto_detraccion_soles: number;
   neto_a_pagar: number;
 }
 
@@ -97,11 +99,15 @@ export interface ImportesComprobante {
  * Cascada de importes de un comprobante de despacho.
  *
  * subtotal -> igv -> total -> detraccion (entera) -> neto a pagar.
+ *
+ * @param tipoCambio Tipo de cambio a soles: 1 cuando la moneda es Soles.
+ *   Solo se usa para obtener la detraccion en soles.
  */
 export const calcularImportes = (
   subtotal: number,
   porcentajeIgv: number,
   porcentajeDetraccion: number,
+  tipoCambio: number = 1,
 ): ImportesComprobante => {
   const sub = round2(subtotal);
   const igv = calcularIgv(sub, porcentajeIgv);
@@ -113,9 +119,17 @@ export const calcularImportes = (
     igv,
     total,
     monto_detraccion: detraccion,
+    // La detraccion en soles se redondea a ENTEROS, igual que la detraccion.
+    monto_detraccion_soles: Math.round(detraccion * (tipoCambio || 1)),
     neto_a_pagar: netoAPagar(total, detraccion),
   };
 };
+
+/**
+ * Simbolo de la moneda de un comprobante.
+ */
+export const simboloMoneda = (moneda?: string | null): string =>
+  moneda === "Dólares" ? "$" : "S/";
 
 /**
  * Subtotal de un comprobante de flete: toneladas x precio por tonelada.

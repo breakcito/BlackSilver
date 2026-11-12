@@ -3,6 +3,7 @@ import type { ElementoQuimicoMineral } from "../../../shared/enums/venta-mineral
 import type { EstadoComprobanteDespacho } from "../../../shared/enums/venta-mineral/estado-comprobante-despacho";
 import type { EstadoDespachoMineral } from "../../../shared/enums/venta-mineral/estado-despacho-mineral";
 import type { EstadoLiquidacionMineral } from "../../../shared/enums/venta-mineral/estado-liquidacion-mineral";
+import type { Moneda } from "../../../shared/enums/_generic/moneda";
 import type { MedioPagoDespacho } from "../../../shared/enums/venta-mineral/medio-pago-despacho";
 import type { TipoGastoDespacho } from "../../../shared/enums/venta-mineral/tipo-gasto-despacho";
 import type { IArchivo } from "../../../shared/interfaces/archivo";
@@ -42,6 +43,15 @@ export interface DespachoMineralResumen {
   total_neto: number;
   total_pagado: number;
   total_detraccion: number;
+  /**
+   * Parte en DOLARES de los importes del comprobante de flete.
+   *
+   * Los agregados de arriba estan siempre en soles (la moneda de
+   * referencia): un comprobante en dolares nunca se suma en soles.
+   */
+  total_facturado_dolares: number;
+  total_neto_dolares: number;
+  total_pagado_dolares: number;
 
   total_facturado_molienda: number;
   total_neto_molienda: number;
@@ -127,6 +137,8 @@ export interface ComprobanteDespachoItem {
   igv: number;
   total: number;
   monto_detraccion: number;
+  /** Detraccion en soles: siempre se guarda, sea cual sea la moneda. */
+  monto_detraccion_soles: number;
   neto_a_pagar: number;
   avance_detraccion: number;
   avance_neto: number;
@@ -139,6 +151,10 @@ export interface ComprobanteDespachoItem {
   toneladas_cobradas: number | null;
   precio_por_tonelada: number | null;
   transportista: string | null;
+  /** Moneda del comprobante de flete (solo el flete la define). */
+  moneda?: Moneda | null;
+  /** Tipo de cambio a soles: 1 cuando la moneda es Soles. */
+  tipo_cambio?: number | null;
   /** Solo en el comprobante de liquidación. */
   id_liquidacion_mineral: number | null;
   codigo_liquidacion: string | null;

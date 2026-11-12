@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Skeleton, Stack, Text } from "@mantine/core";
-import { TruckIcon } from "@heroicons/react/24/outline";
+import { Alert, Button, Group, Skeleton, Stack, Text } from "@mantine/core";
+import { TruckIcon, TrashIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { FormCatalogoMineral } from "../../../presentation/utils/form-catalogo-mineral";
@@ -70,6 +70,9 @@ export const VentaMineralPage = () => {
   const [modalDespacho, setModalDespacho] = useState<
     { despacho: DespachoMineralResumen | null } | null
   >(null);
+  /** Despacho pendiente de confirmacion de eliminacion. */
+  const [despachoPorEliminar, setDespachoPorEliminar] =
+    useState<DespachoMineralResumen | null>(null);
   const [modalGasto, setModalGasto] = useState<{
     despacho: DespachoMineralResumen;
     gasto: GastoDespachoItem | null;
@@ -236,9 +239,7 @@ export const VentaMineralPage = () => {
           detalleCargando={detalleCargando}
           onExpandedChange={(ids) => cambiarDespliegue(ids)}
           onEditarDespacho={(despacho) => abrirDespacho(despacho)}
-          onEliminarDespacho={(despacho) => {
-            void eliminarDespacho(despacho.id_despacho_mineral);
-          }}
+          onEliminarDespacho={(despacho) => setDespachoPorEliminar(despacho)}
           onRegistrarGasto={(despacho) =>
             setModalGasto({ despacho, gasto: null })
           }
@@ -667,6 +668,57 @@ export const VentaMineralPage = () => {
           />
         </ModalEstandar>
       )}
+
+      {/* ---------------- Eliminar despacho ---------------- */}
+      <ModalEstandar
+        opened={despachoPorEliminar !== null}
+        close={() => setDespachoPorEliminar(null)}
+        title="Eliminar despacho"
+        size="md"
+      >
+        <Stack gap="md">
+          <Alert
+            color="red"
+            variant="light"
+            title="Atencion"
+            radius="md"
+            icon={<TrashIcon className="w-5 h-5" />}
+          >
+            Se eliminara el despacho, sus gastos, fletes, comprobantes, analisis
+            y liquidaciones. Esta accion no se puede deshacer.
+            {despachoPorEliminar && (
+              <Text size="xs" c="dimmed" mt={6}>
+                {despachoPorEliminar.lote_codigo ?? "Sin codigo"} ·{" "}
+                {despachoPorEliminar.molino ?? "sin molino"}
+              </Text>
+            )}
+          </Alert>
+
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="default"
+              radius="lg"
+              size="xs"
+              onClick={() => setDespachoPorEliminar(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="red"
+              radius="lg"
+              size="xs"
+              leftSection={<TrashIcon className="w-4 h-4" />}
+              onClick={() => {
+                if (!despachoPorEliminar) return;
+                void eliminarDespacho(despachoPorEliminar.id_despacho_mineral);
+                setDespachoPorEliminar(null);
+              }}
+            >
+              Si, eliminar
+            </Button>
+          </Group>
+        </Stack>
+      </ModalEstandar>
 
       {/* ---------------- Catalogos ---------------- */}
       <ModalEstandar

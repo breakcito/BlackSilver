@@ -11,6 +11,7 @@ import {
   ArrowUturnLeftIcon,
   BanknotesIcon,
   ScaleIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 import dayjs from "dayjs";
@@ -223,13 +224,30 @@ export const DespachoListado = ({
             (r.total_pagado_analisis ?? 0) +
             (r.total_pagado_liquidacion ?? 0);
 
+          // Parte en dolares: solo el comprobante de flete puede estar en
+          // dolares, y los agregados de arriba estan siempre en soles.
+          const facturadoDolares = r.total_facturado_dolares ?? 0;
+          const pagadoDolares = r.total_pagado_dolares ?? 0;
+
           return (
             <div className="flex flex-col gap-0.5">
               <Text size="xs" fw={700} c="indigo.3">
                 S/ {formatNumber(facturado)}
+                {facturadoDolares > 0 && (
+                  <Text span size="xs" fw={700} c="teal.3">
+                    {" "}
+                    · $ {formatNumber(facturadoDolares)}
+                  </Text>
+                )}
               </Text>
               <Text size="xs" c="emerald.4">
                 S/ {formatNumber(pagado)}
+                {facturadoDolares > 0 && (
+                  <Text span size="xs" fw={700} c="teal.3">
+                    {" "}
+                    · $ {formatNumber(pagadoDolares)}
+                  </Text>
+                )}
               </Text>
             </div>
           );
@@ -271,7 +289,7 @@ export const DespachoListado = ({
         accessor: "acciones",
         title: "",
         textAlign: "center",
-        width: 110,
+        width: 140,
         render: (r) => (
           <Group gap={4} justify="center" wrap="nowrap">
             <Tooltip label="Editar despacho" withArrow>
@@ -316,6 +334,20 @@ export const DespachoListado = ({
                 <ScaleIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
+            <Tooltip label="Eliminar despacho" withArrow>
+              <ActionIcon
+                variant="light"
+                color="red"
+                size="md"
+                radius="md"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEliminarDespacho(r);
+                }}
+              >
+                <TrashIcon className="w-4 h-4" />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         ),
       },
@@ -324,6 +356,7 @@ export const DespachoListado = ({
       onEditarDespacho,
       onRegistrarGasto,
       onRegistrarLiquidacion,
+      onEliminarDespacho,
     ],
   );
 
@@ -360,8 +393,6 @@ export const DespachoListado = ({
               <DespachoDetalle
                 detalle={detalle}
                 loading={detalleCargando === record.id_despacho_mineral}
-                onEditarDespacho={() => onEditarDespacho(record)}
-                onEliminarDespacho={() => onEliminarDespacho(record)}
                 onRegistrarGasto={() => onRegistrarGasto(record)}
                 onEditarGasto={(gasto) => onEditarGasto(record, gasto)}
                 onEliminarGasto={(gasto) => onEliminarGasto(record, gasto)}

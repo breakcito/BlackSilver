@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActionIcon,
+  Alert,
   Badge,
   Button,
   Divider,
@@ -38,14 +39,13 @@ import type {
 } from "../../service/venta-mineral.responses";
 import { ComprobanteCard } from "./comprobante-card";
 import { ConfirmarEliminar } from "./confirmar-eliminar";
+import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 
 interface Props {
   detalle: DespachoMineralDetalle;
   /** El detalle se esta recargando (spinner). */
   loading?: boolean;
   onVolver?: () => void;
-  onEditarDespacho: () => void;
-  onEliminarDespacho: () => void;
   onRegistrarGasto: () => void;
   onEditarGasto: (gasto: GastoDespachoItem) => void;
   onEliminarGasto: (gasto: GastoDespachoItem) => void;
@@ -85,8 +85,6 @@ export const DespachoDetalle = ({
   detalle,
   loading,
   onVolver,
-  onEditarDespacho,
-  onEliminarDespacho,
   onRegistrarGasto,
   onEditarGasto,
   onEliminarGasto,
@@ -111,6 +109,17 @@ export const DespachoDetalle = ({
     accion: () => void;
   } | null>(null);
 
+  /** Flete pendiente de confirmacion de elimination. */
+  const [fleteAEliminar, setFleteAEliminar] = useState<FleteDespachoItem | null>(
+    null,
+  );
+
+  /**
+   * Flete del despacho. El mineral se lleva en una sola unidad, asi que el
+   * despacho tiene un unico flete.
+   */
+  const flete = detalle.fletes[0] ?? null;
+
   const totalGastado =
     (detalle.total_gastos ?? 0) +
     (detalle.total_facturado_molienda ?? 0) +
@@ -127,6 +136,13 @@ export const DespachoDetalle = ({
     (detalle.total_pagado_molienda ?? 0) +
     (detalle.total_pagado_analisis ?? 0) +
     (detalle.total_pagado_liquidacion ?? 0);
+
+  /**
+   * Parte en dolares de los importes: solo el comprobante de flete puede
+   * estar en dolares. Los agregados de arriba estan siempre en soles.
+   */
+  const totalFacturadoDolares = detalle.total_facturado_dolares ?? 0;
+  const totalPagadoDolares = detalle.total_pagado_dolares ?? 0;
 
   return (
     <Stack gap="md" className="animate-fade-in">
@@ -179,6 +195,12 @@ export const DespachoDetalle = ({
                 Facturado{" "}
                 <Text span size="xs" fw={700} c="cyan">
                   S/ {formatNumber(totalFacturado)}
+                  {totalFacturadoDolares > 0 && (
+                    <Text span size="xs" fw={700} c="teal.3">
+                      {" "}
+                      · $ {formatNumber(totalFacturadoDolares)}
+                    </Text>
+                  )}
                 </Text>
               </Text>
               <Divider orientation="vertical" />
@@ -186,6 +208,12 @@ export const DespachoDetalle = ({
                 Pagado{" "}
                 <Text span size="xs" fw={700} c="lime.3">
                   S/ {formatNumber(totalPagado)}
+                  {totalFacturadoDolares > 0 && (
+                    <Text span size="xs" fw={700} c="teal.3">
+                      {" "}
+                      · $ {formatNumber(totalPagadoDolares)}
+                    </Text>
+                  )}
                 </Text>
               </Text>
               <Divider orientation="vertical" />
@@ -200,35 +228,6 @@ export const DespachoDetalle = ({
 
           <Group gap={4} wrap="nowrap">
             {loading && <Loader size="xs" color="indigo" />}
-            <Tooltip label="Editar despacho" withArrow>
-              <Button
-                variant="light"
-                color="indigo"
-                size="compact-xs"
-                onClick={onEditarDespacho}
-                leftSection={<IconPencil size={12} />}
-              >
-                Editar
-              </Button>
-            </Tooltip>
-            <Tooltip label="Eliminar despacho" withArrow>
-              <Button
-                variant="subtle"
-                color="red"
-                size="compact-xs"
-                onClick={() =>
-                  setAEliminar({
-                    titulo: "Eliminar despacho",
-                    descripcion:
-                      "Se eliminaran el despacho, sus gastos, fletes, comprobantes, analisis y liquidaciones. No se puede deshacer.",
-                    accion: onEliminarDespacho,
-                  })
-                }
-                leftSection={<IconTrash size={12} />}
-              >
-                Eliminar
-              </Button>
-            </Tooltip>
           </Group>
         </Group>
 
@@ -384,186 +383,217 @@ export const DespachoDetalle = ({
               radius="lg"
               className="bg-zinc-900/40 border border-zinc-800"
             >
-              <Group justify="space-between" mb="sm">
-                <Text size="sm" fw={700} c="white">
-                  Flete de la carga
+              <Group
+                justify="space-between"
+                align="center"
+                wrap="wrap"
+                gap="sm"
+              >
+                <Group gap="xs" wrap="wrap" align="center" className="min-w-0">
+                  <Text size="sm" fw={700} c="white">
+                    Flete de la carga
+                  </Text>
+
+                  {flete && (
+                    <>
+                      {flete.id_comprobante_flete_despacho && (
+                        <Badge
+                          color="indigo"
+                          variant="light"
+                          size="xs"
+                          radius="sm"
+                        >
+                          Facturado
+                        </Badge>
+                      )}
+
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Placa{" "}
+                        <Text span size="xs" fw={700} c="blue">
+                          {flete.placa ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        1ra Guia{" "}
+                        <Text span size="xs" fw={700} c="pink">
+                          {flete.guia_remitente ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        2da Guia{" "}
+                        <Text span size="xs" fw={700} c="cyan">
+                          {flete.segunda_guia_remitente ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Licencia{" "}
+                        <Text span size="xs" fw={700} c="orange.3">
+                          {flete.licencia_conductor ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Transportista{" "}
+                        <Text span size="xs" fw={700} c="lime.3">
+                          {flete.transportista ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Peso guia{" "}
+                        <Text span size="xs" fw={700} c="blue">
+                          {formatNumber(flete.peso_guia)} t
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Peso neto{" "}
+                        <Text span size="xs" fw={700} c="pink">
+                          {formatNumber(flete.peso_neto)} t
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Medidas{" "}
+                        <Text span size="xs" fw={700} c="cyan">
+                          {formatNumber(flete.largo)} x{" "}
+                          {formatNumber(flete.ancho)} x{" "}
+                          {formatNumber(flete.alto)} m
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Balanza{" "}
+                        <Text span size="xs" fw={700} c="orange.3">
+                          {flete.codigo_ticket_balanza ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Pesaje{" "}
+                        <Text span size="xs" fw={700} c="lime.3">
+                          {flete.fecha_hora_pesaje
+                            ? dayjs(flete.fecha_hora_pesaje).format(
+                                "DD/MM/YYYY HH:mm",
+                              )
+                            : "-"}
+                        </Text>
+                      </Text>
+                    </>
+                  )}
+                </Group>
+
+                <Group gap={4} wrap="nowrap">
+                  {flete ? (
+                    <>
+                      <Button
+                        variant="light"
+                        color="teal"
+                        size="compact-xs"
+                        onClick={() => onRegistrarBalanza(flete)}
+                        leftSection={<IconScale size={12} />}
+                      >
+                        {flete.codigo_ticket_balanza
+                          ? "Editar ticket de balanza"
+                          : "Registrar ticket de balanza"}
+                      </Button>
+                      <Button
+                        variant="subtle"
+                        color="indigo"
+                        size="compact-xs"
+                        onClick={() => onEditarFlete(flete)}
+                        leftSection={<IconPencil size={12} />}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="subtle"
+                        color="red"
+                        size="compact-xs"
+                        onClick={() => setFleteAEliminar(flete)}
+                        leftSection={<IconTrash size={12} />}
+                      >
+                        Eliminar
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="compact-xs"
+                      radius="md"
+                      variant="light"
+                      color="indigo"
+                      leftSection={<IconPlus size={12} />}
+                      onClick={onRegistrarFlete}
+                    >
+                      Registrar flete
+                    </Button>
+                  )}
+                </Group>
+              </Group>
+
+              {detalle.fletes.length === 0 && (
+                <Text size="xs" c="gray" ta="center" py="md">
+                  Todavia no hay flete. El mineral del despacho se lleva en una
+                  sola unidad: registra el vehiculo, su guia y el ticket de
+                  balanza.
                 </Text>
-                {detalle.fletes.length === 0 && (
+              )}
+
+              {/* El comprobante de flete vive DENTRO de la tarjeta del
+                  flete: el comprobante no es ajeno a la carga. */}
+              <Divider my="sm" className="border-zinc-800" />
+
+              {detalle.comprobantes_flete.length === 0 ? (
+                <Group justify="space-between" align="center" gap="sm">
+                  <Text size="xs" c="gray">
+                    Sin comprobante de flete. Se factura la carga del despacho
+                    al precio por tonelada.
+                  </Text>
                   <Button
                     size="compact-xs"
                     radius="md"
                     variant="light"
                     color="indigo"
                     leftSection={<IconPlus size={12} />}
-                    onClick={onRegistrarFlete}
+                    onClick={() => onRegistrarComprobante("flete")}
                   >
-                    Registrar flete
+                    Registrar comprobante
                   </Button>
-                )}
-              </Group>
-
-              {detalle.fletes.length === 0 ? (
-                <Text size="xs" c="gray" ta="center" py="md">
-                  Todavia no hay flete. El mineral del despacho se lleva en una
-                  sola unidad: registra el vehiculo, su guia y el ticket de
-                  balanza.
-                </Text>
+                </Group>
               ) : (
-                <Stack gap="xs">
-                  {detalle.fletes.map((flete) => (
-                    <Paper
-                      key={flete.id_flete_despacho}
-                      p="sm"
-                      radius="md"
-                      className="bg-zinc-900/60 border border-zinc-800/70"
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <div className="min-w-0">
-                          <Group gap="xs">
-                            <Text
-                              size="sm"
-                              fw={700}
-                              c="zinc.100"
-                              className="font-mono"
-                            >
-                              {flete.placa ?? "Sin placa"}
-                            </Text>
-                            {flete.id_comprobante_flete_despacho && (
-                              <Badge
-                                color="indigo"
-                                variant="light"
-                                size="xs"
-                                radius="sm"
-                              >
-                                Facturado
-                              </Badge>
-                            )}
-                            {flete.codigo_ticket_balanza && (
-                              <Badge
-                                color="teal"
-                                variant="light"
-                                size="xs"
-                                radius="sm"
-                              >
-                                Balanza: {flete.codigo_ticket_balanza}
-                              </Badge>
-                            )}
-                          </Group>
-                          <Text size="xs" c="gray" mt={2}>
-                            {flete.transportista ?? "Sin transportista"} · Guia{" "}
-                            {flete.guia_remitente ?? "-"} · Licencia{" "}
-                            {flete.licencia_conductor ?? "-"}
-                          </Text>
-                          <Text size="xs" c="gray">
-                            Peso guia {formatNumber(flete.peso_guia)} t
-                            {flete.peso_neto > 0
-                              ? ` · Peso neto ${formatNumber(flete.peso_neto)} t`
-                              : " · Sin peso de balanza"}{" "}
-                            · Medidas {formatNumber(flete.largo)} x{" "}
-                            {formatNumber(flete.ancho)} x{" "}
-                            {formatNumber(flete.alto)} m
-                          </Text>
-                          {flete.fecha_hora_pesaje && (
-                            <Text size="xs" c="gray">
-                              Pesaje:{" "}
-                              {dayjs(flete.fecha_hora_pesaje).format(
-                                "DD/MM/YYYY HH:mm",
-                              )}
-                            </Text>
-                          )}
-                        </div>
-                        <Group gap={4} wrap="nowrap">
-                          <Button
-                            variant="light"
-                            color="teal"
-                            size="compact-xs"
-                            onClick={() => onRegistrarBalanza(flete)}
-                            leftSection={<IconScale size={12} />}
-                          >
-                            {flete.codigo_ticket_balanza
-                              ? "Editar ticket de balanza"
-                              : "Registrar ticket de balanza"}
-                          </Button>
-                          <Button
-                            variant="subtle"
-                            color="indigo"
-                            size="compact-xs"
-                            onClick={() => onEditarFlete(flete)}
-                            leftSection={<IconPencil size={12} />}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="subtle"
-                            color="red"
-                            size="compact-xs"
-                            onClick={() =>
-                              setAEliminar({
-                                titulo: "Eliminar flete",
-                                descripcion:
-                                  "Se eliminara el flete y su ticket de balanza.",
-                                accion: () => onEliminarFlete(flete),
-                              })
-                            }
-                            leftSection={<IconTrash size={12} />}
-                          >
-                            Eliminar
-                          </Button>
-                        </Group>
-                      </Group>
-                    </Paper>
+                <Stack gap="sm">
+                  {detalle.comprobantes_flete.map((comprobante, indice) => (
+                    <div key={comprobante.id_comprobante}>
+                      {indice > 0 && (
+                        <Divider my="sm" className="border-zinc-800" />
+                      )}
+                      <ComprobanteCard
+                        embebido
+                        comprobante={comprobante}
+                        etiqueta={`${formatNumber(comprobante.toneladas_cobradas ?? 0)} t facturadas`}
+                        onEditar={() => onEditarComprobante("flete", comprobante)}
+                        onRegistrarPago={() =>
+                          onRegistrarPago("flete", comprobante)
+                        }
+                        onEliminar={() =>
+                          setAEliminar({
+                            titulo: "Eliminar comprobante de flete",
+                            descripcion:
+                              "Se eliminara el comprobante y sus pagos. El flete quedara libre para facturar de nuevo.",
+                            accion: () =>
+                              onEliminarComprobante("flete", comprobante),
+                          })
+                        }
+                      />
+                    </div>
                   ))}
                 </Stack>
               )}
             </Paper>
-
-            <Group justify="space-between">
-              <Text size="sm" fw={700} c="white">
-                Comprobante de flete
-              </Text>
-              {detalle.comprobantes_flete.length === 0 && (
-                <Button
-                  size="compact-xs"
-                  radius="md"
-                  variant="light"
-                  color="indigo"
-                  leftSection={<IconPlus size={12} />}
-                  onClick={() => onRegistrarComprobante("flete")}
-                >
-                  Registrar comprobante
-                </Button>
-              )}
-            </Group>
-
-            {detalle.comprobantes_flete.length === 0 ? (
-              <Text size="xs" c="gray" ta="center" py="md">
-                Sin comprobante de flete. Se factura la carga del despacho al
-                precio por tonelada.
-              </Text>
-            ) : (
-              <Stack gap="sm">
-                {detalle.comprobantes_flete.map((comprobante) => (
-                  <ComprobanteCard
-                    key={comprobante.id_comprobante}
-                    comprobante={comprobante}
-                    etiqueta={`${formatNumber(comprobante.toneladas_cobradas ?? 0)} t facturadas`}
-                    onEditar={() => onEditarComprobante("flete", comprobante)}
-                    onRegistrarPago={() =>
-                      onRegistrarPago("flete", comprobante)
-                    }
-                    onEliminar={() =>
-                      setAEliminar({
-                        titulo: "Eliminar comprobante de flete",
-                        descripcion:
-                          "Se eliminara el comprobante y sus pagos. El flete quedara libre para facturar de nuevo.",
-                        accion: () =>
-                          onEliminarComprobante("flete", comprobante),
-                      })
-                    }
-                  />
-                ))}
-              </Stack>
-            )}
           </Stack>
         </Tabs.Panel>
 
@@ -966,6 +996,52 @@ export const DespachoDetalle = ({
           setAEliminar(null);
         }}
       />
+
+      {/* Eliminacion del flete */}
+      <ModalEstandar
+        opened={fleteAEliminar !== null}
+        close={() => setFleteAEliminar(null)}
+        title="Eliminar flete"
+        size="md"
+      >
+        <Stack gap="md">
+          <Alert
+            color="red"
+            variant="light"
+            title="Atencion"
+            radius="md"
+            icon={<IconTrash size={18} />}
+          >
+            Se eliminara el flete
+            {fleteAEliminar?.placa ? ` ${fleteAEliminar.placa}` : ""} y su
+            ticket de balanza. Esta accion no se puede deshacer.
+          </Alert>
+
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="default"
+              radius="lg"
+              size="xs"
+              onClick={() => setFleteAEliminar(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="red"
+              radius="lg"
+              size="xs"
+              leftSection={<IconTrash size={14} />}
+              onClick={() => {
+                if (!fleteAEliminar) return;
+                onEliminarFlete(fleteAEliminar);
+                setFleteAEliminar(null);
+              }}
+            >
+              Si, eliminar
+            </Button>
+          </Group>
+        </Stack>
+      </ModalEstandar>
     </Stack>
   );
 };

@@ -405,7 +405,6 @@ export const ModalLiquidacion = ({
           label="Valor por tonelada"
           value={valorPorTonelada}
           onChange={setValorPorTonelada}
-          min={0}
           fixedDecimalScale
           hideControls
           disabled={saving}

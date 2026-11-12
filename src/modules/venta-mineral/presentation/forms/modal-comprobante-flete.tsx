@@ -5,14 +5,15 @@ import {
   Group,
   NumberInput,
   Paper,
+  Select,
   SimpleGrid,
   Stack,
   Text,
 } from "@mantine/core";
 import { IconDeviceFloppy, IconTruckDelivery, IconX } from "@tabler/icons-react";
 import dayjs from "dayjs";
-import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
+import { Moneda } from "../../../../shared/enums/_generic/moneda";
 import type {
   ComprobanteDespachoItem,
   FleteDespachoItem,
@@ -23,6 +24,7 @@ import {
   calcularImportes,
   DETRACCION_FLETE_POR_DEFECTO,
   IGV_POR_DEFECTO,
+  simboloMoneda,
   subtotalFlete,
 } from "./calculos-despacho";
 
@@ -42,6 +44,8 @@ interface Props {
     id_transportista_mineral: number;
     toneladas_cobradas: number;
     precio_por_tonelada: number;
+    moneda: string;
+    tipo_cambio: number;
     evidencias?: File[];
   }) => Promise<boolean>;
 }
@@ -52,6 +56,10 @@ interface Props {
  * El despacho tiene UN SOLO flete (el mineral se lleva en una sola
  * unidad): no hay que seleccionarlo. Lo que se captura es el precio por
  * tonelada y el resto de los datos del comprobante.
+ *
+ * El comprobante puede estar en soles o en dolares. La detraccion SIEMPRE
+ * se cobra en soles: por eso se guarda el tipo de cambio y el monto de la
+ * detraccion en soles.
  */
 export const ModalComprobanteFlete = ({
   close,
@@ -81,6 +89,12 @@ export const ModalComprobanteFlete = ({
   const [precioPorTonelada, setPrecioPorTonelada] = useState<number | string>(
     () => comprobante?.precio_por_tonelada ?? 0,
   );
+  const [moneda, setMoneda] = useState<Moneda>(
+    () => comprobante?.moneda ?? Moneda.Soles,
+  );
+  const [tipoCambio, setTipoCambio] = useState<number | string>(
+    () => comprobante?.tipo_cambio ?? 1,
+  );
   const [archivos, setArchivos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -92,18 +106,35 @@ export const ModalComprobanteFlete = ({
   }, [comprobante, fletesDisponibles]);
 
   // Toneladas facturadas: el peso neto de balanza o, si no hay, el de la
-  // guia. Es el mismo criterio que aplica el backend.
-  const toneladas = useMemo(() => {
+  // guia. Es el mismo criterio que aplica el backend. El usuario puede
+  // corregirlo: lo que se guarda es el TONELADAS COBRADAS del comprobante,
+  // no el flete.
+  const [toneladas, setToneladas] = useState<number | string>(() => {
+    if (comprobante?.toneladas_cobradas) return comprobante.toneladas_cobradas;
     if (!flete) return 0;
 
     const pesoNeto = Number(flete.peso_neto);
     const pesoGuia = Number(flete.peso_guia);
 
     return Math.round((pesoNeto > 0 ? pesoNeto : pesoGuia) * 1000) / 1000;
-  }, [flete]);
+  });
+
+  // Al cambiar la moneda, el tipo de cambio vuelve a su valor por defecto:
+  // 1 en soles y vacio en dolares (hay que digitarlo). El ajuste se hace
+  // durante el render (no en un efecto) para no provocar renders en cascada.
+  const [monedaAnterior, setMonedaAnterior] = useState(moneda);
+
+  if (monedaAnterior !== moneda) {
+    setMonedaAnterior(moneda);
+    setTipoCambio(moneda === Moneda.Soles ? 1 : "");
+  }
+
+  const esDolar = moneda === Moneda.Dolares;
+  const simbolo = simboloMoneda(moneda);
+  const tipoCambioNum = Number(tipoCambio) || 0;
 
   const subtotal = useMemo(
-    () => subtotalFlete(toneladas, Number(precioPorTonelada) || 0),
+    () => subtotalFlete(Number(toneladas) || 0, Number(precioPorTonelada) || 0),
     [toneladas, precioPorTonelada],
   );
 
@@ -113,8 +144,16 @@ export const ModalComprobanteFlete = ({
         subtotal,
         Number(porcentajeIgv) || 0,
         conDetraccion ? Number(porcentajeDetraccion) || 0 : 0,
+        esDolar ? tipoCambioNum : 1,
       ),
-    [subtotal, porcentajeIgv, porcentajeDetraccion, conDetraccion],
+    [
+      subtotal,
+      porcentajeIgv,
+      porcentajeDetraccion,
+      conDetraccion,
+      esDolar,
+      tipoCambioNum,
+    ],
   );
 
   const handleSubmit = async () => {
@@ -140,6 +179,14 @@ export const ModalComprobanteFlete = ({
       setError("Ingresa el precio por tonelada");
       return;
     }
+    if ((Number(toneladas) || 0) <= 0) {
+      setError("Ingresa las toneladas que se facturan");
+      return;
+    }
+    if (esDolar && tipoCambioNum <= 0) {
+      setError("Ingresa el tipo de cambio del comprobante en dolares");
+      return;
+    }
 
     setSaving(true);
     const ok = await onGuardar({
@@ -150,8 +197,10 @@ export const ModalComprobanteFlete = ({
       porcentaje_igv: Number(porcentajeIgv) || 0,
       id_fletes: [flete.id_flete_despacho],
       id_transportista_mineral: flete.id_transportista_mineral,
-      toneladas_cobradas: toneladas,
+      toneladas_cobradas: Number(toneladas) || 0,
       precio_por_tonelada: Number(precioPorTonelada) || 0,
+      moneda,
+      tipo_cambio: esDolar ? tipoCambioNum : 1,
       evidencias: archivos.length > 0 ? archivos : undefined,
     });
     setSaving(false);
@@ -204,14 +253,18 @@ export const ModalComprobanteFlete = ({
                 {flete.guia_remitente ?? "-"}
               </Text>
             </div>
-            <div>
-              <Text size="xs" c="dimmed">
-                Toneladas
-              </Text>
-              <Text size="xs" fw={700} c="emerald.4">
-                {formatNumber(toneladas)} t
-              </Text>
-            </div>
+            <NumberInput
+              label="Toneladas"
+              value={toneladas}
+              onChange={setToneladas}
+              hideControls
+              disabled={saving}
+              classNames={inputClasses}
+              size="xs"
+              radius="lg"
+              suffix=" t"
+              required
+            />
           </SimpleGrid>
         </Paper>
       ) : (
@@ -221,20 +274,34 @@ export const ModalComprobanteFlete = ({
         </Alert>
       )}
 
-      <NumberInput
-        label="Precio por tonelada (S/)"
-        value={precioPorTonelada}
-        onChange={setPrecioPorTonelada}
-        min={0}
-        fixedDecimalScale
-        decimalScale={2}
-        hideControls
-        disabled={saving}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-        required
-      />
+      {/* Moneda y tipo de cambio del comprobante */}
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        <Select
+          label="Moneda"
+          data={Object.values(Moneda)}
+          value={moneda}
+          onChange={(valor) => setMoneda((valor as Moneda) ?? Moneda.Soles)}
+          allowDeselect={false}
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required
+        />
+        {esDolar && (
+          <NumberInput
+            label="Tipo de cambio"
+            value={tipoCambio}
+            onChange={setTipoCambio}
+            hideControls
+            disabled={saving}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            required
+          />
+        )}
+      </SimpleGrid>
 
       <ComprobanteFormPanel
         codigo={codigo}
@@ -249,6 +316,22 @@ export const ModalComprobanteFlete = ({
         setPorcentajeIgv={setPorcentajeIgv}
         importes={importes}
         disabled={saving}
+        igvEnFila2
+        simbolo={simbolo}
+        mostrarDetraccionEnSoles={esDolar}
+        campoFila1={
+          <NumberInput
+            label={`Precio por tonelada (${simbolo})`}
+            value={precioPorTonelada}
+            onChange={setPrecioPorTonelada}
+            hideControls
+            disabled={saving}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+            required
+          />
+        }
       />
 
       <MultiFilePicker
