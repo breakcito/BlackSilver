@@ -33,13 +33,19 @@ import type {
   LoteMineralDespachable,
 } from "../../service/venta-mineral.responses";
 import { inputClasses } from "../components/input-classes";
-import { pesoGuiaToneladas } from "./calculos-despacho";
 
 interface GastoFormItem {
   tipo_gasto: string;
   descripcion: string;
   monto: number | string;
 }
+
+/**
+ * Peso de la guia que se propone al registrar un despacho: 25 tn.
+ *
+ * Es solo un valor por defecto: el usuario puede cambiarlo por el real.
+ */
+const PESO_GUIA_POR_DEFECTO_TONELADAS = 25;
 
 interface Props {
   close: () => void;
@@ -120,8 +126,9 @@ export const ModalDespacho = ({
   const [placa, setPlaca] = useState("");
   const [licencia, setLicencia] = useState("");
   const [guia, setGuia] = useState("");
-  const [pesoGuia, setPesoGuia] = useState<number | string>(0);
-  const [pesoGuiaTocado, setPesoGuiaTocado] = useState(false);
+  const [pesoGuia, setPesoGuia] = useState<number | string>(
+    PESO_GUIA_POR_DEFECTO_TONELADAS,
+  );
   const [largo, setLargo] = useState<number | string>(0);
   const [ancho, setAncho] = useState<number | string>(0);
   const [alto, setAlto] = useState<number | string>(0);
@@ -163,15 +170,6 @@ export const ModalDespacho = ({
     }).map((r) => r.item);
   }, [transportistas, busquedaTransportista]);
 
-  /**
-   * El peso de la guia se propone con la referencia de la operacion
-   * (50 kg por saco). Si el usuario lo edita, no se vuelve a pisar.
-   */
-  const actualizarPesoGuia = (sacos: number) => {
-    if (pesoGuiaTocado) return;
-    setPesoGuia(pesoGuiaToneladas(sacos));
-  };
-
   const handleLoteChange = (valor: string | null) => {
     setIdLote(valor);
     if (!valor) return;
@@ -181,13 +179,11 @@ export const ModalDespacho = ({
     );
     if (lote) {
       setCantidadSacos(lote.cantidad_sacos);
-      actualizarPesoGuia(lote.cantidad_sacos);
     }
   };
 
   const handleSacosChange = (valor: number | string) => {
     setCantidadSacos(valor);
-    actualizarPesoGuia(Number(valor) || 0);
   };
 
   const totalGastos = useMemo(
@@ -421,7 +417,7 @@ export const ModalDespacho = ({
               radius="lg"
             />
             <TextInput
-              label="Guia de remitente"
+              label="Guía de Remisión (1ra)"
               placeholder="N. 000123"
               value={guia}
               onChange={(e) => setGuia(e.currentTarget.value.toUpperCase())}
@@ -439,7 +435,6 @@ export const ModalDespacho = ({
               value={pesoGuia}
               onChange={(valor) => {
                 setPesoGuia(valor);
-                setPesoGuiaTocado(true);
               }}
               fixedDecimalScale
               
@@ -574,7 +569,11 @@ export const ModalDespacho = ({
                         setGastos((prev) =>
                           prev.map((g, i) =>
                             i === indice
-                              ? { ...g, descripcion: e.currentTarget.value }
+                              ? {
+                                  ...g,
+                                  descripcion:
+                                    e.currentTarget.value.toUpperCase(),
+                                }
                               : g,
                           ),
                         )
@@ -633,7 +632,9 @@ export const ModalDespacho = ({
         label="Observaciones"
         placeholder="Notas del despacho..."
         value={observaciones}
-        onChange={(e) => setObservaciones(e.currentTarget.value)}
+        onChange={(e) =>
+          setObservaciones(e.currentTarget.value.toUpperCase())
+        }
         autosize
         minRows={2}
         maxRows={4}

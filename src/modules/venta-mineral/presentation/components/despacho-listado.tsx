@@ -11,7 +11,6 @@ import {
   ArrowUturnLeftIcon,
   BanknotesIcon,
   ScaleIcon,
-  TruckIcon,
 } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 import dayjs from "dayjs";
@@ -303,20 +302,6 @@ export const DespachoListado = ({
                 <BanknotesIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
-            <Tooltip label="Registrar flete" withArrow>
-              <ActionIcon
-                variant="light"
-                color="teal"
-                size="md"
-                radius="md"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRegistrarFlete(r);
-                }}
-              >
-                <TruckIcon className="w-4 h-4" />
-              </ActionIcon>
-            </Tooltip>
             <Tooltip label="Registrar liquidacion" withArrow>
               <ActionIcon
                 variant="light"
@@ -338,7 +323,6 @@ export const DespachoListado = ({
     [
       onEditarDespacho,
       onRegistrarGasto,
-      onRegistrarFlete,
       onRegistrarLiquidacion,
     ],
   );

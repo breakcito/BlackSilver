@@ -186,7 +186,7 @@ export const ModalFlete = ({
           radius="lg"
         />
         <TextInput
-          label="Guia de remitente"
+          label="Guía de Remisión (1ra)"
           placeholder="N. 000123"
           value={guia}
           onChange={(e) => setGuia(e.currentTarget.value.toUpperCase())}

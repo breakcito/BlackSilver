@@ -22,7 +22,6 @@ import type { LiquidacionMineralItem } from "../../service/venta-mineral.respons
 import { inputClasses } from "../components/input-classes";
 import {
   calcularImportesLiquidacion,
-  DETRACCION_ESTANDAR_POR_DEFECTO,
   IGV_POR_DEFECTO,
 } from "./calculos-despacho";
 
@@ -488,7 +487,9 @@ export const ModalLiquidacion = ({
         label="Observaciones"
         placeholder="Notas de la liquidacion..."
         value={observaciones}
-        onChange={(e) => setObservaciones(e.currentTarget.value)}
+        onChange={(e) =>
+          setObservaciones(e.currentTarget.value.toUpperCase())
+        }
         autosize
         minRows={2}
         maxRows={4}

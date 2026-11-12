@@ -266,6 +266,8 @@ export const VentaMineralService = {
   ): Promise<IRespuesta<FleteDespachoItem>> => {
     const formData = new FormData();
     formData.append("codigo_ticket_balanza", payload.codigo_ticket_balanza);
+    if (payload.segunda_guia_remitente)
+      formData.append("segunda_guia_remitente", payload.segunda_guia_remitente);
     formData.append("peso_bruto", String(payload.peso_bruto));
     formData.append("tara", String(payload.tara));
     formData.append("fecha_hora_pesaje", payload.fecha_hora_pesaje);

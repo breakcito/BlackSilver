@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNotify } from "../../../hooks/useNotify";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import { VentaMineralService } from "../service/venta-mineral.service";
@@ -28,6 +28,8 @@ export const useVentaMineral = (
   const [lotesDespachables, setLotesDespachables] = useState<
     LoteMineralDespachable[]
   >([]);
+  /** `true` cuando los lotes despachables ya se pidieron al backend. */
+  const lotesCargadosRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -72,13 +74,28 @@ export const useVentaMineral = (
     }
   }, []);
 
+  /**
+   * Carga los lotes despachables bajo demanda: se piden al abrir el modal
+   * de despacho, no al entrar al modulo. Asi el listado se abre rapido y el
+   * catalogo esta siempre fresco cuando se va a usar.
+   */
+  const cargarLotes = useCallback(async () => {
+    lotesCargadosRef.current = true;
+    await fetchLotesDespachables();
+  }, [fetchLotesDespachables]);
+
+  /**
+   * Recarga los lotes despachables, pero solo si ya se habian cargado: si el
+   * usuario nunca abrio el modal de despacho, no hay nada que refrescar.
+   */
+  const refetchLotes = useCallback(async () => {
+    if (!lotesCargadosRef.current) return;
+    await fetchLotesDespachables();
+  }, [fetchLotesDespachables]);
+
   useEffect(() => {
     void fetchDespachos();
   }, [fetchDespachos]);
-
-  useEffect(() => {
-    void fetchLotesDespachables();
-  }, [fetchLotesDespachables]);
 
   /**
    * Parchea un despacho en la lista local, para no recargar el listado
@@ -179,7 +196,7 @@ export const useVentaMineral = (
             return copia;
           });
           setDesplegados((prev) => prev.filter((id) => id !== idDespacho));
-          await fetchLotesDespachables();
+          await refetchLotes();
           return true;
         }
 
@@ -193,7 +210,7 @@ export const useVentaMineral = (
         setSubmitting(false);
       }
     },
-    [fetchLotesDespachables, notifyError, notifySuccess],
+    [notifyError, notifySuccess, refetchLotes],
   );
 
   return {
@@ -205,7 +222,8 @@ export const useVentaMineral = (
     detalles,
     detalleCargando,
     refetch: fetchDespachos,
-    refetchLotes: fetchLotesDespachables,
+    cargarLotes,
+    refetchLotes,
     updateDespachoLocal,
     insertDespacho,
     refrescarDetalle,

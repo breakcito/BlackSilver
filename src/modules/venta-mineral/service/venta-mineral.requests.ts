@@ -128,6 +128,8 @@ export const Schema_Flete = z.object({
  */
 export interface RegistrarBalanzaRequest {
   codigo_ticket_balanza: string;
+  /** 2da guia de remision: se digita cuando el vehiculo llega al molino. */
+  segunda_guia_remitente?: string | null;
   peso_bruto: number;
   tara: number;
   fecha_hora_pesaje: string;
@@ -138,6 +140,7 @@ export const Schema_Balanza = z.object({
   codigo_ticket_balanza: z
     .string({ error: "Ingresa el código del ticket" })
     .min(1, "Ingresa el código del ticket"),
+  segunda_guia_remitente: z.string().max(50, "Máximo 50 caracteres").nullish(),
   peso_bruto: z
     .number({ error: "Ingresa el peso bruto" })
     .positive("El peso bruto debe ser mayor a 0"),

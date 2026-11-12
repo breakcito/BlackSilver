@@ -128,7 +128,7 @@ export const FormCatalogoMineral = ({
             radius="xl"
             value={razonSocial}
             onChange={(e) => {
-              setRazonSocial(e.currentTarget.value);
+              setRazonSocial(e.currentTarget.value.toUpperCase());
               if (error) setError(null);
             }}
             classNames={inputClasses}

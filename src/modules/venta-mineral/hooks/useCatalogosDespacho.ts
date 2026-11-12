@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNotify } from "../../../hooks/useNotify";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import { VentaMineralService } from "../service/venta-mineral.service";
@@ -7,6 +7,10 @@ import type { CatalogoMineral } from "../service/venta-mineral.responses";
 /**
  * Catalogos del modulo de venta de mineral: molinos (destino de la
  * molienda), transportistas de mineral y laboratorios.
+ *
+ * NO se cargan al entrar al modulo: se piden al abrir el modal que los
+ * necesita. Asi el listado abre rapido y el catalogo sale fresco del
+ * backend en el momento de usarlo.
  *
  * Los tres se pueden registrar sin salir del flujo, asi que cada uno expone
  * su metodo de alta para que los formularios rapidos los agreguen al
@@ -18,8 +22,9 @@ export const useCatalogosDespacho = () => {
   const [molinos, setMolinos] = useState<CatalogoMineral[]>([]);
   const [transportistas, setTransportistas] = useState<CatalogoMineral[]>([]);
   const [laboratorios, setLaboratorios] = useState<CatalogoMineral[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
+  /** Carga los tres catalogos. Se llama al abrir el modal que los usa. */
   const cargar = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -45,10 +50,6 @@ export const useCatalogosDespacho = () => {
       setIsLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    void cargar();
-  }, [cargar]);
 
   /** Agrega un molino recien registrado al catalogo en memoria. */
   const agregarMolino = useCallback((nuevo: CatalogoMineral) => {
@@ -150,6 +151,7 @@ export const useCatalogosDespacho = () => {
     transportistas,
     laboratorios,
     isLoading,
+    cargar,
     refetch: cargar,
     crearMolino,
     crearTransportista,

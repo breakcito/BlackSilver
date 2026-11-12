@@ -90,7 +90,7 @@ export const ModalGasto = ({ close, gasto, onGuardar }: Props) => {
         label="Descripcion"
         placeholder="Ej. Wincha del turno noche, 4 horas..."
         value={descripcion}
-        onChange={(e) => setDescripcion(e.currentTarget.value)}
+        onChange={(e) => setDescripcion(e.currentTarget.value.toUpperCase())}
         autosize
         minRows={2}
         maxRows={4}

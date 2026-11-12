@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Skeleton, Stack, Text } from "@mantine/core";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
@@ -54,6 +54,7 @@ export const VentaMineralPage = () => {
     detalles,
     detalleCargando,
     refetch,
+    cargarLotes,
     refetchLotes,
     insertDespacho,
     refrescarDetalle,
@@ -63,7 +64,7 @@ export const VentaMineralPage = () => {
 
   const acciones = useDetalleDespacho(refrescarDetalle);
   const catalogos = useCatalogosDespacho();
-  const { clientes } = useClientesDespacho();
+  const { clientes, cargar: cargarClientes } = useClientesDespacho();
 
   /* ---------------- Estado de los modales ---------------- */
   const [modalDespacho, setModalDespacho] = useState<
@@ -127,6 +128,65 @@ export const VentaMineralPage = () => {
   /** Detalle cargado de un despacho (para alimentar los modales). */
   const detalleDe = (idDespacho: number) => detalles[idDespacho] ?? null;
 
+  /* ---------------- Apertura de modales ----------------
+   *
+   * Los catalogos no se cargan al entrar al modulo: se piden en el momento
+   * en que se abre el modal que los usa. Asi el catalogo sale fresco del
+   * backend (sin recargar la pagina) y el listado abre de inmediato.
+   */
+
+  const abrirDespacho = (despacho: DespachoMineralResumen | null) => {
+    void catalogos.cargar();
+    // Los lotes despachables solo hacen falta al registrar: en la edicion
+    // el lote ya esta definido.
+    if (!despacho) void cargarLotes();
+    setModalDespacho({ despacho });
+  };
+
+  const abrirFlete = (
+    despacho: DespachoMineralResumen,
+    flete: FleteDespachoItem | null,
+  ) => {
+    void catalogos.cargar();
+    setModalFlete({ despacho, flete });
+  };
+
+  const abrirAnalisis = (
+    despacho: DespachoMineralResumen,
+    analisis: AnalisisLaboratorioItem | null,
+  ) => {
+    void catalogos.cargar();
+    void cargarClientes();
+    setModalAnalisis({ despacho, analisis });
+  };
+
+  const abrirLiquidacion = (
+    despacho: DespachoMineralResumen,
+    liquidacion: LiquidacionMineralItem | null,
+  ) => {
+    void cargarClientes();
+    setModalLiquidacion({ despacho, liquidacion });
+  };
+
+  /**
+   * Por defecto se despliega el despacho mas reciente: el primero de la
+   * lista (el backend los ordena por fecha de despacho descendente).
+   *
+   * Solo se aplica cuando llega una lista distinta: si el usuario repliega
+   * la fila, esta se queda replegada hasta que cambie el listado.
+   */
+  const firmaListaRef = useRef<string>("");
+
+  useEffect(() => {
+    if (despachos.length === 0) return;
+
+    const firma = despachos.map((d) => d.id_despacho_mineral).join(",");
+    if (firma === firmaListaRef.current) return;
+    firmaListaRef.current = firma;
+
+    cambiarDespliegue([despachos[0].id_despacho_mineral]);
+  }, [despachos, cambiarDespliegue]);
+
   const mostrarEmpty =
     !isLoading && despachos.length === 0 && !busqueda;
 
@@ -135,7 +195,7 @@ export const VentaMineralPage = () => {
       <VentaMineralFiltro
         busqueda={busqueda}
         setBusqueda={setBusqueda}
-        openCreate={() => setModalDespacho({ despacho: null })}
+        openCreate={() => abrirDespacho(null)}
         mes={mes}
         anio={anio}
         cambiarPeriodo={(nuevoMes, nuevoAnio) => {
@@ -175,7 +235,7 @@ export const VentaMineralPage = () => {
           detalles={detalles}
           detalleCargando={detalleCargando}
           onExpandedChange={(ids) => cambiarDespliegue(ids)}
-          onEditarDespacho={(despacho) => setModalDespacho({ despacho })}
+          onEditarDespacho={(despacho) => abrirDespacho(despacho)}
           onEliminarDespacho={(despacho) => {
             void eliminarDespacho(despacho.id_despacho_mineral);
           }}
@@ -191,10 +251,8 @@ export const VentaMineralPage = () => {
               gasto.id_gasto_despacho,
             )
           }
-          onRegistrarFlete={(despacho) =>
-            setModalFlete({ despacho, flete: null })
-          }
-          onEditarFlete={(despacho, flete) => setModalFlete({ despacho, flete })}
+          onRegistrarFlete={(despacho) => abrirFlete(despacho, null)}
+          onEditarFlete={(despacho, flete) => abrirFlete(despacho, flete)}
           onRegistrarBalanza={(despacho, flete) =>
             setModalBalanza({ despacho, flete })
           }
@@ -220,11 +278,9 @@ export const VentaMineralPage = () => {
           onRegistrarPago={(despacho, tipo, comprobante) =>
             setModalPago({ despacho, tipo, comprobante })
           }
-          onRegistrarAnalisis={(despacho) =>
-            setModalAnalisis({ despacho, analisis: null })
-          }
+          onRegistrarAnalisis={(despacho) => abrirAnalisis(despacho, null)}
           onEditarAnalisis={(despacho, analisis) =>
-            setModalAnalisis({ despacho, analisis })
+            abrirAnalisis(despacho, analisis)
           }
           onEliminarAnalisis={(despacho, analisis) =>
             void acciones.eliminarAnalisis(
@@ -232,11 +288,9 @@ export const VentaMineralPage = () => {
               analisis.id_analisis_laboratorio,
             )
           }
-          onRegistrarLiquidacion={(despacho) =>
-            setModalLiquidacion({ despacho, liquidacion: null })
-          }
+          onRegistrarLiquidacion={(despacho) => abrirLiquidacion(despacho, null)}
           onEditarLiquidacion={(despacho, liquidacion) =>
-            setModalLiquidacion({ despacho, liquidacion })
+            abrirLiquidacion(despacho, liquidacion)
           }
           onEliminarLiquidacion={(despacho, liquidacion) =>
             void acciones.eliminarLiquidacion(

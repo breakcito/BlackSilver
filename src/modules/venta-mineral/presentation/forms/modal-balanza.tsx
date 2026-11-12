@@ -21,6 +21,7 @@ interface Props {
   flete: FleteDespachoItem | null;
   onGuardar: (payload: {
     codigo_ticket_balanza: string;
+    segunda_guia_remitente: string | null;
     peso_bruto: number;
     tara: number;
     fecha_hora_pesaje: string;
@@ -38,6 +39,9 @@ interface Props {
 export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
   const [codigoTicket, setCodigoTicket] = useState(
     () => flete?.codigo_ticket_balanza ?? "",
+  );
+  const [segundaGuia, setSegundaGuia] = useState(
+    () => flete?.segunda_guia_remitente ?? "",
   );
   const [pesoBruto, setPesoBruto] = useState<number | string>(
     () => flete?.peso_bruto ?? 0,
@@ -65,6 +69,7 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
 
     const payload = {
       codigo_ticket_balanza: codigoTicket.trim().toUpperCase(),
+      segunda_guia_remitente: segundaGuia.trim().toUpperCase() || null,
       peso_bruto: Number(pesoBruto) || 0,
       tara: Number(tara) || 0,
       fecha_hora_pesaje: fechaHoraPesaje,
@@ -125,8 +130,8 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
         <TextInput
           label="Guía de Remisión (2da)"
           placeholder="GRR-000123"
-          value={""}
-          // onChange={""}
+          value={segundaGuia}
+          onChange={(e) => setSegundaGuia(e.currentTarget.value.toUpperCase())}
           disabled={saving}
           classNames={inputClasses}
           size="xs"

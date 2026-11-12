@@ -1,10 +1,13 @@
 import { useState } from "react";
 import {
+  ActionIcon,
   Badge,
   Button,
+  Divider,
   Group,
   Loader,
   Paper,
+  SimpleGrid,
   Stack,
   Tabs,
   Text,
@@ -23,7 +26,6 @@ import {
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
-import { EstadoDespachoMineral } from "../../../../shared/enums/venta-mineral/estado-despacho-mineral";
 import { EstadoLiquidacionMineral } from "../../../../shared/enums/venta-mineral/estado-liquidacion-mineral";
 import type { TipoComprobanteDespacho } from "../../service/venta-mineral.requests";
 import type {
@@ -126,34 +128,6 @@ export const DespachoDetalle = ({
     (detalle.total_pagado_analisis ?? 0) +
     (detalle.total_pagado_liquidacion ?? 0);
 
-  /**
-   * Indicador compacto de la cabecera: etiqueta y valor en una sola linea.
-   */
-  const Pill = ({
-    etiqueta,
-    valor,
-    color,
-  }: {
-    etiqueta: string;
-    valor: string;
-    color?: string;
-  }) => (
-    <span className="inline-flex items-baseline gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5">
-      <span className="text-[10px] uppercase tracking-wide text-zinc-300">
-        {etiqueta}
-      </span>
-      <span className={`text-xs font-bold ${color ?? "text-zinc-200"}`}>
-        {valor}
-      </span>
-    </span>
-  );
-
-  const colorEstado = (estado: EstadoDespachoMineral) => {
-    if (estado === EstadoDespachoMineral.Liquidado) return "green";
-    if (estado === EstadoDespachoMineral.EnProceso) return "yellow";
-    return "gray";
-  };
-
   return (
     <Stack gap="md" className="animate-fade-in">
       {/* Cabecera del despacho: compacta, sin columnas gigantes */}
@@ -163,7 +137,7 @@ export const DespachoDetalle = ({
         className="bg-zinc-900/60 border border-zinc-800"
       >
         <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
-          <Group gap="sm" wrap="nowrap" className="min-w-0">
+          <Group gap="sm" wrap="wrap" className="min-w-0">
             {onVolver && (
               <Button
                 variant="subtle"
@@ -175,32 +149,57 @@ export const DespachoDetalle = ({
                 Volver
               </Button>
             )}
-            <div className="min-w-0">
-              <Group gap="xs">
-                <Text size="xs" fw={800} c="white" className="font-mono">
-                  {detalle.lote_codigo ?? "Despacho"}
+
+            {/* Indicadores en una sola fila, con el mismo criterio y la
+                misma paleta que la liquidacion de venta de carbon: etiqueta
+                en gris, valor con color y divisores verticales. */}
+            <Group gap="xs" wrap="wrap" align="center" className="min-w-0">
+              <Text size="xs" c="gray">
+                Sacos{" "}
+                <Text span size="xs" fw={700} c="blue">
+                  {formatNumber(detalle.cantidad_sacos)}
                 </Text>
-                <Badge
-                  color={colorEstado(detalle.estado)}
-                  variant="light"
-                  size="xs"
-                  radius="sm"
-                >
-                  {detalle.estado}
-                </Badge>
-                {loading && <Loader size="xs" color="indigo" />}
-              </Group>
-              <Text size="xs" c="gray" mt={2}>
-                {detalle.mina ?? "sin mina"} · {detalle.labor ?? "sin labor"} ·{" "}
-                {detalle.molino ?? "sin molino"} ·{" "}
-                {detalle.fecha_despacho
-                  ? dayjs(detalle.fecha_despacho).format("DD/MM/YYYY")
-                  : "sin fecha"}
               </Text>
-            </div>
+              <Divider orientation="vertical" />
+              <Text size="xs" c="gray">
+                Peso{" "}
+                <Text span size="xs" fw={700} c="pink">
+                  {formatNumber(detalle.peso_neto_total)} t
+                </Text>
+              </Text>
+              <Divider orientation="vertical" />
+              <Text size="xs" c="gray">
+                Gastos{" "}
+                <Text span size="xs" fw={700} c="orange.3">
+                  S/ {formatNumber(totalGastado)}
+                </Text>
+              </Text>
+              <Divider orientation="vertical" />
+              <Text size="xs" c="gray">
+                Facturado{" "}
+                <Text span size="xs" fw={700} c="cyan">
+                  S/ {formatNumber(totalFacturado)}
+                </Text>
+              </Text>
+              <Divider orientation="vertical" />
+              <Text size="xs" c="gray">
+                Pagado{" "}
+                <Text span size="xs" fw={700} c="lime.3">
+                  S/ {formatNumber(totalPagado)}
+                </Text>
+              </Text>
+              <Divider orientation="vertical" />
+              <Text size="xs" c="gray">
+                Contratista{" "}
+                <Text span size="xs" fw={700} c="zinc.200">
+                  {detalle.contratista ?? "-"}
+                </Text>
+              </Text>
+            </Group>
           </Group>
 
           <Group gap={4} wrap="nowrap">
+            {loading && <Loader size="xs" color="indigo" />}
             <Tooltip label="Editar despacho" withArrow>
               <Button
                 variant="light"
@@ -231,31 +230,6 @@ export const DespachoDetalle = ({
               </Button>
             </Tooltip>
           </Group>
-        </Group>
-
-        {/* Indicadores en una sola fila compacta */}
-        <Group gap={6} mt={8} wrap="wrap">
-          <Pill etiqueta="Sacos" valor={formatNumber(detalle.cantidad_sacos)} />
-          <Pill
-            etiqueta="Peso"
-            valor={`${formatNumber(detalle.peso_neto_total)} t`}
-          />
-          <Pill
-            etiqueta="Gastos"
-            valor={`S/ ${formatNumber(totalGastado)}`}
-            color="orange.3"
-          />
-          <Pill
-            etiqueta="Facturado"
-            valor={`S/ ${formatNumber(totalFacturado)}`}
-            color="indigo.3"
-          />
-          <Pill
-            etiqueta="Pagado"
-            valor={`S/ ${formatNumber(totalPagado)}`}
-            color="emerald.4"
-          />
-          <Pill etiqueta="Contratista" valor={detalle.contratista ?? "-"} />
         </Group>
 
         {detalle.observaciones && (
@@ -292,9 +266,14 @@ export const DespachoDetalle = ({
             className="bg-zinc-900/40 border border-zinc-800"
           >
             <Group justify="space-between" mb="sm">
-              <Text size="sm" fw={700} c="white">
-                Gastos del despacho
-              </Text>
+              <Group gap="xs">
+                <Text size="sm" fw={700} c="white">
+                  Gastos del despacho
+                </Text>
+                <Badge color="pink" variant="light" size="sm" radius="md">
+                  Total: S/ {formatNumber(detalle.total_gastos)}
+                </Badge>
+              </Group>
               <Button
                 size="compact-xs"
                 radius="md"
@@ -313,16 +292,16 @@ export const DespachoDetalle = ({
                 winchadores del despacho.
               </Text>
             ) : (
-              <Stack gap="xs">
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
                 {detalle.gastos.map((gasto) => (
-                  <Group
+                  <Paper
                     key={gasto.id_gasto_despacho}
-                    justify="space-between"
-                    wrap="nowrap"
-                    className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/70"
+                    p="xs"
+                    radius="md"
+                    className="bg-zinc-900/60 border border-zinc-800/70 min-w-0"
                   >
-                    <div className="min-w-0">
-                      <Group gap="xs">
+                    <Group justify="space-between" wrap="nowrap" gap="xs">
+                      <Group gap="xs" wrap="nowrap" className="min-w-0">
                         <Badge
                           color={
                             gasto.tipo_gasto === "Winche" ? "orange" : "cyan"
@@ -333,55 +312,66 @@ export const DespachoDetalle = ({
                         >
                           {gasto.tipo_gasto}
                         </Badge>
-                        <Text size="sm" c="zinc.200" truncate>
+                        <Text size="xs" c="zinc.200" truncate>
                           {gasto.descripcion ?? "Sin descripcion"}
                         </Text>
                       </Group>
-                      <Text size="xs" c="gray" mt={2}>
+                      <Text
+                        size="sm"
+                        fw={700}
+                        c="orange.3"
+                        className="shrink-0"
+                      >
+                        S/ {formatNumber(gasto.monto)}
+                      </Text>
+                    </Group>
+
+                    <Group
+                      justify="space-between"
+                      wrap="nowrap"
+                      gap="xs"
+                      mt={4}
+                    >
+                      <Text size="11px" c="gray" truncate>
                         {gasto.empleado_registro ?? "Sin registro"} ·{" "}
                         {gasto.created_at
                           ? dayjs(gasto.created_at).format("DD/MM/YYYY")
                           : "-"}
                       </Text>
-                    </div>
-                    <Group gap={4} wrap="nowrap">
-                      <Text size="sm" fw={700} c="orange.3">
-                        S/ {formatNumber(gasto.monto)}
-                      </Text>
-                      <Button
-                        variant="subtle"
-                        color="indigo"
-                        size="compact-xs"
-                        onClick={() => onEditarGasto(gasto)}
-                        leftSection={<IconPencil size={12} />}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="subtle"
-                        color="red"
-                        size="compact-xs"
-                        onClick={() =>
-                          setAEliminar({
-                            titulo: "Eliminar gasto",
-                            descripcion: `Se eliminara el gasto de S/ ${formatNumber(gasto.monto)}.`,
-                            accion: () => onEliminarGasto(gasto),
-                          })
-                        }
-                        leftSection={<IconTrash size={12} />}
-                      >
-                        Eliminar
-                      </Button>
+                      <Group gap={2} wrap="nowrap">
+                        <Tooltip label="Editar gasto" withArrow>
+                          <ActionIcon
+                            variant="subtle"
+                            color="indigo"
+                            size="md"
+                            radius="md"
+                            onClick={() => onEditarGasto(gasto)}
+                          >
+                            <IconPencil size={14} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Eliminar gasto" withArrow>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            size="md"
+                            radius="md"
+                            onClick={() =>
+                              setAEliminar({
+                                titulo: "Eliminar gasto",
+                                descripcion: `Se eliminara el gasto de S/ ${formatNumber(gasto.monto)}.`,
+                                accion: () => onEliminarGasto(gasto),
+                              })
+                            }
+                          >
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Group>
                     </Group>
-                  </Group>
+                  </Paper>
                 ))}
-
-                <Group justify="flex-end">
-                  <Badge color="orange" variant="light" size="md" radius="md">
-                    Total: S/ {formatNumber(detalle.total_gastos)}
-                  </Badge>
-                </Group>
-              </Stack>
+              </SimpleGrid>
             )}
           </Paper>
         </Tabs.Panel>

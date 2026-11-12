@@ -200,7 +200,9 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
           label="Numero de operacion"
           placeholder={exigeOperacion ? "Ej. OP-000123" : "Opcional en efectivo"}
           value={numeroOperacion}
-          onChange={(e) => setNumeroOperacion(e.currentTarget.value)}
+          onChange={(e) =>
+            setNumeroOperacion(e.currentTarget.value.toUpperCase())
+          }
           disabled={saving}
           classNames={inputClasses}
           size="xs"
@@ -267,7 +269,7 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
         label="Observacion"
         placeholder="Notas del pago..."
         value={observacion}
-        onChange={(e) => setObservacion(e.currentTarget.value)}
+        onChange={(e) => setObservacion(e.currentTarget.value.toUpperCase())}
         autosize
         minRows={2}
         maxRows={4}

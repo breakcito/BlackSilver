@@ -76,6 +76,8 @@ export interface FleteDespachoItem {
   placa: string | null;
   licencia_conductor: string | null;
   guia_remitente: string | null;
+  /** 2da guia de remision: se digita al confirmar la llegada al molino. */
+  segunda_guia_remitente: string | null;
   peso_guia: number;
   codigo_ticket_balanza: string | null;
   peso_bruto: number;
