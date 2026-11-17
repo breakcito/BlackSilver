@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import { MESES } from "../../../../shared/variables/meses";
 import type {
   RES_FilaControlVentas,
   RES_ReporteControlVentas,
@@ -542,9 +543,23 @@ const GRUPOS: Grupo[] = [
 
 export interface OpcionesRegistroVentas {
   anio: number;
+  /**
+   * Mes del corte. `undefined` o `null` cuando el reporte cubre el año
+   * completo.
+   */
+  mes?: number | null;
   /** Logo de la empresa como data URL (`data:image/png;base64,...`). */
   logoUrl?: string | null;
 }
+
+/** Etiqueta del periodo del reporte: "Noviembre 2026" o "2026". */
+const etiquetaPeriodo = (anio: number, mes?: number | null): string => {
+  if (!mes) return String(anio);
+
+  const nombre = MESES.find((m) => Number(m.value) === mes)?.label;
+
+  return nombre ? `${nombre} ${anio}` : `${mes}/${anio}`;
+};
 
 /**
  * Construye el builder del workbook. Se separa del hook para poder generar
@@ -554,10 +569,14 @@ export const construirExcelRegistroVentas = (
   reporte: RES_ReporteControlVentas,
   opciones: OpcionesRegistroVentas,
 ): { filename: string; builder: ExcelBuilderFn } => {
-  const filename = `REGISTRO_DE_VENTAS_${opciones.anio}`;
+  const periodo = etiquetaPeriodo(opciones.anio, opciones.mes);
+  const sufijoArchivo = opciones.mes
+    ? `${MESES.find((m) => Number(m.value) === opciones.mes)?.label ?? opciones.mes} ${opciones.anio}`
+    : String(opciones.anio);
+  const filename = `REGISTRO_DE_VENTAS_${sufijoArchivo}`;
 
   const builder: ExcelBuilderFn = async (workbook: ExcelJS.Workbook) => {
-    const ws = workbook.addWorksheet(`REGISTRO DE VENTAS (${opciones.anio})`, {
+    const ws = workbook.addWorksheet(`REGISTRO DE VENTAS (${periodo})`, {
       views: [{ showGridLines: false, state: "frozen", ySplit: 5 }],
     });
 
@@ -630,7 +649,7 @@ export const construirExcelRegistroVentas = (
     // El titulo se mergea en todo el ancho para que quede centrado en la
     // hoja; el logo se ancla encima, en el extremo derecho.
     ws.mergeCells(FILA_TITULO, 1, FILA_TITULO, TOTAL_COLUMNAS);
-    ws.getCell(FILA_TITULO, 1).value = `REGISTRO DE VENTAS (${opciones.anio})`;
+    ws.getCell(FILA_TITULO, 1).value = `REGISTRO DE VENTAS (${periodo})`;
     ws.getCell(FILA_TITULO, 1).font = fontTituloReporte;
     ws.getCell(FILA_TITULO, 1).alignment = {
       vertical: "middle",

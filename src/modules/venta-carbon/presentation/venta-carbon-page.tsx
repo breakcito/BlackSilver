@@ -185,7 +185,7 @@ export const VentaCarbonPage = () => {
         cambiarPeriodo={cambiarPeriodo}
         recargar={recargar}
         loading={loading}
-        onExportarRegistroVentas={() => void exportarRegistroVentas(anio)}
+        onExportarRegistroVentas={() => void exportarRegistroVentas(anio, mes)}
         exportandoRegistroVentas={exportandoRegistroVentas}
       />
 

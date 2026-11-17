@@ -19,7 +19,10 @@ interface Props {
   cambiarPeriodo: (mes: number, anio: number) => void;
   recargar: () => void;
   loading?: boolean;
-  /** Exporta el "Registro de Ventas" del año seleccionado. */
+  /**
+   * Exporta el "Registro de Ventas" del periodo visible: el mes y el año
+   * que estan seleccionados arriba.
+   */
   onExportarRegistroVentas: () => void;
   exportandoRegistroVentas?: boolean;
 }

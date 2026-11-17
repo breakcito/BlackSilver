@@ -29,7 +29,10 @@ import type {
   GastoDespachoItem,
   LiquidacionMineralItem,
 } from "../../service/venta-mineral.responses";
-import type { TipoComprobanteDespacho } from "../../service/venta-mineral.requests";
+import type {
+  SeccionDespachoMineral,
+  TipoComprobanteDespacho,
+} from "../../service/venta-mineral.requests";
 
 interface Props {
   despachos: DespachoMineralResumen[];
@@ -38,18 +41,27 @@ interface Props {
   desplegados: number[];
   /** Detalle ya cargado de cada despacho. */
   detalles: Record<number, DespachoMineralDetalle>;
-  /** Id del despacho que se esta recargando (spinner en su fila). */
-  detalleCargando: number | null;
+  /** Despacho que se esta recargando y la seccion afectada. */
+  detalleCargando: {
+    id_despacho_mineral: number;
+    seccion: SeccionDespachoMineral | null;
+  } | null;
   onExpandedChange: (ids: number[]) => void;
   onEditarDespacho: (despacho: DespachoMineralResumen) => void;
   onEliminarDespacho: (despacho: DespachoMineralResumen) => void;
   onRegistrarGasto: (despacho: DespachoMineralResumen) => void;
   onEditarGasto: (despacho: DespachoMineralResumen, gasto: GastoDespachoItem) => void;
-  onEliminarGasto: (despacho: DespachoMineralResumen, gasto: GastoDespachoItem) => void;
+  onEliminarGasto: (
+    despacho: DespachoMineralResumen,
+    gasto: GastoDespachoItem,
+  ) => void | Promise<unknown>;
   onRegistrarFlete: (despacho: DespachoMineralResumen) => void;
   onEditarFlete: (despacho: DespachoMineralResumen, flete: FleteDespachoItem) => void;
   onRegistrarBalanza: (despacho: DespachoMineralResumen, flete: FleteDespachoItem) => void;
-  onEliminarFlete: (despacho: DespachoMineralResumen, flete: FleteDespachoItem) => void;
+  onEliminarFlete: (
+    despacho: DespachoMineralResumen,
+    flete: FleteDespachoItem,
+  ) => void | Promise<unknown>;
   onRegistrarComprobante: (
     despacho: DespachoMineralResumen,
     tipo: TipoComprobanteDespacho,
@@ -65,7 +77,7 @@ interface Props {
     despacho: DespachoMineralResumen,
     tipo: TipoComprobanteDespacho,
     comprobante: ComprobanteDespachoItem,
-  ) => void;
+  ) => void | Promise<unknown>;
   onRegistrarPago: (
     despacho: DespachoMineralResumen,
     tipo: TipoComprobanteDespacho,
@@ -79,7 +91,7 @@ interface Props {
   onEliminarAnalisis: (
     despacho: DespachoMineralResumen,
     analisis: AnalisisLaboratorioItem,
-  ) => void;
+  ) => void | Promise<unknown>;
   onRegistrarLiquidacion: (despacho: DespachoMineralResumen) => void;
   onEditarLiquidacion: (
     despacho: DespachoMineralResumen,
@@ -88,7 +100,7 @@ interface Props {
   onEliminarLiquidacion: (
     despacho: DespachoMineralResumen,
     liquidacion: LiquidacionMineralItem,
-  ) => void;
+  ) => void | Promise<unknown>;
 }
 
 const formatDate = (iso: string | null | undefined): string => {
@@ -394,7 +406,12 @@ export const DespachoListado = ({
             return (
               <DespachoDetalle
                 detalle={detalle}
-                loading={detalleCargando === record.id_despacho_mineral}
+                seccionCargando={
+                  detalleCargando?.id_despacho_mineral ===
+                  record.id_despacho_mineral
+                    ? detalleCargando.seccion
+                    : null
+                }
                 onRegistrarGasto={() => onRegistrarGasto(record)}
                 onEditarGasto={(gasto) => onEditarGasto(record, gasto)}
                 onEliminarGasto={(gasto) => onEliminarGasto(record, gasto)}

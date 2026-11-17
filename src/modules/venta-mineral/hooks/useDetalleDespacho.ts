@@ -11,6 +11,7 @@ import type {
   RegistrarGastoRequest,
   RegistrarLiquidacionRequest,
   RegistrarPagoRequest,
+  SeccionDespachoMineral,
   TipoComprobanteDespacho,
 } from "../service/venta-mineral.requests";
 
@@ -22,19 +23,26 @@ import type {
  * vuelve a consultar.
  */
 export const useDetalleDespacho = (
-  refrescar: (idDespacho: number) => Promise<void>,
+  refrescar: (
+    idDespacho: number,
+    seccion?: SeccionDespachoMineral,
+  ) => Promise<void>,
 ) => {
   const { notifySuccess, notifyError } = useNotify();
   const [submitting, setSubmitting] = useState(false);
 
   /**
    * Ejecuta una mutacion: avisa el resultado y recarga el detalle.
+   *
+   * `seccion` es la parte del despacho que cambia: se usa para avisar, en
+   * esa sola seccion, que la informacion se esta actualizando.
    */
   const ejecutar = useCallback(
     async <T,>(
       idDespacho: number,
       fn: () => Promise<IRespuesta<T>>,
       mensajeOk: string,
+      seccion?: SeccionDespachoMineral,
     ): Promise<T | null> => {
       setSubmitting(true);
       try {
@@ -44,7 +52,7 @@ export const useDetalleDespacho = (
           notifySuccess(res.message || mensajeOk);
           // El refresco NO bloquea: el modal se cierra al instante y el
           // detalle se actualiza en segundo plano.
-          void refrescar(idDespacho);
+          void refrescar(idDespacho, seccion);
           return res.data;
         }
 
@@ -86,6 +94,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.registrarGasto(idDespacho, payload),
         "Gasto registrado correctamente",
+        "gastos",
       ),
     [ejecutar],
   );
@@ -96,6 +105,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.actualizarGasto(idGasto, payload),
         "Gasto actualizado correctamente",
+        "gastos",
       ),
     [ejecutar],
   );
@@ -106,6 +116,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.eliminarGasto(idGasto),
         "Gasto eliminado correctamente",
+        "gastos",
       ),
     [ejecutar],
   );
@@ -118,6 +129,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.registrarFlete(idDespacho, payload),
         "Flete registrado correctamente",
+        "flete",
       ),
     [ejecutar],
   );
@@ -128,6 +140,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.actualizarFlete(idFlete, payload),
         "Flete actualizado correctamente",
+        "flete",
       ),
     [ejecutar],
   );
@@ -138,6 +151,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.registrarBalanza(idFlete, payload),
         "Ticket de balanza registrado correctamente",
+        "flete",
       ),
     [ejecutar],
   );
@@ -148,6 +162,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.eliminarFlete(idFlete),
         "Flete eliminado correctamente",
+        "flete",
       ),
     [ejecutar],
   );
@@ -160,6 +175,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.registrarAnalisis(idDespacho, payload),
         "Analisis registrado correctamente",
+        "analisis",
       ),
     [ejecutar],
   );
@@ -174,6 +190,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.actualizarAnalisis(idAnalisis, payload),
         "Analisis actualizado correctamente",
+        "analisis",
       ),
     [ejecutar],
   );
@@ -184,6 +201,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.eliminarAnalisis(idAnalisis),
         "Analisis eliminado correctamente",
+        "analisis",
       ),
     [ejecutar],
   );
@@ -196,6 +214,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.registrarLiquidacion(idDespacho, payload),
         "Liquidacion registrada correctamente",
+        "liquidacion",
       ),
     [ejecutar],
   );
@@ -210,6 +229,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.actualizarLiquidacion(idLiquidacion, payload),
         "Liquidacion actualizada correctamente",
+        "liquidacion",
       ),
     [ejecutar],
   );
@@ -220,6 +240,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.eliminarLiquidacion(idLiquidacion),
         "Liquidacion eliminada correctamente",
+        "liquidacion",
       ),
     [ejecutar],
   );
@@ -236,6 +257,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.registrarComprobante(tipo, idDespacho, payload),
         "Comprobante registrado correctamente",
+        tipo,
       ),
     [ejecutar],
   );
@@ -256,6 +278,7 @@ export const useDetalleDespacho = (
             payload,
           ),
         "Comprobante actualizado correctamente",
+        tipo,
       ),
     [ejecutar],
   );
@@ -270,6 +293,7 @@ export const useDetalleDespacho = (
         idDespacho,
         () => VentaMineralService.eliminarComprobante(tipo, idComprobante),
         "Comprobante eliminado correctamente",
+        tipo,
       ),
     [ejecutar],
   );
@@ -288,6 +312,7 @@ export const useDetalleDespacho = (
         () =>
           VentaMineralService.registrarPago(tipo, idComprobante, payload),
         "Pago registrado correctamente",
+        tipo,
       ),
     [ejecutar],
   );

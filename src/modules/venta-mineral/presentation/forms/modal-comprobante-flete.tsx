@@ -163,6 +163,13 @@ export const ModalComprobanteFlete = ({
       setError("El despacho no tiene un flete registrado");
       return;
     }
+    // El id del flete es lo que se envia a la API: sin el, el comprobante
+    // se registraria sin flete y el backend lo rechaza.
+    const idFlete = flete.id_flete_despacho;
+    if (typeof idFlete !== "number" || idFlete <= 0) {
+      setError("El flete no tiene un identificador valido");
+      return;
+    }
     if (!codigo.trim()) {
       setError("Ingresa el numero del comprobante");
       return;
@@ -195,7 +202,7 @@ export const ModalComprobanteFlete = ({
       con_detraccion: conDetraccion,
       porcentaje_detraccion: Number(porcentajeDetraccion) || 0,
       porcentaje_igv: Number(porcentajeIgv) || 0,
-      id_fletes: [flete.id_flete_despacho],
+      id_fletes: [idFlete],
       id_transportista_mineral: flete.id_transportista_mineral,
       toneladas_cobradas: Number(toneladas) || 0,
       precio_por_tonelada: Number(precioPorTonelada) || 0,

@@ -50,6 +50,7 @@ export const VentaMineralPage = () => {
     data,
     lotesDespachables,
     isLoading,
+    submitting,
     desplegados,
     detalles,
     detalleCargando,
@@ -57,6 +58,7 @@ export const VentaMineralPage = () => {
     cargarLotes,
     refetchLotes,
     insertDespacho,
+    updateDespachoLocal,
     refrescarDetalle,
     cambiarDespliegue,
     eliminarDespacho,
@@ -249,7 +251,7 @@ export const VentaMineralPage = () => {
             setModalGasto({ despacho, gasto })
           }
           onEliminarGasto={(despacho, gasto) =>
-            void acciones.eliminarGasto(
+            acciones.eliminarGasto(
               despacho.id_despacho_mineral,
               gasto.id_gasto_despacho,
             )
@@ -260,7 +262,7 @@ export const VentaMineralPage = () => {
             setModalBalanza({ despacho, flete })
           }
           onEliminarFlete={(despacho, flete) =>
-            void acciones.eliminarFlete(
+            acciones.eliminarFlete(
               despacho.id_despacho_mineral,
               flete.id_flete_despacho,
             )
@@ -277,7 +279,7 @@ export const VentaMineralPage = () => {
             setModalComprobante({ despacho, tipo, comprobante })
           }
           onEliminarComprobante={(despacho, tipo, comprobante) =>
-            void acciones.eliminarComprobante(
+            acciones.eliminarComprobante(
               despacho.id_despacho_mineral,
               tipo,
               comprobante.id_comprobante,
@@ -291,7 +293,7 @@ export const VentaMineralPage = () => {
             abrirAnalisis(despacho, analisis)
           }
           onEliminarAnalisis={(despacho, analisis) =>
-            void acciones.eliminarAnalisis(
+            acciones.eliminarAnalisis(
               despacho.id_despacho_mineral,
               analisis.id_analisis_laboratorio,
             )
@@ -301,7 +303,7 @@ export const VentaMineralPage = () => {
             abrirLiquidacion(despacho, liquidacion)
           }
           onEliminarLiquidacion={(despacho, liquidacion) =>
-            void acciones.eliminarLiquidacion(
+            acciones.eliminarLiquidacion(
               despacho.id_despacho_mineral,
               liquidacion.id_liquidacion_mineral,
             )
@@ -330,7 +332,7 @@ export const VentaMineralPage = () => {
             despacho={modalDespacho.despacho}
             onGuardar={async (payload, evidencias) => {
               if (modalDespacho.despacho) {
-                const ok = await acciones.actualizarDespacho(
+                const actualizado = await acciones.actualizarDespacho(
                   modalDespacho.despacho.id_despacho_mineral,
                   {
                     id_lote_mineral: payload.id_lote_mineral,
@@ -340,7 +342,17 @@ export const VentaMineralPage = () => {
                     observaciones: payload.observaciones,
                   },
                 );
-                return ok !== null;
+
+                // La cabecera del despacho se ve en la fila del listado:
+                // se actualiza al instante, sin esperar al refresco.
+                if (actualizado) {
+                  updateDespachoLocal(
+                    modalDespacho.despacho.id_despacho_mineral,
+                    actualizado,
+                  );
+                }
+
+                return actualizado !== null;
               }
 
               const res = await VentaMineralService.registrarDespacho(
@@ -711,6 +723,7 @@ export const VentaMineralPage = () => {
               variant="default"
               radius="lg"
               size="xs"
+              disabled={submitting}
               onClick={() => setDespachoPorEliminar(null)}
             >
               Cancelar
@@ -719,10 +732,11 @@ export const VentaMineralPage = () => {
               color="red"
               radius="lg"
               size="xs"
+              loading={submitting}
               leftSection={<TrashIcon className="w-4 h-4" />}
-              onClick={() => {
+              onClick={async () => {
                 if (!despachoPorEliminar) return;
-                void eliminarDespacho(despachoPorEliminar.id_despacho_mineral);
+                await eliminarDespacho(despachoPorEliminar.id_despacho_mineral);
                 setDespachoPorEliminar(null);
               }}
             >

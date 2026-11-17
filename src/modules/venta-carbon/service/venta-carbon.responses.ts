@@ -305,8 +305,10 @@ export interface RES_FilaControlVentas {
   pago_banco: string | null;
 }
 
-/** Reporte "Registro de Ventas" de un año. */
+/** Reporte "Registro de Ventas" de un año (opcionalmente de un mes). */
 export interface RES_ReporteControlVentas {
   anio: number;
+  /** Mes del corte. `null` cuando el reporte cubre el año completo. */
+  mes: number | null;
   cargas: RES_FilaControlVentas[];
 }

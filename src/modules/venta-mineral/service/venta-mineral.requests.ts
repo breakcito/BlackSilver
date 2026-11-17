@@ -307,6 +307,19 @@ export type TipoComprobanteDespacho =
   | "analisis"
   | "liquidacion";
 
+/**
+ * Secciones del detalle de un despacho: una por pestana.
+ *
+ * Es la que se recarga tras un cambio: el indicador de carga se dibuja solo
+ * en la seccion que se toco.
+ */
+export type SeccionDespachoMineral =
+  | "gastos"
+  | "flete"
+  | "molienda"
+  | "analisis"
+  | "liquidacion";
+
 export interface RegistrarComprobanteRequest {
   codigo_comprobante: string;
   fecha_emision: string;

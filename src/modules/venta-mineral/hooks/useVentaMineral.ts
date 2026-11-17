@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNotify } from "../../../hooks/useNotify";
 import type { IRespuesta } from "../../../shared/interfaces/_response";
 import { VentaMineralService } from "../service/venta-mineral.service";
+import type { SeccionDespachoMineral } from "../service/venta-mineral.requests";
 import type {
   DespachoMineralDetalle,
   DespachoMineralResumen,
@@ -39,8 +40,14 @@ export const useVentaMineral = (
   const [detalles, setDetalles] = useState<
     Record<number, DespachoMineralDetalle>
   >({});
-  /** Id del despacho que se esta recargando (spinner en su fila). */
-  const [detalleCargando, setDetalleCargando] = useState<number | null>(null);
+  /**
+   * Despacho que se esta recargando y la seccion afectada (spinner en esa
+   * seccion). `null` cuando no hay nada recargandose.
+   */
+  const [detalleCargando, setDetalleCargando] = useState<{
+    id_despacho_mineral: number;
+    seccion: SeccionDespachoMineral | null;
+  } | null>(null);
 
   const fetchDespachos = useCallback(async () => {
     setIsLoading(true);
@@ -135,27 +142,33 @@ export const useVentaMineral = (
   /**
    * Carga (o recarga) el arbol de un despacho: gastos, fletes,
    * comprobantes, analisis y liquidaciones.
+   *
+   * `seccion` es la parte que cambio: se dibuja el spinner solo ahi, para
+   * que el resto del detalle siga siendo legible.
    */
-  const refrescarDetalle = useCallback(async (idDespacho: number) => {
-    setDetalleCargando(idDespacho);
-    try {
-      const response = await VentaMineralService.getDespacho(idDespacho);
+  const refrescarDetalle = useCallback(
+    async (idDespacho: number, seccion?: SeccionDespachoMineral) => {
+      setDetalleCargando({ id_despacho_mineral: idDespacho, seccion: seccion ?? null });
+      try {
+        const response = await VentaMineralService.getDespacho(idDespacho);
 
-      if (response.success && response.data) {
-        setDetalles((prev) => ({
-          ...prev,
-          [idDespacho]: response.data as DespachoMineralDetalle,
-        }));
-      } else {
-        notifyError(response.message || "No se pudo cargar el despacho");
+        if (response.success && response.data) {
+          setDetalles((prev) => ({
+            ...prev,
+            [idDespacho]: response.data as DespachoMineralDetalle,
+          }));
+        } else {
+          notifyError(response.message || "No se pudo cargar el despacho");
+        }
+      } catch (error) {
+        console.error(error);
+        notifyError("Error de conexión al cargar el despacho");
+      } finally {
+        setDetalleCargando(null);
       }
-    } catch (error) {
-      console.error(error);
-      notifyError("Error de conexión al cargar el despacho");
-    } finally {
-      setDetalleCargando(null);
-    }
-  }, [notifyError]);
+    },
+    [notifyError],
+  );
 
   /**
    * Despliega una fila: si su detalle todavia no se cargo, se pide.
