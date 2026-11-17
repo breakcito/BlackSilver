@@ -224,7 +224,7 @@ export const NavegacionTab = () => {
                     <ChevronRightIcon className="w-4 h-4" />
                   )}
                 </ActionIcon>
-                <div className="flex-1">
+                <div className="flex">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-white">
                       {menu.nombre}
@@ -301,7 +301,7 @@ export const NavegacionTab = () => {
                             <ChevronRightIcon className="w-3 h-3" />
                           )}
                         </ActionIcon>
-                        <div className="flex-1">
+                        <div className="flex">
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-zinc-200">
                               {sub.nombre}
@@ -370,7 +370,7 @@ export const NavegacionTab = () => {
                         sub.modulos.map((mod: RES_ModuloMenu) => (
                           <div key={`md-${mod.id}`} className="ml-8 mt-1">
                             <div className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-zinc-800/30 transition-all">
-                              <div className="flex-1">
+                              <div className="flex">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-zinc-300">
                                     {mod.nombre}

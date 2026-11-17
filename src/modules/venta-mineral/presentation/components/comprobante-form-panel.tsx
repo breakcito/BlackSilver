@@ -133,7 +133,11 @@ export const ComprobanteFormPanel = ({
         {igvEnFila2 && inputIgv}
       </SimpleGrid>
 
-      <Paper p="md" radius="lg" className="bg-zinc-900/60 border border-zinc-800">
+      <Paper
+        p="md"
+        radius="lg"
+        className="bg-zinc-900/60 border border-zinc-800"
+      >
         <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
           Importes del comprobante
         </Text>
@@ -166,13 +170,11 @@ export const ComprobanteFormPanel = ({
                 <Text size="sm" fw={600} c="orange.3">
                   {simbolo} {formatNumber(importes.monto_detraccion)}
                 </Text>
-              </Text>
-              <Text size="xs" c="gray">
-                Detraccion en soles
                 <Text size="sm" fw={600} c="orange.3">
                   S/ {formatNumber(importes.monto_detraccion_soles)}
                 </Text>
               </Text>
+              
             </>
           ) : (
             <Text size="xs" c="gray">

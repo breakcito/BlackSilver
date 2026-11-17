@@ -195,12 +195,17 @@ export const ModalPago = ({
           <Select
             label="Medio de pago"
             data={[
-              { value: MedioPagoVentaCarbon.Transferencia, label: "Transferencia" },
+              {
+                value: MedioPagoVentaCarbon.Transferencia,
+                label: "Transferencia",
+              },
               { value: MedioPagoVentaCarbon.Deposito, label: "Depósito" },
               { value: MedioPagoVentaCarbon.Efectivo, label: "Efectivo" },
             ]}
             value={medioPago}
-            onChange={(val) => setMedioPago(val ?? MedioPagoVentaCarbon.Transferencia)}
+            onChange={(val) =>
+              setMedioPago(val ?? MedioPagoVentaCarbon.Transferencia)
+            }
             classNames={inputClasses}
             size="xs"
             radius="lg"
@@ -227,7 +232,9 @@ export const ModalPago = ({
 
           <TextInput
             label="Numero de operacion"
-            placeholder={exigeOperacion ? "Ej. OP-000123" : "Opcional en efectivo"}
+            placeholder={
+              exigeOperacion ? "Ej. OP-000123" : "Opcional en efectivo"
+            }
             value={numeroOperacion}
             onChange={(e) => setNumeroOperacion(e.currentTarget.value)}
             classNames={inputClasses}
@@ -250,11 +257,11 @@ export const ModalPago = ({
 
         <Switch
           label="El pago es para la detraccion"
-          description={
-            esParaDetraccion
-              ? "Se descuenta del saldo de detraccion"
-              : "Se descuenta del saldo del neto a pagar"
-          }
+          // description={
+          //   esParaDetraccion
+          //     ? "Se descuenta del saldo de detraccion"
+          //     : "Se descuenta del saldo del neto a pagar"
+          // }
           checked={esParaDetraccion}
           onChange={(e) => setEsParaDetraccion(e.currentTarget.checked)}
           color="orange"
@@ -285,13 +292,13 @@ export const ModalPago = ({
             radius="lg"
             disabled={saving}
           />
-          <Text size="xs" c="gray">
+          <Text size="xs" c="gray" mt={"5px"}>
             Saldo pendiente
             <Text size="sm" fw={700} c="orange.3">
               S/ {formatNumber(pendiente)}
             </Text>
           </Text>
-          <Text size="xs" c="gray">
+          <Text size="xs" c="gray" mt={"5px"}>
             Comprobante
             <Text size="sm" fw={700} c="zinc.200">
               {comprobante.codigo_comprobante}
@@ -311,6 +318,7 @@ export const ModalPago = ({
           value={observacion}
           onChange={(e) => setObservacion(e.currentTarget.value)}
           mt="sm"
+          mb="sm"
           autosize
           minRows={2}
           maxRows={4}

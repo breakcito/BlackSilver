@@ -633,97 +633,7 @@ export const DespachoDetalle = ({
   return (
     <Stack gap="md" className="animate-fade-in">
       {/* Cabecera del despacho: compacta, sin columnas gigantes */}
-      <Paper
-        p="xs"
-        radius="lg"
-        className="bg-zinc-900/60 border border-zinc-800"
-      >
-        <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
-          <Group gap="sm" wrap="wrap" className="min-w-0">
-            {onVolver && (
-              <Button
-                variant="subtle"
-                color="gray"
-                size="compact-sm"
-                onClick={onVolver}
-                leftSection={<IconArrowLeft size={16} />}
-              >
-                Volver
-              </Button>
-            )}
-
-            {/* Indicadores en una sola fila, con el mismo criterio y la
-                misma paleta que la liquidacion de venta de carbon: etiqueta
-                en gris, valor con color y divisores verticales. */}
-            <Group gap="xs" wrap="wrap" align="center" className="min-w-0">
-              <Text size="xs" c="gray">
-                Sacos{" "}
-                <Text span size="xs" fw={700} c="blue">
-                  {formatNumber(detalle.cantidad_sacos)}
-                </Text>
-              </Text>
-              <Divider orientation="vertical" />
-              <Text size="xs" c="gray">
-                Peso{" "}
-                <Text span size="xs" fw={700} c="pink">
-                  {formatNumber(detalle.peso_neto_total)} t
-                </Text>
-              </Text>
-              <Divider orientation="vertical" />
-              <Text size="xs" c="gray">
-                Gastos{" "}
-                <Text span size="xs" fw={700} c="orange.3">
-                  S/ {formatNumber(totalGastado)}
-                </Text>
-              </Text>
-              <Divider orientation="vertical" />
-              <Text size="xs" c="gray">
-                Facturado{" "}
-                <Text span size="xs" fw={700} c="cyan">
-                  S/ {formatNumber(totalFacturado)}
-                  {totalFacturadoDolares > 0 && (
-                    <Text span size="xs" fw={700} c="teal.3">
-                      {" "}
-                      · $ {formatNumber(totalFacturadoDolares)}
-                    </Text>
-                  )}
-                </Text>
-              </Text>
-              <Divider orientation="vertical" />
-              <Text size="xs" c="gray">
-                Pagado{" "}
-                <Text span size="xs" fw={700} c="lime.3">
-                  S/ {formatNumber(totalPagado)}
-                  {totalFacturadoDolares > 0 && (
-                    <Text span size="xs" fw={700} c="teal.3">
-                      {" "}
-                      · $ {formatNumber(totalPagadoDolares)}
-                    </Text>
-                  )}
-                </Text>
-              </Text>
-              <Divider orientation="vertical" />
-              <Text size="xs" c="gray">
-                Contratista{" "}
-                <Text span size="xs" fw={700} c="zinc.200">
-                  {detalle.contratista ?? "-"}
-                </Text>
-              </Text>
-            </Group>
-          </Group>
-
-          <Group gap={4} wrap="nowrap">
-            {loading && <Loader size="xs" color="indigo" />}
-          </Group>
-        </Group>
-
-        {detalle.observaciones && (
-          <Text size="xs" c="gray" mt="sm">
-            {detalle.observaciones}
-          </Text>
-        )}
-      </Paper>
-
+ 
       <Tabs defaultValue="gastos" variant="outline" color="indigo">
         <Tabs.List>
           <Tabs.Tab value="gastos" leftSection={<IconWallet size={14} />}>
@@ -777,7 +687,7 @@ export const DespachoDetalle = ({
                 winchadores del despacho.
               </Text>
             ) : (
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
                 {detalle.gastos.map((gasto) => (
                   <Paper
                     key={gasto.id_gasto_despacho}

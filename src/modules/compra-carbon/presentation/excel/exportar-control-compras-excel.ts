@@ -241,7 +241,7 @@ const GRUPOS: Grupo[] = [
         valor: almacenDestino,
       },
       {
-        titulo: "TRACTÓ",
+        titulo: "TRACTO",
         ancho: 12,
         sub: "PLACAS",
         valor: (f) => texto(f.placa),

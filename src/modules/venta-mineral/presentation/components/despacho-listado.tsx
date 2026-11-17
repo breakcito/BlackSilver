@@ -209,52 +209,52 @@ export const DespachoListado = ({
           </div>
         ),
       },
-      {
-        accessor: "total_facturado",
-        title: "Facturado / Pagado",
-        textAlign: "center",
-        width: 180,
-        render: (r) => {
-          const facturado =
-            (r.total_facturado ?? 0) +
-            (r.total_facturado_molienda ?? 0) +
-            (r.total_facturado_analisis ?? 0) +
-            (r.total_facturado_liquidacion ?? 0);
-          const pagado =
-            (r.total_pagado ?? 0) +
-            (r.total_pagado_molienda ?? 0) +
-            (r.total_pagado_analisis ?? 0) +
-            (r.total_pagado_liquidacion ?? 0);
+      // {
+      //   accessor: "total_facturado",
+      //   title: "Facturado",
+      //   textAlign: "center",
+      //   width: 180,
+      //   render: (r) => {
+      //     const facturado =
+      //       (r.total_facturado ?? 0) +
+      //       (r.total_facturado_molienda ?? 0) +
+      //       (r.total_facturado_analisis ?? 0) +
+      //       (r.total_facturado_liquidacion ?? 0);
+      //     const pagado =
+      //       (r.total_pagado ?? 0) +
+      //       (r.total_pagado_molienda ?? 0) +
+      //       (r.total_pagado_analisis ?? 0) +
+      //       (r.total_pagado_liquidacion ?? 0);
 
-          // Parte en dolares: solo el comprobante de flete puede estar en
-          // dolares, y los agregados de arriba estan siempre en soles.
-          const facturadoDolares = r.total_facturado_dolares ?? 0;
-          const pagadoDolares = r.total_pagado_dolares ?? 0;
+      //     // Parte en dolares: solo el comprobante de flete puede estar en
+      //     // dolares, y los agregados de arriba estan siempre en soles.
+      //     const facturadoDolares = r.total_facturado_dolares ?? 0;
+      //     const pagadoDolares = r.total_pagado_dolares ?? 0;
 
-          return (
-            <div className="flex flex-col gap-0.5">
-              <Text size="xs" fw={700} c="indigo.3">
-                S/ {formatNumber(facturado)}
-                {facturadoDolares > 0 && (
-                  <Text span size="xs" fw={700} c="teal.3">
-                    {" "}
-                    · $ {formatNumber(facturadoDolares)}
-                  </Text>
-                )}
-              </Text>
-              <Text size="xs" c="emerald.4">
-                S/ {formatNumber(pagado)}
-                {facturadoDolares > 0 && (
-                  <Text span size="xs" fw={700} c="teal.3">
-                    {" "}
-                    · $ {formatNumber(pagadoDolares)}
-                  </Text>
-                )}
-              </Text>
-            </div>
-          );
-        },
-      },
+      //     return (
+      //       <div className="flex flex-col gap-0.5">
+      //         <Text size="xs" fw={700} c="indigo.3">
+      //           S/ {formatNumber(facturado)}
+      //           {facturadoDolares > 0 && (
+      //             <Text span size="xs" fw={700} c="teal.3">
+      //               {" "}
+      //               · $ {formatNumber(facturadoDolares)}
+      //             </Text>
+      //           )}
+      //         </Text>
+      //         {/* <Text size="xs" c="emerald.4">
+      //           S/ {formatNumber(pagado)}
+      //           {facturadoDolares > 0 && (
+      //             <Text span size="xs" fw={700} c="teal.3">
+      //               {" "}
+      //               · $ {formatNumber(pagadoDolares)}
+      //             </Text>
+      //           )}
+      //         </Text> */}
+      //       </div>
+      //     );
+      //   },
+      // },
       {
         accessor: "estado",
         title: "Estado",

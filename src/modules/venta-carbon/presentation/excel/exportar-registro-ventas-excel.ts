@@ -268,7 +268,7 @@ const GRUPOS: Grupo[] = [
         valor: (f) => texto(f.almacen_cliente_llegada),
       },
       {
-        titulo: "TRACTÓ",
+        titulo: "TRACTO",
         ancho: 12,
         sub: "PLACAS",
         valor: (f) => texto(f.placa),
@@ -382,7 +382,7 @@ const GRUPOS: Grupo[] = [
     color: COLOR_PRECIOS,
     columnas: [
       {
-        titulo: "precio Base",
+        titulo: "PRECIO BASE",
         ancho: 13,
         fmt: "moneda",
         valor: (f) => num(f.precio_base),
