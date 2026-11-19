@@ -127,7 +127,7 @@ const Grilla = ({
                   >
                     {formatearMonto(moneda, c.total)}
                   </Text>
-                  <div className="mr-auto h-1.5 w-[72px] rounded-full bg-zinc-700/60 overflow-hidden">
+                  <div className="mr-auto h-1.5 w-18 rounded-full bg-zinc-700/60 overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
                         esIngreso ? "bg-teal-400" : "bg-red-400"

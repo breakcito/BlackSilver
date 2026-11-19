@@ -294,7 +294,7 @@ export const ControlUsoPage = () => {
                 <>
                   <div className="h-6 w-px bg-zinc-800 shrink-0" />
                   {/* Fin Block */}
-                  <div className="flex flex-col items-start gap-0.5 min-w-[75px]">
+                  <div className="flex flex-col items-start gap-0.5 min-w-18.75">
                     <Text
                       size="10px"
                       fw={700}
@@ -491,7 +491,7 @@ export const ControlUsoPage = () => {
           {/* Inner Content holding Unitario | Total */}
           <Group gap="xs" wrap="nowrap" className="shrink-0">
             {/* Unitario Block */}
-            <div className="flex flex-col items-start gap-0.5 min-w-[95px]">
+            <div className="flex flex-col items-start gap-0.5 min-w-23.75">
               <Text
                 size="10px"
                 fw={700}
@@ -732,7 +732,7 @@ export const ControlUsoPage = () => {
         </div>
 
         {/* Buscador (flex-1 para que sea el más grande) */}
-        <div className="flex-1 min-w-[200px] w-full">
+        <div className="flex-1 min-w-50 w-full">
           <TextInput
             label="Buscar Registro"
             placeholder="Buscar correlativo, fecha..."
@@ -787,7 +787,7 @@ export const ControlUsoPage = () => {
       </div>
 
       {/* Unified Table Card Container (Matches Lotes, Activos Fijos, and Ordenes de Compra) */}
-      <div className="bg-zinc-900/65 border border-zinc-800 rounded-[24px] shadow-2xl overflow-hidden flex flex-col backdrop-blur-md">
+      <div className="bg-zinc-900/65 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col backdrop-blur-md">
         {/* Header Block (Unified header layout) */}
         {selectedAssetObj && (
           <div className="p-3 bg-zinc-900/20 border-b border-zinc-800/50 flex flex-col md:flex-row justify-between items-center gap-4">

@@ -37,7 +37,7 @@ export const ComprobanteCard = ({
   etiqueta,
   embebido,
   onEditar,
-  onEliminar,
+  // onEliminar,
   onRegistrarPago,
   onVerPagos,
 }: Props) => {

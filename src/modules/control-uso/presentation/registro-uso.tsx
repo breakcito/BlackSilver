@@ -1511,7 +1511,7 @@ export const RegistroUso = ({
                 color="zinc.4"
                 size={32}
                 radius="lg"
-                className="mb-[3px] border border-zinc-700/50"
+                className="mb-0.75 border border-zinc-700/50"
               >
                 <QueueListIcon className="w-4 h-4" />
               </ActionIcon>
@@ -1523,7 +1523,7 @@ export const RegistroUso = ({
                 color="indigo.6"
                 size={32}
                 radius="lg"
-                className="mb-[3px]"
+                className="mb-0.75"
               >
                 <PlusIcon className="w-4 h-4" />
               </ActionIcon>
@@ -2942,7 +2942,7 @@ export const RegistroUso = ({
         title={`Historial de Tarifas - ${tipoControl.charAt(0).toUpperCase() + tipoControl.slice(1)}`}
         size="xl"
       >
-        <div className="mt-2 h-[350px]">
+        <div className="mt-2 h-87.5">
           <DataTableEstandar
             idAccessor="id"
             loading={false}
