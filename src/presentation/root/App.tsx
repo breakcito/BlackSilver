@@ -48,6 +48,7 @@ import { KardexCarbonPage } from "../../modules/kardex-carbon/presentation/karde
 import { TamizajeCarbonPage } from "../../modules/tamizaje-carbon/presentation/tamizaje-carbon-page.tsx";
 import { VentaCarbonPage } from "../../modules/venta-carbon/presentation/venta-carbon-page";
 import { VentaMineralPage } from "../../modules/venta-mineral/presentation/venta-mineral.page.tsx";
+import { BalancesPage } from "../../modules/balances/presentation/balances.page.tsx";
 
 export const App = () => {
   const { setModoAuditoria } = useAuditoriaStore();
@@ -156,6 +157,9 @@ export const App = () => {
 
         {/* System module (oculto, solo URL directa) */}
         <Route path="/system" element={<SystemPage />} />
+
+        {/* Balances */}
+        <Route path="/balances" element={<BalancesPage />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/home" replace />} />

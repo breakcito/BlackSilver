@@ -129,6 +129,9 @@ export const iconos_menu_navegacion: IconoMenuEntrada[] = [
   { path: "lote-mineral", icono: CubeIcon },
   { path: "produccion-mineral", icono: CubeIcon },
   { path: "venta-mineral", icono: BanknotesIcon },
+
+  // Balances
+  { path: "balances", icono: ChartPieIcon },
 ];
 
 // Lookup hibrido:
