@@ -182,11 +182,7 @@ export const VentaCarbonLiquidacionPanel = ({
         </Group>
 
         <Group gap={6} wrap="nowrap">
-          <Tooltip
-            label="Exportar liquidación"
-            withArrow
-            position="top"
-          >
+          <Tooltip label="Exportar liquidación" withArrow position="top">
             <Button
               size="xs"
               radius="md"
@@ -194,9 +190,7 @@ export const VentaCarbonLiquidacionPanel = ({
               color="teal"
               leftSection={<IconDownload size={14} />}
               loading={exportandoLiquidacion}
-              onClick={() =>
-                void exportarLiquidacion(venta, liquidacion)
-              }
+              onClick={() => void exportarLiquidacion(venta, liquidacion)}
             >
               Exportar
             </Button>
@@ -328,6 +322,12 @@ export const VentaCarbonLiquidacionPanel = ({
               </Text>
             </Text>
             <Text size="xs" c="gray">
+              IGV{" "}
+              <Text span size="xs" fw={700} c="zinc.200">
+                {formatPEN(comprobante.monto_igv)}
+              </Text>
+            </Text>
+            <Text size="xs" c="gray">
               Total{" "}
               <Text span size="xs" fw={700} c="indigo.3">
                 {formatPEN(comprobante.importe_total)}
@@ -391,7 +391,7 @@ export const VentaCarbonLiquidacionPanel = ({
                   Anticipos amortizados ({anticiposAplicados.length})
                 </Text>
               </Group>
-              <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs">
+              <SimpleGrid cols={{ base: 1, md: 5 }} spacing="xs">
                 {anticiposAplicados.map((ant) => (
                   <Paper
                     key={ant.id_transaccion}
@@ -400,7 +400,7 @@ export const VentaCarbonLiquidacionPanel = ({
                     className="bg-zinc-800 border border-zinc-700 min-w-0"
                   >
                     <Group justify="space-between" wrap="nowrap" gap="xs">
-                      <Text size="11px" c="gray" truncate>
+                      <Text size="xs" c="gray">
                         {ant.codigo_comprobante
                           ? `Doc: ${ant.codigo_comprobante}`
                           : ``}
@@ -429,7 +429,7 @@ export const VentaCarbonLiquidacionPanel = ({
               <Text size="xs" fw={700} c="white">
                 Pagos ({comprobante.pagos.length})
               </Text>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 {comprobante.pagos.map((pago) => (
                   <Paper
                     key={pago.id_pago_venta_carbon}
@@ -439,7 +439,7 @@ export const VentaCarbonLiquidacionPanel = ({
                   >
                     <Group justify="space-between" wrap="nowrap">
                       <Badge
-                        size="xs"
+                        size="sm"
                         variant="light"
                         color={pago.es_para_detraccion ? "orange" : "teal"}
                         radius="xl"
@@ -450,10 +450,10 @@ export const VentaCarbonLiquidacionPanel = ({
                         {formatPEN(pago.monto_pagado)}
                       </Text>
                     </Group>
-                    <Text size="11px" c="gray" truncate>
+                    <Text size="xs" c="gray" >
                       {pago.medio_pago} · Op: {pago.numero_operacion || "S/N"}
                     </Text>
-                    <Text size="11px" c="gray" truncate>
+                    <Text size="xs" c="gray" >
                       {pago.fecha_hora_pago
                         ? dayjs(pago.fecha_hora_pago).format("DD/MM/YYYY HH:mm")
                         : "—"}

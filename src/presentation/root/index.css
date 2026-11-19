@@ -153,3 +153,43 @@ textarea:disabled,
   color: #adb5bd !important;
   -webkit-text-fill-color: #adb5bd !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Foco visual de la fila desplegada (venta / compra de mineral y carbon)
+   El detalle se renderiza en un <tr> hermano del de la fila, asi que la
+   fila y su panel se tratan por separado.
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* Fila desplegada: fondo indigo tenue + barra de acento a la izquierda.
+     El inset shadow va en la primera celda para no depender del fondo
+     rayado (striped) de la tabla, que gana en especificidad. */
+  .mantine-datatable-table tbody tr.fila-enfocada > td {
+    background-color: color-mix(
+      in srgb,
+      var(--mantine-color-indigo-4) 14%,
+      transparent
+    );
+  }
+
+  .mantine-datatable-table tbody tr.fila-enfocada > td:first-child {
+    box-shadow: inset 3px 0 0 0 var(--mantine-color-indigo-4);
+  }
+
+  /* Filas sin desplegar: se atenuan para que no compitan con el detalle.
+     El hover las devuelve a su opacidad normal: la fila sigue siendo
+     clickeable y legible cuando el usuario la apunta. */
+  .mantine-datatable-table tbody tr.fila-atenuada {
+    opacity: 0.35;
+    transition: opacity 0.15s ease;
+  }
+
+  .mantine-datatable-table tbody tr.fila-atenuada:hover {
+    opacity: 1;
+  }
+
+  /* Panel de detalle: se lee como continuacion de la fila desplegada. */
+  .panel-despliegue {
+    background-color: color-mix(in srgb, var(--bg) 92%, transparent);
+    border-left: 3px solid var(--mantine-color-indigo-4);
+  }
+}

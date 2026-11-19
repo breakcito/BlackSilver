@@ -132,7 +132,7 @@ export const TablaCargasVenta = ({
             <>
               <Table.Th
                 ta={"center"}
-                w={100}
+                w={130}
                 className="text-zinc-400 text-xs font-semibold"
               >
                 Precios
@@ -321,24 +321,40 @@ export const TablaCargasVenta = ({
                   <Table.Td ta={"center"}>
                     <div className="flex items-center justify-center">
                       <div className="flex flex-col gap-1.5 text-left">
-                        <Text size="xs" c="blue" fw={700}>
+                        <Text size="xs" c="gray" fw={700}>
                           Base: S/ {formatNumber(carga.precio_base)}
                         </Text>
-                        <Text size="xs" c="lime" fw={700}>
-                          Bono: S/ {formatNumber(carga.bono)}
+                        <Group grow wrap="nowrap">
+                          <Text
+                            size="xs"
+                            c="teal"
+                            fw={700}
+                            className="whitespace-nowrap shrink-0"
+                          >
+                            Bono: S/ {formatNumber(carga.bono)}
+                          </Text>
+                          <Text
+                            size="xs"
+                            c="pink"
+                            fw={700}
+                            className="whitespace-nowrap shrink-0"
+                          >
+                            Desc.: S/ {formatNumber(carga.descuento)}
+                          </Text>
+                        </Group>
+                        <Text size="xs" fw={700} c="blue">
+                          M. Prima: S/{" "}
+                          {formatNumber(carga.precio_materia_prima)}
                         </Text>
-                        <Text size="xs" c="pink" fw={700}>
-                          Desc.: S/ {formatNumber(carga.descuento)}
-                        </Text>
-                        {/* <Text size="xs" fw={700} c="lime">
+                        <Text size="xs" fw={700} c="orange">
                           Sub.: S/ {formatNumber(carga.subtotal)}
                         </Text>
-                        <Text size="xs" fw={700} c="lime">
+                        <Text size="xs" fw={700} c="cyan">
                           IGV: S/ {formatNumber(carga.monto_igv)}
-                        </Text> */}
-                        {/* <Text size="xs" fw={700} c="lime">
+                        </Text>
+                        <Text size="xs" fw={700} c="lime">
                           Total: S/ {formatNumber(carga.total)}
-                        </Text> */}
+                        </Text>
                         <Text size="xs" fw={700} c="yellow">
                           Detr.: S/ {formatNumber(carga.monto_detraccion)}
                         </Text>
@@ -376,12 +392,7 @@ export const TablaCargasVenta = ({
                       label="Esta carga no tiene blending: no se puede confirmar la llegada"
                       withArrow
                     >
-                      <Badge
-                        size="sm"
-                        variant="light"
-                        color="gray"
-                        radius="md"
-                      >
+                      <Badge size="sm" variant="light" color="gray" radius="md">
                         Sin blending
                       </Badge>
                     </Tooltip>

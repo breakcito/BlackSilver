@@ -34,9 +34,6 @@ const formatDateTime = (iso: string | null | undefined): string => {
   return dayjs(d).format("DD/MM/YYYY HH:mm");
 };
 
-const formatPEN = (val: number | null | undefined) =>
-  `S/ ${formatNumber(Number(val ?? 0))}`;
-
 const colorEstadoVenta = (estado: EstadoVentaCarbon) => {
   switch (estado) {
     case EstadoVentaCarbon.Completada:
@@ -187,11 +184,11 @@ export const VentaCarbonListado = ({
                 </ActionIcon>
               </Tooltip>
             </Group>
-            {r.cantidad_cargas_confirmadas > 0 && (
+            {/* {r.cantidad_cargas_confirmadas > 0 && (
               <Badge variant="light" color="lime" radius="md" size="xs">
                 {r.cantidad_cargas_confirmadas} confirmadas
               </Badge>
-            )}
+            )} */}
           </div>
         ),
       },
@@ -216,17 +213,17 @@ export const VentaCarbonListado = ({
           </div>
         ),
       },
-      {
-        accessor: "total_total",
-        title: "Total",
-        textAlign: "center",
-        width: 120,
-        render: (r) => (
-          <Text size="xs" fw={800} c="lime">
-            {formatPEN(r.total_total)}
-          </Text>
-        ),
-      },
+      // {
+      //   accessor: "total_total",
+      //   title: "Total",
+      //   textAlign: "center",
+      //   width: 120,
+      //   render: (r) => (
+      //     <Text size="xs" fw={800} c="lime">
+      //       {formatPEN(r.total_total)}
+      //     </Text>
+      //   ),
+      // },
       {
         accessor: "cantidad_liquidaciones",
         title: "Liquidaciones",
@@ -298,6 +295,20 @@ export const VentaCarbonListado = ({
     [onDespacharCargas, onLiquidar],
   );
 
+  /**
+   * Foco visual de la fila desplegada: la venta abierta se resalta y las
+   * demas se atenuan, para que no se confundan los datos del detalle con
+   * los de otra venta.
+   */
+  const idsDesplegados = useMemo(() => new Set(desplegadas), [desplegadas]);
+  const rowClassName = (r: VentaCarbonResumen) => {
+    // Sin ninguna venta desplegada no se atenua nada.
+    if (idsDesplegados.size === 0) return undefined;
+    return idsDesplegados.has(r.id_venta_carbon)
+      ? "fila-enfocada"
+      : "fila-atenuada";
+  };
+
   return (
     <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
       <DataTableEstandar
@@ -307,6 +318,7 @@ export const VentaCarbonListado = ({
         loading={loading}
         initialPageSize={10}
         noRecordsText="No se encontraron ventas de carbon."
+        rowClassName={rowClassName}
         rowExpansion={{
           // `trigger: "always"` despliega TODAS las filas e ignora el
           // estado controlado. Con "click" el despliegue lo maneja el padre
@@ -320,16 +332,18 @@ export const VentaCarbonListado = ({
           },
           expandable: () => true,
           content: ({ record }: { record: VentaCarbonResumen }) => (
-            <VentaCarbonDetalle
-              detalle={record}
-              loading={detalleCargando === record.id_venta_carbon}
-              onConfirmarLlegada={onConfirmarLlegada}
-              onLiquidarGrupo={onLiquidarGrupo}
-              onEditarLiquidacion={onEditarLiquidacion}
-              onConfirmarLiquidacion={onConfirmarLiquidacion}
-              onRegistrarComprobante={onRegistrarComprobante}
-              onRegistrarPago={onRegistrarPago}
-            />
+            <div className="panel-despliegue">
+              <VentaCarbonDetalle
+                detalle={record}
+                loading={detalleCargando === record.id_venta_carbon}
+                onConfirmarLlegada={onConfirmarLlegada}
+                onLiquidarGrupo={onLiquidarGrupo}
+                onEditarLiquidacion={onEditarLiquidacion}
+                onConfirmarLiquidacion={onConfirmarLiquidacion}
+                onRegistrarComprobante={onRegistrarComprobante}
+                onRegistrarPago={onRegistrarPago}
+              />
+            </div>
           ),
         }}
       />

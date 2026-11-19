@@ -292,6 +292,20 @@ export const CompraCarbonListado = ({
     return base.slice().sort((a, b) => b.id_compra_carbon - a.id_compra_carbon);
   }, [compras, busqueda]);
 
+  /**
+   * Foco visual de la fila desplegada: la compra abierta se resalta y las
+   * demas se atenuan, para que no se confundan los datos del detalle con
+   * los de otra compra.
+   */
+  const idsDesplegados = useMemo(() => new Set(desplegadas), [desplegadas]);
+  const rowClassName = (r: CompraCarbonResumen) => {
+    // Sin ninguna compra desplegada no se atenua nada.
+    if (idsDesplegados.size === 0) return undefined;
+    return idsDesplegados.has(r.id_compra_carbon)
+      ? "fila-enfocada"
+      : "fila-atenuada";
+  };
+
   // ── Seleccion para la exportacion masiva de liquidaciones ───────────
   const seleccionadas = useMemo(
     () => new Set(idsSeleccionados),
@@ -979,6 +993,7 @@ export const CompraCarbonListado = ({
         records={ordenadas}
         loading={false}
         initialPageSize={15}
+        rowClassName={rowClassName}
         // Las cargas se despliegan dentro de la fila, como en venta de carbon.
         rowExpansion={{
           trigger: "click",
@@ -990,12 +1005,14 @@ export const CompraCarbonListado = ({
           },
           expandable: () => true,
           content: ({ record }: { record: CompraCarbonResumen }) => (
-            <CompraCarbonDetalle
-              compra={record}
-              detalle={detalles[record.id_compra_carbon] ?? null}
-              loading={detalleCargando === record.id_compra_carbon}
-              onEditarCarga={onEditarCarga}
-            />
+            <div className="panel-despliegue">
+              <CompraCarbonDetalle
+                compra={record}
+                detalle={detalles[record.id_compra_carbon] ?? null}
+                loading={detalleCargando === record.id_compra_carbon}
+                onEditarCarga={onEditarCarga}
+              />
+            </div>
           ),
         }}
       />

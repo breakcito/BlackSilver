@@ -182,7 +182,7 @@ export const DespachoListado = ({
         ),
       },
       {
-        accessor: "labor",
+        accessor: "contratista",
         title: "Contratista",
         textAlign: "center",
         width: 180,
@@ -231,7 +231,7 @@ export const DespachoListado = ({
         ),
       },
       {
-        accessor: "fecha_despacho",
+        accessor: "observaciones",
         title: "Observaciones",
         textAlign: "center",
         width: 180,
@@ -368,11 +368,25 @@ export const DespachoListado = ({
     ],
     [
       onEditarDespacho,
-      onRegistrarGasto,
-      onRegistrarLiquidacion,
+      // onRegistrarGasto,
+      // onRegistrarLiquidacion,
       onEliminarDespacho,
     ],
   );
+
+  /**
+   * Foco visual de la fila desplegada: el despacho abierto se resalta y los
+   * demas se atenuan, para que no se confundan los datos del detalle con
+   * los de otro despacho.
+   */
+  const idsDesplegados = useMemo(() => new Set(desplegados), [desplegados]);
+  const rowClassName = (r: DespachoMineralResumen) => {
+    // Sin ningun despacho desplegado no se atenua nada.
+    if (idsDesplegados.size === 0) return undefined;
+    return idsDesplegados.has(r.id_despacho_mineral)
+      ? "fila-enfocada"
+      : "fila-atenuada";
+  };
 
   return (
     <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
@@ -383,6 +397,7 @@ export const DespachoListado = ({
         loading={loading}
         initialPageSize={10}
         noRecordsText="No se encontraron despachos de mineral."
+        rowClassName={rowClassName}
         rowExpansion={{
           trigger: "click",
           allowMultiple: false,
@@ -397,59 +412,63 @@ export const DespachoListado = ({
 
             if (!detalle) {
               return (
-                <div className="flex items-center justify-center gap-2 py-6 text-zinc-500 text-xs">
-                  <span className="animate-pulse">
-                    Cargando detalle del despacho...
-                  </span>
+                <div className="panel-despliegue">
+                  <div className="flex items-center justify-center gap-2 py-6 text-zinc-500 text-xs">
+                    <span className="animate-pulse">
+                      Cargando detalle del despacho...
+                    </span>
+                  </div>
                 </div>
               );
             }
 
             return (
-              <DespachoDetalle
-                detalle={detalle}
-                seccionCargando={
-                  detalleCargando?.id_despacho_mineral ===
-                  record.id_despacho_mineral
-                    ? detalleCargando.seccion
-                    : null
-                }
-                onRegistrarGasto={() => onRegistrarGasto(record)}
-                onEditarGasto={(gasto) => onEditarGasto(record, gasto)}
-                onEliminarGasto={(gasto) => onEliminarGasto(record, gasto)}
-                onRegistrarFlete={() => onRegistrarFlete(record)}
-                onEditarFlete={(flete) => onEditarFlete(record, flete)}
-                onRegistrarBalanza={(flete) =>
-                  onRegistrarBalanza(record, flete)
-                }
-                onEliminarFlete={(flete) => onEliminarFlete(record, flete)}
-                onRegistrarComprobante={(tipo, analisis) =>
-                  onRegistrarComprobante(record, tipo, analisis)
-                }
-                onEditarComprobante={(tipo, comprobante) =>
-                  onEditarComprobante(record, tipo, comprobante)
-                }
-                onEliminarComprobante={(tipo, comprobante) =>
-                  onEliminarComprobante(record, tipo, comprobante)
-                }
-                onRegistrarPago={(tipo, comprobante) =>
-                  onRegistrarPago(record, tipo, comprobante)
-                }
-                onRegistrarAnalisis={() => onRegistrarAnalisis(record)}
-                onEditarAnalisis={(analisis) =>
-                  onEditarAnalisis(record, analisis)
-                }
-                onEliminarAnalisis={(analisis) =>
-                  onEliminarAnalisis(record, analisis)
-                }
-                onRegistrarLiquidacion={() => onRegistrarLiquidacion(record)}
-                onEditarLiquidacion={(liquidacion) =>
-                  onEditarLiquidacion(record, liquidacion)
-                }
-                onEliminarLiquidacion={(liquidacion) =>
-                  onEliminarLiquidacion(record, liquidacion)
-                }
-              />
+              <div className="panel-despliegue">
+                <DespachoDetalle
+                  detalle={detalle}
+                  seccionCargando={
+                    detalleCargando?.id_despacho_mineral ===
+                    record.id_despacho_mineral
+                      ? detalleCargando.seccion
+                      : null
+                  }
+                  onRegistrarGasto={() => onRegistrarGasto(record)}
+                  onEditarGasto={(gasto) => onEditarGasto(record, gasto)}
+                  onEliminarGasto={(gasto) => onEliminarGasto(record, gasto)}
+                  onRegistrarFlete={() => onRegistrarFlete(record)}
+                  onEditarFlete={(flete) => onEditarFlete(record, flete)}
+                  onRegistrarBalanza={(flete) =>
+                    onRegistrarBalanza(record, flete)
+                  }
+                  onEliminarFlete={(flete) => onEliminarFlete(record, flete)}
+                  onRegistrarComprobante={(tipo, analisis) =>
+                    onRegistrarComprobante(record, tipo, analisis)
+                  }
+                  onEditarComprobante={(tipo, comprobante) =>
+                    onEditarComprobante(record, tipo, comprobante)
+                  }
+                  onEliminarComprobante={(tipo, comprobante) =>
+                    onEliminarComprobante(record, tipo, comprobante)
+                  }
+                  onRegistrarPago={(tipo, comprobante) =>
+                    onRegistrarPago(record, tipo, comprobante)
+                  }
+                  onRegistrarAnalisis={() => onRegistrarAnalisis(record)}
+                  onEditarAnalisis={(analisis) =>
+                    onEditarAnalisis(record, analisis)
+                  }
+                  onEliminarAnalisis={(analisis) =>
+                    onEliminarAnalisis(record, analisis)
+                  }
+                  onRegistrarLiquidacion={() => onRegistrarLiquidacion(record)}
+                  onEditarLiquidacion={(liquidacion) =>
+                    onEditarLiquidacion(record, liquidacion)
+                  }
+                  onEliminarLiquidacion={(liquidacion) =>
+                    onEliminarLiquidacion(record, liquidacion)
+                  }
+                />
+              </div>
             );
           },
         }}
