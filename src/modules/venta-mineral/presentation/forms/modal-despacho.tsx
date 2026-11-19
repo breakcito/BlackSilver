@@ -357,6 +357,7 @@ export const ModalDespacho = ({
             }
             className="border-zinc-800"
             labelPosition="left"
+            mt={"xs"}
           />
 
           <Group gap="xs" align="flex-end" wrap="nowrap">
@@ -429,14 +430,12 @@ export const ModalDespacho = ({
 
           <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="sm">
             <NumberInput
-              label="Peso de la guia (tn)"
-          
+              label="Peso de la 1ra guia (tn)"
               value={pesoGuia}
               onChange={(valor) => {
                 setPesoGuia(valor);
               }}
               fixedDecimalScale
-              
               hideControls
               disabled={saving}
               classNames={inputClasses}
@@ -449,7 +448,6 @@ export const ModalDespacho = ({
               value={largo}
               onChange={setLargo}
               fixedDecimalScale
-              
               hideControls
               disabled={saving}
               classNames={inputClasses}
@@ -461,7 +459,6 @@ export const ModalDespacho = ({
               value={ancho}
               onChange={setAncho}
               fixedDecimalScale
-              
               hideControls
               disabled={saving}
               classNames={inputClasses}
@@ -473,7 +470,6 @@ export const ModalDespacho = ({
               value={alto}
               onChange={setAlto}
               fixedDecimalScale
-              
               hideControls
               disabled={saving}
               classNames={inputClasses}
@@ -482,11 +478,13 @@ export const ModalDespacho = ({
             />
           </SimpleGrid>
 
-          <MultiFilePicker
-            label="Evidencias del flete"
-            files={archivos}
-            onFilesChange={setArchivos}
-          />
+          <div className="mt-1">
+            <MultiFilePicker
+              label="Evidencias del flete"
+              files={archivos}
+              onFilesChange={setArchivos}
+            />
+          </div>
         </>
       )}
 
@@ -504,6 +502,7 @@ export const ModalDespacho = ({
             }
             className="border-zinc-800"
             labelPosition="left"
+            mt={"xs"}
           />
 
           <Group justify="space-between">
@@ -593,9 +592,7 @@ export const ModalDespacho = ({
                           ),
                         )
                       }
-                      
                       fixedDecimalScale
-                      
                       hideControls
                       disabled={saving}
                       className="w-36 shrink-0"
@@ -609,7 +606,7 @@ export const ModalDespacho = ({
                       size="compact-xs"
                       onClick={() => quitarGasto(indice)}
                       leftSection={<IconTrash size={12} />}
-                      className="shrink-0"
+                      className="shrink-0 bottom-1 rounded-lg"
                     >
                       Quitar
                     </Button>
@@ -631,9 +628,7 @@ export const ModalDespacho = ({
         label="Observaciones"
         placeholder="Notas del despacho..."
         value={observaciones}
-        onChange={(e) =>
-          setObservaciones(e.currentTarget.value.toUpperCase())
-        }
+        onChange={(e) => setObservaciones(e.currentTarget.value.toUpperCase())}
         autosize
         minRows={2}
         maxRows={4}

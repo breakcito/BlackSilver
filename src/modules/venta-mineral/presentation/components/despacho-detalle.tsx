@@ -45,6 +45,7 @@ import type {
 import { ComprobanteCard } from "./comprobante-card";
 import { ConfirmarEliminar } from "./confirmar-eliminar";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { PencilSquareIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   detalle: DespachoMineralDetalle;
@@ -81,7 +82,9 @@ interface Props {
   ) => void;
   onRegistrarAnalisis: () => void;
   onEditarAnalisis: (analisis: AnalisisLaboratorioItem) => void;
-  onEliminarAnalisis: (analisis: AnalisisLaboratorioItem) => void | Promise<unknown>;
+  onEliminarAnalisis: (
+    analisis: AnalisisLaboratorioItem,
+  ) => void | Promise<unknown>;
   onRegistrarLiquidacion: () => void;
   onEditarLiquidacion: (liquidacion: LiquidacionMineralItem) => void;
   onEliminarLiquidacion: (
@@ -107,11 +110,7 @@ const ELEMENTO_QUIMICO = {
  * Cuadradito con el simbolo del elemento quimico, como en la tabla
  * periodica.
  */
-const CuadroElemento = ({
-  elemento,
-}: {
-  elemento: string;
-}) => {
+const CuadroElemento = ({ elemento }: { elemento: string }) => {
   const datos =
     ELEMENTO_QUIMICO[elemento as keyof typeof ELEMENTO_QUIMICO] ??
     ELEMENTO_QUIMICO.Oro;
@@ -700,14 +699,15 @@ export const DespachoDetalle = ({
   } | null>(null);
 
   /** Flete pendiente de confirmacion de elimination. */
-  const [fleteAEliminar, setFleteAEliminar] = useState<FleteDespachoItem | null>(
-    null,
-  );
+  const [fleteAEliminar, setFleteAEliminar] =
+    useState<FleteDespachoItem | null>(null);
   /** El flete se esta borrando en el backend. */
   const [eliminandoFlete, setEliminandoFlete] = useState(false);
 
   /** Comprobantes de analisis cuya factura esta desplegada. */
-  const [comprobantesAbiertos, setComprobantesAbiertos] = useState<number[]>([]);
+  const [comprobantesAbiertos, setComprobantesAbiertos] = useState<number[]>(
+    [],
+  );
 
   /** Comprobante de liquidacion cuya factura esta desplegada. */
   const [facturaDesplegada, setFacturaDesplegada] = useState<number | null>(
@@ -747,8 +747,7 @@ export const DespachoDetalle = ({
   );
 
   const analisisSinFacturar = useMemo(
-    () =>
-      analisisEmpresa.filter((a) => !a.id_comprobante_analisis_despacho),
+    () => analisisEmpresa.filter((a) => !a.id_comprobante_analisis_despacho),
     [analisisEmpresa],
   );
 
@@ -800,21 +799,18 @@ export const DespachoDetalle = ({
         </Tabs.List>
 
         {/* ---------------- GASTOS ---------------- */}
-        <Tabs.Panel value="gastos" pt="md">
+        <Tabs.Panel value="gastos" pt="md" mb={"4rem"}>
           <Paper
             p="md"
             radius="lg"
             className="bg-zinc-900/40 border border-zinc-800"
           >
-            <Group justify="space-between" mb="sm">
+            <Group justify="" mb={"xs"} gap={"sm"}>
               <Group gap="xs">
                 <Text size="sm" fw={700} c="white">
                   Gastos del despacho
                 </Text>
-                <IndicadorCarga
-                  seccion="gastos"
-                  cargando={seccionCargando}
-                />
+                <IndicadorCarga seccion="gastos" cargando={seccionCargando} />
                 <Badge color="pink" variant="light" size="sm" radius="md">
                   Total: S/ {formatNumber(detalle.total_gastos)}
                 </Badge>
@@ -837,7 +833,7 @@ export const DespachoDetalle = ({
                 winchadores del despacho.
               </Text>
             ) : (
-              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
+              <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="xs">
                 {detalle.gastos.map((gasto) => (
                   <Paper
                     key={gasto.id_gasto_despacho}
@@ -922,7 +918,7 @@ export const DespachoDetalle = ({
         </Tabs.Panel>
 
         {/* ---------------- FLETE ---------------- */}
-        <Tabs.Panel value="flete" pt="md">
+        <Tabs.Panel value="flete" pt="md" mb={"4rem"}>
           <Stack gap="md">
             <Paper
               p="md"
@@ -940,71 +936,67 @@ export const DespachoDetalle = ({
                     Flete de la carga
                   </Text>
 
-                  <IndicadorCarga
-                    seccion="flete"
-                    cargando={seccionCargando}
-                  />
+                  <IndicadorCarga seccion="flete" cargando={seccionCargando} />
 
                   {flete && (
                     <>
-                      {flete.id_comprobante_flete_despacho && (
-                        <Badge
-                          color="indigo"
-                          variant="light"
-                          size="xs"
-                          radius="sm"
-                        >
-                          Facturado
-                        </Badge>
-                      )}
+                      <Group gap={4} wrap="nowrap">
+                        {flete ? (
+                          <>
+                            <Tooltip
+                              label="Editar información del flete"
+                              withArrow
+                            >
+                              <Button
+                                variant="subtle"
+                                color="indigo"
+                                size="compact-xs"
+                                onClick={() => onEditarFlete(flete)}
+                                leftSection={<IconPencil size={12} />}
+                              >
+                                Editar
+                              </Button>
+                            </Tooltip>
+                            {/* <Button
+                        variant="subtle"
+                        color="red"
+                        size="compact-xs"
+                        onClick={() => setFleteAEliminar(flete)}
+                        leftSection={<IconTrash size={12} />}
+                      >
+                        Eliminar
+                      </Button> */}
+                          </>
+                        ) : (
+                          <Button
+                            size="compact-xs"
+                            radius="md"
+                            variant="light"
+                            color="indigo"
+                            leftSection={<IconPlus size={12} />}
+                            onClick={onRegistrarFlete}
+                          >
+                            Registrar flete
+                          </Button>
+                        )}
+
+                        {/* {flete.id_comprobante_flete_despacho && (
+                          <Badge
+                            color="indigo"
+                            variant="light"
+                            size="sm"
+                            radius="sm"
+                          >
+                            Facturado
+                          </Badge>
+                        )} */}
+                      </Group>
 
                       <Divider orientation="vertical" />
                       <Text size="xs" c="gray">
                         Placa{" "}
                         <Text span size="xs" fw={700} c="blue">
                           {flete.placa ?? "-"}
-                        </Text>
-                      </Text>
-                      <Divider orientation="vertical" />
-                      <Text size="xs" c="gray">
-                        1ra Guia{" "}
-                        <Text span size="xs" fw={700} c="pink">
-                          {flete.guia_remitente ?? "-"}
-                        </Text>
-                      </Text>
-                      <Divider orientation="vertical" />
-                      <Text size="xs" c="gray">
-                        2da Guia{" "}
-                        <Text span size="xs" fw={700} c="cyan">
-                          {flete.segunda_guia_remitente ?? "-"}
-                        </Text>
-                      </Text>
-                      <Divider orientation="vertical" />
-                      <Text size="xs" c="gray">
-                        Licencia{" "}
-                        <Text span size="xs" fw={700} c="orange.3">
-                          {flete.licencia_conductor ?? "-"}
-                        </Text>
-                      </Text>
-                      <Divider orientation="vertical" />
-                      <Text size="xs" c="gray">
-                        Transportista{" "}
-                        <Text span size="xs" fw={700} c="lime.3">
-                          {flete.transportista ?? "-"}
-                        </Text>
-                      </Text>
-                      <Divider orientation="vertical" />
-                      <Text size="xs" c="gray">
-                        Peso guia{" "}
-                        <Text span size="xs" fw={700} c="blue">
-                          {formatNumber(flete.peso_guia)} t
-                        </Text>
-                      </Text>
-                      <Divider orientation="vertical" />
-                      <Text size="xs" c="gray">
-                        Peso neto{" "}
-                        <Text span size="xs" fw={700} c="pink">
-                          {formatNumber(flete.peso_neto)} t
                         </Text>
                       </Text>
                       <Divider orientation="vertical" />
@@ -1018,14 +1010,76 @@ export const DespachoDetalle = ({
                       </Text>
                       <Divider orientation="vertical" />
                       <Text size="xs" c="gray">
-                        Balanza{" "}
-                        <Text span size="xs" fw={700} c="orange.3">
-                          {flete.codigo_ticket_balanza ?? "-"}
+                        Transportista{" "}
+                        <Text span size="xs" fw={700} c="lime.3">
+                          {flete.transportista ?? "-"}
                         </Text>
                       </Text>
                       <Divider orientation="vertical" />
                       <Text size="xs" c="gray">
-                        Pesaje{" "}
+                        Licencia{" "}
+                        <Text span size="xs" fw={700} c="orange.3">
+                          {flete.licencia_conductor ?? "-"}
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        1ra Guia{" "}
+                        <Text span size="xs" fw={700} c="pink">
+                          {flete.guia_remitente ?? "-"}
+                        </Text>
+                      </Text>
+
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        2da Guia{" "}
+                        <Text span size="xs" fw={700} c="cyan">
+                          {flete.segunda_guia_remitente ?? "-"}
+                        </Text>
+                      </Text>
+
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Peso 1ra guia{" "}
+                        <Text span size="xs" fw={700} c="blue">
+                          {formatNumber(flete.peso_guia)} t
+                        </Text>
+                      </Text>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Peso neto{" "}
+                        <Text span size="xs" fw={700} c="pink">
+                          {formatNumber(flete.peso_neto)} t
+                        </Text>
+                      </Text>
+
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        Ticket{" "}
+                        <Text span size="xs" fw={700} c="orange.3">
+                          {flete.codigo_ticket_balanza ?? "-"}
+                        </Text>
+                      </Text>
+                      <Tooltip
+                        label={
+                          flete.codigo_ticket_balanza
+                            ? "Editar ticket de balanza"
+                            : "Registrar ticket de balanza"
+                        }
+                        withArrow
+                      >
+                        <ActionIcon
+                          variant="light"
+                          color="teal"
+                          size="xs"
+                          onClick={() => onRegistrarBalanza(flete)}
+                        >
+                          <PencilSquareIcon className="size-4" />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Divider orientation="vertical" />
+                      <Text size="xs" c="gray">
+                        F. Pesaje{" "}
                         <Text span size="xs" fw={700} c="lime.3">
                           {flete.fecha_hora_pesaje
                             ? dayjs(flete.fecha_hora_pesaje).format(
@@ -1035,53 +1089,6 @@ export const DespachoDetalle = ({
                         </Text>
                       </Text>
                     </>
-                  )}
-                </Group>
-
-                <Group gap={4} wrap="nowrap">
-                  {flete ? (
-                    <>
-                      <Button
-                        variant="light"
-                        color="teal"
-                        size="compact-xs"
-                        onClick={() => onRegistrarBalanza(flete)}
-                        leftSection={<IconScale size={12} />}
-                      >
-                        {flete.codigo_ticket_balanza
-                          ? "Editar ticket de balanza"
-                          : "Registrar ticket de balanza"}
-                      </Button>
-                      <Button
-                        variant="subtle"
-                        color="indigo"
-                        size="compact-xs"
-                        onClick={() => onEditarFlete(flete)}
-                        leftSection={<IconPencil size={12} />}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="subtle"
-                        color="red"
-                        size="compact-xs"
-                        onClick={() => setFleteAEliminar(flete)}
-                        leftSection={<IconTrash size={12} />}
-                      >
-                        Eliminar
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      size="compact-xs"
-                      radius="md"
-                      variant="light"
-                      color="indigo"
-                      leftSection={<IconPlus size={12} />}
-                      onClick={onRegistrarFlete}
-                    >
-                      Registrar flete
-                    </Button>
                   )}
                 </Group>
               </Group>
@@ -1125,8 +1132,10 @@ export const DespachoDetalle = ({
                       <ComprobanteCard
                         embebido
                         comprobante={comprobante}
-                        etiqueta={`${formatNumber(comprobante.toneladas_cobradas ?? 0)} t facturadas`}
-                        onEditar={() => onEditarComprobante("flete", comprobante)}
+                        etiqueta={`${formatNumber(comprobante.toneladas_cobradas ?? 0)}t facturadas`}
+                        onEditar={() =>
+                          onEditarComprobante("flete", comprobante)
+                        }
                         onRegistrarPago={() =>
                           onRegistrarPago("flete", comprobante)
                         }
@@ -1149,16 +1158,13 @@ export const DespachoDetalle = ({
         </Tabs.Panel>
 
         {/* ---------------- MOLIENDA ---------------- */}
-        <Tabs.Panel value="molienda" pt="md">
+        <Tabs.Panel value="molienda" pt="md" mb={"4rem"}>
           <Group justify="space-between" mb="sm">
             <Group gap="xs" align="center">
               <Text size="sm" fw={700} c="white">
                 Comprobante de molienda
               </Text>
-              <IndicadorCarga
-                seccion="molienda"
-                cargando={seccionCargando}
-              />
+              <IndicadorCarga seccion="molienda" cargando={seccionCargando} />
             </Group>
             {detalle.comprobantes_molienda.length === 0 && (
               <Button
@@ -1211,14 +1217,14 @@ export const DespachoDetalle = ({
         </Tabs.Panel>
 
         {/* ---------------- ANALISIS ---------------- */}
-        <Tabs.Panel value="analisis" pt="md">
+        <Tabs.Panel value="analisis" pt="md" mb={"4rem"}>
           <Stack gap="md">
             <Paper
               p="md"
               radius="lg"
               className="bg-zinc-900/40 border border-zinc-800"
             >
-              <Group justify="space-between" mb="sm">
+              <Group justify="" mb="sm" gap={"sm"}>
                 <Group gap="xs" align="center">
                   <Text size="sm" fw={700} c="white">
                     Analisis de laboratorio
@@ -1275,7 +1281,10 @@ export const DespachoDetalle = ({
                           color="teal"
                           leftSection={<IconReceipt size={12} />}
                           onClick={() =>
-                            onRegistrarComprobante("analisis", analisisSinFacturar)
+                            onRegistrarComprobante(
+                              "analisis",
+                              analisisSinFacturar,
+                            )
                           }
                         >
                           Facturar analisis
@@ -1332,9 +1341,8 @@ export const DespachoDetalle = ({
                       <Stack gap="xs">
                         {analisisPorComprobante.map(
                           ([idComprobante, lista]) => {
-                            const comprobante = comprobanteDeAnalisis(
-                              idComprobante,
-                            );
+                            const comprobante =
+                              comprobanteDeAnalisis(idComprobante);
 
                             const abierto =
                               comprobantesAbiertos.includes(idComprobante);
@@ -1354,8 +1362,7 @@ export const DespachoDetalle = ({
                                     titulo: "Eliminar analisis",
                                     descripcion:
                                       "Se eliminara el analisis del despacho.",
-                                    accion: () =>
-                                      onEliminarAnalisis(analisis),
+                                    accion: () => onEliminarAnalisis(analisis),
                                   })
                                 }
                                 onEditarComprobante={(comp) =>
@@ -1366,8 +1373,7 @@ export const DespachoDetalle = ({
                                 }
                                 onEliminarComprobante={(comp) =>
                                   setAEliminar({
-                                    titulo:
-                                      "Eliminar comprobante de analisis",
+                                    titulo: "Eliminar comprobante de analisis",
                                     descripcion:
                                       "Se eliminara el comprobante y sus pagos. Los analisis quedaran libres para facturar de nuevo.",
                                     accion: () =>
@@ -1429,14 +1435,14 @@ export const DespachoDetalle = ({
         </Tabs.Panel>
 
         {/* ---------------- LIQUIDACIONES ---------------- */}
-        <Tabs.Panel value="liquidacion" pt="md">
+        <Tabs.Panel value="liquidacion" pt="md" mb={"4rem"}>
           <Stack gap="md">
             <Paper
               p="md"
               radius="lg"
               className="bg-zinc-900/40 border border-zinc-800"
             >
-              <Group justify="space-between" mb="sm">
+              <Group justify="" mb="sm" gap={"sm"}>
                 <Group gap="xs" align="center">
                   <Text size="sm" fw={700} c="white">
                     Liquidaciones de mineral
@@ -1501,8 +1507,7 @@ export const DespachoDetalle = ({
                             titulo: "Eliminar liquidacion",
                             descripcion:
                               "Se eliminara la liquidacion y su comprobante (si no tiene pagos).",
-                            accion: () =>
-                              onEliminarLiquidacion(liquidacion),
+                            accion: () => onEliminarLiquidacion(liquidacion),
                           })
                         }
                         onToggleFactura={
@@ -1524,10 +1529,7 @@ export const DespachoDetalle = ({
                                 comprobante.codigo_liquidacion ?? "Liquidacion"
                               }
                               onEditar={() =>
-                                onEditarComprobante(
-                                  "liquidacion",
-                                  comprobante,
-                                )
+                                onEditarComprobante("liquidacion", comprobante)
                               }
                               onRegistrarPago={() =>
                                 onRegistrarPago("liquidacion", comprobante)

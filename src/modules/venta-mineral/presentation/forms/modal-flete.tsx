@@ -186,7 +186,7 @@ export const ModalFlete = ({
           radius="lg"
         />
         <TextInput
-          label="Guía de Remisión (1ra)"
+          label="1ra) Guía de Remisión"
           placeholder="N. 000123"
           value={guia}
           onChange={(e) => setGuia(e.currentTarget.value.toUpperCase())}
@@ -245,11 +245,13 @@ export const ModalFlete = ({
         />
       </SimpleGrid>
 
-      <MultiFilePicker
-        label="Evidencias del flete"
-        files={archivos}
-        onFilesChange={setArchivos}
-      />
+      <div className="my-1">
+        <MultiFilePicker
+          label="Evidencias del flete"
+          files={archivos}
+          onFilesChange={setArchivos}
+        />
+      </div>
 
       <Group justify="flex-end" gap="sm">
         <Button

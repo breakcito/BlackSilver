@@ -139,7 +139,7 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
               <span className="text-zinc-300 font-medium text-sm">
                 ¿Es para mantenimiento?
               </span>
-              <span className="text-zinc-500 text-xs">
+              <span className="text-zinc-400 text-xs">
                 Si se confirma, este proveedor se listará en el módulo de mantenimiento.
               </span>
             </div>
@@ -158,7 +158,7 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
               <span className="text-zinc-300 font-medium text-sm">
                 ¿Es para transporte?
               </span>
-              <span className="text-zinc-500 text-xs">
+              <span className="text-zinc-400 text-xs">
                 Si se confirma, este proveedor se listará en las opciones de despacho/entrega.
               </span>
             </div>

@@ -18,8 +18,6 @@ import {
   Tabs,
 } from "@mantine/core";
 import {
-  Cog8ToothIcon,
-  TruckIcon,
   ArrowPathRoundedSquareIcon,
   MapPinIcon,
   BriefcaseIcon,
@@ -32,10 +30,9 @@ import dayjs from "dayjs";
 import { TimeInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
 import { useNotify } from "../../../hooks/useNotify";
-import { AuxService } from "../../../service/auxiliar.service";
 import { ClientesService } from "../../clientes/service/clientes.service";
 import { ControlUsoService } from "../service/control-uso.service";
-import { MinasService } from "../../minas-labores/service/minas.service";
+import { useDestinoMineral } from "../hooks/useDestinoMineral";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { DataTableEstandar } from "../../../presentation/utils/datatable-estandar";
 import { CustomDatePicker } from "../../../presentation/utils/date-picker-input";
@@ -101,19 +98,46 @@ export const EdicionControlUsoModal = ({
   const { notifyError, notifySuccess } = useNotify();
 
   // Catálogos
-  const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
   const [clientes, setClientes] = useState<{ value: string; label: string }[]>(
     [],
   );
   const [tarifas, setTarifas] = useState<RES_Tarifa[]>([]);
-  const [labores, setLabores] = useState<{ value: string; label: string }[]>(
-    [],
-  );
-  const [loadingLabores, setLoadingLabores] = useState(false);
+  const [loadingClientes, setLoadingClientes] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [lotesMineral, setLotesMineral] = useState<
-    { id_lote_mineral: number; codigo: string; contratista?: string }[]
-  >([]);
+
+  /**
+   * Cascada Mina > Labor > Lote de mineral.
+   * Catalogo unico (minas + todas las labores + todos los lotes) que se
+   * filtra en el cliente: al elegir una mina se filtran labores y lotes; al
+   * elegir una labor se auto-elige su mina y se filtran sus lotes; al elegir
+   * un lote se auto-eligen la labor y la mina.
+   */
+  const {
+    minas,
+    opcionesMina,
+    opcionesLabor,
+    opcionesLaborPorMina,
+    opcionesLote,
+    idMina,
+    idLabor,
+    idLoteMineral,
+    seleccionarMina,
+    seleccionarLabor,
+    seleccionarLaborComoDestino,
+    seleccionarLote,
+    setIdMina,
+    setIdLabor,
+    setIdLoteMineral,
+    loadingMinas,
+    loadingLabores,
+    loadingLotesMineral,
+    busquedaMina,
+    setBusquedaMina,
+    busquedaLabor,
+    setBusquedaLabor,
+    busquedaLote,
+    setBusquedaLote,
+  } = useDestinoMineral(opened);
 
   // Estado del form (campos operativos)
   const [tipoTurno, setTipoTurno] = useState<TipoTurno | "">("");
@@ -129,9 +153,6 @@ export const EdicionControlUsoModal = ({
   const [idTarifa, setIdTarifa] = useState<string | null>(null);
   const [precioUnitario, setPrecioUnitario] = useState(0);
   const [esParaMina, setEsParaMina] = useState<boolean>(true);
-  const [idMina, setIdMina] = useState<string | null>(null);
-  const [idLabor, setIdLabor] = useState<string | null>(null);
-  const [idLoteMineral, setIdLoteMineral] = useState<string | null>(null);
   const [idCliente, setIdCliente] = useState<string | null>(null);
   const [tipoCarga, setTipoCarga] = useState<string | null>(null);
   const [observacion, setObservacion] = useState("");
@@ -190,24 +211,15 @@ export const EdicionControlUsoModal = ({
   };
 
   // Cargar catalogos base al abrir el modal.
+  // Minas / labores / lotes de mineral los carga `useDestinoMineral` (una
+  // request por catalogo, sin recargar al cambiar de seleccion).
   useEffect(() => {
     if (!opened) return;
 
     const fetchBaseData = async () => {
       setLoadingData(true);
+      setLoadingClientes(true);
       try {
-        const respMinas = await AuxService.get_minas();
-        if (respMinas.success) {
-          setMinas(
-            respMinas.data.map(
-              (m: { id_mina: string | number; nombre: string }) => ({
-                value: m.id_mina.toString(),
-                label: m.nombre,
-              }),
-            ),
-          );
-        }
-
         const respClientes = await ClientesService.getClientes();
         if (Array.isArray(respClientes)) {
           setClientes(
@@ -219,15 +231,11 @@ export const EdicionControlUsoModal = ({
             ),
           );
         }
-
-        const respLotes = await AuxService.get_lotes_mineral();
-        if (respLotes.success) {
-          setLotesMineral(respLotes.data);
-        }
       } catch (err) {
         console.error(err);
         notifyError("Error cargando datos iniciales");
       } finally {
+        setLoadingClientes(false);
         setLoadingData(false);
       }
     };
@@ -261,42 +269,6 @@ export const EdicionControlUsoModal = ({
       }
     });
   }, [opened, target]);
-
-  // Cargar labores al cambiar la mina seleccionada.
-  useEffect(() => {
-    if (!opened || !idMina) {
-      setLabores([]);
-      setIdLabor(null);
-      setLoadingLabores(false);
-      return;
-    }
-    let cancelado = false;
-    setLoadingLabores(true);
-    setLabores([]);
-    MinasService.getLabores(Number(idMina))
-      .then((resp) => {
-        if (cancelado) return;
-        if (resp.success) {
-          setLabores(
-            resp.data.map(
-              (l: { id_labor: string | number; nombre: string | null }) => ({
-                value: l.id_labor.toString(),
-                label: l.nombre || "Sin nombre",
-              }),
-            ),
-          );
-        }
-      })
-      .catch((e) => {
-        if (!cancelado) console.error(e);
-      })
-      .finally(() => {
-        if (!cancelado) setLoadingLabores(false);
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [idMina, opened]);
 
   // Defaults por mina para los checks de "Usar Horas" / "Usar Horometro".
   useEffect(() => {
@@ -400,7 +372,7 @@ export const EdicionControlUsoModal = ({
     setIdCliente(target.id_cliente ? String(target.id_cliente) : null);
     setTipoCarga(target.tipo_carga ?? null);
     setObservacion(target.observacion ?? "");
-  }, [opened, target]);
+  }, [opened, target, setIdMina, setIdLabor, setIdLoteMineral]);
 
   // Sincronizar precioUnitario con la tarifa seleccionada (mismo patron que
   // registro-uso.tsx).
@@ -517,54 +489,8 @@ export const EdicionControlUsoModal = ({
       size="xl"
     >
       <Stack gap="md" className="p-1">
-        {/* Asset card (cabecera informativa, no editable) - mismo diseno
-            que el registro. */}
-        <div className="relative overflow-hidden bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 flex gap-3.5 transition-all">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
-          <div className="flex items-center justify-center shrink-0 w-11 h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-            {esHorometro ? (
-              <Cog8ToothIcon className="w-5 h-5 text-indigo-400" />
-            ) : esOdometro ? (
-              <TruckIcon className="w-5 h-5 text-indigo-400" />
-            ) : (
-              <ArrowPathRoundedSquareIcon className="w-5 h-5 text-indigo-400" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[10px] uppercase tracking-wider font-extrabold text-zinc-500">
-                Activo Fijo
-              </span>
-              <Badge
-                size="xs"
-                color="pink"
-                variant="light"
-                className="font-bold shrink-0 border border-pink-500/10"
-              >
-                {target.correlativo}
-              </Badge>
-            </div>
-            <Text
-              size="sm"
-              fw={800}
-              className="text-white leading-snug truncate"
-            >
-              {target.producto}
-            </Text>
-            {(target.ubicacion_activo || target.mina) && (
-              <Text
-                size="10px"
-                className="text-zinc-500 mt-1.5 flex items-center gap-1.5"
-              >
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500/50 animate-pulse" />
-                <span className="font-medium">Ubicacion:</span>
-                <span className="text-zinc-400 font-semibold truncate">
-                  {target.ubicacion_activo || target.mina}
-                </span>
-              </Text>
-            )}
-          </div>
-        </div>
+        {/* Asset card: oculto en la edicion igual que en el registro
+            (el activo fijo ya se ve en la fila de la grilla). */}
 
         {/* Cabecera. El layout varia por tipo:
               - horometro: Tarifa + Fecha del Trabajo (SimpleGrid cols=2)
@@ -650,114 +576,19 @@ export const EdicionControlUsoModal = ({
           </SimpleGrid>
         )}
 
-        {/* Lote Mineral + Tipo de Carga (solo horometro / odometro, mismo
-            diseno que el registro). En vueltas NO se muestran (el
-            registro de vueltas tiene su propio card Mina/Labor/Lote). */}
-        {(esHorometro || esOdometro) && (
-          <SimpleGrid cols={2} spacing="md">
-            <Select
-              label="Lote Mineral (Opc.)"
-              placeholder="Seleccione lote de mineral..."
-              data={lotesMineral.map((lm) => ({
-                value: String(lm.id_lote_mineral),
-                label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-              }))}
-              value={idLoteMineral}
-              onChange={setIdLoteMineral}
-              searchable
-              clearable
-              classNames={fieldClasses}
-              radius="lg"
-              size="xs"
-            />
-            <Select
-              label="Tipo de Carga (Opc.)"
-              placeholder="Seleccione..."
-              data={TIPO_CARGA_OPTIONS}
-              value={tipoCarga}
-              onChange={setTipoCarga}
-              clearable
-              classNames={fieldClasses}
-              radius="lg"
-              size="xs"
-            />
-          </SimpleGrid>
-        )}
-
-        {/* Cabecera ESPECIFICA de vueltas: Mina (required) + Labor +
-            Lote Mineral (opcional, filtrado por labor). Reemplaza al
-            "Destino del Trabajo" generico porque vueltas SIEMPRE va a
-            mina (es_para_mina=true en el service). */}
-        {esVueltas && (
-          <Card
-            withBorder
-            padding="md"
-            radius="lg"
-            className="bg-zinc-950/20 border-zinc-800/60"
-          >
-            <SimpleGrid cols={2} spacing="md">
-              <Select
-                label="Mina"
-                placeholder="Seleccione mina"
-                data={minas}
-                value={idMina}
-                onChange={setIdMina}
-                searchable
-                required
-                classNames={fieldClasses}
-                radius="lg"
-                size="xs"
-              />
-              <Select
-                label="Labor"
-                placeholder="Seleccione labor"
-                data={labores}
-                value={idLabor}
-                onChange={setIdLabor}
-                searchable
-                disabled={!idMina}
-                classNames={fieldClasses}
-                radius="lg"
-                size="xs"
-              />
-            </SimpleGrid>
-            <Select
-              mt="md"
-              label="Lote de Mineral (Opcional)"
-              placeholder={
-                idLabor
-                  ? "Seleccione lote de la labor (opcional)..."
-                  : "Seleccione primero una labor"
-              }
-              data={lotesMineral
-                .filter(() => Boolean(idLabor))
-                .map((lm) => ({
-                  value: String(lm.id_lote_mineral),
-                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-                }))}
-              value={idLoteMineral}
-              onChange={setIdLoteMineral}
-              searchable
-              clearable
-              disabled={!idLabor}
-              classNames={fieldClasses}
-              radius="lg"
-              size="xs"
-            />
-          </Card>
-        )}
-
-        {/* Destino del Trabajo (solo horometro / odometro, mismo
-            diseno que el registro). En vueltas se omite porque arriba
-            va el card Mina/Labor/Lote y vueltas SIEMPRE es para mina. */}
+        {/* Destino del Trabajo (solo horometro / odometro, mismo diseno
+            que el registro). En vueltas se omite porque arriba va la
+            cabecera Mina/Labor/Lote y vueltas SIEMPRE es para mina.
+            En "En Mina" solo se muestra la labor: la mina se deduce de
+            ella. En "Para Terceros" se muestra el cliente en su lugar. */}
         {!esVueltas && (
-          <Card
-            withBorder
-            padding="md"
-            radius="lg"
-            className="bg-zinc-950/20 border-zinc-800/60"
-          >
-            <Group justify="flex-start" align="center" mb="sm" gap="xs">
+          <>
+            <Group
+              justify="flex-start"
+              align="center"
+              gap="xs"
+              className="relative top-1"
+            >
               <Text size="xs" fw={600} className="text-zinc-300">
                 Destino del Trabajo:
               </Text>
@@ -767,10 +598,10 @@ export const EdicionControlUsoModal = ({
                   if (val) setEsParaMina(val === "mina");
                 }}
                 variant="pills"
-                color="indigo"
+                color="teal"
                 radius="md"
               >
-                <Tabs.List className="bg-zinc-900/50 border border-zinc-800 p-0.5 rounded-md">
+                <Tabs.List className="">
                   <Tabs.Tab
                     value="mina"
                     leftSection={<MapPinIcon className="w-4 h-4" />}
@@ -788,65 +619,190 @@ export const EdicionControlUsoModal = ({
                 </Tabs.List>
               </Tabs>
             </Group>
-
-            <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="md">
+            <SimpleGrid cols={3} spacing="md">
               {esParaMina ? (
-                <>
-                  <Select
-                    label="Mina"
-                    placeholder="Seleccione mina"
-                    data={minas}
-                    value={idMina}
-                    onChange={setIdMina}
-                    searchable
-                    required
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                  />
-                  <Select
-                    label="Labor (Opcional)"
-                    placeholder={
-                      loadingLabores
-                        ? "Cargando labores..."
-                        : "Seleccione labor"
-                    }
-                    data={labores}
-                    value={idLabor}
-                    onChange={setIdLabor}
-                    searchable
-                    clearable
-                    disabled={!idMina || loadingLabores}
-                    rightSection={
-                      loadingLabores ? (
-                        <Loader size={12} color="indigo" />
-                      ) : undefined
-                    }
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                  />
-                </>
+                <Select
+                  label="Labor"
+                  placeholder={
+                    loadingLabores ? "Cargando labores..." : "Seleccione labor"
+                  }
+                  data={opcionesLabor}
+                  value={idLabor}
+                  onChange={seleccionarLaborComoDestino}
+                  searchable
+                  searchValue={busquedaLabor}
+                  onSearchChange={setBusquedaLabor}
+                  nothingFoundMessage="Sin coincidencias"
+                  required
+                  clearable
+                  classNames={fieldClasses}
+                  radius="lg"
+                  size="xs"
+                  rightSection={
+                    loadingLabores ? (
+                      <Loader size={12} color="indigo" />
+                    ) : undefined
+                  }
+                />
               ) : (
                 <Select
                   label="Cliente"
-                  placeholder="Seleccione cliente"
+                  placeholder={
+                    loadingClientes
+                      ? "Cargando clientes..."
+                      : "Seleccione cliente"
+                  }
                   data={clientes}
                   value={idCliente}
                   onChange={setIdCliente}
                   searchable
                   required
+                  clearable
                   classNames={fieldClasses}
                   radius="lg"
                   size="xs"
+                  rightSection={
+                    loadingClientes ? (
+                      <Loader size={12} color="indigo" />
+                    ) : undefined
+                  }
                 />
               )}
+
+              {/* Lote Mineral + Tipo de Carga (solo horometro / odometro, mismo
+  diseno que el registro). En vueltas NO se muestran (el
+  registro de vueltas tiene su propio bloque Mina/Labor/Lote). */}
+              {(esHorometro || esOdometro) && (
+                <>
+                  <Select
+                    label="Lote Mineral (Opc.)"
+                    placeholder={
+                      loadingLotesMineral
+                        ? "Cargando lotes de mineral..."
+                        : idLabor
+                          ? "Seleccione lote de la labor..."
+                          : "Seleccione lote de mineral..."
+                    }
+                    data={opcionesLote}
+                    value={idLoteMineral}
+                    onChange={seleccionarLote}
+                    searchable
+                    searchValue={busquedaLote}
+                    onSearchChange={setBusquedaLote}
+                    nothingFoundMessage="Sin coincidencias"
+                    clearable
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                    rightSection={
+                      loadingLotesMineral ? (
+                        <Loader size={12} color="indigo" />
+                      ) : undefined
+                    }
+                  />
+                  <Select
+                    label="Tipo de Carga (Opc.)"
+                    placeholder="Seleccione..."
+                    data={TIPO_CARGA_OPTIONS}
+                    value={tipoCarga}
+                    onChange={setTipoCarga}
+                    clearable
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                  />
+                </>
+              )}
             </SimpleGrid>
-          </Card>
+          </>
+        )}
+
+        {/* Cabecera ESPECIFICA de vueltas: Mina (required) + Labor +
+            Lote Mineral (opcional, filtrado por labor). Reemplaza al
+            "Destino del Trabajo" generico porque vueltas SIEMPRE va a
+            mina (es_para_mina=true en el service). */}
+        {esVueltas && (
+          <>
+            <SimpleGrid cols={2} spacing="md">
+              <Select
+                label="Mina"
+                placeholder={
+                  loadingMinas ? "Cargando minas..." : "Seleccione mina"
+                }
+                data={opcionesMina}
+                value={idMina}
+                onChange={seleccionarMina}
+                searchable
+                searchValue={busquedaMina}
+                onSearchChange={setBusquedaMina}
+                nothingFoundMessage="Sin coincidencias"
+                required
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+                rightSection={
+                  loadingMinas ? <Loader size={12} color="indigo" /> : undefined
+                }
+              />
+              <Select
+                label="Labor"
+                placeholder={
+                  loadingLabores ? "Cargando labores..." : "Seleccione labor"
+                }
+                data={opcionesLaborPorMina}
+                value={idLabor}
+                onChange={(val) => seleccionarLabor(val)}
+                searchable
+                searchValue={busquedaLabor}
+                onSearchChange={setBusquedaLabor}
+                nothingFoundMessage="Sin coincidencias"
+                clearable
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+                rightSection={
+                  loadingLabores ? (
+                    <Loader size={12} color="indigo" />
+                  ) : undefined
+                }
+              />
+            </SimpleGrid>
+            <Select
+              mt="md"
+              label="Lote de Mineral (Opcional)"
+              placeholder={
+                loadingLotesMineral
+                  ? "Cargando lotes de mineral..."
+                  : idLabor
+                    ? "Seleccione lote de la labor (opcional)..."
+                    : idMina
+                      ? "Seleccione lote de la mina (opcional)..."
+                      : "Seleccione lote de mineral (opcional)..."
+              }
+              data={opcionesLote}
+              value={idLoteMineral}
+              onChange={seleccionarLote}
+              searchable
+              searchValue={busquedaLote}
+              onSearchChange={setBusquedaLote}
+              nothingFoundMessage="Sin coincidencias"
+              clearable
+              classNames={fieldClasses}
+              radius="lg"
+              size="xs"
+              rightSection={
+                loadingLotesMineral ? (
+                  <Loader size={12} color="indigo" />
+                ) : undefined
+              }
+            />
+          </>
         )}
 
         {/* Bloque Horometro (single, no agregar/quitar) - mismo diseno
-            que el registro. */}
+            que el registro: badge + turno a la izquierda, checks a la
+            derecha, horas y horometros en una fila de 4, y observacion
+            junto al resumen. */}
         {esHorometro && (
           <Card
             withBorder
@@ -859,9 +815,26 @@ export const EdicionControlUsoModal = ({
                 <Badge color="indigo" variant="light" size="sm" radius="sm">
                   Bloque #1
                 </Badge>
-                <Text size="xs" c="zinc.500" fw={600}>
-                  Horario independiente
-                </Text>
+                <Group gap={"xs"}>
+                  <Text size="xs" fw={600}>
+                    Turno (opcional) :
+                  </Text>
+                  <Select
+                    placeholder="Seleccione turno..."
+                    data={[
+                      { value: TipoTurno.Dia, label: "Día" },
+                      { value: TipoTurno.Noche, label: "Noche" },
+                    ]}
+                    value={tipoTurno === "" ? null : tipoTurno}
+                    onChange={(val) =>
+                      setTipoTurno((val ?? "") as TipoTurno | "")
+                    }
+                    clearable
+                    classNames={fieldClasses}
+                    radius="lg"
+                    size="xs"
+                  />
+                </Group>
               </Group>
               <Group gap="md" align="center" wrap="nowrap">
                 <Checkbox
@@ -897,10 +870,10 @@ export const EdicionControlUsoModal = ({
               </Group>
             </Group>
 
-            <SimpleGrid cols={2} spacing="md">
+            <SimpleGrid cols={4} spacing="xs">
               <div>
                 <TimeInput
-                  label={usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"}
+                  label={usarHoras ? "Hora Inicio" : "Hora Inicio "}
                   placeholder="08:00"
                   value={horaInicioStr}
                   onChange={(event) =>
@@ -921,7 +894,7 @@ export const EdicionControlUsoModal = ({
 
               <div>
                 <TimeInput
-                  label={usarHoras ? "Hora Fin" : "Hora Fin (no aplica)"}
+                  label={usarHoras ? "Hora Fin" : "Hora Fin "}
                   placeholder="10:00"
                   value={horaFinStr}
                   onChange={(event) =>
@@ -948,30 +921,10 @@ export const EdicionControlUsoModal = ({
                   </Text>
                 )}
               </div>
-            </SimpleGrid>
 
-            <Select
-              label="Turno (opcional)"
-              placeholder="Seleccione turno..."
-              data={[
-                { value: TipoTurno.Dia, label: "Día" },
-                { value: TipoTurno.Noche, label: "Noche" },
-              ]}
-              value={tipoTurno === "" ? null : tipoTurno}
-              onChange={(val) => setTipoTurno((val ?? "") as TipoTurno | "")}
-              clearable
-              classNames={fieldClasses}
-              radius="lg"
-              size="xs"
-              mt="sm"
-            />
-
-            <SimpleGrid cols={2} spacing="md" mt="sm" className="opacity-85">
               <NumberInput
                 label={
-                  usarHorometro
-                    ? "Horometro Inicial"
-                    : "Horometro Inicial (no aplica)"
+                  usarHorometro ? "Horometro Inicial" : "Horometro Inicial"
                 }
                 placeholder="Ej: 1250.00"
                 value={horometroInicio}
@@ -986,11 +939,7 @@ export const EdicionControlUsoModal = ({
                 disabled={!usarHorometro || loadingData}
               />
               <NumberInput
-                label={
-                  usarHorometro
-                    ? "Horometro Final"
-                    : "Horometro Final (no aplica)"
-                }
+                label={usarHorometro ? "Horometro Final" : "Horometro Final"}
                 placeholder="Ej: 1252.00"
                 value={horometroFin}
                 onChange={(val) => setHorometroFin(val as number | "")}
@@ -1005,65 +954,63 @@ export const EdicionControlUsoModal = ({
               />
             </SimpleGrid>
 
-            <Textarea
-              label="Observacion"
-              placeholder="Notas u observaciones de este bloque (opcional)..."
-              value={observacion}
-              onChange={(e) => setObservacion(e.currentTarget.value)}
-              classNames={fieldClasses}
-              size="xs"
-              radius="lg"
-              minRows={2}
-              mt="sm"
-            />
-
-            {/* Resumen Total Horas / Costo (mismo patron que el registro) */}
-            <SimpleGrid cols={2} spacing="md" mt="md">
-              <Group gap={6} align="center" wrap="nowrap">
-                <ClockIcon className="w-4 h-4 text-indigo-400 shrink-0" />
-                <div className="min-w-0">
-                  <Text
-                    size="9px"
-                    c="zinc.500"
-                    fw={900}
-                    tt="uppercase"
-                    lts="0.08em"
-                  >
-                    Total Horas
-                  </Text>
-                  <Text size="md" fw={800} className="text-indigo-300">
-                    {formatHoras(totalHorasBloque)}{" "}
-                    <span className="text-[10px] text-zinc-500 italic font-medium">
-                      hrs
-                    </span>
-                  </Text>
-                </div>
-              </Group>
-              <Group gap={6} align="center" wrap="nowrap" justify="flex-end">
-                <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div className="min-w-0 text-right">
-                  <Text
-                    size="9px"
-                    c="zinc.500"
-                    fw={900}
-                    tt="uppercase"
-                    lts="0.08em"
-                  >
-                    Costo Operativo
-                  </Text>
-                  <Text size="md" fw={800} className="text-emerald-300">
-                    S/.{" "}
-                    {totalCostoBloque.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Text>
-                </div>
-              </Group>
+            <SimpleGrid cols={2} spacing="md" mt="xs">
+              <Textarea
+                label="Observacion"
+                placeholder="Notas u observaciones de este bloque (opcional)..."
+                value={observacion}
+                onChange={(e) => setObservacion(e.currentTarget.value)}
+                classNames={fieldClasses}
+                size="xs"
+                radius="lg"
+                minRows={2}
+              />
+              <div className="flex items-center justify-between">
+                <Group gap={6} align="center" wrap="nowrap">
+                  <ClockIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <div className="min-w-0">
+                    <Text
+                      size="9px"
+                      c="zinc.500"
+                      fw={900}
+                      tt="uppercase"
+                      lts="0.08em"
+                    >
+                      Total Horas
+                    </Text>
+                    <Text size="md" fw={800} className="text-indigo-300">
+                      {formatHoras(totalHorasBloque)}{" "}
+                      <span className="text-[11px] text-zinc-300 italic font-medium">
+                        hrs
+                      </span>
+                    </Text>
+                  </div>
+                </Group>
+                <Group gap={6} align="center" wrap="nowrap" justify="flex-end">
+                  <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0 text-right">
+                    <Text
+                      size="9px"
+                      c="zinc.500"
+                      fw={900}
+                      tt="uppercase"
+                      lts="0.08em"
+                    >
+                      Costo Operativo
+                    </Text>
+                    <Text size="md" fw={800} className="text-emerald-300">
+                      S/.{" "}
+                      {totalCostoBloque.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </Text>
+                  </div>
+                </Group>
+              </div>
             </SimpleGrid>
           </Card>
         )}
-
         {/* Bloque Odometro (single, no agregar/quitar). */}
         {esOdometro && (
           <Card

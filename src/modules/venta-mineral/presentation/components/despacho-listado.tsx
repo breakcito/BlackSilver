@@ -1,18 +1,6 @@
 import { useMemo } from "react";
-import {
-  ActionIcon,
-  Badge,
-  Group,
-  Paper,
-  Text,
-  Tooltip,
-} from "@mantine/core";
-import {
-  ArrowUturnLeftIcon,
-  BanknotesIcon,
-  ScaleIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
+import { ActionIcon, Badge, Group, Paper, Text, Tooltip } from "@mantine/core";
+import { TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
 import type { DataTableColumn } from "mantine-datatable";
 import dayjs from "dayjs";
 
@@ -50,14 +38,23 @@ interface Props {
   onEditarDespacho: (despacho: DespachoMineralResumen) => void;
   onEliminarDespacho: (despacho: DespachoMineralResumen) => void;
   onRegistrarGasto: (despacho: DespachoMineralResumen) => void;
-  onEditarGasto: (despacho: DespachoMineralResumen, gasto: GastoDespachoItem) => void;
+  onEditarGasto: (
+    despacho: DespachoMineralResumen,
+    gasto: GastoDespachoItem,
+  ) => void;
   onEliminarGasto: (
     despacho: DespachoMineralResumen,
     gasto: GastoDespachoItem,
   ) => void | Promise<unknown>;
   onRegistrarFlete: (despacho: DespachoMineralResumen) => void;
-  onEditarFlete: (despacho: DespachoMineralResumen, flete: FleteDespachoItem) => void;
-  onRegistrarBalanza: (despacho: DespachoMineralResumen, flete: FleteDespachoItem) => void;
+  onEditarFlete: (
+    despacho: DespachoMineralResumen,
+    flete: FleteDespachoItem,
+  ) => void;
+  onRegistrarBalanza: (
+    despacho: DespachoMineralResumen,
+    flete: FleteDespachoItem,
+  ) => void;
   onEliminarFlete: (
     despacho: DespachoMineralResumen,
     flete: FleteDespachoItem,
@@ -153,55 +150,56 @@ export const DespachoListado = ({
       },
       {
         accessor: "lote_codigo",
-        title: "Despacho",
+        title: "Lote",
         textAlign: "center",
-        width: 150,
+        width: 100,
         render: (r) => (
-          <div className="flex flex-col gap-0.5">
-            <Text size="xs" fw={800} c="white" className="font-mono">
+          <div className="flex flex-row justify-center">
+            <Badge size="sm" color="grape">
               {r.lote_codigo ?? "—"}
-            </Text>
-            <Text size="xs" c="gray">
-              {formatNumber(r.cantidad_sacos)} sacos
-            </Text>
+            </Badge>
           </div>
+        ),
+      },
+
+      {
+        accessor: "labor",
+        title: "Mina > Labor",
+        textAlign: "center",
+        width: 120,
+        render: (r) => (
+          <Group justify="center" align="center" gap={"4"}>
+            <Text size="xs" fw={500} c="gray">
+              {r.mina ?? "—"}
+            </Text>
+            <Text size="xs" fw={500} c="gray">
+              {">"}
+            </Text>
+            <Text size="xs" fw={700} c="gray">
+              {r.labor ?? "—"}
+            </Text>
+          </Group>
+        ),
+      },
+      {
+        accessor: "labor",
+        title: "Contratista",
+        textAlign: "center",
+        width: 180,
+        render: (r) => (
+          <Text size="xs" c="gray">
+            {r.contratista ?? "—"}
+          </Text>
         ),
       },
       {
         accessor: "molino",
         title: "Molino",
         textAlign: "center",
-        width: 200,
+        width: 150,
         render: (r) => (
-          <Text size="xs" fw={600} c="zinc.200" truncate>
+          <Text size="xs" c="gray">
             {r.molino ?? "—"}
-          </Text>
-        ),
-      },
-      {
-        accessor: "labor",
-        title: "Labor / Mina",
-        textAlign: "center",
-        width: 180,
-        render: (r) => (
-          <div className="flex flex-col gap-0.5">
-            <Text size="xs" fw={600} c="zinc.200" truncate>
-              {r.labor ?? "—"}
-            </Text>
-            <Text size="xs" c="gray" truncate>
-              {r.mina ?? "—"}
-            </Text>
-          </div>
-        ),
-      },
-      {
-        accessor: "fecha_despacho",
-        title: "Fecha",
-        textAlign: "center",
-        width: 110,
-        render: (r) => (
-          <Text size="xs" fw={600} c="emerald.4">
-            {formatDate(r.fecha_despacho)}
           </Text>
         ),
       },
@@ -212,14 +210,32 @@ export const DespachoListado = ({
         width: 130,
         render: (r) => (
           <div className="flex flex-col gap-0.5">
-            <Text size="xs" fw={600} c="zinc.200">
-              {r.cantidad_fletes} flete(s)
+            <Text size="xs" c="teal" fw={700}>
+              {r.peso_neto_total > 0 ? formatNumber(r.peso_neto_total) : "-"} t
             </Text>
             <Text size="xs" c="gray">
-              {formatNumber(r.peso_neto_total)} t
+              {formatNumber(r.cantidad_sacos)} sacos
             </Text>
           </div>
         ),
+      },
+      {
+        accessor: "fecha_despacho",
+        title: "F. Despacho",
+        textAlign: "center",
+        width: 110,
+        render: (r) => (
+          <Text size="xs" fw={600} c="emerald.4">
+            {formatDate(r.fecha_despacho)}
+          </Text>
+        ),
+      },
+      {
+        accessor: "fecha_despacho",
+        title: "Observaciones",
+        textAlign: "center",
+        width: 180,
+        render: (r) => <Text size="xs">{r.observaciones || "-"}</Text>,
       },
       // {
       //   accessor: "total_facturado",
@@ -284,26 +300,10 @@ export const DespachoListado = ({
         ),
       },
       {
-        accessor: "empleado_registro",
-        title: "Registro",
-        textAlign: "center",
-        width: 150,
-        render: (r) => (
-          <div className="flex flex-col gap-0.5">
-            <Text size="xs" fw={700} c="zinc.200" truncate>
-              {r.empleado_registro ?? "—"}
-            </Text>
-            <Text size="xs" c="gray">
-              {formatDate(r.created_at)}
-            </Text>
-          </div>
-        ),
-      },
-      {
         accessor: "acciones",
-        title: "",
+        title: "Acciones",
         textAlign: "center",
-        width: 140,
+        width: 100,
         render: (r) => (
           <Group gap={4} justify="center" wrap="nowrap">
             <Tooltip label="Editar despacho" withArrow>
@@ -317,10 +317,10 @@ export const DespachoListado = ({
                   onEditarDespacho(r);
                 }}
               >
-                <ArrowUturnLeftIcon className="w-4 h-4" />
+                <PencilIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
-            <Tooltip label="Registrar gasto" withArrow>
+            {/* <Tooltip label="Registrar gasto" withArrow>
               <ActionIcon
                 variant="light"
                 color="yellow"
@@ -347,7 +347,7 @@ export const DespachoListado = ({
               >
                 <ScaleIcon className="w-4 h-4" />
               </ActionIcon>
-            </Tooltip>
+            </Tooltip> */}
             <Tooltip label="Eliminar despacho" withArrow>
               <ActionIcon
                 variant="light"
@@ -398,7 +398,9 @@ export const DespachoListado = ({
             if (!detalle) {
               return (
                 <div className="flex items-center justify-center gap-2 py-6 text-zinc-500 text-xs">
-                  <span className="animate-pulse">Cargando detalle del despacho...</span>
+                  <span className="animate-pulse">
+                    Cargando detalle del despacho...
+                  </span>
                 </div>
               );
             }
@@ -417,7 +419,9 @@ export const DespachoListado = ({
                 onEliminarGasto={(gasto) => onEliminarGasto(record, gasto)}
                 onRegistrarFlete={() => onRegistrarFlete(record)}
                 onEditarFlete={(flete) => onEditarFlete(record, flete)}
-                onRegistrarBalanza={(flete) => onRegistrarBalanza(record, flete)}
+                onRegistrarBalanza={(flete) =>
+                  onRegistrarBalanza(record, flete)
+                }
                 onEliminarFlete={(flete) => onEliminarFlete(record, flete)}
                 onRegistrarComprobante={(tipo, analisis) =>
                   onRegistrarComprobante(record, tipo, analisis)
@@ -432,7 +436,9 @@ export const DespachoListado = ({
                   onRegistrarPago(record, tipo, comprobante)
                 }
                 onRegistrarAnalisis={() => onRegistrarAnalisis(record)}
-                onEditarAnalisis={(analisis) => onEditarAnalisis(record, analisis)}
+                onEditarAnalisis={(analisis) =>
+                  onEditarAnalisis(record, analisis)
+                }
                 onEliminarAnalisis={(analisis) =>
                   onEliminarAnalisis(record, analisis)
                 }

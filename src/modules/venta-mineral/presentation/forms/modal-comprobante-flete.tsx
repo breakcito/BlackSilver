@@ -10,7 +10,10 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
-import { IconDeviceFloppy, IconTruckDelivery, IconX } from "@tabler/icons-react";
+import {
+  IconDeviceFloppy,
+  IconX,
+} from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
 import { Moneda } from "../../../../shared/enums/_generic/moneda";
@@ -80,9 +83,9 @@ export const ModalComprobanteFlete = ({
   const [conDetraccion, setConDetraccion] = useState(
     () => comprobante?.con_detraccion ?? true,
   );
-  const [porcentajeDetraccion, setPorcentajeDetraccion] = useState<number | string>(
-    () => comprobante?.porcentaje_detraccion ?? DETRACCION_FLETE_POR_DEFECTO,
-  );
+  const [porcentajeDetraccion, setPorcentajeDetraccion] = useState<
+    number | string
+  >(() => comprobante?.porcentaje_detraccion ?? DETRACCION_FLETE_POR_DEFECTO);
   const [porcentajeIgv, setPorcentajeIgv] = useState<number | string>(
     () => comprobante?.porcentaje_igv ?? IGV_POR_DEFECTO,
   );
@@ -126,7 +129,7 @@ export const ModalComprobanteFlete = ({
 
   if (monedaAnterior !== moneda) {
     setMonedaAnterior(moneda);
-    setTipoCambio(moneda === Moneda.Soles ? 1 : "");
+    setTipoCambio(moneda === Moneda.Soles ? 1 : 1);
   }
 
   const esDolar = moneda === Moneda.Dolares;
@@ -229,12 +232,6 @@ export const ModalComprobanteFlete = ({
           radius="lg"
           className="bg-zinc-950/60 border border-zinc-800"
         >
-          <Group gap="xs" mb="xs">
-            <IconTruckDelivery size={16} className="text-indigo-400" />
-            <Text size="xs" fw={700} c="white">
-              Carga que se factura
-            </Text>
-          </Group>
           <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
             <div>
               <Text size="xs" c="dimmed">
@@ -295,19 +292,17 @@ export const ModalComprobanteFlete = ({
           radius="lg"
           required
         />
-        {esDolar && (
-          <NumberInput
-            label="Tipo de cambio"
-            value={tipoCambio}
-            onChange={setTipoCambio}
-            hideControls
-            disabled={saving}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-            required
-          />
-        )}
+        <NumberInput
+          label="Tipo de cambio"
+          value={tipoCambio}
+          onChange={setTipoCambio}
+          hideControls
+          disabled={saving || !esDolar}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required={esDolar}
+        />
       </SimpleGrid>
 
       <ComprobanteFormPanel

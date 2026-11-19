@@ -138,11 +138,9 @@ export const ComprobanteFormPanel = ({
         radius="lg"
         className="bg-zinc-900/60 border border-zinc-800"
       >
-        <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
-          Importes del comprobante
-        </Text>
+
         <SimpleGrid
-          cols={{ base: 2, md: mostrarDetraccionEnSoles ? 6 : 5 }}
+          cols={{ base: 2, md: 5 }}
           spacing="sm"
         >
           <Text size="xs" c="gray">

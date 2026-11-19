@@ -1,10 +1,5 @@
-import { Badge, Button, Group, Paper, Text } from "@mantine/core";
-import {
-  IconCash,
-  IconPencil,
-  IconReceipt,
-  IconTrash,
-} from "@tabler/icons-react";
+import { Badge, Button, Divider, Group, Paper, Text } from "@mantine/core";
+import { IconCash, IconPencil, IconReceipt } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { EstadoComprobanteDespacho } from "../../../../shared/enums/venta-mineral/estado-comprobante-despacho";
@@ -61,7 +56,7 @@ export const ComprobanteCard = ({
   const moneda = comprobante.moneda ?? Moneda.Soles;
   const esDolar = moneda === Moneda.Dolares;
   const simbolo = simboloMoneda(moneda);
-  const tipoCambio = Number(comprobante.tipo_cambio ?? 1) || 1;
+  // const tipoCambio = Number(comprobante.tipo_cambio ?? 1) || 1;
 
   /**
    * Saldo pendiente TOTAL, en la moneda del comprobante: el neto que falta
@@ -72,18 +67,19 @@ export const ComprobanteCard = ({
    * para restarlo del monto de la detraccion del comprobante. Asi el saldo
    * pendiente es una sola cifra, coherente con los importes de arriba.
    */
-  const pendienteTotal = Math.round(
-    (pendienteNeto +
-      (esDolar
-        ? Number(comprobante.monto_detraccion) -
-          Number(comprobante.avance_detraccion) / tipoCambio
-        : pendienteDetraccion)) *
-      100,
-  ) / 100;
+  // const pendienteTotal =
+  //   Math.round(
+  //     (pendienteNeto +
+  //       (esDolar
+  //         ? Number(comprobante.monto_detraccion) -
+  //           Number(comprobante.avance_detraccion) / tipoCambio
+  //         : pendienteDetraccion)) *
+  //       100,
+  //   ) / 100;
 
   const contenido = (
     <>
-      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+      <Group justify="" align="flex-start" wrap="nowrap" gap="xs">
         <div className="min-w-0">
           {/* Codigo | estado | detalle: todo en una sola linea */}
           <Group gap="xs" wrap="wrap" align="center">
@@ -91,42 +87,25 @@ export const ComprobanteCard = ({
             <Text size="sm" fw={700} c="white" truncate>
               {comprobante.codigo_comprobante || "Sin codigo"}
             </Text>
-            <Text size="xs" c="zinc.600">
-              |
-            </Text>
+            <Divider orientation="vertical" />
             <Badge
               color={colorEstado(comprobante.estado)}
               variant="light"
-              size="xs"
+              size="sm"
               radius="sm"
             >
               {comprobante.estado}
             </Badge>
-            <Text size="xs" c="zinc.600">
-              |
+            <Divider orientation="vertical" />
+            <Text size="xs" fw={700} c="pink.3" truncate>
+              {etiqueta || "-"}
             </Text>
-            <Text size="xs" c="dimmed" truncate>
-              {etiqueta && (
-                <Text span size="xs" fw={700} c="pink.3">
-                  {etiqueta}
-                </Text>
-              )}
-              {comprobante.transportista && (
-                <>
-                  {" · "}
-                  <Text span size="xs" fw={600} c="grape.4">
-                    {comprobante.transportista}
-                  </Text>
-                </>
-              )}
-              {comprobante.fecha_emision && (
-                <>
-                  {" · "}
-                  <Text span size="xs" fw={600} c="teal.3">
-                    {dayjs(comprobante.fecha_emision).format("DD/MM/YYYY")}
-                  </Text>
-                </>
-              )}
+            <Divider orientation="vertical" />
+            <Text size="xs" c="gray" fw={700}>
+              F. emisión:{" "}
+              {comprobante.fecha_emision
+                ? dayjs(comprobante.fecha_emision).format("DD/MM/YYYY")
+                : "-"}
             </Text>
           </Group>
         </div>
@@ -143,17 +122,20 @@ export const ComprobanteCard = ({
               Editar
             </Button>
           )}
-          {onRegistrarPago && (
-            <Button
-              variant="light"
-              size="compact-xs"
-              color="teal"
-              onClick={onRegistrarPago}
-              leftSection={<IconCash size={12} />}
-            >
-              Pagar
-            </Button>
-          )}
+          {onRegistrarPago &&
+            (comprobante.avance_neto < comprobante.neto_a_pagar ||
+              comprobante.avance_detraccion <
+                comprobante.monto_detraccion_soles) && (
+              <Button
+                variant="light"
+                size="compact-xs"
+                color="teal"
+                onClick={onRegistrarPago}
+                leftSection={<IconCash size={12} />}
+              >
+                Pagar
+              </Button>
+            )}
           {onVerPagos && hayPagos && (
             <Button
               variant="subtle"
@@ -165,7 +147,7 @@ export const ComprobanteCard = ({
               {comprobante.pagos?.length === 1 ? "" : "s"}
             </Button>
           )}
-          {onEliminar && (
+          {/* {onEliminar && (
             <Button
               variant="subtle"
               size="compact-xs"
@@ -175,17 +157,15 @@ export const ComprobanteCard = ({
             >
               Eliminar
             </Button>
-          )}
+          )} */}
         </Group>
       </Group>
 
       <div
-        className={`grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 ${
-          esDolar ? "lg:grid-cols-7" : "lg:grid-cols-6"
-        }`}
+        className={`grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 lg:grid-cols-9`}
       >
         <div>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="gray">
             Subtotal
           </Text>
           <Text size="sm" fw={600} c="zinc.200">
@@ -193,7 +173,7 @@ export const ComprobanteCard = ({
           </Text>
         </div>
         <div>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="gray">
             IGV ({formatNumber(comprobante.porcentaje_igv)}%)
           </Text>
           <Text size="sm" fw={600} c="zinc.200">
@@ -201,7 +181,7 @@ export const ComprobanteCard = ({
           </Text>
         </div>
         <div>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="gray">
             Total
           </Text>
           <Text size="sm" fw={700} c="indigo.3">
@@ -209,7 +189,7 @@ export const ComprobanteCard = ({
           </Text>
         </div>
         <div>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="gray">
             Detraccion ({formatNumber(comprobante.porcentaje_detraccion)}%)
           </Text>
           <Text size="sm" fw={600} c="orange.3">
@@ -217,19 +197,15 @@ export const ComprobanteCard = ({
               ? `${simbolo} ${formatNumber(comprobante.monto_detraccion)}`
               : `S/ ${formatNumber(comprobante.monto_detraccion_soles)}`}
           </Text>
-        </div>
-        {esDolar && (
-          <div>
-            <Text size="xs" c="dimmed">
-              Detraccion en soles
-            </Text>
+          {esDolar && (
             <Text size="sm" fw={600} c="orange.3">
               S/ {formatNumber(comprobante.monto_detraccion_soles)}
             </Text>
-          </div>
-        )}
+          )}
+        </div>
+
         <div>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="gray">
             Neto a pagar
           </Text>
           <Text size="sm" fw={700} c="lime.3">
@@ -237,48 +213,59 @@ export const ComprobanteCard = ({
           </Text>
         </div>
         <div>
-          <Text size="xs" c="dimmed">
-            Saldo pendiente
+          <Text size="xs" c="gray">
+            Neto pendiente
           </Text>
           <Text
             size="sm"
             fw={700}
-            c={pendienteTotal > 0 ? "yellow.3" : "green.3"}
+            c={pendienteNeto > 0 ? "yellow.3" : "green.3"}
           >
-            {simbolo} {formatNumber(pendienteTotal)}
+            {simbolo} {formatNumber(pendienteNeto)}
+          </Text>
+        </div>
+        <div>
+          <Text size="xs" c="gray">
+            Detracción pendiente
+          </Text>
+          <Text
+            size="sm"
+            fw={700}
+            c={pendienteDetraccion > 0 ? "yellow.3" : "green.3"}
+          >
+            S/ {formatNumber(pendienteDetraccion)}
           </Text>
         </div>
       </div>
 
-      {comprobante.importes_bloqueados && (
-        <Text size="xs" c="yellow.4" mt="sm">
-          El comprobante ya tiene pagos: los importes no se pueden modificar.
-        </Text>
-      )}
+      <Text size="sm" c="gray" fw={700} mt="sm">
+        PAGOS:
+      </Text>
 
-      {hayPagos && (
-        <div className="mt-3 pt-3 border-t border-zinc-800/70 space-y-1">
+      {hayPagos ? (
+        <Group gap="sm" mt={"4"}>
           {comprobante.pagos.map((pago) => (
             <div
               key={pago.id_pago}
-              className="flex items-center justify-between gap-2 text-xs"
+              className="flex items-center gap-2 text-xs shrink-0 bg-teal-950 p-1.5 rounded-lg"
             >
-              <span className="text-zinc-400 truncate">
+              <span className="text-zinc-300">
                 {dayjs(pago.fecha_hora_pago).format("DD/MM/YYYY HH:mm")} ·{" "}
                 {pago.medio_pago}
                 {pago.numero_operacion ? ` · ${pago.numero_operacion}` : ""}
-                {pago.es_para_detraccion ? " · detraccion" : ""}
+                {pago.es_para_detraccion ? " · DETRACCIÓN" : " · NETO"}
               </span>
-              <span
-                className="text-zinc-200 font-semibold shrink-0"
-                style={{ color: undefined }}
-              >
+              <span className="text-zinc-200 font-semibold">
                 {pago.es_para_detraccion ? "S/" : simbolo}{" "}
                 {formatNumber(pago.monto_pagado)}
               </span>
             </div>
           ))}
-        </div>
+        </Group>
+      ) : (
+        <Text size="xs" c="dimmed" className="italic">
+          Sin pagos registrados
+        </Text>
       )}
     </>
   );

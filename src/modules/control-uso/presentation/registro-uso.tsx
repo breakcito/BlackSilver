@@ -16,14 +16,14 @@ import {
   Alert,
   Loader,
   Tabs,
+  Divider,
 } from "@mantine/core";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { useNotify } from "../../../hooks/useNotify";
 import { ControlUsoService } from "../service/control-uso.service";
 import { AuxService } from "../../../service/auxiliar.service";
-import type { RES_LoteMineral } from "../../../service/responses/lote-mineral";
-import { MinasService } from "../../../modules/minas-labores/service/minas.service";
+import { useDestinoMineral } from "../hooks/useDestinoMineral";
 import { ClientesService } from "../../../modules/clientes/service/clientes.service";
 import type {
   RES_ControlUsoLog,
@@ -34,8 +34,6 @@ import type { RES_LoteDisponible } from "../../../service/responses/lote-product
 import type { RES_Producto } from "../../../service/responses/producto";
 import type { RES_UnidadMedida } from "../../../service/responses/unidad-medida";
 import {
-  Cog8ToothIcon,
-  TruckIcon,
   ArrowPathRoundedSquareIcon,
   MapPinIcon,
   BriefcaseIcon,
@@ -142,11 +140,6 @@ export const RegistroUso = ({
   const [saving, setSaving] = useState(false);
 
   const [tarifas, setTarifas] = useState<RES_Tarifa[]>([]);
-  const [minas, setMinas] = useState<{ value: string; label: string }[]>([]);
-  const [labores, setLabores] = useState<{ value: string; label: string }[]>(
-    [],
-  );
-  const [lotesMineral, setLotesMineral] = useState<RES_LoteMineral[]>([]);
   const [clientes, setClientes] = useState<{ value: string; label: string }[]>(
     [],
   );
@@ -165,19 +158,45 @@ export const RegistroUso = ({
   // Loading flags individuales por catalogo, para que cada Select muestre
   // su propio Loader + placeholder "Cargando..." mientras llega su data.
   const [loadingTarifas, setLoadingTarifas] = useState(false);
-  const [loadingMinas, setLoadingMinas] = useState(false);
   const [loadingClientes, setLoadingClientes] = useState(false);
-  const [loadingLotesMineral, setLoadingLotesMineral] = useState(false);
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [loadingAlmacenesConsumo, setLoadingAlmacenesConsumo] = useState(false);
   const [loadingUnidadesMedida, setLoadingUnidadesMedida] = useState(false);
 
-  const [loadingLabores, setLoadingLabores] = useState(false);
+  /**
+   * Cascada Mina > Labor > Lote de mineral.
+   * Los catalogos se cargan una sola vez y todo el filtrado ocurre en el
+   * cliente: al elegir una mina se filtran labores y lotes; al elegir una
+   * labor se auto-elige su mina y se filtran sus lotes; al elegir un lote se
+   * auto-eligen la labor y la mina. Sin volver a pedir datos a la API.
+   */
+  const {
+    minas,
+    labores,
+    lotesMineral,
+    opcionesMina,
+    opcionesLabor,
+    opcionesLaborPorMina,
+    opcionesLote,
+    idMina,
+    idLabor,
+    idLoteMineral,
+    seleccionarMina,
+    seleccionarLabor,
+    seleccionarLaborComoDestino,
+    seleccionarLote,
+    loadingMinas,
+    loadingLabores,
+    loadingLotesMineral,
+    busquedaMina,
+    setBusquedaMina,
+    busquedaLabor,
+    setBusquedaLabor,
+    busquedaLote,
+    setBusquedaLote,
+  } = useDestinoMineral();
 
   const [esParaMina, setEsParaMina] = useState<boolean>(true);
-  const [idMina, setIdMina] = useState<string | null>(null);
-  const [idLabor, setIdLabor] = useState<string | null>(null);
-  const [idLoteMineral, setIdLoteMineral] = useState<string | null>(null);
   const [idCliente, setIdCliente] = useState<string | null>(null);
   const [tipoCarga, setTipoCarga] = useState<string | null>(null);
   const [idTarifa, setIdTarifa] = useState<string | null>(null);
@@ -296,9 +315,10 @@ export const RegistroUso = ({
 
   // Load initial data: cabecera + datos especificos segun tipoControl.
   // Todas las requests SIN dependencia entre si se disparan en paralelo
-  // (Promise.all). Las dependencias (labores / almacenes / lotes-mineral
-  // dependen de la mina seleccionada) se manejan en sus propios useEffect
-  // mas abajo.
+  // (Promise.all). Minas / labores / lotes de mineral los carga
+  // `useDestinoMineral` (una request por catalogo, sin recargar al cambiar
+  // de seleccion). Los almacenes si dependen de la mina y se resuelven en su
+  // propio useEffect mas abajo.
   useEffect(() => {
     if (!idActivoFijo) return;
 
@@ -308,7 +328,6 @@ export const RegistroUso = ({
       // Marcamos loading individual para que el circulito de cada Select
       // aparezca apenas se inicia la request que le corresponde.
       setLoadingTarifas(true);
-      setLoadingMinas(true);
       setLoadingClientes(true);
       if (tipoControl === "horometro") {
         setLoadingProductos(true);
@@ -317,16 +336,16 @@ export const RegistroUso = ({
       }
 
       // Disparamos todas las requests SIN dependencia entre si en paralelo.
+      // Las minas / labores / lotes de mineral los carga `useDestinoMineral`
+      // (unica request por catalogo, sin recargar al cambiar de seleccion).
       const [
         respTarifas,
-        respMinas,
         respClientes,
         respProductos,
         respAlmacenes,
         respUnidades,
       ] = await Promise.all([
         ControlUsoService.getTarifas(idActivoFijo),
-        AuxService.get_minas(),
         ClientesService.getClientes(),
         tipoControl === "horometro"
           ? AuxService.get_productos()
@@ -359,19 +378,6 @@ export const RegistroUso = ({
         }
       }
       setLoadingTarifas(false);
-
-      // Minas
-      if (respMinas.success) {
-        setMinas(
-          respMinas.data.map(
-            (m: { id_mina: string | number; nombre: string }) => ({
-              value: m.id_mina.toString(),
-              label: m.nombre,
-            }),
-          ),
-        );
-      }
-      setLoadingMinas(false);
 
       // Clientes
       if (Array.isArray(respClientes)) {
@@ -448,75 +454,6 @@ export const RegistroUso = ({
 
     fetchData();
   }, [idActivoFijo, tipoControl, notifyError]);
-
-  // Cuando cambia la mina, cargar lotes de mineral (con lock "cargando..."
-  // hasta que llegue la respuesta). Es DEPENDIENTE de la mina por diseno:
-  // el listado se filtra server-side para no traer lotes de otras minas.
-  // Usa cancelacion para evitar race conditions si el usuario cambia de
-  // mina rapido. Si NO hay mina seleccionada, vaciamos la lista (el
-  // Select ya esta disabled en ese caso).
-  useEffect(() => {
-    if (!idMina) {
-      setLotesMineral([]);
-      setIdLoteMineral(null);
-      setLoadingLotesMineral(false);
-      return;
-    }
-    let cancelado = false;
-    setLoadingLotesMineral(true);
-    setLotesMineral([]);
-    AuxService.get_lotes_mineral({ id_mina: Number(idMina) })
-      .then((resp) => {
-        if (cancelado || !resp.success) return;
-        setLotesMineral(resp.data);
-      })
-      .catch((e) => {
-        if (!cancelado) console.error(e);
-      })
-      .finally(() => {
-        if (!cancelado) setLoadingLotesMineral(false);
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [idMina]);
-
-  // Cuando cambia la mina, cargar labores (con lock "cargando..." hasta que llegue la respuesta).
-  // Usa cancelacion para evitar race conditions si el usuario cambia de mina rapido.
-  useEffect(() => {
-    if (!idMina) {
-      setLabores([]);
-      setIdLabor(null);
-      setLoadingLabores(false);
-      return;
-    }
-    let cancelado = false;
-    setLoadingLabores(true);
-    setLabores([]);
-    MinasService.getLabores(Number(idMina))
-      .then((resp) => {
-        if (cancelado) return;
-        if (resp.success) {
-          setLabores(
-            resp.data.map(
-              (l: { id_labor: string | number; nombre: string | null }) => ({
-                value: l.id_labor.toString(),
-                label: l.nombre || "Sin nombre",
-              }),
-            ),
-          );
-        }
-      })
-      .catch((e) => {
-        if (!cancelado) console.error(e);
-      })
-      .finally(() => {
-        if (!cancelado) setLoadingLabores(false);
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [idMina]);
 
   /**
    * Carga los lotes del modal segun (idAlmacen, idProducto) actuales del form.
@@ -1124,7 +1061,9 @@ export const RegistroUso = ({
     if (idMina)
       e.mina = minas.find((m) => m.value === String(idMina))?.label || null;
     if (idLabor)
-      e.labor = labores.find((l) => l.value === String(idLabor))?.label || null;
+      e.labor =
+        labores.find((l) => String(l.id_labor) === String(idLabor))?.nombre ||
+        null;
     if (idLoteMineral)
       e.lote_mineral =
         lotesMineral.find(
@@ -1481,7 +1420,7 @@ export const RegistroUso = ({
         </Alert>
       )}
       {/* Asset card (cabecera) */}
-      <div className="relative overflow-hidden bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 flex gap-3.5 transition-all">
+      {/* <div className="relative overflow-hidden bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 flex gap-3.5 transition-all">
         <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
         <div className="flex items-center justify-center shrink-0 w-11 h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
           {tipoControl === "horometro" ? (
@@ -1522,7 +1461,7 @@ export const RegistroUso = ({
             </Text>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Cabecera por modo:
           - horometro: Tarifa + Fecha (cols=2).
@@ -1607,122 +1546,188 @@ export const RegistroUso = ({
           (OPCIONAL). La Fecha del Trabajo pasa a vivir dentro de cada
           Bloque #N, no aqui, porque cada viaje puede caer en dia
           distinto. */}
-      {tipoControl === "vueltas" &&
-        (() => {
-          const lotesFiltrados = lotesMineral.filter((lm) => {
-            if (idLabor) {
-              return lm.id_labor === Number(idLabor);
-            }
-            if (idMina) {
-              return lm.id_mina === Number(idMina);
-            }
-            return false;
-          });
-          return (
-            <Card
-              withBorder
-              padding="md"
+      {tipoControl === "vueltas" && (
+        <>
+          <SimpleGrid cols={2} spacing="md">
+            <Select
+              label="Mina"
+              placeholder={
+                loadingMinas ? "Cargando minas..." : "Seleccione mina"
+              }
+              data={opcionesMina}
+              value={idMina}
+              onChange={seleccionarMina}
+              searchable
+              searchValue={busquedaMina}
+              onSearchChange={setBusquedaMina}
+              nothingFoundMessage="Sin coincidencias"
+              required
+              classNames={fieldClasses}
               radius="lg"
-              className="bg-zinc-950/20 border-zinc-800/60"
-            >
-              <SimpleGrid cols={2} spacing="md">
-                <Select
-                  label="Mina"
-                  placeholder={
-                    loadingMinas ? "Cargando minas..." : "Seleccione mina"
-                  }
-                  data={minas}
-                  value={idMina}
-                  onChange={setIdMina}
-                  searchable
-                  required
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                  rightSection={
-                    loadingMinas ? <Loader size={12} color="indigo" /> : null
-                  }
-                />
-                <Select
-                  label="Labor (Opcional)"
-                  placeholder={
-                    loadingLabores
-                      ? "Cargando labores..."
-                      : "Seleccione labor (opcional)"
-                  }
-                  data={labores}
-                  value={idLabor}
-                  onChange={setIdLabor}
-                  searchable
-                  clearable
-                  disabled={!idMina}
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                  rightSection={
-                    loadingLabores ? <Loader size={12} color="indigo" /> : null
-                  }
-                />
-              </SimpleGrid>
-              <Select
-                mt="md"
-                label="Lote de Mineral (Opcional)"
-                placeholder={
-                  !idMina
-                    ? "Seleccione primero una mina"
-                    : loadingLotesMineral
-                      ? "Cargando lotes de mineral..."
-                      : idLabor
-                        ? "Seleccione lote de la labor (opcional)..."
-                        : "Seleccione lote de la mina (opcional)..."
-                }
-                data={lotesFiltrados.map((lm) => ({
-                  value: String(lm.id_lote_mineral),
-                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-                }))}
-                value={idLoteMineral}
-                onChange={setIdLoteMineral}
-                searchable
-                clearable
-                disabled={!idMina}
-                classNames={fieldClasses}
-                radius="lg"
-                size="xs"
-                rightSection={
-                  loadingLotesMineral ? (
-                    <Loader size={12} color="indigo" />
-                  ) : null
-                }
-              />
-            </Card>
-          );
-        })()}
+              size="xs"
+              rightSection={
+                loadingMinas ? <Loader size={12} color="indigo" /> : null
+              }
+            />
+            <Select
+              label="Labor"
+              placeholder={
+                loadingLabores ? "Cargando labores..." : "Seleccione labor"
+              }
+              data={opcionesLaborPorMina}
+              value={idLabor}
+              onChange={(val) => seleccionarLabor(val)}
+              searchable
+              searchValue={busquedaLabor}
+              onSearchChange={setBusquedaLabor}
+              nothingFoundMessage="Sin coincidencias"
+              clearable
+              classNames={fieldClasses}
+              radius="lg"
+              size="xs"
+              rightSection={
+                loadingLabores ? <Loader size={12} color="indigo" /> : null
+              }
+            />
+          </SimpleGrid>
+          <Select
+            mt="md"
+            label="Lote de Mineral (Opcional)"
+            placeholder={
+              loadingLotesMineral
+                ? "Cargando lotes de mineral..."
+                : idLabor
+                  ? "Seleccione lote de la labor (opcional)..."
+                  : idMina
+                    ? "Seleccione lote de la mina (opcional)..."
+                    : "Seleccione lote de mineral (opcional)..."
+            }
+            data={opcionesLote}
+            value={idLoteMineral}
+            onChange={seleccionarLote}
+            searchable
+            searchValue={busquedaLote}
+            onSearchChange={setBusquedaLote}
+            nothingFoundMessage="Sin coincidencias"
+            clearable
+            classNames={fieldClasses}
+            radius="lg"
+            size="xs"
+            rightSection={
+              loadingLotesMineral ? <Loader size={12} color="indigo" /> : null
+            }
+          />
+        </>
+      )}
 
       {/* Bloque Horometro: Bulk (N items) */}
       {tipoControl === "horometro" ? (
         <Stack gap="sm">
           {/* Lote Mineral + Tipo de Carga (Opc.) en la misma fila */}
-          <SimpleGrid cols={2} spacing="md">
+          {/* Destino del Trabajo (cabecera del bulk) */}
+          <Group
+            justify="flex-start"
+            align="center"
+            gap="xs"
+            className="relative top-1"
+          >
+            <Text size="xs" fw={600} className="text-zinc-300">
+              Destino del Trabajo:
+            </Text>
+            <Tabs
+              value={esParaMina ? "mina" : "terceros"}
+              onChange={(val) => {
+                if (val) setEsParaMina(val === "mina");
+              }}
+              variant="pills"
+              color="teal"
+              radius="md"
+            >
+              <Tabs.List className="">
+                <Tabs.Tab
+                  value="mina"
+                  leftSection={<MapPinIcon className="w-4 h-4" />}
+                  className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
+                >
+                  En Mina
+                </Tabs.Tab>
+                <Tabs.Tab
+                  value="terceros"
+                  leftSection={<BriefcaseIcon className="w-4 h-4" />}
+                  className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
+                >
+                  Para Terceros
+                </Tabs.Tab>
+              </Tabs.List>
+            </Tabs>
+          </Group>
+
+          <SimpleGrid cols={3} spacing="md">
+            {esParaMina ? (
+              <Select
+                label="Labor"
+                required
+                placeholder={
+                  loadingLabores ? "Cargando labores..." : "Seleccione labor"
+                }
+                data={opcionesLabor}
+                value={idLabor}
+                onChange={seleccionarLaborComoDestino}
+                searchable
+                searchValue={busquedaLabor}
+                onSearchChange={setBusquedaLabor}
+                nothingFoundMessage="Sin coincidencias"
+                clearable
+                rightSection={
+                  loadingLabores ? (
+                    <Loader size={12} color="indigo" />
+                  ) : undefined
+                }
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+              />
+            ) : (
+              <Select
+                label="Cliente"
+                placeholder={
+                  loadingClientes
+                    ? "Cargando clientes..."
+                    : "Seleccione cliente"
+                }
+                data={clientes}
+                value={idCliente}
+                onChange={setIdCliente}
+                searchable
+                required
+                clearable
+                classNames={fieldClasses}
+                radius="lg"
+                size="xs"
+                rightSection={
+                  loadingClientes ? <Loader size={12} color="indigo" /> : null
+                }
+              />
+            )}
             <Select
               label="Lote Mineral (Opc.)"
               placeholder={
-                !idMina
-                  ? "Seleccione primero una mina"
-                  : loadingLotesMineral
-                    ? "Cargando lotes de mineral..."
-                    : "Seleccione lote de la mina (opcional)..."
+                loadingLotesMineral
+                  ? "Cargando lotes de mineral..."
+                  : idLabor
+                    ? "Seleccione lote de la labor (opcional)..."
+                    : idMina
+                      ? "Seleccione lote de la mina (opcional)..."
+                      : "Seleccione lote de mineral (opcional)..."
               }
-              data={lotesMineral
-                .filter((lm) => (idMina ? lm.id_mina === Number(idMina) : true))
-                .map((lm) => ({
-                  value: String(lm.id_lote_mineral),
-                  label: `${lm.contratista ? `${lm.contratista.split(" ")[0]} - ` : ""}${lm.codigo}`,
-                }))}
+              data={opcionesLote}
               value={idLoteMineral}
-              onChange={setIdLoteMineral}
+              onChange={seleccionarLote}
               searchable
+              searchValue={busquedaLote}
+              onSearchChange={setBusquedaLote}
+              nothingFoundMessage="Sin coincidencias"
               clearable
-              disabled={!idMina}
               classNames={fieldClasses}
               radius="lg"
               size="xs"
@@ -1743,115 +1748,7 @@ export const RegistroUso = ({
             />
           </SimpleGrid>
 
-          {/* Destino del Trabajo (cabecera del bulk) */}
-          <Card
-            withBorder
-            padding="md"
-            radius="lg"
-            className="bg-zinc-950/20 border-zinc-800/60"
-          >
-            <Group justify="flex-start" align="center" gap="xs">
-              <Text size="xs" fw={600} className="text-zinc-300">
-                Destino del Trabajo:
-              </Text>
-              <Tabs
-                value={esParaMina ? "mina" : "terceros"}
-                onChange={(val) => {
-                  if (val) setEsParaMina(val === "mina");
-                }}
-                variant="pills"
-                color="teal"
-                radius="md"
-              >
-                <Tabs.List className="">
-                  <Tabs.Tab
-                    value="mina"
-                    leftSection={<MapPinIcon className="w-4 h-4" />}
-                    className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
-                  >
-                    En Mina
-                  </Tabs.Tab>
-                  <Tabs.Tab
-                    value="terceros"
-                    leftSection={<BriefcaseIcon className="w-4 h-4" />}
-                    className="text-zinc-400 data-active:text-white font-bold h-7 px-3 text-xs"
-                  >
-                    Para Terceros
-                  </Tabs.Tab>
-                </Tabs.List>
-              </Tabs>
-            </Group>
-
-            <SimpleGrid cols={esParaMina ? 2 : 1} spacing="md" mt="xs">
-              {esParaMina ? (
-                <>
-                  <Select
-                    label="Mina"
-                    placeholder={
-                      loadingMinas
-                        ? "Cargando minas..."
-                        : "Seleccione mina"
-                    }
-                    data={minas}
-                    value={idMina}
-                    onChange={setIdMina}
-                    searchable
-                    required
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                    rightSection={
-                      loadingMinas ? (
-                        <Loader size={12} color="indigo" />
-                      ) : null
-                    }
-                  />
-                  <Select
-                    label="Labor (Opcional)"
-                    placeholder={
-                      loadingLabores
-                        ? "Cargando labores..."
-                        : "Seleccione labor"
-                    }
-                    data={labores}
-                    value={idLabor}
-                    onChange={setIdLabor}
-                    searchable
-                    clearable
-                    disabled={!idMina || loadingLabores}
-                    rightSection={
-                      loadingLabores ? (
-                        <Loader size={12} color="indigo" />
-                      ) : undefined
-                    }
-                    classNames={fieldClasses}
-                    radius="lg"
-                    size="xs"
-                  />
-                </>
-              ) : (
-                <Select
-                  label="Cliente"
-                  placeholder={
-                    loadingClientes
-                      ? "Cargando clientes..."
-                      : "Seleccione cliente"
-                  }
-                  data={clientes}
-                  value={idCliente}
-                  onChange={setIdCliente}
-                  searchable
-                  required
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                  rightSection={
-                    loadingClientes ? <Loader size={12} color="indigo" /> : null
-                  }
-                />
-              )}
-            </SimpleGrid>
-          </Card>
+          <SimpleGrid cols={2} spacing="md"></SimpleGrid>
 
           {/* Consumos asociados (compartidos por todo el grupo UUID).
               Antes vivia DENTRO de cada Bloque #1; ahora va aqui, debajo
@@ -1860,16 +1757,16 @@ export const RegistroUso = ({
               del grupo, no a uno puntual. */}
           <Card
             withBorder
-            padding="md"
+            padding="xs"
             radius="lg"
-            className="bg-amber-950/10 border-amber-500/30"
+            className="bg-amber-950/10 border-amber-500/30 mt-2"
           >
             <Group justify="space-between" align="center" mb="xs" wrap="nowrap">
               <Group gap="xs" wrap="nowrap">
                 <BeakerIcon className="w-4 h-4 text-amber-400" />
                 <Text
                   size="xs"
-                  fw={800}
+                  fw={700}
                   className="text-amber-200 uppercase tracking-wider"
                 >
                   Consumos asociados
@@ -1895,9 +1792,7 @@ export const RegistroUso = ({
 
             {consumos.length === 0 ? (
               <Text size="xs" c="gray.4" fs="italic">
-                Sin consumos asociados. Si este control representa salida
-                directa de stock (p. ej. combustible gastado por el activo),
-                agrega un consumo.
+                Sin consumos asociados.
               </Text>
             ) : (
               <Stack gap={6} mt={4}>
@@ -2072,316 +1967,333 @@ export const RegistroUso = ({
               </Stack>
             )}
           </Card>
-
+          <Divider
+            orientation="horizontal"
+            className="my-1"
+            variant="dashed"
+            label="BLOQUES"
+            labelPosition="center"
+          />
           {/* Items: N bloques de horario */}
           <Stack gap="sm">
             {items.map((it, idx) => (
-              <Card
-                key={it.id}
-                withBorder
-                padding="md"
-                radius="lg"
-                className="bg-zinc-950/40 border-zinc-800"
-              >
-                <Group
-                  justify="space-between"
-                  align="center"
-                  mb="sm"
-                  wrap="nowrap"
+              <Fragment key={it.id}>
+                <Card
+                  withBorder
+                  padding="md"
+                  radius="lg"
+                  className="bg-zinc-950/40 border-zinc-800"
                 >
-                  <Group gap="xs" wrap="nowrap">
-                    <Badge color="indigo" variant="light" size="sm" radius="sm">
-                      Bloque #{idx + 1}
-                    </Badge>
-                    <Text size="xs" c="zinc.500" fw={600}>
-                      Horario independiente
-                    </Text>
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    mb="sm"
+                    wrap="nowrap"
+                  >
+                    <Group gap="xs" wrap="nowrap">
+                      <Badge
+                        color="indigo"
+                        variant="light"
+                        size="sm"
+                        radius="sm"
+                      >
+                        Bloque #{idx + 1}
+                      </Badge>
+
+                      <Group gap={"xs"}>
+                        <Text size="xs" fw={600}>
+                          Turno (opcional) :
+                        </Text>
+                        <Select
+                          placeholder="Seleccione turno..."
+                          data={[
+                            { value: TipoTurno.Dia, label: "Día" },
+                            { value: TipoTurno.Noche, label: "Noche" },
+                          ]}
+                          value={it.tipoTurno === "" ? null : it.tipoTurno}
+                          onChange={(val) =>
+                            actualizarItem(
+                              it.id,
+                              "tipoTurno",
+                              (val ?? "") as TipoTurno | "",
+                            )
+                          }
+                          clearable
+                          classNames={fieldClasses}
+                          radius="lg"
+                          size="xs"
+                        />
+                      </Group>
+                    </Group>
+                    <Group gap="md" align="center" wrap="nowrap">
+                      <Checkbox
+                        label="Usar Horas"
+                        checked={it.usarHoras}
+                        onChange={(event) => {
+                          const value = event.currentTarget.checked;
+                          actualizarItem(it.id, "usarHoras", value);
+                          if (!value) {
+                            actualizarItem(it.id, "horaInicioStr", "");
+                            actualizarItem(it.id, "horaFinStr", "");
+                          }
+                        }}
+                        radius="sm"
+                        size="xs"
+                        color="indigo"
+                      />
+                      <Checkbox
+                        label="Usar Horometro"
+                        checked={it.usarHorometro}
+                        onChange={(event) => {
+                          const value = event.currentTarget.checked;
+                          actualizarItem(it.id, "usarHorometro", value);
+                          if (!value) {
+                            actualizarItem(it.id, "lecturaInicio", "");
+                            actualizarItem(it.id, "lecturaFin", "");
+                          }
+                        }}
+                        radius="sm"
+                        size="xs"
+                        color="indigo"
+                      />
+                      {items.length > 1 && (
+                        <Tooltip label="Quitar bloque">
+                          <ActionIcon
+                            onClick={() => quitarItem(it.id)}
+                            variant="subtle"
+                            color="red"
+                            size="sm"
+                            radius="xl"
+                            aria-label={`Quitar bloque ${idx + 1}`}
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </Group>
                   </Group>
-                  <Group gap="md" align="center" wrap="nowrap">
-                    <Checkbox
-                      label="Usar Horas"
-                      checked={it.usarHoras}
-                      onChange={(event) => {
-                        const value = event.currentTarget.checked;
-                        actualizarItem(it.id, "usarHoras", value);
-                        if (!value) {
-                          actualizarItem(it.id, "horaInicioStr", "");
-                          actualizarItem(it.id, "horaFinStr", "");
+
+                  <SimpleGrid cols={4} spacing="xs">
+                    <div>
+                      <TimeInput
+                        ref={(el) => {
+                          refInicioRefs.current[it.id] = el;
+                        }}
+                        label={it.usarHoras ? "Hora Inicio" : "Hora Inicio "}
+                        placeholder="08:00"
+                        value={it.horaInicioStr}
+                        onChange={(event) => {
+                          actualizarItem(
+                            it.id,
+                            "horaInicioStr",
+                            formatHora(event.currentTarget.value),
+                          );
+                        }}
+                        onClick={() =>
+                          it.usarHoras &&
+                          refInicioRefs.current[it.id]?.showPicker?.()
                         }
-                      }}
-                      radius="sm"
-                      size="xs"
-                      color="indigo"
-                    />
-                    <Checkbox
-                      label="Usar Horometro"
-                      checked={it.usarHorometro}
-                      onChange={(event) => {
-                        const value = event.currentTarget.checked;
-                        actualizarItem(it.id, "usarHorometro", value);
-                        if (!value) {
-                          actualizarItem(it.id, "lecturaInicio", "");
-                          actualizarItem(it.id, "lecturaFin", "");
-                        }
-                      }}
-                      radius="sm"
-                      size="xs"
-                      color="indigo"
-                    />
-                    {items.length > 1 && (
-                      <Tooltip label="Quitar bloque">
-                        <ActionIcon
-                          onClick={() => quitarItem(it.id)}
-                          variant="subtle"
-                          color="red"
-                          size="sm"
-                          radius="xl"
-                          aria-label={`Quitar bloque ${idx + 1}`}
+                        classNames={fieldClasses}
+                        size="xs"
+                        radius="lg"
+                        required={it.usarHoras}
+                        disabled={!it.usarHoras}
+                      />
+                      {it.horaInicioStr && it.usarHoras && (
+                        <Text
+                          size="10px"
+                          c="blue.4"
+                          fw={700}
+                          mt={3}
+                          className="ml-1"
                         >
-                          <TrashIcon className="w-4 h-4" />
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </Group>
-                </Group>
-
-                <SimpleGrid cols={2} spacing="md">
-                  <div>
-                    <TimeInput
-                      ref={(el) => {
-                        refInicioRefs.current[it.id] = el;
-                      }}
-                      label={
-                        it.usarHoras ? "Hora Inicio" : "Hora Inicio (no aplica)"
-                      }
-                      placeholder="08:00"
-                      value={it.horaInicioStr}
-                      onChange={(event) => {
-                        actualizarItem(
-                          it.id,
-                          "horaInicioStr",
-                          formatHora(event.currentTarget.value),
-                        );
-                      }}
-                      onClick={() =>
-                        it.usarHoras &&
-                        refInicioRefs.current[it.id]?.showPicker?.()
-                      }
-                      classNames={fieldClasses}
-                      size="xs"
-                      radius="lg"
-                      required={it.usarHoras}
-                      disabled={!it.usarHoras}
-                    />
-                    {it.horaInicioStr && it.usarHoras && (
-                      <Text
-                        size="10px"
-                        c="blue.4"
-                        fw={700}
-                        mt={3}
-                        className="ml-1"
-                      >
-                        (
-                        {dayjs(`2000-01-01 ${it.horaInicioStr}`).format(
-                          "hh:mm A",
-                        )}
-                        )
-                      </Text>
-                    )}
-                  </div>
-
-                  <div>
-                    <TimeInput
-                      ref={(el) => {
-                        refFinRefs.current[it.id] = el;
-                      }}
-                      label={it.usarHoras ? "Hora Fin" : "Hora Fin (no aplica)"}
-                      placeholder="10:00"
-                      value={it.horaFinStr}
-                      onChange={(event) => {
-                        actualizarItem(
-                          it.id,
-                          "horaFinStr",
-                          formatHora(event.currentTarget.value),
-                        );
-                      }}
-                      onClick={() =>
-                        it.usarHoras &&
-                        refFinRefs.current[it.id]?.showPicker?.()
-                      }
-                      classNames={fieldClasses}
-                      size="xs"
-                      radius="lg"
-                      required={it.usarHoras}
-                      disabled={!it.usarHoras}
-                    />
-                    {it.horaFinStr && it.usarHoras && (
-                      <Text
-                        size="10px"
-                        c="blue.4"
-                        fw={700}
-                        mt={3}
-                        className="ml-1"
-                      >
-                        (
-                        {dayjs(`2000-01-01 ${it.horaFinStr}`).format("hh:mm A")}
-                        )
-                        {it.horaInicioStr &&
-                          it.horaFinStr &&
-                          dayjs(`2000-01-01 ${it.horaFinStr}`).isBefore(
-                            dayjs(`2000-01-01 ${it.horaInicioStr}`),
-                          ) && (
-                            <span className="text-amber-400 font-bold ml-1">
-                              (Dia siguiente)
-                            </span>
+                          (
+                          {dayjs(`2000-01-01 ${it.horaInicioStr}`).format(
+                            "hh:mm A",
                           )}
-                      </Text>
-                    )}
-                  </div>
-                </SimpleGrid>
+                          )
+                        </Text>
+                      )}
+                    </div>
 
-                <Select
-                  label="Turno (opcional)"
-                  placeholder="Seleccione turno..."
-                  data={[
-                    { value: TipoTurno.Dia, label: "Día" },
-                    { value: TipoTurno.Noche, label: "Noche" },
-                  ]}
-                  value={it.tipoTurno === "" ? null : it.tipoTurno}
-                  onChange={(val) =>
-                    actualizarItem(
-                      it.id,
-                      "tipoTurno",
-                      (val ?? "") as TipoTurno | "",
-                    )
-                  }
-                  clearable
-                  classNames={fieldClasses}
-                  radius="lg"
-                  size="xs"
-                  mt="sm"
-                />
+                    <div>
+                      <TimeInput
+                        ref={(el) => {
+                          refFinRefs.current[it.id] = el;
+                        }}
+                        label={it.usarHoras ? "Hora Fin" : "Hora Fin "}
+                        placeholder="10:00"
+                        value={it.horaFinStr}
+                        onChange={(event) => {
+                          actualizarItem(
+                            it.id,
+                            "horaFinStr",
+                            formatHora(event.currentTarget.value),
+                          );
+                        }}
+                        onClick={() =>
+                          it.usarHoras &&
+                          refFinRefs.current[it.id]?.showPicker?.()
+                        }
+                        classNames={fieldClasses}
+                        size="xs"
+                        radius="lg"
+                        required={it.usarHoras}
+                        disabled={!it.usarHoras}
+                      />
+                      {it.horaFinStr && it.usarHoras && (
+                        <Text
+                          size="10px"
+                          c="blue.4"
+                          fw={700}
+                          mt={3}
+                          className="ml-1"
+                        >
+                          (
+                          {dayjs(`2000-01-01 ${it.horaFinStr}`).format(
+                            "hh:mm A",
+                          )}
+                          )
+                          {it.horaInicioStr &&
+                            it.horaFinStr &&
+                            dayjs(`2000-01-01 ${it.horaFinStr}`).isBefore(
+                              dayjs(`2000-01-01 ${it.horaInicioStr}`),
+                            ) && (
+                              <span className="text-amber-400 font-bold ml-1">
+                                (Dia siguiente)
+                              </span>
+                            )}
+                        </Text>
+                      )}
+                    </div>
 
-                <SimpleGrid
-                  cols={2}
-                  spacing="md"
-                  mt="sm"
-                  className="opacity-85"
-                >
-                  <NumberInput
-                    label={
-                      it.usarHorometro
-                        ? "Horometro Inicial"
-                        : "Horometro Inicial (no aplica)"
-                    }
-                    placeholder="Ej: 1250.00"
-                    value={it.lecturaInicio}
-                    onChange={(val) =>
-                      actualizarItem(it.id, "lecturaInicio", val as number | "")
-                    }
-                    min={0}
-                    decimalScale={2}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                    required={it.usarHorometro}
-                    disabled={!it.usarHorometro || loadingData}
-                  />
-                  <NumberInput
-                    label={
-                      it.usarHorometro
-                        ? "Horometro Final"
-                        : "Horometro Final (no aplica)"
-                    }
-                    placeholder="Ej: 1252.00"
-                    value={it.lecturaFin}
-                    onChange={(val) =>
-                      actualizarItem(it.id, "lecturaFin", val as number | "")
-                    }
-                    min={0}
-                    decimalScale={2}
-                    fixedDecimalScale
-                    classNames={fieldClasses}
-                    size="xs"
-                    radius="lg"
-                    required={it.usarHorometro}
-                    disabled={!it.usarHorometro || loadingData}
-                  />
-                </SimpleGrid>
+                    <NumberInput
+                      label={
+                        it.usarHorometro
+                          ? "Horometro Inicial"
+                          : "Horometro Inicial"
+                      }
+                      placeholder="Ej: 1250.00"
+                      value={it.lecturaInicio}
+                      onChange={(val) =>
+                        actualizarItem(
+                          it.id,
+                          "lecturaInicio",
+                          val as number | "",
+                        )
+                      }
+                      fixedDecimalScale
+                      classNames={fieldClasses}
+                      size="xs"
+                      hideControls
+                      radius="lg"
+                      required={it.usarHorometro}
+                      disabled={!it.usarHorometro || loadingData}
+                    />
+                    <NumberInput
+                      label={
+                        it.usarHorometro
+                          ? "Horometro Final"
+                          : "Horometro Final "
+                      }
+                      placeholder="Ej: 1252.00"
+                      value={it.lecturaFin}
+                      onChange={(val) =>
+                        actualizarItem(it.id, "lecturaFin", val as number | "")
+                      }
+                      hideControls
+                      fixedDecimalScale
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                      required={it.usarHorometro}
+                      disabled={!it.usarHorometro || loadingData}
+                    />
+                  </SimpleGrid>
 
-                <Textarea
-                  label="Observacion"
-                  placeholder="Notas u observaciones de este bloque (opcional)..."
-                  value={it.observacion}
-                  onChange={(e) =>
-                    actualizarItem(it.id, "observacion", e.currentTarget.value)
-                  }
-                  classNames={fieldClasses}
-                  size="xs"
-                  radius="lg"
-                  minRows={2}
-                  mt="sm"
-                />
-
-                {/* NOTA: los consumos ya NO son por bloque. La seccion
+                  {/* NOTA: los consumos ya NO son por bloque. La seccion
                     "Consumos asociados" se movio abajo de los selects de
                     mina/labor (compartida por todo el grupo UUID). */}
 
-                <SimpleGrid cols={2} spacing="md" mt="md">
-                  <Group gap={6} align="center" wrap="nowrap">
-                    <ClockIcon className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <div className="min-w-0">
-                      <Text
-                        size="9px"
-                        c="zinc.500"
-                        fw={900}
-                        tt="uppercase"
-                        lts="0.08em"
+                  <SimpleGrid cols={2} spacing="md" mt="xs">
+                    <Textarea
+                      label="Observacion"
+                      placeholder="Notas u observaciones de este bloque (opcional)..."
+                      value={it.observacion}
+                      onChange={(e) =>
+                        actualizarItem(
+                          it.id,
+                          "observacion",
+                          e.currentTarget.value,
+                        )
+                      }
+                      classNames={fieldClasses}
+                      size="xs"
+                      radius="lg"
+                      minRows={2}
+                    />
+                    <div className="flex items-center justify-between">
+                      <Group gap={6} align="center" wrap="nowrap">
+                        <ClockIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <div className="min-w-0">
+                          <Text
+                            size="9px"
+                            c="zinc.500"
+                            fw={900}
+                            tt="uppercase"
+                            lts="0.08em"
+                          >
+                            Total Horas
+                          </Text>
+                          <Text size="md" fw={800} className="text-indigo-300">
+                            {formatHorasDisplay(
+                              calculosPorItem[idx]?.totalHoras ?? 0,
+                            )}{" "}
+                            <span className="text-[11px] text-zinc-300 italic font-medium">
+                              hrs
+                            </span>
+                          </Text>
+                        </div>
+                      </Group>
+                      <Group
+                        gap={6}
+                        align="center"
+                        wrap="nowrap"
+                        justify="flex-end"
                       >
-                        Total Horas
-                      </Text>
-                      <Text size="md" fw={800} className="text-indigo-300">
-                        {formatHorasDisplay(
-                          calculosPorItem[idx]?.totalHoras ?? 0,
-                        )}{" "}
-                        <span className="text-[10px] text-zinc-500 italic font-medium">
-                          hrs
-                        </span>
-                      </Text>
+                        <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="min-w-0 text-right">
+                          <Text
+                            size="9px"
+                            c="zinc.500"
+                            fw={900}
+                            tt="uppercase"
+                            lts="0.08em"
+                          >
+                            Costo Operativo
+                          </Text>
+                          <Text size="md" fw={800} className="text-emerald-300">
+                            S/.{" "}
+                            {calculosPorItem[idx]?.costoTotal?.toLocaleString(
+                              undefined,
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            ) ?? "0.00"}
+                          </Text>
+                        </div>
+                      </Group>
                     </div>
-                  </Group>
-                  <Group
-                    gap={6}
-                    align="center"
-                    wrap="nowrap"
-                    justify="flex-end"
-                  >
-                    <BanknotesIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div className="min-w-0 text-right">
-                      <Text
-                        size="9px"
-                        c="zinc.500"
-                        fw={900}
-                        tt="uppercase"
-                        lts="0.08em"
-                      >
-                        Costo Operativo
-                      </Text>
-                      <Text size="md" fw={800} className="text-emerald-300">
-                        S/.{" "}
-                        {calculosPorItem[idx]?.costoTotal?.toLocaleString(
-                          undefined,
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          },
-                        ) ?? "0.00"}
-                      </Text>
-                    </div>
-                  </Group>
-                </SimpleGrid>
-              </Card>
+                  </SimpleGrid>
+                </Card>
+
+                <Divider
+                  orientation="horizontal"
+                  className="my-1"
+                  variant="dashed"
+                />
+              </Fragment>
             ))}
 
             <Button
@@ -3184,7 +3096,9 @@ export const RegistroUso = ({
             <Select
               label="Producto"
               placeholder={
-                loadingProductos ? "Cargando productos..." : "Seleccione producto"
+                loadingProductos
+                  ? "Cargando productos..."
+                  : "Seleccione producto"
               }
               data={productos.map((p) => ({
                 value: String(p.id_producto),

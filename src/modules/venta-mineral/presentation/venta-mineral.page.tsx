@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Group, Skeleton, Stack, Text } from "@mantine/core";
+import {
+  Alert,
+  Badge,
+  Button,
+  Group,
+  Skeleton,
+  Stack,
+  Text,
+} from "@mantine/core";
 import { TruckIcon, TrashIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
@@ -41,9 +49,8 @@ export const VentaMineralPage = () => {
   const [busqueda, setBusqueda] = useState("");
   const [mes, setMes] = useState(dayjs().month() + 1);
   const [anio, setAnio] = useState(dayjs().year());
-  const [modalCatalogo, setModalCatalogo] = useState<TipoCatalogoMineral | null>(
-    null,
-  );
+  const [modalCatalogo, setModalCatalogo] =
+    useState<TipoCatalogoMineral | null>(null);
   const { notifySuccess, notifyError } = useNotify();
 
   const {
@@ -69,9 +76,9 @@ export const VentaMineralPage = () => {
   const { clientes, cargar: cargarClientes } = useClientesDespacho();
 
   /* ---------------- Estado de los modales ---------------- */
-  const [modalDespacho, setModalDespacho] = useState<
-    { despacho: DespachoMineralResumen | null } | null
-  >(null);
+  const [modalDespacho, setModalDespacho] = useState<{
+    despacho: DespachoMineralResumen | null;
+  } | null>(null);
   /** Despacho pendiente de confirmacion de eliminacion. */
   const [despachoPorEliminar, setDespachoPorEliminar] =
     useState<DespachoMineralResumen | null>(null);
@@ -194,8 +201,7 @@ export const VentaMineralPage = () => {
     cambiarDespliegue([despachos[0].id_despacho_mineral]);
   }, [despachos, cambiarDespliegue]);
 
-  const mostrarEmpty =
-    !isLoading && despachos.length === 0 && !busqueda;
+  const mostrarEmpty = !isLoading && despachos.length === 0 && !busqueda;
 
   return (
     <div className="space-y-6 animate-fade-in p-1">
@@ -298,7 +304,9 @@ export const VentaMineralPage = () => {
               analisis.id_analisis_laboratorio,
             )
           }
-          onRegistrarLiquidacion={(despacho) => abrirLiquidacion(despacho, null)}
+          onRegistrarLiquidacion={(despacho) =>
+            abrirLiquidacion(despacho, null)
+          }
           onEditarLiquidacion={(despacho, liquidacion) =>
             abrirLiquidacion(despacho, liquidacion)
           }
@@ -439,7 +447,27 @@ export const VentaMineralPage = () => {
         opened={modalBalanza !== null}
         close={() => setModalBalanza(null)}
         title="Ticket de balanza"
-        size="md"
+        rightSection={
+          modalBalanza?.flete && (
+            <Group grow gap={"xs"}>
+              <Badge
+                className="whitespace-normal overflow-visible line-clamp-none wrap-break-word"
+                size="sm"
+                color="teal"
+              >
+                {modalBalanza?.flete.placa ?? "SIN PLACA"}
+              </Badge>
+              <Badge
+                className="whitespace-normal overflow-visible line-clamp-none wrap-break-word"
+                size="sm"
+                color="blue"
+              >
+                {modalBalanza?.flete.transportista ?? "sin transportista"}
+              </Badge>
+            </Group>
+          )
+        }
+        size="lg"
       >
         {modalBalanza && (
           <ModalBalanza
@@ -461,7 +489,9 @@ export const VentaMineralPage = () => {
       <ModalEstandar
         opened={modalAnalisis !== null}
         close={() => setModalAnalisis(null)}
-        title={modalAnalisis?.analisis ? "Editar analisis" : "Registrar analisis"}
+        title={
+          modalAnalisis?.analisis ? "Editar analisis" : "Registrar analisis"
+        }
         size="lg"
       >
         {modalAnalisis && (
@@ -470,7 +500,10 @@ export const VentaMineralPage = () => {
             laboratorios={catalogos.laboratorios}
             clientes={clientesCatalogo}
             analisis={modalAnalisis.analisis}
-            nombreLabor={detalleDe(modalAnalisis.despacho.id_despacho_mineral)?.labor ?? null}
+            nombreLabor={
+              detalleDe(modalAnalisis.despacho.id_despacho_mineral)?.labor ??
+              null
+            }
             cantidadSacos={modalAnalisis.despacho.cantidad_sacos}
             onGuardar={async (payload) => {
               const idDespacho = modalAnalisis.despacho.id_despacho_mineral;
@@ -538,8 +571,8 @@ export const VentaMineralPage = () => {
           <ModalComprobanteFlete
             close={() => setModalComprobante(null)}
             fletesDisponibles={
-              detalleDe(modalComprobante.despacho.id_despacho_mineral)?.fletes ??
-              []
+              detalleDe(modalComprobante.despacho.id_despacho_mineral)
+                ?.fletes ?? []
             }
             comprobante={modalComprobante.comprobante}
             onGuardar={async (payload) => {
@@ -551,7 +584,11 @@ export const VentaMineralPage = () => {
                     modalComprobante.comprobante.id_comprobante,
                     payload,
                   )
-                : await acciones.registrarComprobante(idDespacho, "flete", payload);
+                : await acciones.registrarComprobante(
+                    idDespacho,
+                    "flete",
+                    payload,
+                  );
               return ok !== null;
             }}
           />
@@ -607,7 +644,8 @@ export const VentaMineralPage = () => {
             close={() => setModalComprobante(null)}
             analisisDisponibles={
               modalComprobante.analisisDisponibles ??
-              detalleDe(modalComprobante.despacho.id_despacho_mineral)?.analisis ??
+              detalleDe(modalComprobante.despacho.id_despacho_mineral)
+                ?.analisis ??
               []
             }
             comprobante={modalComprobante.comprobante}

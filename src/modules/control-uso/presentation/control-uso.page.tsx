@@ -27,6 +27,7 @@ import {
   Loader,
   ActionIcon,
   Menu,
+  Divider,
 } from "@mantine/core";
 import {
   PlusIcon,
@@ -35,7 +36,6 @@ import {
   Cog8ToothIcon,
   TruckIcon,
   CalendarDaysIcon,
-  BanknotesIcon,
   NoSymbolIcon,
   EllipsisVerticalIcon,
   PencilSquareIcon,
@@ -113,9 +113,7 @@ export const ControlUsoPage = () => {
         // El backend decide si reingresa stock o no segun cuantos items
         // del mismo `uuid_grupo` quedan activos. Mostramos el mensaje tal
         // cual lo devuelve el service para no mentir sobre el reingreso.
-        const msg =
-          resp.message ||
-          "Control de uso anulado.";
+        const msg = resp.message || "Control de uso anulado.";
         notifySuccess?.(msg);
         closeAnular();
         setAnularTarget(null);
@@ -135,15 +133,24 @@ export const ControlUsoPage = () => {
   const { notifyError, notifySuccess } = useNotify();
 
   const handleExportExcel = () => {
-    const mesNombre = MESES.find((m) => m.value === String(mes))?.label || String(mes);
-    const prefix = tipoControl === "horometro" ? "Control_Horas" : tipoControl === "vueltas" ? "Control_Vueltas" : "Control_Odometro";
+    const mesNombre =
+      MESES.find((m) => m.value === String(mes))?.label || String(mes);
+    const prefix =
+      tipoControl === "horometro"
+        ? "Control_Horas"
+        : tipoControl === "vueltas"
+          ? "Control_Vueltas"
+          : "Control_Odometro";
     const filename = `${prefix}_${mesNombre}_${anio}.xlsx`;
 
     generateExcel({
       filename,
       builder: async (workbook) => {
         try {
-          const resp = await ControlUsoService.getReporteMensual(Number(mes), Number(anio));
+          const resp = await ControlUsoService.getReporteMensual(
+            Number(mes),
+            Number(anio),
+          );
           if (resp.success) {
             if (tipoControl === "horometro") {
               await buildControlHorasExcel(
@@ -154,10 +161,17 @@ export const ControlUsoPage = () => {
                 resp.data.consumos_combustible_por_uuid ?? {},
               );
             } else {
-              await buildControlVueltasExcel(workbook, resp.data.logs, Number(mes), Number(anio));
+              await buildControlVueltasExcel(
+                workbook,
+                resp.data.logs,
+                Number(mes),
+                Number(anio),
+              );
             }
           } else {
-            notifyError(resp.message || "Error al obtener datos para el reporte");
+            notifyError(
+              resp.message || "Error al obtener datos para el reporte",
+            );
             throw new Error(resp.message);
           }
         } catch (e) {
@@ -177,13 +191,16 @@ export const ControlUsoPage = () => {
 
   // Agrupar activos por producto para el Select con secciones
   const activosAgrupados = Object.entries(
-    activos.reduce<Record<string, { value: string; label: string }[]>>((acc, a) => {
-      (acc[a.producto] ??= []).push({
-        value: String(a.id_activo),
-        label: a.correlativo,
-      });
-      return acc;
-    }, {}),
+    activos.reduce<Record<string, { value: string; label: string }[]>>(
+      (acc, a) => {
+        (acc[a.producto] ??= []).push({
+          value: String(a.id_activo),
+          label: a.correlativo,
+        });
+        return acc;
+      },
+      {},
+    ),
   )
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([group, items]) => ({ group, items }));
@@ -218,10 +235,28 @@ export const ControlUsoPage = () => {
       width: 50,
     },
     {
+      accessor: "turno",
+      title: "Turno",
+      textAlign: "center",
+      width: 90,
+      render: (r) => {
+        return (
+          <Badge
+            size="sm"
+            color={r.tipo_turno === "Noche" ? "violet" : "yellow"}
+            variant="light"
+            radius="sm"
+          >
+            {r.tipo_turno || "-"}
+          </Badge>
+        );
+      },
+    },
+    {
       accessor: "periodo",
       title: "Periodo de Uso",
       textAlign: "center",
-      width: 280,
+      width: 200,
       render: (r) => {
         const inicioDate = dayjs(r.fecha_hora_inicio_control);
 
@@ -236,44 +271,21 @@ export const ControlUsoPage = () => {
             justify="center"
             className="mx-auto w-fit"
           >
-            {/* Single Calendar Icon at the left */}
-            <div className="p-1.5 bg-zinc-850/60 rounded-xl border border-zinc-800/80 shrink-0 shadow-sm flex items-center justify-center">
-              <CalendarDaysIcon className="w-4 h-4 text-zinc-400" />
-            </div>
-
-            {/* Turno (opcional) — al costadito del icono, verticalmente centrado */}
-            {r.tipo_turno && (
-              <Badge
-                size="sm"
-                color={r.tipo_turno === "Noche" ? "violet" : "yellow"}
-                variant="light"
-                radius="sm"
-                className="font-bold uppercase shrink-0 border border-zinc-700/40 px-1.5"
-              >
-                {r.tipo_turno}
-              </Badge>
-            )}
-
             {/* Inner Content holding Inicio & Fin */}
             <Group gap="xs" wrap="nowrap" className="shrink-0">
               {/* Inicio Block */}
-              <div className="flex flex-col items-start gap-0.5 min-w-[75px]">
+              <div className="flex flex-col items-start gap-0.5 min-w-18.75">
                 <Text
-                  size="8px"
-                  fw={900}
-                  className="text-zinc-500 uppercase tracking-widest leading-none"
+                  size="10px"
+                  fw={700}
+                  className="text-zinc-400 uppercase tracking-widest leading-none"
                 >
                   Inicio
                 </Text>
-                <Text size="11px" fw={800} className="text-zinc-200">
+                <Text size="xs" fw={700} className="text-zinc-200">
                   {inicioDate.format("DD MMM YYYY")}
                 </Text>
-                <Text
-                  size="10px"
-                  c="dimmed"
-                  fw={700}
-                  className="tracking-tighter"
-                >
+                <Text size="xs" c="gray" fw={500}>
                   {inicioDate.format("HH:mm")}
                 </Text>
               </div>
@@ -284,21 +296,16 @@ export const ControlUsoPage = () => {
                   {/* Fin Block */}
                   <div className="flex flex-col items-start gap-0.5 min-w-[75px]">
                     <Text
-                      size="8px"
-                      fw={900}
-                      className="text-zinc-500 uppercase tracking-widest leading-none"
+                      size="10px"
+                      fw={700}
+                      className="text-zinc-400 uppercase tracking-widest leading-none"
                     >
                       Fin
                     </Text>
-                    <Text size="11px" fw={800} className="text-zinc-200">
+                    <Text size="xs" fw={700} className="text-zinc-200">
                       {finDate.format("DD MMM YYYY")}
                     </Text>
-                    <Text
-                      size="10px"
-                      c="dimmed"
-                      fw={700}
-                      className="tracking-tighter"
-                    >
+                    <Text size="xs" c="gray" fw={500}>
                       {finDate.format("HH:mm")}
                     </Text>
                   </div>
@@ -311,24 +318,33 @@ export const ControlUsoPage = () => {
     },
     {
       accessor: "lecturas",
-      title: tipoControl === "horometro" ? "Horómetro" : tipoControl === "odometro" ? "Odómetro" : "Vueltas",
-      width: 160,
+      title:
+        tipoControl === "horometro"
+          ? "Horómetro"
+          : tipoControl === "odometro"
+            ? "Odómetro"
+            : "Vueltas",
+      width: 110,
+      textAlign: "center",
       render: (r) => (
-        <div className="flex flex-col items-start gap-0.5 ml-2">
+        <div className="flex flex-col items-center gap-0.5 ml-2">
           {tipoControl === "vueltas" ? (
             <div className="flex flex-col gap-1 mt-0.5 mb-0.5">
-              <Text size="11px" fw={700} className="text-zinc-200">
-                <span className="text-zinc-500 font-extrabold uppercase tracking-wider text-[9px] mr-1">
+              <Text size="xs" fw={700} className="text-zinc-200">
+                <span className="text-zinc-400 font-extrabold uppercase tracking-wider mr-1">
                   Vueltas:
                 </span>
                 {formatNumber(r.cantidad_vueltas ?? 0)}
               </Text>
               {(r.horometro_inicio !== null || r.horometro_fin !== null) && (
-                <Text size="10px" c="dimmed" fw={600}>
-                  Horóm: {formatNumber(r.horometro_inicio ?? 0)} - {formatNumber(r.horometro_fin ?? 0)}
+                <Text size="xs" c="gray" fw={600}>
+                  Horóm: {formatNumber(r.horometro_inicio ?? 0)} -{" "}
+                  {formatNumber(r.horometro_fin ?? 0)}
                 </Text>
               )}
-              {(r.tarifa_material || r.tarifa_distancia_metros || r.cantidad_sacos) && (
+              {(r.tarifa_material ||
+                r.tarifa_distancia_metros ||
+                r.cantidad_sacos) && (
                 <Group gap={4} wrap="wrap">
                   {r.tarifa_distancia_metros && (
                     <Badge size="xs" color="blue" variant="filled">
@@ -350,17 +366,25 @@ export const ControlUsoPage = () => {
             </div>
           ) : (
             <>
-              <Text size="11px" fw={700} className="text-zinc-200">
-                <span className="text-zinc-500 font-extrabold uppercase tracking-wider text-[9px] mr-1">
+              <Text size="xs" fw={500} className="text-zinc-200">
+                <span className="text-zinc-400 font-extrabold uppercase tracking-wider mr-1 text-[10px]">
                   Inicio:
                 </span>
-                {formatNumber(tipoControl === "horometro" ? (r.horometro_inicio ?? 0) : (r.odometro_inicio ?? 0))}
+                {formatNumber(
+                  tipoControl === "horometro"
+                    ? (r.horometro_inicio ?? 0)
+                    : (r.odometro_inicio ?? 0),
+                )}
               </Text>
-              <Text size="11px" fw={700} className="text-zinc-200">
-                <span className="text-zinc-500 font-extrabold uppercase tracking-wider text-[9px] mr-1">
+              <Text size="xs" fw={500} className="text-zinc-200">
+                <span className="text-zinc-400 font-extrabold uppercase tracking-wider mr-1 text-[10px]">
                   Fin:
                 </span>
-                {formatNumber(tipoControl === "horometro" ? (r.horometro_fin ?? 0) : (r.odometro_fin ?? 0))}
+                {formatNumber(
+                  tipoControl === "horometro"
+                    ? (r.horometro_fin ?? 0)
+                    : (r.odometro_fin ?? 0),
+                )}
               </Text>
             </>
           )}
@@ -369,26 +393,31 @@ export const ControlUsoPage = () => {
     },
     {
       accessor: "total_horas",
-      title: tipoControl === "horometro" ? "Total Horas" : tipoControl === "odometro" ? "Total Km" : "Total Vueltas",
+      title:
+        tipoControl === "horometro"
+          ? "Total Horas"
+          : tipoControl === "odometro"
+            ? "Total Km"
+            : "Total Vueltas",
       hidden: tipoControl === "vueltas",
       textAlign: "center",
-      width: 140,
+      width: 110,
       render: (r) => {
         const value = formatNumber(
           tipoControl === "vueltas"
             ? (r.cantidad_vueltas ?? 0)
             : tipoControl === "odometro"
               ? (r.total_km ?? 0)
-              : (r.total_horas ?? 0)
+              : (r.total_horas ?? 0),
         );
-        const unit = tipoControl === "horometro" ? "hrs" : tipoControl === "odometro" ? "Km" : "vlts";
+        const unit =
+          tipoControl === "horometro"
+            ? "hrs"
+            : tipoControl === "odometro"
+              ? "Km"
+              : "vlts";
         return (
-          <Badge
-            variant="light"
-            color="violet"
-            radius="md"
-            className="font-bold border border-violet-500/20 py-2.5 h-7 shadow-sm mx-auto shrink-0"
-          >
+          <Badge variant="light" color="violet" radius="sm" size="sm">
             {value} {unit}
           </Badge>
         );
@@ -397,27 +426,34 @@ export const ControlUsoPage = () => {
     {
       accessor: "destino",
       title: "Destino / Trabajo",
-      width: 250,
+      width: 220,
       hidden: tipoControl === "odometro",
+      textAlign: "center",
       render: (r) => (
         <Stack gap={2} className="py-1">
           {r.es_para_mina ? (
             <>
               {r.mina && (
-                <Text size="11px" c="zinc.300">
-                  <span className="font-extrabold uppercase tracking-wider text-[9px] text-zinc-500 mr-1">Mina:</span>
+                <Text size="xs" c="gray">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-zinc-300 mr-1">
+                    Mina:
+                  </span>
                   {r.mina}
                 </Text>
               )}
               {r.labor && (
-                <Text size="11px" c="zinc.400">
-                  <span className="font-extrabold uppercase tracking-wider text-[9px] text-zinc-500 mr-1">Labor:</span>
+                <Text size="xs" c="gray">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-zinc-300 mr-1">
+                    Labor:
+                  </span>
                   {r.labor}
                 </Text>
               )}
               {r.lote_mineral && (
-                <Text size="11px" c="amber.4">
-                  <span className="font-extrabold uppercase tracking-wider text-[9px] text-zinc-500 mr-1">Lote:</span>
+                <Text size="xs" c="amber.4">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-zinc-300 mr-1">
+                    Lote:
+                  </span>
                   {r.lote_mineral}
                 </Text>
               )}
@@ -425,16 +461,20 @@ export const ControlUsoPage = () => {
           ) : (
             <>
               {r.cliente && (
-                <Text size="11px" c="zinc.300">
-                  <span className="font-extrabold uppercase tracking-wider text-[9px] text-zinc-500 mr-1">Cliente:</span>
+                <Text size="xs" c="gray">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px] text-zinc-300 mr-1">
+                    Cliente:
+                  </span>
                   {r.cliente}
                 </Text>
               )}
             </>
           )}
           {r.tipo_carga && (
-            <Text size="11px" c="zinc.400" mt={2}>
-              <span className="font-extrabold uppercase tracking-wider text-[9px] text-zinc-500 mr-1">Carga / Servicio:</span>
+            <Text size="xs" c="gray">
+              <span className="font-extrabold uppercase tracking-wider text-[10px] text-zinc-300 mr-1">
+                Carga / Servicio:
+              </span>
               {r.tipo_carga}
             </Text>
           )}
@@ -445,22 +485,17 @@ export const ControlUsoPage = () => {
       accessor: "costo",
       title: "Costo Operativo",
       textAlign: "center",
-      width: 270,
+      width: 220,
       render: (r) => (
         <Group gap={8} wrap="nowrap" justify="center" className="mx-auto w-fit">
-          {/* Single Banknotes Icon at the left */}
-          <div className="p-1.5 bg-zinc-850/60 rounded-xl border border-zinc-800/80 shrink-0 shadow-sm flex items-center justify-center">
-            <BanknotesIcon className="w-4 h-4 text-zinc-400" />
-          </div>
-
           {/* Inner Content holding Unitario | Total */}
           <Group gap="xs" wrap="nowrap" className="shrink-0">
             {/* Unitario Block */}
             <div className="flex flex-col items-start gap-0.5 min-w-[95px]">
               <Text
-                size="8px"
-                fw={900}
-                className="text-zinc-500 uppercase tracking-widest leading-none"
+                size="10px"
+                fw={700}
+                className="text-zinc-300 uppercase tracking-widest leading-none"
               >
                 Precio Unit.
               </Text>
@@ -469,12 +504,18 @@ export const ControlUsoPage = () => {
                 color="indigo"
                 radius="sm"
                 size="sm"
-                className="font-bold border border-indigo-500/10 px-1.5 mt-0.5"
+                mt={4}
               >
                 S/. {formatNumber(r.precio_unitario ?? 0)}
               </Badge>
               {r.tarifa_desc && (
-                <Text size="8px" c="zinc.500" fw={600} className="mt-1 truncate max-w-[95px]" title={r.tarifa_desc}>
+                <Text
+                  size="10px"
+                  c="zinc.300"
+                  fw={600}
+                  className="mt-1 truncate max-w-23.75"
+                  title={r.tarifa_desc}
+                >
                   {r.tarifa_desc}
                 </Text>
               )}
@@ -484,21 +525,15 @@ export const ControlUsoPage = () => {
             <div className="w-px h-8 bg-zinc-800/80 self-center shrink-0" />
 
             {/* Total Block */}
-            <div className="flex flex-col items-start gap-0.5 min-w-[95px]">
+            <div className="flex flex-col items-start gap-0.5 min-w-23.75">
               <Text
-                size="8px"
-                fw={900}
-                className="text-zinc-500 uppercase tracking-widest leading-none"
+                size="10px"
+                fw={700}
+                className="text-zinc-300 uppercase tracking-widest leading-none"
               >
                 Costo Total
               </Text>
-              <Badge
-                variant="light"
-                color="pink"
-                radius="sm"
-                size="sm"
-                className="font-bold border border-pink-500/10 px-1.5 mt-0.5"
-              >
+              <Badge variant="light" color="pink" radius="sm" size="sm" mt={4}>
                 S/. {formatNumber(r.costo_total ?? 0)}
               </Badge>
             </div>
@@ -509,13 +544,14 @@ export const ControlUsoPage = () => {
     {
       accessor: "observacion",
       title: "Observaciones",
-      width: 280,
+      width: 170,
+      textAlign: "center",
       render: (r) =>
         r.observacion ? (
           <Tooltip label={r.observacion} multiline w={245} withArrow>
             <Text
               size="xs"
-              className="text-zinc-400 truncate max-w-[250px] cursor-help"
+              className="text-zinc-300 truncate max-w-62.5 cursor-help"
             >
               {r.observacion}
             </Text>
@@ -529,7 +565,8 @@ export const ControlUsoPage = () => {
     {
       accessor: "estado",
       title: "Estado",
-      width: 130,
+      width: 100,
+      textAlign: "center",
       render: (r) => {
         // Mismo patron visual que Requerimientos (variant="light", color
         // segun estado): Activo en verde (green), Anulado en rojo (red).
@@ -538,7 +575,7 @@ export const ControlUsoPage = () => {
           estado.toLowerCase() === Estado_ControlUso.Anulado.toLowerCase();
         const color = esAnulado ? "red" : "green";
         return (
-          <Group gap={6} wrap="nowrap" justify="space-between">
+          <Group gap={6} wrap="nowrap" justify="center">
             <Badge
               color={color}
               variant="light"
@@ -568,7 +605,7 @@ export const ControlUsoPage = () => {
                     }
                     onClick={() => abrirModalEditar(r)}
                   >
-                    Editar Control de Uso
+                    Editar
                   </Menu.Item>
                 )}
                 {!esAnulado ? (
@@ -579,7 +616,7 @@ export const ControlUsoPage = () => {
                     color="red"
                     onClick={() => abrirModalAnular(r)}
                   >
-                    Anular Control de Uso
+                    Anular
                   </Menu.Item>
                 ) : (
                   <Menu.Item disabled color="zinc.5">
@@ -596,7 +633,7 @@ export const ControlUsoPage = () => {
 
   const fieldClasses = {
     input:
-      "bg-zinc-900/50 border-zinc-800 focus:border-zinc-300 focus:ring-1 focus:ring-zinc-300 text-white placeholder:text-zinc-500 transition-all",
+      "bg-zinc-900/50 border-zinc-800 focus:border-zinc-300 focus:ring-1 focus:ring-zinc-300 text-white placeholder:text-zinc-400 transition-all",
     label: "text-zinc-400 text-xs font-semibold mb-1 ml-1",
   };
 
@@ -619,8 +656,11 @@ export const ControlUsoPage = () => {
             ]}
             value={tipoControl}
             onChange={(val) =>
-              setTipoControl((val as "horometro" | "odometro" | "vueltas") || "horometro")
+              setTipoControl(
+                (val as "horometro" | "odometro" | "vueltas") || "horometro",
+              )
             }
+            clearable
             radius="lg"
             size="sm"
             classNames={{
@@ -634,10 +674,11 @@ export const ControlUsoPage = () => {
         {/* Seleccionar Activo Fijo */}
         <div className="w-full md:w-64">
           <Select
-            label="Activo Fijo"
+            label="Máquina / Equipo"
             placeholder={
               loadingActivos ? "Cargando activos..." : "Seleccione un activo..."
             }
+            clearable
             data={activosAgrupados}
             value={idActivoFijo}
             onChange={setIdActivoFijo}
@@ -698,7 +739,7 @@ export const ControlUsoPage = () => {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             leftSection={
-              <MagnifyingGlassIcon className="w-4 h-4 text-zinc-500" />
+              <MagnifyingGlassIcon className="w-4 h-4 text-zinc-400" />
             }
             radius="lg"
             size="sm"
@@ -716,7 +757,9 @@ export const ControlUsoPage = () => {
             disabled={logs.length === 0 || isGeneratingExcel}
             radius="lg"
             className="h-9 transition-all px-4 disabled:opacity-50"
-            leftSection={!isGeneratingExcel && <IconFileSpreadsheet size={18} />}
+            leftSection={
+              !isGeneratingExcel && <IconFileSpreadsheet size={18} />
+            }
           >
             Exportar
           </Button>
@@ -747,27 +790,27 @@ export const ControlUsoPage = () => {
       <div className="bg-zinc-900/65 border border-zinc-800 rounded-[24px] shadow-2xl overflow-hidden flex flex-col backdrop-blur-md">
         {/* Header Block (Unified header layout) */}
         {selectedAssetObj && (
-          <div className="p-4 bg-zinc-900/20 border-b border-zinc-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="p-3 bg-zinc-900/20 border-b border-zinc-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20">
                 {tipoControl === "horometro" ? (
-                  <Cog8ToothIcon className="w-5 h-5 text-indigo-400" />
+                  <Cog8ToothIcon className="size-4  text-indigo-400" />
                 ) : (
-                  <TruckIcon className="w-5 h-5 text-indigo-400" />
+                  <TruckIcon className="size-4  text-indigo-400" />
                 )}
               </div>
               <Stack gap={2}>
                 <div className="flex items-center gap-2.5">
                   <Text
                     fw={800}
-                    className="uppercase tracking-widest text-zinc-500 text-[10px]!"
+                    className="uppercase tracking-widest text-zinc-300 text-[10px]!"
                   >
                     {tipoControl === "horometro"
                       ? "Control por Horómetro"
                       : "Control por Odómetro"}
                   </Text>
                   <Badge
-                    size="xs"
+                    size="sm"
                     color="pink"
                     variant="light"
                     className="font-extrabold border border-pink-500/10"
@@ -775,7 +818,7 @@ export const ControlUsoPage = () => {
                     {selectedAssetObj.correlativo}
                   </Badge>
                 </div>
-                <Text size="md" fw={900} className="text-white tracking-tight">
+                <Text size="sm" fw={900} className="text-white tracking-tight">
                   {selectedAssetObj.producto}
                 </Text>
               </Stack>
@@ -784,7 +827,7 @@ export const ControlUsoPage = () => {
             <div className="flex items-center gap-6">
               {(selectedAssetObj.almacen || selectedAssetObj.mina) && (
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-zinc-500 uppercase font-extrabold tracking-wider">
+                  <span className="text-[10px] text-zinc-300 uppercase font-extrabold tracking-wider">
                     Ubicación
                   </span>
                   <div className="flex items-center gap-1.5 text-zinc-300 font-semibold text-xs">
@@ -795,7 +838,7 @@ export const ControlUsoPage = () => {
               )}
 
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-zinc-500 uppercase font-extrabold tracking-wider">
+                <span className="text-[10px] text-zinc-300 uppercase font-extrabold tracking-wider">
                   Registros del Mes
                 </span>
                 <Badge
@@ -822,7 +865,7 @@ export const ControlUsoPage = () => {
               <Text
                 size="xs"
                 fw={900}
-                className="uppercase tracking-[0.3em] text-zinc-500"
+                className="uppercase tracking-[0.3em] text-zinc-400"
               >
                 Consultando registros...
               </Text>
@@ -842,7 +885,7 @@ export const ControlUsoPage = () => {
               </Text>
             </div>
           ) : (
-            <Stack gap="md" p="md">
+            <Stack gap="md" p="xs">
               {agruparPorUuidGrupo(logs).map((grupo) => {
                 const uuid = grupo.uuid;
                 const registros = grupo.registros;
@@ -862,7 +905,7 @@ export const ControlUsoPage = () => {
                         <Text
                           size="10px"
                           fw={900}
-                          className="uppercase tracking-widest text-zinc-500"
+                          className="uppercase tracking-widest text-zinc-400"
                         >
                           Registrado el:
                         </Text>
@@ -933,9 +976,7 @@ export const ControlUsoPage = () => {
                       loading={loading}
                       minHeight={0}
                       // Bordes mas sutiles para que se vea como sub-tabla.
-                      rowClassName={() =>
-                        "bg-zinc-950/20 hover:bg-zinc-900/40"
-                      }
+                      rowClassName={() => "bg-zinc-950/20 hover:bg-zinc-900/40"}
                     />
                   </div>
                 );
@@ -952,6 +993,17 @@ export const ControlUsoPage = () => {
         validateClose
         title={`Registrar Control por ${tipoControl === "horometro" ? "Horómetro" : tipoControl === "odometro" ? "Odómetro" : "Vueltas"}`}
         size="xl"
+        rightSection={
+          <Group>
+            <Badge size="sm" color="pink" variant="light">
+              {selectedAssetObj?.correlativo}
+            </Badge>
+            <Divider orientation="vertical" />
+            <Text size="xs" fw={600} className="uppercase">
+              {selectedAssetObj?.producto}
+            </Text>
+          </Group>
+        }
       >
         {selectedAssetObj && (
           <RegistroUso
@@ -985,7 +1037,8 @@ export const ControlUsoPage = () => {
                 cantidad_consumo: payload.cantidad_consumo,
                 contenido_por_presentacion: payload.contenido_por_presentacion,
                 cantidad_base: payload.cantidad_base,
-                uuid_control_uso_activo: payload.uuid_control_uso_activo ?? null,
+                uuid_control_uso_activo:
+                  payload.uuid_control_uso_activo ?? null,
                 comentario_consumo: payload.comentario || undefined,
               });
               if (res.success) {
@@ -994,9 +1047,7 @@ export const ControlUsoPage = () => {
                 );
                 closeConsumoDirecto();
               } else {
-                notifyError(
-                  res.message ?? "Error al registrar el consumo",
-                );
+                notifyError(res.message ?? "Error al registrar el consumo");
               }
               return res.success;
             } catch (err) {
@@ -1026,7 +1077,11 @@ export const ControlUsoPage = () => {
             <div className="rounded-lg border border-red-500/30 bg-red-950/10 p-3">
               <Group gap={8} align="center">
                 <NoSymbolIcon className="w-5 h-5 text-red-400" />
-                <Text size="sm" fw={800} className="text-red-300 uppercase tracking-wider">
+                <Text
+                  size="sm"
+                  fw={800}
+                  className="text-red-300 uppercase tracking-wider"
+                >
                   Esta accion no se puede deshacer
                 </Text>
               </Group>
@@ -1036,17 +1091,20 @@ export const ControlUsoPage = () => {
               <Stack gap={3} mt={4} className="text-xs text-zinc-400">
                 <Text size="xs">
                   - El registro de uso cambiara a estado{" "}
-                  <span className="text-red-400 font-bold">Anulado</span> y no se
-                  contara en calculos, listados principales ni en el Excel.
+                  <span className="text-red-400 font-bold">Anulado</span> y no
+                  se contara en calculos, listados principales ni en el Excel.
                 </Text>
                 <Text size="xs">
-                  - <span className="text-amber-300 font-bold">Stock y consumo:</span>{" "}
-                  los consumos se asocian al GRUPO UUID, no a este item
-                  puntual. El stock se reingresa al lote y el consumo se
-                  elimina fisicamente SOLO cuando este sea el ULTIMO item
-                  activo del grupo (los demas bloques horometrados ya
-                  esten anulados). Si quedan mas bloques activos del
-                  mismo grupo, no se toca stock ni Kardex.
+                  -{" "}
+                  <span className="text-amber-300 font-bold">
+                    Stock y consumo:
+                  </span>{" "}
+                  los consumos se asocian al GRUPO UUID, no a este item puntual.
+                  El stock se reingresa al lote y el consumo se elimina
+                  fisicamente SOLO cuando este sea el ULTIMO item activo del
+                  grupo (los demas bloques horometrados ya esten anulados). Si
+                  quedan mas bloques activos del mismo grupo, no se toca stock
+                  ni Kardex.
                 </Text>
                 <Text size="xs">
                   - Se registra un movimiento en Kardex (Ingreso / Reingreso)
@@ -1056,7 +1114,14 @@ export const ControlUsoPage = () => {
             </div>
 
             <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-lg p-3">
-              <Text size="10px" c="zinc.500" fw={900} tt="uppercase" lts="0.08em" mb={4}>
+              <Text
+                size="10px"
+                c="zinc.500"
+                fw={900}
+                tt="uppercase"
+                lts="0.08em"
+                mb={4}
+              >
                 Registro a anular
               </Text>
               <Text size="sm" fw={700} className="text-zinc-100">

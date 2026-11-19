@@ -13,8 +13,8 @@ import {
   Tabs,
   Card,
   Checkbox,
-  Stack,
   Badge,
+  SimpleGrid,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
 import type { DateValue } from "@mantine/dates";
@@ -24,11 +24,8 @@ import {
   TrashIcon,
   UserPlusIcon,
   ListBulletIcon,
-  IdentificationIcon,
-  MapPinIcon,
   BanknotesIcon,
   CubeIcon,
-  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { useRegistrarMantenimiento } from "../hooks/useRegistrarMantenimiento";
 import { MultiFilePicker } from "../../../presentation/utils/archivo/multifile-picker";
@@ -165,7 +162,12 @@ export const RegistroMantenimiento = ({
       setEvidencias,
       fieldErrors,
     },
-    status: { loadingPersonal, loadingTodoPersonal, loadingDespachados, submitting },
+    status: {
+      loadingPersonal,
+      loadingTodoPersonal,
+      loadingDespachados,
+      submitting,
+    },
     actions: {
       agregarGasto,
       eliminarGasto,
@@ -254,350 +256,346 @@ export const RegistroMantenimiento = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-zinc-200">
       {/* 1. Identificación */}
-      <SeccionCard
-        icon={<IdentificationIcon className="w-4 h-4 text-indigo-400" />}
-        titulo="Identificación"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Select
+          label={
+            <>
+              Activo
+              <Requerido />
+            </>
+          }
+          placeholder="Seleccione..."
+          data={activosSelectData}
+          value={idActivoFijo ? String(idActivoFijo) : null}
+          onChange={(val) => {
+            setIdActivoFijo(val ? Number(val) : null);
+            setQActivo("");
+            clearFieldError("id_activo_fijo");
+          }}
+          searchable
+          searchValue={qActivo}
+          onSearchChange={setQActivo}
+          nothingFoundMessage="Sin coincidencias"
+          comboboxProps={{ withinPortal: true }}
+          error={fieldErrors.id_activo_fijo}
+          classNames={inputClasses}
+          size="xs"
+          clearable
+          radius="lg"
+        />
+
+        <Select
+          label={
+            <>
+              Supervisor
+              <Opcional />
+            </>
+          }
+          placeholder="Seleccione..."
+          data={supervisorSelectData}
+          value={idEmpleadoSupervisor ? String(idEmpleadoSupervisor) : null}
+          onChange={(val) => setIdEmpleadoSupervisor(val ? Number(val) : null)}
+          searchable
+          searchValue={qSupervisor}
+          onSearchChange={setQSupervisor}
+          nothingFoundMessage="Sin coincidencias"
+          comboboxProps={{ withinPortal: true }}
+          clearable
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+
+        <DateTimePicker
+          label={
+            <>
+              Fecha / Hora
+              <Requerido />
+            </>
+          }
+          placeholder="Seleccione..."
+          value={fechaHoraMantenimiento}
+          onChange={(val: DateValue) => {
+            setFechaHoraMantenimiento(val ? new Date(val) : null);
+            clearFieldError("fecha_hora_mantenimiento");
+          }}
+          maxDate={new Date()}
+          error={fieldErrors.fecha_hora_mantenimiento}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+      </div>
+
+      {/* 2. Ejecución */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1">
           <Select
             label={
               <>
-                Activo Fijo
+                Lugar de Trabajo
                 <Requerido />
               </>
             }
-            placeholder="Seleccione..."
-            data={activosSelectData}
-            value={idActivoFijo ? String(idActivoFijo) : null}
-            onChange={(val) => {
-              setIdActivoFijo(val ? Number(val) : null);
-              setQActivo("");
-              clearFieldError("id_activo_fijo");
-            }}
-            searchable
-            searchValue={qActivo}
-            onSearchChange={setQActivo}
-            nothingFoundMessage="Sin coincidencias"
-            comboboxProps={{ withinPortal: true }}
-            error={fieldErrors.id_activo_fijo}
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-          />
-
-          <Select
-            label={
-              <>
-                Supervisor
-                <Opcional />
-              </>
-            }
-            placeholder="Seleccione..."
-            data={supervisorSelectData}
-            value={idEmpleadoSupervisor ? String(idEmpleadoSupervisor) : null}
-            onChange={(val) => setIdEmpleadoSupervisor(val ? Number(val) : null)}
-            searchable
-            searchValue={qSupervisor}
-            onSearchChange={setQSupervisor}
-            nothingFoundMessage="Sin coincidencias"
-            comboboxProps={{ withinPortal: true }}
             clearable
-            classNames={inputClasses}
-            size="xs"
-            radius="lg"
-          />
-
-          <DateTimePicker
-            label={
-              <>
-                Fecha / Hora
-                <Requerido />
-              </>
-            }
             placeholder="Seleccione..."
-            value={fechaHoraMantenimiento}
-            onChange={(val: DateValue) => {
-              setFechaHoraMantenimiento(val ? new Date(val) : null);
-              clearFieldError("fecha_hora_mantenimiento");
+            data={lugarSelectData}
+            value={
+              tipoLugar === "almacen" && idAlmacen
+                ? `almacen-${idAlmacen}`
+                : tipoLugar === "mina" && idMina
+                  ? `mina-${idMina}`
+                  : tipoLugar === "otro"
+                    ? "otro"
+                    : null
+            }
+            onChange={(val) => {
+              clearFieldError("lugar_trabajo");
+              if (!val) {
+                setTipoLugar("");
+                setIdAlmacen(null);
+                setIdMina(null);
+                setLugarOtro("");
+                return;
+              }
+              if (val.startsWith("almacen-")) {
+                setTipoLugar("almacen");
+                setIdAlmacen(Number(val.replace("almacen-", "")));
+                setIdMina(null);
+                setLugarOtro("");
+              } else if (val.startsWith("mina-")) {
+                setTipoLugar("mina");
+                setIdMina(Number(val.replace("mina-", "")));
+                setIdAlmacen(null);
+                setLugarOtro("");
+              } else if (val === "otro") {
+                setTipoLugar("otro");
+                setIdAlmacen(null);
+                setIdMina(null);
+              }
+              setQLugar("");
             }}
-            maxDate={new Date()}
-            error={fieldErrors.fecha_hora_mantenimiento}
+            searchable
+            searchValue={qLugar}
+            onSearchChange={setQLugar}
+            nothingFoundMessage="Sin coincidencias"
+            comboboxProps={{ withinPortal: true }}
+            error={fieldErrors.lugar_trabajo}
             classNames={inputClasses}
             size="xs"
             radius="lg"
           />
         </div>
-      </SeccionCard>
 
-      {/* 2. Ejecución */}
-      <SeccionCard
-        icon={<MapPinIcon className="w-4 h-4 text-indigo-400" />}
-        titulo="Ejecución"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
+        {tipoLugar === "otro" && (
+          <div className="grid grid-cols-1">
+            <TextInput
               label={
                 <>
-                  Lugar de Trabajo
+                  Especificar Lugar
                   <Requerido />
                 </>
               }
-              placeholder="Seleccione..."
-              data={lugarSelectData}
-              value={
-                tipoLugar === "almacen" && idAlmacen
-                  ? `almacen-${idAlmacen}`
-                  : tipoLugar === "mina" && idMina
-                    ? `mina-${idMina}`
-                    : tipoLugar === "otro"
-                      ? "otro"
-                      : null
-              }
-              onChange={(val) => {
+              placeholder="Ej. Taller, campo..."
+              value={lugarOtro}
+              onChange={(e) => {
+                setLugarOtro(e.currentTarget.value);
                 clearFieldError("lugar_trabajo");
-                if (!val) {
-                  setTipoLugar("");
-                  setIdAlmacen(null);
-                  setIdMina(null);
-                  setLugarOtro("");
-                  return;
-                }
-                if (val.startsWith("almacen-")) {
-                  setTipoLugar("almacen");
-                  setIdAlmacen(Number(val.replace("almacen-", "")));
-                  setIdMina(null);
-                  setLugarOtro("");
-                } else if (val.startsWith("mina-")) {
-                  setTipoLugar("mina");
-                  setIdMina(Number(val.replace("mina-", "")));
-                  setIdAlmacen(null);
-                  setLugarOtro("");
-                } else if (val === "otro") {
-                  setTipoLugar("otro");
-                  setIdAlmacen(null);
-                  setIdMina(null);
-                }
-                setQLugar("");
               }}
-              searchable
-              searchValue={qLugar}
-              onSearchChange={setQLugar}
-              nothingFoundMessage="Sin coincidencias"
-              comboboxProps={{ withinPortal: true }}
-              error={fieldErrors.lugar_trabajo}
+              maxLength={150}
               classNames={inputClasses}
               size="xs"
               radius="lg"
             />
+          </div>
+        )}
 
-            {tipoLugar === "otro" && (
-              <TextInput
+        <div className="grid grid-cols-1 mt-1">
+          <Text size="xs" fw={600} className="text-zinc-400 mb-1 ml-1">
+            Quien ejecuta
+          </Text>
+          <Tabs
+            value={tipoEjecutor}
+            onChange={handleCambioTipoEjecutor}
+            variant="pills"
+            color="teal"
+            radius="lg"
+          >
+            <Tabs.List>
+              <Tabs.Tab value="interno" h={26}>
+                Interno
+              </Tabs.Tab>
+              <Tabs.Tab value="externo" h={26}>
+                Externo
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
+        </div>
+      </div>
+
+      {tipoEjecutor === "interno" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <Select
+            label={
+              <>
+                Trabajador
+                <Requerido />
+              </>
+            }
+            placeholder="Seleccione..."
+            data={ejecutorSelectData}
+            value={idEmpleadoEjecutor ? String(idEmpleadoEjecutor) : null}
+            onChange={(val) => {
+              setIdEmpleadoEjecutor(val ? Number(val) : null);
+              clearFieldError("id_empleado_ejecutor");
+              setQEjecutor("");
+            }}
+            searchable
+            searchValue={qEjecutor}
+            onSearchChange={setQEjecutor}
+            nothingFoundMessage="Sin coincidencias"
+            comboboxProps={{ withinPortal: true }}
+            error={fieldErrors.id_empleado_ejecutor}
+            classNames={inputClasses}
+            size="xs"
+            radius="lg"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 animate-fade-in">
+          <div>
+            <Group gap={6} align="flex-end" wrap="nowrap" className="w-full">
+              <Select
                 label={
                   <>
-                    Especificar Lugar
+                    Proveedor
                     <Requerido />
                   </>
                 }
-                placeholder="Ej. Taller, campo..."
-                value={lugarOtro}
-                onChange={(e) => {
-                  setLugarOtro(e.currentTarget.value);
-                  clearFieldError("lugar_trabajo");
+                placeholder="Seleccione..."
+                data={proveedoresSelectData}
+                value={idProveedor ? String(idProveedor) : null}
+                onChange={(val) => {
+                  setIdProveedor(val ? Number(val) : null);
+                  clearFieldError("id_proveedor");
+                  setQProveedor("");
                 }}
-                maxLength={150}
+                searchable
+                searchValue={qProveedor}
+                onSearchChange={setQProveedor}
+                nothingFoundMessage="Sin coincidencias"
+                comboboxProps={{ withinPortal: true }}
+                error={fieldErrors.id_proveedor}
                 classNames={inputClasses}
                 size="xs"
                 radius="lg"
+                className="flex-1"
               />
-            )}
+              <div className="flex gap-1 shrink-0">
+                <Tooltip
+                  label={
+                    verTodosProveedores ? "Solo Mantenimiento" : "Ver Todos"
+                  }
+                  withArrow
+                  radius="md"
+                >
+                  <ActionIcon
+                    color={verTodosProveedores ? "teal" : "indigo"}
+                    variant={verTodosProveedores ? "filled" : "light"}
+                    size={30}
+                    radius="lg"
+                    onClick={handleVerTodosProveedores}
+                    className="border border-zinc-800 text-zinc-400"
+                  >
+                    <ListBulletIcon className="w-4 h-4" />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Nuevo Proveedor" withArrow radius="md">
+                  <ActionIcon
+                    color="indigo"
+                    variant="filled"
+                    size={30}
+                    radius="lg"
+                    onClick={() => setProveedorModalOpen(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <PlusIcon className="w-4 h-4 text-white" />
+                  </ActionIcon>
+                </Tooltip>
+              </div>
+            </Group>
           </div>
 
-          <div className="flex flex-col justify-end">
-            <Text size="xs" fw={600} className="text-zinc-400 mb-1 ml-1">
-              Tipo Ejecutor
-            </Text>
-            <Tabs
-              value={tipoEjecutor}
-              onChange={handleCambioTipoEjecutor}
-              variant="pills"
-              color="teal"
-              radius="lg"
-            >
-              <Tabs.List>
-                <Tabs.Tab value="interno" h={26}>
-                  Interno
-                </Tabs.Tab>
-                <Tabs.Tab value="externo" h={26}>
-                  Externo
-                </Tabs.Tab>
-              </Tabs.List>
-            </Tabs>
+          <div>
+            <Group gap={6} align="flex-end" wrap="nowrap" className="w-full">
+              <Select
+                label={
+                  <>
+                    Personal de Proveedor
+                    <Requerido />
+                  </>
+                }
+                placeholder={
+                  !idProveedor
+                    ? "Seleccione proveedor primero"
+                    : "Seleccione..."
+                }
+                data={personalExternoSelectData}
+                value={idPersonalExterno ? String(idPersonalExterno) : null}
+                onChange={(val) => {
+                  setIdPersonalExterno(val ? Number(val) : null);
+                  clearFieldError("id_personal_externo");
+                }}
+                disabled={!idProveedor || loadingPersonal}
+                searchable
+                searchValue={qPersonal}
+                onSearchChange={setQPersonal}
+                nothingFoundMessage="Sin coincidencias"
+                comboboxProps={{ withinPortal: true }}
+                error={fieldErrors.id_personal_externo}
+                classNames={inputClasses}
+                size="xs"
+                radius="lg"
+                className="flex-1"
+              />
+              <div className="flex gap-1 shrink-0">
+                <Tooltip
+                  label={verTodoPersonal ? "Solo del Proveedor" : "Ver Todo"}
+                  withArrow
+                  radius="md"
+                >
+                  <ActionIcon
+                    color={verTodoPersonal ? "teal" : "indigo"}
+                    variant={verTodoPersonal ? "filled" : "light"}
+                    size={30}
+                    radius="lg"
+                    onClick={handleVerTodoPersonal}
+                    disabled={
+                      !idProveedor || loadingPersonal || loadingTodoPersonal
+                    }
+                    className="border border-zinc-800 text-zinc-400"
+                  >
+                    <ListBulletIcon className="w-4 h-4" />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Nuevo Personal" withArrow radius="md">
+                  <ActionIcon
+                    color="indigo"
+                    variant="filled"
+                    size={30}
+                    radius="lg"
+                    disabled={!idProveedor}
+                    onClick={() => setPersonalExternoModalOpen(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <UserPlusIcon className="w-4 h-4 text-white" />
+                  </ActionIcon>
+                </Tooltip>
+              </div>
+            </Group>
           </div>
         </div>
-
-        {tipoEjecutor === "interno" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <Select
-              label={
-                <>
-                  Ejecutor Interno
-                  <Requerido />
-                </>
-              }
-              placeholder="Seleccione..."
-              data={ejecutorSelectData}
-              value={idEmpleadoEjecutor ? String(idEmpleadoEjecutor) : null}
-              onChange={(val) => {
-                setIdEmpleadoEjecutor(val ? Number(val) : null);
-                clearFieldError("id_empleado_ejecutor");
-                setQEjecutor("");
-              }}
-              searchable
-              searchValue={qEjecutor}
-              onSearchChange={setQEjecutor}
-              nothingFoundMessage="Sin coincidencias"
-              comboboxProps={{ withinPortal: true }}
-              error={fieldErrors.id_empleado_ejecutor}
-              classNames={inputClasses}
-              size="xs"
-              radius="lg"
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 animate-fade-in">
-            <div>
-              <Group gap={6} align="flex-end" wrap="nowrap" className="w-full">
-                <Select
-                  label={
-                    <>
-                      Proveedor
-                      <Requerido />
-                    </>
-                  }
-                  placeholder="Seleccione..."
-                  data={proveedoresSelectData}
-                  value={idProveedor ? String(idProveedor) : null}
-                  onChange={(val) => {
-                    setIdProveedor(val ? Number(val) : null);
-                    clearFieldError("id_proveedor");
-                    setQProveedor("");
-                  }}
-                  searchable
-                  searchValue={qProveedor}
-                  onSearchChange={setQProveedor}
-                  nothingFoundMessage="Sin coincidencias"
-                  comboboxProps={{ withinPortal: true }}
-                  error={fieldErrors.id_proveedor}
-                  classNames={inputClasses}
-                  size="xs"
-                  radius="lg"
-                  className="flex-1"
-                />
-                <div className="flex gap-1 shrink-0">
-                  <Tooltip
-                    label={
-                      verTodosProveedores ? "Solo Mantenimiento" : "Ver Todos"
-                    }
-                    withArrow
-                    radius="md"
-                  >
-                    <ActionIcon
-                      color={verTodosProveedores ? "teal" : "indigo"}
-                      variant={verTodosProveedores ? "filled" : "light"}
-                      size={30}
-                      radius="lg"
-                      onClick={handleVerTodosProveedores}
-                      className="border border-zinc-800 text-zinc-400"
-                    >
-                      <ListBulletIcon className="w-4 h-4" />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Nuevo Proveedor" withArrow radius="md">
-                    <ActionIcon
-                      color="indigo"
-                      variant="filled"
-                      size={30}
-                      radius="lg"
-                      onClick={() => setProveedorModalOpen(true)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      <PlusIcon className="w-4 h-4 text-white" />
-                    </ActionIcon>
-                  </Tooltip>
-                </div>
-              </Group>
-            </div>
-
-            <div>
-              <Group gap={6} align="flex-end" wrap="nowrap" className="w-full">
-                <Select
-                  label={
-                    <>
-                      Personal de Proveedor
-                      <Requerido />
-                    </>
-                  }
-                  placeholder={
-                    !idProveedor
-                      ? "Seleccione proveedor primero"
-                      : "Seleccione..."
-                  }
-                  data={personalExternoSelectData}
-                  value={idPersonalExterno ? String(idPersonalExterno) : null}
-                  onChange={(val) => {
-                    setIdPersonalExterno(val ? Number(val) : null);
-                    clearFieldError("id_personal_externo");
-                  }}
-                  disabled={!idProveedor || loadingPersonal}
-                  searchable
-                  searchValue={qPersonal}
-                  onSearchChange={setQPersonal}
-                  nothingFoundMessage="Sin coincidencias"
-                  comboboxProps={{ withinPortal: true }}
-                  error={fieldErrors.id_personal_externo}
-                  classNames={inputClasses}
-                  size="xs"
-                  radius="lg"
-                  className="flex-1"
-                />
-                <div className="flex gap-1 shrink-0">
-                  <Tooltip
-                    label={verTodoPersonal ? "Solo del Proveedor" : "Ver Todo"}
-                    withArrow
-                    radius="md"
-                  >
-                    <ActionIcon
-                      color={verTodoPersonal ? "teal" : "indigo"}
-                      variant={verTodoPersonal ? "filled" : "light"}
-                      size={30}
-                      radius="lg"
-                      onClick={handleVerTodoPersonal}
-                      disabled={!idProveedor || loadingPersonal || loadingTodoPersonal}
-                      className="border border-zinc-800 text-zinc-400"
-                    >
-                      <ListBulletIcon className="w-4 h-4" />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Nuevo Personal" withArrow radius="md">
-                    <ActionIcon
-                      color="indigo"
-                      variant="filled"
-                      size={30}
-                      radius="lg"
-                      disabled={!idProveedor}
-                      onClick={() => setPersonalExternoModalOpen(true)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      <UserPlusIcon className="w-4 h-4 text-white" />
-                    </ActionIcon>
-                  </Tooltip>
-                </div>
-              </Group>
-            </div>
-          </div>
-        )}
-      </SeccionCard>
+      )}
 
       {/* 3. Costos */}
       <SeccionCard
@@ -636,7 +634,9 @@ export const RegistroMantenimiento = ({
             }
             placeholder="F001"
             value={serieFactura}
-            onChange={(e) => setSerieFactura(e.currentTarget.value.toUpperCase())}
+            onChange={(e) =>
+              setSerieFactura(e.currentTarget.value.toUpperCase())
+            }
             maxLength={20}
             classNames={inputClasses}
             size="xs"
@@ -670,7 +670,7 @@ export const RegistroMantenimiento = ({
             value={costoManoObra}
             onChange={(val) =>
               setCostoManoObra(
-                typeof val === "number" ? val : (val as string) ?? "",
+                typeof val === "number" ? val : ((val as string) ?? ""),
               )
             }
             prefix="S/. "
@@ -688,47 +688,46 @@ export const RegistroMantenimiento = ({
         </div>
 
         {/* Otros Gastos */}
-        <div className="mt-4 bg-zinc-950/20 border border-zinc-800/80 rounded-xl p-3 flex flex-col gap-2">
-          <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mt-2.5 mb-2">
+          <Text
+            size="xs"
+            fw={800}
+            className="text-zinc-400 uppercase tracking-wider"
+          >
+            Gastos Adicionales ({otrosGastos.length})
+          </Text>
+          <Button
+            size="xs"
+            radius="lg"
+            variant="light"
+            color="indigo"
+            onClick={agregarGasto}
+            leftSection={<PlusIcon className="w-3.5 h-3.5" />}
+            className="font-bold"
+          >
+            Agregar Gasto
+          </Button>
+        </div>
+
+        <div className="max-h-32 overflow-y-auto space-y-2 pr-1">
+          {otrosGastos.length === 0 ? (
             <Text
               size="xs"
-              fw={800}
-              className="text-zinc-400 uppercase tracking-wider"
+              c="dimmed"
+              className="italic text-center py-3 text-zinc-500"
             >
-              Gastos Adicionales ({otrosGastos.length})
+              Sin otros gastos adicionales registrados.
             </Text>
-            <Button
-              size="xs"
-              radius="lg"
-              variant="light"
-              color="indigo"
-              onClick={agregarGasto}
-              leftSection={<PlusIcon className="w-3.5 h-3.5" />}
-              className="font-bold"
-            >
-              Agregar Gasto
-            </Button>
-          </div>
-
-          <div className="max-h-32 overflow-y-auto space-y-2 pr-1">
-            {otrosGastos.length === 0 ? (
-              <Text
-                size="xs"
-                c="dimmed"
-                className="italic text-center py-3 text-zinc-500"
-              >
-                Sin otros gastos adicionales registrados.
-              </Text>
-            ) : (
-              otrosGastos.map((g, idx) => (
+          ) : (
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
+              {otrosGastos.map((g, idx) => (
                 <Group
                   key={idx}
                   gap="xs"
-                  wrap="nowrap"
-                  className="animate-fade-in"
+                  className="animate-fade-in bg-teal-900 p-1.5 rounded-lg"
                 >
                   <TextInput
-                    placeholder="Concepto (ej. Repuestos, herramientas)..."
+                    placeholder="Ej. Repuestos, herramientas..."
                     aria-label={`Concepto del gasto ${idx + 1}`}
                     value={g.concepto}
                     onChange={(e) =>
@@ -751,16 +750,14 @@ export const RegistroMantenimiento = ({
                       )
                     }
                     prefix="S/. "
-                    decimalSeparator="."
                     fixedDecimalScale
                     allowNegative={false}
                     clampBehavior="blur"
                     hideControls
-                    min={0}
                     classNames={inputClasses}
                     size="xs"
                     radius="lg"
-                    className="w-32"
+                    className="w-28"
                   />
                   <ActionIcon
                     color="red"
@@ -773,9 +770,9 @@ export const RegistroMantenimiento = ({
                     <TrashIcon className="w-4 h-4" />
                   </ActionIcon>
                 </Group>
-              ))
-            )}
-          </div>
+              ))}
+            </SimpleGrid>
+          )}
         </div>
       </SeccionCard>
 
@@ -977,18 +974,11 @@ export const RegistroMantenimiento = ({
             radius="lg"
           />
 
-          <Stack gap={6} align="stretch">
-            <MultiFilePicker
-              label="Evidencias (Facturas, Informes, etc.)"
-              files={evidencias}
-              onFilesChange={setEvidencias}
-            />
-            <Text size="10px" c="dimmed" className="px-1">
-              <DocumentTextIcon className="w-3 h-3 inline mr-1 align-text-bottom" />
-              Adjunte la factura escaneada u otros soportes. Si no hay factura,
-              deje la serie y el numero vacios.
-            </Text>
-          </Stack>
+          <MultiFilePicker
+            label="Evidencias (Facturas, Informes, etc.)"
+            files={evidencias}
+            onFilesChange={setEvidencias}
+          />
         </div>
       </SeccionCard>
 
@@ -1011,7 +1001,9 @@ export const RegistroMantenimiento = ({
           radius="lg"
           size="xs"
           className="bg-linear-to-r from-zinc-100 to-zinc-300 text-zinc-900 font-semibold hover:from-white hover:to-zinc-200 shadow-md border-0 px-6"
-          leftSection={<WrenchScrewdriverIcon className="w-4 h-4 text-zinc-900" />}
+          leftSection={
+            <WrenchScrewdriverIcon className="w-4 h-4 text-zinc-900" />
+          }
         >
           Guardar Mantenimiento
         </Button>

@@ -6,7 +6,6 @@ import {
   NumberInput,
   SimpleGrid,
   Stack,
-  Text,
   TextInput,
 } from "@mantine/core";
 import { IconDeviceFloppy, IconX } from "@tabler/icons-react";
@@ -106,15 +105,7 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
         </Alert>
       )}
 
-      {flete && (
-        <Text size="xs" c="dimmed">
-          Flete {flete.placa ?? "sin placa"} ·{" "}
-          {flete.transportista ?? "sin transportista"}
-          {/* {flete.guia_remitente ? ` · guia ${flete.guia_remitente}` : ""} */}
-        </Text>
-      )}
-
-      <Group grow>
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <TextInput
           label="Codigo del ticket"
           placeholder="TB-000123"
@@ -128,7 +119,7 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
         />
 
         <TextInput
-          label="Guía de Remisión (2da)"
+          label="2da Guía de Remisión"
           placeholder="GRR-000123"
           value={segundaGuia}
           onChange={(e) => setSegundaGuia(e.currentTarget.value.toUpperCase())}
@@ -137,19 +128,19 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
           size="xs"
           radius="lg"
         />
-      </Group>
 
-      <TextInput
-        label="Fecha y hora del pesaje"
-        type="datetime-local"
-        value={fechaHoraPesaje}
-        onChange={(e) => setFechaHoraPesaje(e.currentTarget.value)}
-        disabled={saving}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-        required
-      />
+        <TextInput
+          label="Fecha y hora del pesaje"
+          type="datetime-local"
+          value={fechaHoraPesaje}
+          onChange={(e) => setFechaHoraPesaje(e.currentTarget.value)}
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required
+        />
+      </SimpleGrid>
 
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
         <NumberInput
@@ -190,11 +181,13 @@ export const ModalBalanza = ({ close, flete, onGuardar }: Props) => {
         />
       </SimpleGrid>
 
-      <MultiFilePicker
-        label="Evidencias del pesaje"
-        files={archivos}
-        onFilesChange={setArchivos}
-      />
+      <div className="mt-1.5 mb-1.5">
+        <MultiFilePicker
+          label="Evidencias del pesaje"
+          files={archivos}
+          onFilesChange={setArchivos}
+        />
+      </div>
 
       <Group justify="flex-end" gap="sm">
         <Button

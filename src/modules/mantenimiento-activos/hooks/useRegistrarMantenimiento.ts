@@ -320,15 +320,15 @@ export const useRegistrarMantenimiento = ({
   const lugarSelectData = useMemo(() => {
     const data: { group: string; items: { value: string; label: string }[] }[] =
       [];
-    if (almacenes.length > 0) {
-      data.push({
-        group: "Almacenes",
-        items: almacenes.map((a) => ({
-          value: `almacen-${a.id_almacen}`,
-          label: a.nombre,
-        })),
-      });
-    }
+    // if (almacenes.length > 0) {
+    //   data.push({
+    //     group: "Almacenes",
+    //     items: almacenes.map((a) => ({
+    //       value: `almacen-${a.id_almacen}`,
+    //       label: a.nombre,
+    //     })),
+    //   });
+    // }
     if (minas.length > 0) {
       data.push({
         group: "Minas",
@@ -340,7 +340,7 @@ export const useRegistrarMantenimiento = ({
     }
     data.push({
       group: "Otros",
-      items: [{ value: "otro", label: "Otro (Especificar)..." }],
+      items: [{ value: "otro", label: "Otro..." }],
     });
 
     const q = qLugar.trim();
