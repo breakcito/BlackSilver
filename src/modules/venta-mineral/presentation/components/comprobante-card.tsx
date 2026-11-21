@@ -2,10 +2,14 @@ import { Badge, Button, Divider, Group, Paper, Text } from "@mantine/core";
 import { IconCash, IconPencil, IconReceipt } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
-import { EstadoComprobanteDespacho } from "../../../../shared/enums/venta-mineral/estado-comprobante-despacho";
 import { Moneda } from "../../../../shared/enums/_generic/moneda";
 import { simboloMoneda } from "../forms/calculos-despacho";
 import type { ComprobanteDespachoItem } from "../../service/venta-mineral.responses";
+import {
+  colorEstadoComprobante,
+  pendientesComprobante,
+  tieneSaldoPendiente,
+} from "./comprobante-estado";
 
 /**
  * Tarjeta de un comprobante de despacho con sus importes y el saldo
@@ -26,12 +30,6 @@ interface Props {
   onVerPagos?: () => void;
 }
 
-const colorEstado = (estado: EstadoComprobanteDespacho) => {
-  if (estado === EstadoComprobanteDespacho.Pagado) return "green";
-  if (estado === EstadoComprobanteDespacho.EnProcesoPago) return "yellow";
-  return "gray";
-};
-
 export const ComprobanteCard = ({
   comprobante,
   etiqueta,
@@ -41,15 +39,8 @@ export const ComprobanteCard = ({
   onRegistrarPago,
   onVerPagos,
 }: Props) => {
-  const pendienteNeto = Math.max(
-    0,
-    Number(comprobante.neto_a_pagar) - Number(comprobante.avance_neto),
-  );
-  const pendienteDetraccion = Math.max(
-    0,
-    Number(comprobante.monto_detraccion_soles) -
-      Number(comprobante.avance_detraccion),
-  );
+  const { neto: pendienteNeto, detraccion: pendienteDetraccion } =
+    pendientesComprobante(comprobante);
   const hayPagos = (comprobante.pagos?.length ?? 0) > 0;
 
   /** Moneda del comprobante: solo el de flete puede estar en dolares. */
@@ -80,7 +71,7 @@ export const ComprobanteCard = ({
   const contenido = (
     <>
       <Group justify="" align="flex-start" wrap="nowrap" gap="xs">
-        <div className="min-w-0">
+        <div className="min-w-0 mt-0.5">
           {/* Codigo | estado | detalle: todo en una sola linea */}
           <Group gap="xs" wrap="wrap" align="center">
             <IconReceipt size={16} className="text-indigo-400 shrink-0" />
@@ -89,7 +80,7 @@ export const ComprobanteCard = ({
             </Text>
             <Divider orientation="vertical" />
             <Badge
-              color={colorEstado(comprobante.estado)}
+              color={colorEstadoComprobante(comprobante.estado)}
               variant="light"
               size="sm"
               radius="sm"
@@ -122,20 +113,17 @@ export const ComprobanteCard = ({
               Editar
             </Button>
           )}
-          {onRegistrarPago &&
-            (comprobante.avance_neto < comprobante.neto_a_pagar ||
-              comprobante.avance_detraccion <
-                comprobante.monto_detraccion_soles) && (
-              <Button
-                variant="light"
-                size="compact-xs"
-                color="teal"
-                onClick={onRegistrarPago}
-                leftSection={<IconCash size={12} />}
-              >
-                Pagar
-              </Button>
-            )}
+          {onRegistrarPago && tieneSaldoPendiente(comprobante) && (
+            <Button
+              variant="light"
+              size="compact-xs"
+              color="teal"
+              onClick={onRegistrarPago}
+              leftSection={<IconCash size={12} />}
+            >
+              Pagar
+            </Button>
+          )}
           {onVerPagos && hayPagos && (
             <Button
               variant="subtle"
@@ -162,7 +150,7 @@ export const ComprobanteCard = ({
       </Group>
 
       <div
-        className={`grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 lg:grid-cols-9`}
+        className={`grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 lg:grid-cols-7`}
       >
         <div>
           <Text size="xs" c="gray">
@@ -238,7 +226,7 @@ export const ComprobanteCard = ({
         </div>
       </div>
 
-      <Text size="sm" c="gray" fw={700} mt="sm">
+      <Text size="sm" c="gray" fw={700} mt={"10px"}>
         PAGOS:
       </Text>
 

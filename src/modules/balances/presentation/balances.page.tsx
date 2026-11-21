@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tabs } from "@mantine/core";
+import { Tabs, Text } from "@mantine/core";
 import { ListBulletIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 
 import { useTitlePage } from "../../../hooks/useTitlePage";
@@ -66,69 +66,79 @@ export const BalancesPage = () => {
         onRecargar={cargar}
       />
 
-      {/* ── Resultado, una ficha por moneda ────────────────────────── */}
-      <BalancesKpis
-        resumenes={resumenPorMoneda}
-        etiquetaPeriodo={etiquetaMes(mes, anio)}
-        etiquetaComparativo={etiquetaMesCorta(mesComparativo, anioComparativo)}
-        loading={loading}
-      />
+      <div className="grid grid-cols-5 gap-4">
+        {/* ── Resultado, una ficha por moneda ────────────────────────── */}
+        <div className="mt-2 flex flex-col gap-3">
+          <Text fw={800} size="lg" c={"gray.5"} className="uppdercase text-center tracking-widest">RESULTADOS</Text>
+          <BalancesKpis
+            resumenes={resumenPorMoneda}
+            etiquetaPeriodo={etiquetaMes(mes, anio)}
+            etiquetaComparativo={etiquetaMesCorta(
+              mesComparativo,
+              anioComparativo,
+            )}
+            loading={loading}
+          />
+        </div>
 
-      {/* ── Detalle ────────────────────────────────────────────────── */}
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        variant="pills"
-        color="indigo"
-        classNames={{
-          root: "space-y-4",
-          list: "bg-zinc-950/80 p-0 rounded-lg border border-zinc-800 w-fit shrink-0 overflow-hidden gap-0",
-          tab: "rounded-none px-4 py-2 transition-all duration-200 data-[active]:bg-indigo-600! data-[active]:text-white text-zinc-400 hover:text-zinc-200 font-semibold text-xs",
-        }}
-      >
-        <Tabs.List>
-          <Tabs.Tab
-            value="categorias"
-            leftSection={<Squares2X2Icon className="w-4 h-4" />}
+        {/* ── Detalle ────────────────────────────────────────────────── */}
+        <div className="col-span-4">
+          <Tabs
+            value={tab}
+            onChange={setTab}
+            variant="pills"
+            color="indigo"
+            classNames={{
+              root: "space-y-4",
+              list: "bg-zinc-950/80 p-0 rounded-lg border border-zinc-800 w-fit shrink-0 overflow-hidden gap-0",
+              tab: "rounded-none px-4 py-2 transition-all duration-200 data-[active]:bg-indigo-600! data-[active]:text-white text-zinc-400 hover:text-zinc-200 font-semibold text-xs",
+            }}
           >
-            Desglose por categoría
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="movimientos"
-            leftSection={<ListBulletIcon className="w-4 h-4" />}
-          >
-            Movimientos
-          </Tabs.Tab>
-        </Tabs.List>
+            <Tabs.List>
+              <Tabs.Tab
+                value="categorias"
+                leftSection={<Squares2X2Icon className="w-4 h-4" />}
+              >
+                Desglose por categoría
+              </Tabs.Tab>
+              <Tabs.Tab
+                value="movimientos"
+                leftSection={<ListBulletIcon className="w-4 h-4" />}
+              >
+                Movimientos
+              </Tabs.Tab>
+            </Tabs.List>
 
-        <Tabs.Panel value="categorias">
-          <BalancesDesgloseCategorias grupos={resumenCategoriaPorMoneda} />
-        </Tabs.Panel>
+            <Tabs.Panel value="categorias">
+              <BalancesDesgloseCategorias grupos={resumenCategoriaPorMoneda} />
+            </Tabs.Panel>
 
-        <Tabs.Panel value="movimientos">
-          <div className="space-y-3">
-            <BalancesFiltrosDetalle
-              ambito={filtroAmbito}
-              setAmbito={setFiltroAmbito}
-              tipo={filtroTipo}
-              setTipo={setFiltroTipo}
-              origen={filtroOrigen}
-              setOrigen={setFiltroOrigen}
-              busqueda={busqueda}
-              setBusqueda={setBusqueda}
-              origenes={origenes}
-              hayFiltros={hayFiltros}
-              limpiarFiltros={limpiarFiltros}
-            />
+            <Tabs.Panel value="movimientos">
+              <div className="space-y-3">
+                <BalancesFiltrosDetalle
+                  ambito={filtroAmbito}
+                  setAmbito={setFiltroAmbito}
+                  tipo={filtroTipo}
+                  setTipo={setFiltroTipo}
+                  origen={filtroOrigen}
+                  setOrigen={setFiltroOrigen}
+                  busqueda={busqueda}
+                  setBusqueda={setBusqueda}
+                  origenes={origenes}
+                  hayFiltros={hayFiltros}
+                  limpiarFiltros={limpiarFiltros}
+                />
 
-            <BalancesListaMovimientos
-              movimientos={movimientosDetalle}
-              loading={loading}
-              etiquetas={etiquetasOrigen}
-            />
-          </div>
-        </Tabs.Panel>
-      </Tabs>
+                <BalancesListaMovimientos
+                  movimientos={movimientosDetalle}
+                  loading={loading}
+                  etiquetas={etiquetasOrigen}
+                />
+              </div>
+            </Tabs.Panel>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 };

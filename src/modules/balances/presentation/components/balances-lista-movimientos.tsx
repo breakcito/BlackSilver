@@ -13,7 +13,7 @@ interface Props {
 }
 
 /** Movimientos por pagina: tres columnas de cuatro filas. */
-const POR_PAGINA = 12;
+const POR_PAGINA = 15;
 
 /**
  * Ficha de un movimiento.

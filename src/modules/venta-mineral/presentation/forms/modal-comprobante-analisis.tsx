@@ -1,14 +1,22 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Badge,
   Button,
   Checkbox,
   Group,
   Paper,
+  SimpleGrid,
   Stack,
   Text,
+  Tooltip,
 } from "@mantine/core";
-import { IconDeviceFloppy, IconFlask, IconX } from "@tabler/icons-react";
+import {
+  IconDeviceFloppy,
+  IconFlask,
+  IconLock,
+  IconX,
+} from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
 import { MultiFilePicker } from "../../../../presentation/utils/archivo/multifile-picker";
@@ -40,11 +48,31 @@ interface Props {
   }) => Promise<boolean>;
 }
 
+/** Analisis de un mismo laboratorio (proveedor del servicio de analisis). */
+interface GrupoProveedor {
+  /** Id del laboratorio; 0 cuando el analisis no tiene laboratorio. */
+  id: number;
+  nombre: string;
+  ruc: string | null;
+  analisis: AnalisisLaboratorioItem[];
+}
+
+/** Id del laboratorio cuando el analisis no tiene proveedor registrado. */
+const SIN_LABORATORIO = 0;
+
+/** Laboratorio (proveedor) al que pertenece un analisis. */
+const idProveedor = (analisis: AnalisisLaboratorioItem): number =>
+  analisis.id_laboratorio ?? SIN_LABORATORIO;
+
 /**
  * Registro y edicion del comprobante de analisis de laboratorio.
  *
  * El subtotal es la suma del costo de servicio de los analisis que factura:
  * no se captura a mano. Los analisis asumidos por el cliente no entran.
+ *
+ * Un comprobante factura a un solo proveedor (laboratorio): el primer
+ * analisis que se marca define de quien es el comprobante y los analisis de
+ * los demas laboratorios quedan bloqueados.
  */
 export const ModalComprobanteAnalisis = ({
   close,
@@ -91,15 +119,65 @@ export const ModalComprobanteAnalisis = ({
     [analisisDisponibles, idsAnalisis],
   );
 
+  /**
+   * Laboratorio del comprobante: lo define el primer analisis marcado.
+   * Es null cuando todavia no se ha marcado ninguno (nada esta bloqueado).
+   */
+  const proveedorActivo = useMemo(() => {
+    const marcado = analisisFacturables.find((a) =>
+      idsAnalisis.includes(a.id_analisis_laboratorio),
+    );
+    return marcado ? idProveedor(marcado) : null;
+  }, [analisisFacturables, idsAnalisis]);
+
+  /** Analisis agrupados por laboratorio: cada comprobante factura a uno. */
+  const gruposProveedor = useMemo(() => {
+    const porId = new Map<number, GrupoProveedor>();
+
+    analisisFacturables.forEach((analisis) => {
+      const id = idProveedor(analisis);
+      const grupo = porId.get(id);
+
+      if (grupo) {
+        grupo.analisis.push(analisis);
+        return;
+      }
+
+      porId.set(id, {
+        id,
+        nombre: analisis.laboratorio?.trim() || "Sin laboratorio",
+        ruc: analisis.laboratorio_ruc,
+        analisis: [analisis],
+      });
+    });
+
+    return Array.from(porId.values()).sort((a, b) =>
+      a.nombre.localeCompare(b.nombre),
+    );
+  }, [analisisFacturables]);
+
+  /** Laboratorio que factura el comprobante (null si no hay nada marcado). */
+  const grupoActivo = useMemo(
+    () => gruposProveedor.find((g) => g.id === proveedorActivo) ?? null,
+    [gruposProveedor, proveedorActivo],
+  );
+
+  /** Analisis ya marcados: son los que suman al subtotal. */
+  const analisisMarcados = useMemo(
+    () =>
+      analisisFacturables.filter((a) =>
+        idsAnalisis.includes(a.id_analisis_laboratorio),
+      ),
+    [analisisFacturables, idsAnalisis],
+  );
+
   const subtotal = useMemo(
     () =>
       Math.round(
-        analisisFacturables
-          .filter((a) => idsAnalisis.includes(a.id_analisis_laboratorio))
-          .reduce((acc, a) => acc + (Number(a.costo_servicio) || 0), 0) *
+        analisisMarcados.reduce((acc, a) => acc + (Number(a.costo_servicio) || 0), 0) *
           100,
       ) / 100,
-    [analisisFacturables, idsAnalisis],
+    [analisisMarcados],
   );
 
   const importes = useMemo(
@@ -113,10 +191,29 @@ export const ModalComprobanteAnalisis = ({
   );
 
   const handleToggle = (idAnalisis: number, marcado: boolean) => {
-    setIdsAnalisis((prev) => {
-      if (marcado) return prev.includes(idAnalisis) ? prev : [...prev, idAnalisis];
-      return prev.filter((id) => id !== idAnalisis);
-    });
+    if (marcado) {
+      const analisis = analisisDisponibles.find(
+        (a) => a.id_analisis_laboratorio === idAnalisis,
+      );
+      const yaMarcado = analisisFacturables.find((a) =>
+        idsAnalisis.includes(a.id_analisis_laboratorio),
+      );
+
+      // Un comprobante factura a un solo proveedor: no se mezclan laboratorios.
+      if (
+        !analisis ||
+        (yaMarcado && idProveedor(yaMarcado) !== idProveedor(analisis))
+      ) {
+        return;
+      }
+
+      setIdsAnalisis((prev) =>
+        prev.includes(idAnalisis) ? prev : [...prev, idAnalisis],
+      );
+      return;
+    }
+
+    setIdsAnalisis((prev) => prev.filter((id) => id !== idAnalisis));
   };
 
   const handleSubmit = async () => {
@@ -132,6 +229,17 @@ export const ModalComprobanteAnalisis = ({
     }
     if (idsAnalisis.length === 0) {
       setError("Selecciona al menos un analisis para facturar");
+      return;
+    }
+
+    // Guarda contra el paso de providers: el comprobante es de un solo
+    // laboratorio. Solo se alcanza cuando el comprobante ya traia analisis de
+    // dos laboratorios y el usuario todavia no los depuro.
+    const proveedores = new Set(analisisMarcados.map(idProveedor));
+    if (proveedores.size > 1) {
+      setError(
+        "Los analisis de un comprobante deben ser del mismo laboratorio",
+      );
       return;
     }
 
@@ -166,56 +274,126 @@ export const ModalComprobanteAnalisis = ({
         <Group gap="xs" mb="xs">
           <IconFlask size={16} className="text-indigo-400" />
           <Text size="xs" fw={700} c="white">
-            Analisis a facturar
+            Análisis a facturar
           </Text>
+          <Badge color="indigo" variant="light" size="xs" radius="sm">
+            {analisisMarcados.length} de {analisisFacturables.length}
+          </Badge>
         </Group>
 
-        {analisisFacturables.length === 0 ? (
+        {gruposProveedor.length === 0 ? (
           <Text size="xs" c="dimmed" ta="center" py="sm">
             No hay analisis propios para facturar. Los analisis que asume el
             cliente no se facturan.
           </Text>
         ) : (
-          <Stack gap="xs">
-            {analisisFacturables.map((analisis) => {
-              const marcado = idsAnalisis.includes(analisis.id_analisis_laboratorio);
+          <Stack gap="sm">
+            {gruposProveedor.map((grupo) => {
+              // Con un laboratorio ya marcado, los demas quedan bloqueados.
+              const bloqueadoGrupo =
+                proveedorActivo !== null && grupo.id !== proveedorActivo;
+              const marcados = grupo.analisis.filter((a) =>
+                idsAnalisis.includes(a.id_analisis_laboratorio),
+              ).length;
 
               return (
-                <Group
-                  key={analisis.id_analisis_laboratorio}
-                  justify="space-between"
-                  wrap="nowrap"
-                  className={`p-2 rounded-lg border transition-colors ${
-                    marcado
-                      ? "bg-zinc-900/80 border-indigo-500/50"
-                      : "bg-zinc-900/40 border-zinc-800/80"
-                  }`}
-                >
-                  <Group gap="xs" align="flex-start" wrap="nowrap" className="flex-1">
-                    <Checkbox
+                <div key={grupo.id}>
+                  <Group gap="xs" mb={4} wrap="nowrap">
+                    <Text
                       size="xs"
-                      color="indigo"
-                      checked={marcado}
-                      onChange={(e) =>
-                        handleToggle(
-                          analisis.id_analisis_laboratorio,
-                          e.currentTarget.checked,
-                        )
-                      }
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <Text size="xs" c="gray">
-                        {analisis.codigo_cliente ?? "Sin codigo"} ·{" "}
-                        {analisis.laboratorio ?? "Sin laboratorio"}
+                      fw={700}
+                      c={bloqueadoGrupo ? "dimmed" : "indigo.3"}
+                      truncate
+                    >
+                      {grupo.nombre}
+                    </Text>
+                    {grupo.ruc && (
+                      <Text size="xs" c="gray.5" className="font-mono">
+                        {grupo.ruc}
                       </Text>
-                      <Text size="xs" c="dimmed">
-                        Costo del servicio: S/{" "}
-                        {formatNumber(analisis.costo_servicio)}
-                      </Text>
-                    </div>
+                    )}
+                    <Badge
+                      color={bloqueadoGrupo ? "gray" : "indigo"}
+                      variant="light"
+                      size="xs"
+                      radius="sm"
+                    >
+                      {marcados}/{grupo.analisis.length}
+                    </Badge>
+                    {bloqueadoGrupo && (
+                      <IconLock size={12} className="text-zinc-600" />
+                    )}
                   </Group>
-                </Group>
+
+                  <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs">
+                    {grupo.analisis.map((analisis) => {
+                      const marcado = idsAnalisis.includes(
+                        analisis.id_analisis_laboratorio,
+                      );
+                      // Un analisis ya marcado de otro laboratorio se deja
+                      // editable para que el usuario pueda quitarlo; los
+                      // demas no se pueden marcar.
+                      const bloqueado = bloqueadoGrupo && !marcado;
+
+                      return (
+                        <Group
+                          key={analisis.id_analisis_laboratorio}
+                          justify="space-between"
+                          wrap="nowrap"
+                          className={`p-2 rounded-lg border transition-colors ${
+                            bloqueado
+                              ? "bg-zinc-950/40 border-zinc-800/50 opacity-50"
+                              : marcado
+                                ? "bg-zinc-900/80 border-indigo-500/50"
+                                : "bg-zinc-900/40 border-zinc-800/80"
+                          }`}
+                        >
+                          <Group
+                            gap="xs"
+                            align="flex-start"
+                            wrap="nowrap"
+                            className="flex-1"
+                          >
+                            <Tooltip
+                              label={`Solo puedes facturar analisis de ${grupoActivo?.nombre}`}
+                              withArrow
+                              disabled={!bloqueado}
+                            >
+                              <Checkbox
+                                size="xs"
+                                color="indigo"
+                                checked={marcado}
+                                disabled={bloqueado}
+                                onChange={(e) =>
+                                  handleToggle(
+                                    analisis.id_analisis_laboratorio,
+                                    e.currentTarget.checked,
+                                  )
+                                }
+                                className="mt-0.5"
+                              />
+                            </Tooltip>
+                            <div className="min-w-0">
+                              <Text
+                                size="xs"
+                                c="gray"
+                                className="uppercase"
+                                fw={600}
+                                truncate
+                              >
+                                {analisis.codigo_cliente ?? "Sin codigo"}
+                              </Text>
+                              <Text size="xs" c="gray.5">
+                                Costo del servicio: S/{" "}
+                                {formatNumber(analisis.costo_servicio)}
+                              </Text>
+                            </div>
+                          </Group>
+                        </Group>
+                      );
+                    })}
+                  </SimpleGrid>
+                </div>
               );
             })}
           </Stack>

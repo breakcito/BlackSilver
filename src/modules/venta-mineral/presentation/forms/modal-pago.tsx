@@ -272,11 +272,7 @@ export const ModalPago = ({ close, comprobante, onGuardar }: Props) => {
 
       <Switch
         label="El pago es para la detraccion"
-        description={
-          esParaDetraccion
-            ? "Se descuenta del saldo de detraccion"
-            : "Se descuenta del saldo del neto a pagar"
-        }
+
         checked={esParaDetraccion}
         onChange={(e) => setEsParaDetraccion(e.currentTarget.checked)}
         color="orange"

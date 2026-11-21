@@ -255,11 +255,10 @@ export const ModalAnalisis = ({
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         {esPropio ? (
           <TextInput
-            label="Codigo del cliente"
+            label="Código del cliente"
             value={codigoClienteCalculado}
             onChange={() => {}}
             readOnly
-            disabled
             classNames={inputClasses}
             size="xs"
             radius="lg"
@@ -288,7 +287,9 @@ export const ModalAnalisis = ({
               label="Codigo del cliente del analisis"
               placeholder="Codigo que entrega el cliente"
               value={codigoCliente}
-              onChange={(e) => setCodigoCliente(e.currentTarget.value.toUpperCase())}
+              onChange={(e) =>
+                setCodigoCliente(e.currentTarget.value.toUpperCase())
+              }
               disabled={saving}
               classNames={inputClasses}
               size="xs"
@@ -302,7 +303,9 @@ export const ModalAnalisis = ({
           label="Codigo del laboratorio"
           placeholder="Codigo que asigna el laboratorio"
           value={codigoLaboratorio}
-          onChange={(e) => setCodigoLaboratorio(e.currentTarget.value.toUpperCase())}
+          onChange={(e) =>
+            setCodigoLaboratorio(e.currentTarget.value.toUpperCase())
+          }
           disabled={saving}
           classNames={inputClasses}
           size="xs"
@@ -314,6 +317,17 @@ export const ModalAnalisis = ({
           type="date"
           value={fechaAnalisis}
           onChange={(e) => setFechaAnalisis(e.currentTarget.value)}
+          disabled={saving}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+        />
+        <NumberInput
+          label="Costo del servicio (S/)"
+          value={costoServicio}
+          onChange={setCostoServicio}
+          leftSection={<IconCash size={14} className="text-emerald-400" />}
+          hideControls
           disabled={saving}
           classNames={inputClasses}
           size="xs"
@@ -408,17 +422,6 @@ export const ModalAnalisis = ({
           onChange={setPorcentajeHumedad}
           leftSection={<IconDroplet size={14} className="text-cyan-400" />}
           max={100}
-          hideControls
-          disabled={saving}
-          classNames={inputClasses}
-          size="xs"
-          radius="lg"
-        />
-        <NumberInput
-          label="Costo del servicio (S/)"
-          value={costoServicio}
-          onChange={setCostoServicio}
-          leftSection={<IconCash size={14} className="text-emerald-400" />}
           hideControls
           disabled={saving}
           classNames={inputClasses}

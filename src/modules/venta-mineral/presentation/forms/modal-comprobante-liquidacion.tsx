@@ -158,32 +158,38 @@ export const ModalComprobanteLiquidacion = ({
         </Alert>
       )}
 
-      <Select
-        label="Liquidacion"
-        placeholder="Selecciona la liquidacion"
-        data={liquidacionesDisponibles.map((l) => ({
-          value: String(l.id_liquidacion_mineral),
-          label: `${l.codigo_liquidacion ?? "Sin codigo"} · ${l.elemento_quimico} · ${l.cliente ?? "sin cliente"}`,
-        }))}
-        value={idLiquidacion}
-        onChange={setIdLiquidacion}
-        searchable
-        nothingFoundMessage="Sin liquidaciones disponibles"
-        comboboxProps={{ withinPortal: true }}
-        disabled={saving || esEdicion}
-        classNames={inputClasses}
-        size="xs"
-        radius="lg"
-        required
-      />
-
-      {liquidacionSeleccionada && (
-        <Text size="xs" c="dimmed">
-          Neto de la liquidacion: {SIMBOLO}{" "}
-          {formatNumber(liquidacionSeleccionada.neto)} · peso neto{" "}
-          {formatNumber(liquidacionSeleccionada.peso_neto)} t
-        </Text>
+      {liquidacionesDisponibles.length === 0 ? (
+        <Alert
+          color="yellow"
+          variant="light"
+          title="No hay liquidaciones por facturar"
+          radius="md"
+        >
+          Todas las liquidaciones de este despacho ya tienen un comprobante
+          registrado.
+        </Alert>
+      ) : (
+        <Select
+          label="Liquidacion"
+          placeholder="Selecciona la liquidacion"
+          data={liquidacionesDisponibles.map((l) => ({
+            value: String(l.id_liquidacion_mineral),
+            label: `${l.codigo_liquidacion ?? "Sin codigo"} · ${l.elemento_quimico} · ${l.cliente ?? "sin cliente"}`,
+          }))}
+          value={idLiquidacion}
+          onChange={setIdLiquidacion}
+          searchable
+          nothingFoundMessage="Sin liquidaciones disponibles"
+          comboboxProps={{ withinPortal: true }}
+          disabled={saving || esEdicion}
+          classNames={inputClasses}
+          size="xs"
+          radius="lg"
+          required
+        />
       )}
+
+
 
       {/* Tipo de cambio: el comprobante es en dolares y la detraccion se
           cobra en soles. */}

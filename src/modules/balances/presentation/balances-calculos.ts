@@ -105,7 +105,7 @@ export const formatearMonto = (
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return numero < 0 ? `-${simbolo} ${texto}` : `${simbolo} ${texto}`;
+  return numero < 0 ? `${simbolo} ${texto}` : `${simbolo} ${texto}`;
 };
 
 /**

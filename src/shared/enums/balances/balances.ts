@@ -62,8 +62,16 @@ export enum BalanceOrigen {
   CompraCarbon = "COMPRA_CARBON",
   FleteCompraCarbon = "FLETE_COMPRA_CARBON",
   GastoProduccionCarbon = "GASTO_PRODUCCION_CARBON",
+  AnticipoProveedorCarbon = "ANTICIPO_PROVEEDOR_CARBON",
+
+  // MINERAL - EGRESOS de la cadena de almacenes (reposiciones, entregas de
+  // reabastecimiento, entregas de prestamo y transferencias de orden de
+  // compra): el costo del transporte hired a terceros o agencia.
+  Transporte = "TRANSPORTE",
+
   // CARBON - INGRESOS
   VentaCarbon = "VENTA_CARBON",
+  AnticipoClienteCarbon = "ANTICIPO_CLIENTE_CARBON",
 }
 
 /**

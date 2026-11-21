@@ -44,11 +44,7 @@ const FichaMoneda = ({
   );
 
   const favorable =
-    variacion === null || variacion === 0
-      ? null
-      : variacion > 0
-        ? true
-        : false;
+    variacion === null || variacion === 0 ? null : variacion > 0 ? true : false;
 
   const sinActividadPrevia = resumen.movimientosComparativo === 0;
   const sinActividadEnPeriodo = resumen.movimientos === 0;
@@ -80,15 +76,16 @@ const FichaMoneda = ({
           fw={800}
           className={`leading-none tracking-tight tabular-nums ${
             sinActividadEnPeriodo
-              ? "text-zinc-700"
+              ? "text-zinc-600"
               : resumen.resultado >= 0
-                ? "text-white"
+                ? "text-teal-400"
                 : "text-red-400"
           }`}
         >
           {sinActividadEnPeriodo
             ? "—"
-            : formatearMonto(resumen.moneda, resumen.resultado)}
+            : (resumen.resultado >= 0 ? "+" : "-") +
+              formatearMonto(resumen.moneda, resumen.resultado)}
         </Text>
 
         {variacion !== null && (
@@ -116,7 +113,7 @@ const FichaMoneda = ({
           ? "Sin actividad en el periodo"
           : sinActividadPrevia
             ? "Sin actividad en el periodo de comparación"
-            : `Resultado · ${etiquetaComparativo}: ${formatearMonto(
+            : `Resultado · ${etiquetaComparativo}: ${resumen.egresosComparativo > resumen.ingresosComparativo ? "-" : "+"} ${formatearMonto(
                 resumen.moneda,
                 resumen.resultadoComparativo,
               )}`}
@@ -137,11 +134,7 @@ const FichaMoneda = ({
               Ingresos
             </Text>
           </div>
-          <Text
-            size="md"
-            fw={700}
-            className="mt-1 text-teal-300 tabular-nums "
-          >
+          <Text size="md" fw={700} className="mt-1 text-teal-300 tabular-nums ">
             {formatearMonto(resumen.moneda, resumen.ingresos)}
           </Text>
           <Text size="xs" className="text-zinc-300 tabular-nums ">
@@ -161,15 +154,12 @@ const FichaMoneda = ({
               Egresos
             </Text>
           </div>
-          <Text
-            size="md"
-            fw={700}
-            className="mt-1 text-red-300 tabular-nums "
-          >
+          <Text size="md" fw={700} className="mt-1 text-red-300 tabular-nums ">
             {formatearMonto(resumen.moneda, resumen.egresos)}
           </Text>
           <Text size="xs" className="text-zinc-300 tabular-nums ">
             {etiquetaComparativo}:{" "}
+            
             {formatearMonto(resumen.moneda, resumen.egresosComparativo)}
           </Text>
         </div>
@@ -193,7 +183,7 @@ export const BalancesKpis = ({
   const porMoneda = new Map(resumenes.map((r) => [r.moneda, r]));
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div className="flex flex-col gap-4">
       {MONEDAS_BALANCE.map((moneda) => {
         const resumen = porMoneda.get(moneda);
         if (!resumen) return null;

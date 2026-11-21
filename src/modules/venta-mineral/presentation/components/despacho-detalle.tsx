@@ -15,6 +15,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import {
+  IconCash,
   IconChevronDown,
   IconDroplet,
   IconFlask,
@@ -43,8 +44,14 @@ import type {
   LiquidacionMineralItem,
 } from "../../service/venta-mineral.responses";
 import { ComprobanteCard } from "./comprobante-card";
+import {
+  colorEstadoComprobante,
+  pendientesComprobante,
+  tieneSaldoPendiente,
+} from "./comprobante-estado";
 import { ConfirmarEliminar } from "./confirmar-eliminar";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
+import { simboloMoneda } from "../forms/calculos-despacho";
 import { PencilSquareIcon } from "@heroicons/react/24/outline";
 
 interface Props {
@@ -180,7 +187,7 @@ const TarjetaLiquidacion = ({
               ] ?? "gray"
             }
             variant="light"
-            size="xs"
+            size="sm"
             radius="sm"
           >
             {liquidacion.elemento_quimico}
@@ -194,7 +201,7 @@ const TarjetaLiquidacion = ({
                   : "gray"
             }
             variant="light"
-            size="xs"
+            size="sm"
             radius="sm"
           >
             {liquidacion.estado}
@@ -256,7 +263,7 @@ const TarjetaLiquidacion = ({
 
       <Group gap={4} wrap="nowrap">
         <Text size="sm" fw={700} c="lime.3">
-          $ {formatNumber(liquidacion.neto)}
+          $ {formatNumber(liquidacion.total)}
         </Text>
         <Button
           variant="subtle"
@@ -339,7 +346,7 @@ const LeyCuadro = ({
  * Datos del laboratorio de un analisis: laboratorio, codigo y fecha.
  */
 const DatosAnalisis = ({ analisis }: { analisis: AnalisisLaboratorioItem }) => (
-  <Text size="xs" c="zinc.300" truncate>
+  <Text size="xs" c="gray" truncate>
     {analisis.laboratorio ?? "Sin laboratorio"} · Cod. lab.{" "}
     <Text span size="xs" c="gray">
       {analisis.codigo_laboratorio ?? "-"}
@@ -415,24 +422,29 @@ const AccionesAnalisis = ({
   onEliminar: () => void;
 }) => (
   <>
-    <Button
-      variant="subtle"
-      color="indigo"
-      size="compact-xs"
-      onClick={onEditar}
-      leftSection={<IconPencil size={12} />}
-    >
-      Editar
-    </Button>
-    <Button
-      variant="subtle"
-      color="red"
-      size="compact-xs"
-      onClick={onEliminar}
-      leftSection={<IconTrash size={12} />}
-    >
-      Eliminar
-    </Button>
+    <Tooltip label="Editar">
+      <ActionIcon
+        variant="subtle"
+        color="indigo"
+        size="sm"
+        onClick={onEditar}
+        aria-label="Editar"
+      >
+        <IconPencil size={15} />
+      </ActionIcon>
+    </Tooltip>
+
+    <Tooltip label="Eliminar">
+      <ActionIcon
+        variant="subtle"
+        color="red"
+        size="sm"
+        onClick={onEliminar}
+        aria-label="Eliminar"
+      >
+        <IconTrash size={15} />
+      </ActionIcon>
+    </Tooltip>
   </>
 );
 
@@ -454,39 +466,42 @@ const TarjetaAnalisis = ({
     radius="md"
     className="bg-zinc-900/60 border border-zinc-800/70"
   >
-    <Group justify="space-between" wrap="nowrap" align="flex-start">
-      <div className="min-w-0">
-        {/* Codigo, badge y datos del laboratorio en la misma linea */}
+    {/* Codigo, badge y datos del laboratorio en la misma linea */}
+    <Stack gap={"2"}>
+      <Group justify="space-between" align="center">
         <Group gap="xs" align="center" wrap="wrap">
-          <Text size="sm" fw={700} c="zinc.100" className="font-mono">
+          <Text
+            size="xs"
+            fw={700}
+            c="white"
+            className="font-mono uppercase"
+            mt={2}
+          >
             {analisis.codigo_cliente ?? "Sin codigo"}
           </Text>
-          <Badge
+          {/* <Badge
             color={analisis.asumido_por === "Propio" ? "indigo" : "gray"}
             variant="light"
-            size="xs"
+            size="sm"
             radius="sm"
           >
             {analisis.asumido_por === "Propio"
               ? "Asume la empresa"
               : "Asume el cliente"}
-          </Badge>
-          <Text size="xs" c="zinc.600">
-            |
-          </Text>
-          <DatosAnalisis analisis={analisis} />
+          </Badge> */}
+          <AccionesAnalisis onEditar={onEditar} onEliminar={onEliminar} />
         </Group>
 
-        <LeyesAnalisis analisis={analisis} />
-      </div>
-
-      <Group gap={4} wrap="nowrap">
-        <Text size="sm" fw={700} c="orange.3">
-          S/ {formatNumber(analisis.costo_servicio)}
-        </Text>
-        <AccionesAnalisis onEditar={onEditar} onEliminar={onEliminar} />
+        <Group gap={4} wrap="nowrap">
+          <Text size="sm" fw={700} c="orange.3">
+            S/ {formatNumber(analisis.costo_servicio)}
+          </Text>
+        </Group>
       </Group>
-    </Group>
+
+      <DatosAnalisis analisis={analisis} />
+      <LeyesAnalisis analisis={analisis} />
+    </Stack>
   </Paper>
 );
 
@@ -506,19 +521,26 @@ const FilaAnalisis = ({
   onEliminar: () => void;
 }) => (
   <div className="p-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40">
-    <Group justify="space-between" wrap="nowrap" align="flex-start">
-      <div className="min-w-0">
-        <DatosAnalisis analisis={analisis} />
-        <LeyesAnalisis analisis={analisis} />
-      </div>
-
-      <Group gap={4} wrap="nowrap" className="shrink-0">
-        <Text size="sm" fw={700} c="orange.3">
-          S/ {formatNumber(analisis.costo_servicio)}
-        </Text>
-        <AccionesAnalisis onEditar={onEditar} onEliminar={onEliminar} />
+    <Stack gap={4}>
+      <Group justify="space-between">
+        <Stack gap={"2"}>
+          <Group gap={"xs"}>
+            <Text size="xs" c={"white"} fw={600} className="uppercase" mt={2}>
+              {analisis.codigo_cliente}
+            </Text>
+            <AccionesAnalisis onEditar={onEditar} onEliminar={onEliminar} />
+          </Group>
+          <DatosAnalisis analisis={analisis} />
+        </Stack>
+        <Group gap={4} wrap="nowrap" className="shrink-0">
+          <Text size="sm" fw={700} c="orange.3">
+            S/ {formatNumber(analisis.costo_servicio)}
+          </Text>
+        </Group>
       </Group>
-    </Group>
+
+      <LeyesAnalisis analisis={analisis} />
+    </Stack>
   </div>
 );
 
@@ -579,9 +601,11 @@ const TarjetaFacturaAnalisis = ({
   onRegistrarPago: (comprobante: ComprobanteDespachoItem) => void;
   onEliminarComprobante: (comprobante: ComprobanteDespachoItem) => void;
 }) => {
-  // Todos los analisis de una factura comparten el codigo del lote: es el
-  // primero el que lo define.
-  const codigoLote = analisis[0]?.codigo_cliente ?? null;
+  // Estado de pago de la factura: se ve SIN desplegar la tarjeta, que es
+  // donde el usuario decide si tiene algo que pagar.
+  const pendientes = comprobante ? pendientesComprobante(comprobante) : null;
+  const saldoPendiente = comprobante ? tieneSaldoPendiente(comprobante) : false;
+  const cantidadPagos = comprobante?.pagos?.length ?? 0;
 
   return (
     <Paper
@@ -593,20 +617,70 @@ const TarjetaFacturaAnalisis = ({
         {/* La factura se identifica UNA vez */}
         <Group gap="xs" align="center" wrap="wrap" className="min-w-0">
           <IconReceipt size={16} className="text-teal-400 shrink-0" />
-          <Text size="sm" fw={700} c="zinc.100" className="font-mono">
-            {codigoLote ?? "Sin codigo"}
-          </Text>
-          <Badge color="teal" variant="light" size="xs" radius="sm">
-            Facturado
-          </Badge>
+
           {comprobante?.codigo_comprobante && (
-            <Badge color="pink" variant="light" size="xs" radius="sm">
+            <Badge color="pink" variant="light" size="sm" radius="sm">
               {comprobante.codigo_comprobante}
             </Badge>
           )}
-          <Badge color="gray" variant="light" size="xs" radius="sm">
-            {analisis.length} {enPlural("analisis", analisis.length)}
-          </Badge>
+
+          {/* Pagos: el estado del comprobante y su saldo se ven de entrada, sin
+          tener que desplegar la factura. */}
+          {comprobante && (
+            <>
+              <Group gap="xs" wrap="wrap" className="min-w-0">
+                <Badge
+                  color={colorEstadoComprobante(comprobante.estado)}
+                  variant="light"
+                  size="sm"
+                  radius="sm"
+                >
+                  {comprobante.estado}
+                </Badge>
+
+                {saldoPendiente && pendientes && (
+                  <>
+                    <Text size="xs" fw={700} c="blue.3">
+                      {`Neto pendiente ${simboloMoneda(comprobante.moneda)} ${formatNumber(pendientes.neto)}`}
+                    </Text>
+                    <Text size="xs" fw={700} c="yellow.3">
+                      {`Detraccion pendiente ${simboloMoneda(comprobante.moneda)} ${formatNumber(pendientes.detraccion)}`}
+                    </Text>
+                  </>
+                )}
+
+                {cantidadPagos > 0 && (
+                  <Tooltip label="Ver los pagos de la factura" withArrow>
+                    <Button
+                      variant="subtle"
+                      color="gray"
+                      size="compact-xs"
+                      radius="md"
+                      onClick={() => {
+                        if (!facturaAbierta) onToggleFactura();
+                      }}
+                    >
+                      {cantidadPagos} {enPlural("pago", cantidadPagos)}
+                    </Button>
+                  </Tooltip>
+                )}
+              </Group>
+
+              {saldoPendiente && (
+                <Button
+                  variant="light"
+                  color="teal"
+                  size="compact-xs"
+                  radius="md"
+                  onClick={() => onRegistrarPago(comprobante)}
+                  leftSection={<IconCash size={12} />}
+                  className="shrink-0"
+                >
+                  Pagar
+                </Button>
+              )}
+            </>
+          )}
         </Group>
 
         {comprobante && (
@@ -635,7 +709,7 @@ const TarjetaFacturaAnalisis = ({
       </Group>
 
       {/* Los analisis de la factura, uno debajo del otro */}
-      <Stack gap="xs" mt="sm">
+      <Group gap="xs" mt="4" grow>
         {analisis.map((a) => (
           <FilaAnalisis
             key={a.id_analisis_laboratorio}
@@ -644,7 +718,7 @@ const TarjetaFacturaAnalisis = ({
             onEliminar={() => onEliminarAnalisis(a)}
           />
         ))}
-      </Stack>
+      </Group>
 
       {/* La factura (importes y pagos) se despliega dentro de la tarjeta */}
       {facturaAbierta && comprobante && (
@@ -800,11 +874,7 @@ export const DespachoDetalle = ({
 
         {/* ---------------- GASTOS ---------------- */}
         <Tabs.Panel value="gastos" pt="md" mb={"4rem"}>
-          <Paper
-            p="md"
-            radius="lg"
-            className="bg-zinc-900/40 border border-zinc-800"
-          >
+          <div className=" ml-4">
             <Group justify="" mb={"xs"} gap={"sm"}>
               <Group gap="xs">
                 <Text size="sm" fw={700} c="white">
@@ -833,7 +903,7 @@ export const DespachoDetalle = ({
                 winchadores del despacho.
               </Text>
             ) : (
-              <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="xs">
+              <SimpleGrid cols={{ base: 1, sm: 5 }} spacing="xs">
                 {detalle.gastos.map((gasto) => (
                   <Paper
                     key={gasto.id_gasto_despacho}
@@ -848,14 +918,42 @@ export const DespachoDetalle = ({
                             gasto.tipo_gasto === "Winche" ? "orange" : "cyan"
                           }
                           variant="light"
-                          size="xs"
+                          size="sm"
                           radius="sm"
                         >
                           {gasto.tipo_gasto}
                         </Badge>
-                        <Text size="xs" c="zinc.200" truncate>
-                          {gasto.descripcion ?? "Sin descripcion"}
-                        </Text>
+
+                        <Group gap={2} wrap="nowrap">
+                          <Tooltip label="Editar gasto" withArrow>
+                            <ActionIcon
+                              variant="subtle"
+                              color="indigo"
+                              size="md"
+                              radius="md"
+                              onClick={() => onEditarGasto(gasto)}
+                            >
+                              <IconPencil size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Eliminar gasto" withArrow>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              size="md"
+                              radius="md"
+                              onClick={() =>
+                                setAEliminar({
+                                  titulo: "Eliminar gasto",
+                                  descripcion: `Se eliminara el gasto de S/ ${formatNumber(gasto.monto)}.`,
+                                  accion: () => onEliminarGasto(gasto),
+                                })
+                              }
+                            >
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
                       </Group>
                       <Text
                         size="sm"
@@ -873,58 +971,26 @@ export const DespachoDetalle = ({
                       gap="xs"
                       mt={4}
                     >
-                      <Text size="11px" c="gray" truncate>
-                        {gasto.empleado_registro ?? "Sin registro"} ·{" "}
+                      <Text size="xs" c="zinc.200" truncate>
+                        {gasto.descripcion ?? "Sin descripcion"}
+                      </Text>
+                      <Text size="11px" c="gray.5" truncate>
                         {gasto.created_at
                           ? dayjs(gasto.created_at).format("DD/MM/YYYY")
                           : "-"}
                       </Text>
-                      <Group gap={2} wrap="nowrap">
-                        <Tooltip label="Editar gasto" withArrow>
-                          <ActionIcon
-                            variant="subtle"
-                            color="indigo"
-                            size="md"
-                            radius="md"
-                            onClick={() => onEditarGasto(gasto)}
-                          >
-                            <IconPencil size={14} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Eliminar gasto" withArrow>
-                          <ActionIcon
-                            variant="subtle"
-                            color="red"
-                            size="md"
-                            radius="md"
-                            onClick={() =>
-                              setAEliminar({
-                                titulo: "Eliminar gasto",
-                                descripcion: `Se eliminara el gasto de S/ ${formatNumber(gasto.monto)}.`,
-                                accion: () => onEliminarGasto(gasto),
-                              })
-                            }
-                          >
-                            <IconTrash size={14} />
-                          </ActionIcon>
-                        </Tooltip>
-                      </Group>
                     </Group>
                   </Paper>
                 ))}
               </SimpleGrid>
             )}
-          </Paper>
+          </div>
         </Tabs.Panel>
 
         {/* ---------------- FLETE ---------------- */}
         <Tabs.Panel value="flete" pt="md" mb={"4rem"}>
           <Stack gap="md">
-            <Paper
-              p="md"
-              radius="lg"
-              className="bg-zinc-900/40 border border-zinc-800"
-            >
+            <div className="ml-4">
               <Group
                 justify="space-between"
                 align="center"
@@ -1153,67 +1219,71 @@ export const DespachoDetalle = ({
                   ))}
                 </Stack>
               )}
-            </Paper>
+            </div>
           </Stack>
         </Tabs.Panel>
 
         {/* ---------------- MOLIENDA ---------------- */}
         <Tabs.Panel value="molienda" pt="md" mb={"4rem"}>
-          <Group justify="space-between" mb="sm">
-            <Group gap="xs" align="center">
-              <Text size="sm" fw={700} c="white">
-                Comprobante de molienda
-              </Text>
-              <IndicadorCarga seccion="molienda" cargando={seccionCargando} />
+          <div className="ml-4">
+            <Group justify="" mb="xs">
+              <Group gap="xs" align="center">
+                <Text size="sm" fw={700} c="white">
+                  Comprobante de molienda
+                </Text>
+                <IndicadorCarga seccion="molienda" cargando={seccionCargando} />
+              </Group>
+              {detalle.comprobantes_molienda.length === 0 && (
+                <Button
+                  size="compact-xs"
+                  radius="md"
+                  variant="light"
+                  color="indigo"
+                  leftSection={<IconPlus size={12} />}
+                  onClick={() => onRegistrarComprobante("molienda")}
+                >
+                  Registrar comprobante
+                </Button>
+              )}
             </Group>
-            {detalle.comprobantes_molienda.length === 0 && (
-              <Button
-                size="compact-xs"
-                radius="md"
-                variant="light"
-                color="indigo"
-                leftSection={<IconPlus size={12} />}
-                onClick={() => onRegistrarComprobante("molienda")}
-              >
-                Registrar comprobante
-              </Button>
-            )}
-          </Group>
 
-          {detalle.comprobantes_molienda.length === 0 ? (
-            <Paper
-              p="md"
-              radius="lg"
-              className="bg-zinc-900/40 border border-zinc-800"
-            >
-              <Text size="xs" c="gray" ta="center" py="md">
-                Sin comprobante de molienda. Es la factura del molino de destino
-                por este despacho.
-              </Text>
-            </Paper>
-          ) : (
-            <Stack gap="sm">
-              {detalle.comprobantes_molienda.map((comprobante) => (
-                <ComprobanteCard
-                  key={comprobante.id_comprobante}
-                  comprobante={comprobante}
-                  etiqueta={`Molienda · ${detalle.molino ?? "sin molino"}`}
-                  onEditar={() => onEditarComprobante("molienda", comprobante)}
-                  onRegistrarPago={() =>
-                    onRegistrarPago("molienda", comprobante)
-                  }
-                  onEliminar={() =>
-                    setAEliminar({
-                      titulo: "Eliminar comprobante de molienda",
-                      descripcion: "Se eliminara el comprobante y sus pagos.",
-                      accion: () =>
-                        onEliminarComprobante("molienda", comprobante),
-                    })
-                  }
-                />
-              ))}
-            </Stack>
-          )}
+            {detalle.comprobantes_molienda.length === 0 ? (
+              <Paper
+                p="md"
+                radius="lg"
+                className="bg-zinc-900/40 border border-zinc-800"
+              >
+                <Text size="xs" c="gray" ta="center" py="md">
+                  Sin comprobante de molienda. Es la factura del molino de
+                  destino por este despacho.
+                </Text>
+              </Paper>
+            ) : (
+              <Stack gap="sm">
+                {detalle.comprobantes_molienda.map((comprobante) => (
+                  <ComprobanteCard
+                    key={comprobante.id_comprobante}
+                    comprobante={comprobante}
+                    etiqueta={`Molienda · ${detalle.molino ?? "sin molino"}`}
+                    onEditar={() =>
+                      onEditarComprobante("molienda", comprobante)
+                    }
+                    onRegistrarPago={() =>
+                      onRegistrarPago("molienda", comprobante)
+                    }
+                    onEliminar={() =>
+                      setAEliminar({
+                        titulo: "Eliminar comprobante de molienda",
+                        descripcion: "Se eliminara el comprobante y sus pagos.",
+                        accion: () =>
+                          onEliminarComprobante("molienda", comprobante),
+                      })
+                    }
+                  />
+                ))}
+              </Stack>
+            )}
+          </div>
         </Tabs.Panel>
 
         {/* ---------------- ANALISIS ---------------- */}
@@ -1254,12 +1324,8 @@ export const DespachoDetalle = ({
               ) : (
                 <Stack gap="md">
                   {/* GRUPO 1: analisis de la empresa sin facturar */}
-                  <Paper
-                    p="sm"
-                    radius="md"
-                    className="bg-zinc-950/40 border border-zinc-800"
-                  >
-                    <Group justify="space-between" mb="xs">
+                  <div>
+                    <Group justify="" mb="xs">
                       <Group gap="xs">
                         <Text size="xs" fw={700} c="indigo.3">
                           De la empresa · sin facturar
@@ -1297,7 +1363,7 @@ export const DespachoDetalle = ({
                         No hay analisis de la empresa pendientes de facturar.
                       </Text>
                     ) : (
-                      <Stack gap="xs">
+                      <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
                         {analisisSinFacturar.map((analisis) => (
                           <TarjetaAnalisis
                             key={analisis.id_analisis_laboratorio}
@@ -1313,17 +1379,13 @@ export const DespachoDetalle = ({
                             }
                           />
                         ))}
-                      </Stack>
+                      </SimpleGrid>
                     )}
-                  </Paper>
+                  </div>
 
                   {/* GRUPO 2: analisis de la empresa ya facturados */}
                   {analisisFacturados.length > 0 && (
-                    <Paper
-                      p="sm"
-                      radius="md"
-                      className="bg-zinc-950/40 border border-zinc-800"
-                    >
+                    <div>
                       <Group gap="xs" mb="xs">
                         <Text size="xs" fw={700} c="teal.3">
                           De la empresa · facturados
@@ -1338,7 +1400,7 @@ export const DespachoDetalle = ({
                         </Badge>
                       </Group>
 
-                      <Stack gap="xs">
+                      <SimpleGrid cols={{ base: 2, md: 2 }} spacing="xs">
                         {analisisPorComprobante.map(
                           ([idComprobante, lista]) => {
                             const comprobante =
@@ -1384,23 +1446,19 @@ export const DespachoDetalle = ({
                             );
                           },
                         )}
-                      </Stack>
-                    </Paper>
+                      </SimpleGrid>
+                    </div>
                   )}
 
                   {/* GRUPO 3: analisis asumidos por el cliente */}
                   {analisisCliente.length > 0 && (
-                    <Paper
-                      p="sm"
-                      radius="md"
-                      className="bg-zinc-950/40 border border-zinc-800"
-                    >
+                    <div>
                       <Group gap="xs" mb="xs">
-                        <Text size="xs" fw={700} c="zinc.300">
+                        <Text size="xs" fw={700} c="grape.3">
                           Asumidos por el cliente
                         </Text>
                         <Badge
-                          color="gray"
+                          color="grape"
                           variant="light"
                           size="xs"
                           radius="sm"
@@ -1409,7 +1467,7 @@ export const DespachoDetalle = ({
                         </Badge>
                       </Group>
 
-                      <Stack gap="xs">
+                      <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
                         {analisisCliente.map((analisis) => (
                           <TarjetaAnalisis
                             key={analisis.id_analisis_laboratorio}
@@ -1425,8 +1483,8 @@ export const DespachoDetalle = ({
                             }
                           />
                         ))}
-                      </Stack>
-                    </Paper>
+                      </SimpleGrid>
+                    </div>
                   )}
                 </Stack>
               )}
@@ -1437,11 +1495,7 @@ export const DespachoDetalle = ({
         {/* ---------------- LIQUIDACIONES ---------------- */}
         <Tabs.Panel value="liquidacion" pt="md" mb={"4rem"}>
           <Stack gap="md">
-            <Paper
-              p="md"
-              radius="lg"
-              className="bg-zinc-900/40 border border-zinc-800"
-            >
+            <div className="ml-4">
               <Group justify="" mb="sm" gap={"sm"}>
                 <Group gap="xs" align="center">
                   <Text size="sm" fw={700} c="white">
@@ -1487,7 +1541,7 @@ export const DespachoDetalle = ({
                   acordadas con el cliente.
                 </Text>
               ) : (
-                <Stack gap="xs">
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs" className="mr-4">
                   {detalle.liquidaciones.map((liquidacion) => {
                     const comprobante = detalle.comprobantes_liquidacion.find(
                       (c) =>
@@ -1552,9 +1606,9 @@ export const DespachoDetalle = ({
                       />
                     );
                   })}
-                </Stack>
+                </SimpleGrid>
               )}
-            </Paper>
+            </div>
           </Stack>
         </Tabs.Panel>
       </Tabs>

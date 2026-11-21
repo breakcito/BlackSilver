@@ -273,14 +273,7 @@ export const ModalLiquidacion = ({
         labelPosition="left"
       />
 
-      {flete && !esEdicion && (
-        <Text size="xs" c="dimmed">
-          Pesos precargados del ticket de balanza del flete
-          {flete.placa ? ` ${flete.placa}` : ""}: bruto{" "}
-          {formatNumber(flete.peso_bruto)} t, tara{" "}
-          {formatNumber(flete.tara)} t. Puedes ajustarlos.
-        </Text>
-      )}
+
 
       <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
         <NumberInput

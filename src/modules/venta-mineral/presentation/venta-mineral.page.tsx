@@ -142,6 +142,37 @@ export const VentaMineralPage = () => {
   /** Detalle cargado de un despacho (para alimentar los modales). */
   const detalleDe = (idDespacho: number) => detalles[idDespacho] ?? null;
 
+  /**
+   * Liquidaciones que todavia no tienen comprobante.
+   *
+   * Una liquidacion con factura registrada no se puede volver a facturar:
+   * el backend la rechaza. Al EDITAR un comprobante, la liquidacion que lo
+   * respalda se conserva en la lista (el select va bloqueado, pero sus
+   * importes siguen alimentando el formulario).
+   */
+  const liquidacionesParaFacturar = useMemo(() => {
+    const detalle = modalComprobante
+      ? detalles[modalComprobante.despacho.id_despacho_mineral] ?? null
+      : null;
+
+    if (!detalle) return [];
+
+    const yaFacturadas = new Set(
+      detalle.comprobantes_liquidacion
+        .map((c) => c.id_liquidacion_mineral)
+        .filter((id): id is number => id !== null && id !== undefined),
+    );
+
+    const idEnEdicion =
+      modalComprobante?.comprobante?.id_liquidacion_mineral ?? null;
+
+    return detalle.liquidaciones.filter(
+      (l) =>
+        !yaFacturadas.has(l.id_liquidacion_mineral) ||
+        l.id_liquidacion_mineral === idEnEdicion,
+    );
+  }, [detalles, modalComprobante]);
+
   /* ---------------- Apertura de modales ----------------
    *
    * Los catalogos no se cargan al entrar al modulo: se piden en el momento
@@ -682,10 +713,7 @@ export const VentaMineralPage = () => {
         >
           <ModalComprobanteLiquidacion
             close={() => setModalComprobante(null)}
-            liquidacionesDisponibles={
-              detalleDe(modalComprobante.despacho.id_despacho_mineral)
-                ?.liquidaciones ?? []
-            }
+            liquidacionesDisponibles={liquidacionesParaFacturar}
             comprobante={modalComprobante.comprobante}
             onGuardar={async (payload) => {
               const idDespacho = modalComprobante.despacho.id_despacho_mineral;
