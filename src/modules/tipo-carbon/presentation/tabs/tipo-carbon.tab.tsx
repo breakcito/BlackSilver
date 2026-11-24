@@ -204,11 +204,7 @@ export const TipoCarbonTab = () => {
       variantesSeleccionadas.map((v) => v.id_tipo_variante),
     );
     return catalogoTipos
-      .filter(
-        (t) =>
-          t.id_tipo_carbon !== variantesTarget.id_tipo_carbon &&
-          !seleccionadasIds.has(t.id_tipo_carbon),
-      )
+      .filter((t) => !seleccionadasIds.has(t.id_tipo_carbon))
       .map((t) => ({
         value: String(t.id_tipo_carbon),
         label: t.codigo ? `${t.nombre} (${t.codigo})` : t.nombre,
