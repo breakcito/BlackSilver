@@ -214,7 +214,7 @@ export const TipoCarbonTab = () => {
   const handleAgregarVariante = (value: string | null) => {
     if (!value || !variantesTarget) return;
     const id = Number(value);
-    if (id === variantesTarget.id_tipo_carbon) return;
+    // if (id === variantesTarget.id_tipo_carbon) return;
     if (variantesSeleccionadas.some((v) => v.id_tipo_variante === id)) return;
     const tipo = catalogoTipos.find((t) => t.id_tipo_carbon === id);
     if (!tipo) return;

@@ -531,15 +531,6 @@ export const ModalRegistrarZarandeo = ({
     [tiposConVariantes],
   );
 
-  const tiposVisibles = useMemo(() => {
-    const q = tipoBusqueda.trim();
-    if (!q) return tiposCarbonOptions;
-    return getCoincidencias(tiposCarbonOptions, q, {
-      keys: ["label"],
-      fuseThreshold: 0.4,
-    }).map((r) => r.item);
-  }, [tiposCarbonOptions, tipoBusqueda]);
-
   const almacenesVisibles = useMemo(() => {
     const q = almacenBusqueda.trim();
     if (!q) return almacenesOptions;
@@ -610,7 +601,7 @@ export const ModalRegistrarZarandeo = ({
             <Select
               label="Tipo de carbón"
               placeholder="Seleccione tipo de carbón"
-              data={tiposVisibles}
+              data={tiposCarbonOptions}
               value={idTipoPadre}
               onChange={(val) => {
                 handleTipoChange(val);
