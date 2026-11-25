@@ -36,10 +36,11 @@ export const FormTransportista = ({
     TipoEntidad.Juridica,
   );
   const [razonSocial, setRazonSocial] = useState("");
-  // Input unico que cambia label/validacion/maxLength segun `tipoEntidad`:
-  //   Juridica -> RUC (11 digitos, prefijo 20).
-  //   Natural  -> DNI (8 digitos).
-  // El valor se envia al backend al campo que corresponda.
+  // El transportista se identifica SIEMPRE con RUC, tambien la persona
+  // natural: es lo que exige SUNAT para emitir guias y comprobantes de
+  // transporte, y es el dato con el que se concilia el flete.
+  //   Juridica -> RUC de 11 digitos con prefijo 20.
+  //   Natural  -> RUC de 11 digitos con prefijo 10.
   const [identificacion, setIdentificacion] = useState("");
   const [telefono, setTelefono] = useState("");
 
@@ -56,18 +57,15 @@ export const FormTransportista = ({
       return "Razon social o nombre es requerido (min 3 caracteres)";
     }
     const id = identificacion.trim();
-    if (tipoEntidad === TipoEntidad.Juridica) {
-      if (!id || !/^\d{11}$/.test(id)) {
-        return "El RUC debe tener exactamente 11 dígitos";
-      }
-      if (!id.startsWith("20")) {
-        return "El RUC de una persona jurídica debe comenzar con 20";
-      }
-    } else {
-      // Natural
-      if (!id || !/^\d{8}$/.test(id)) {
-        return "El DNI debe tener exactamente 8 dígitos";
-      }
+    if (!/^\d{11}$/.test(id)) {
+      return "El RUC debe tener exactamente 11 dígitos";
+    }
+    const prefijo =
+      tipoEntidad === TipoEntidad.Juridica ? "20" : "10";
+    if (!id.startsWith(prefijo)) {
+      return tipoEntidad === TipoEntidad.Juridica
+        ? "El RUC de una persona jurídica debe comenzar con 20"
+        : "El RUC de una persona natural debe comenzar con 10";
     }
     if (telefono && !/^\d{6,15}$/.test(telefono)) {
       return "Telefono invalido (solo digitos, 6-15 caracteres)";
@@ -87,12 +85,10 @@ export const FormTransportista = ({
 
     setLoading(true);
     try {
-      const id = identificacion.trim();
       const res = await AuxService.crear_transportista({
         tipo_entidad: tipoEntidad,
         razon_social: razonSocial.trim(),
-        ruc: tipoEntidad === TipoEntidad.Juridica ? id : null,
-        dni: tipoEntidad === TipoEntidad.Natural ? id : null,
+        ruc: identificacion.trim(),
         telefono: telefono.trim() || null,
       });
 
@@ -143,14 +139,14 @@ export const FormTransportista = ({
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
             withAsterisk
-            label={tipoEntidad === TipoEntidad.Natural ? "DNI" : "RUC"}
+            label="RUC"
             placeholder={
               tipoEntidad === TipoEntidad.Natural
-                ? "12345678 (persona natural)"
-                : "20345678901 (persona jurídica)"
+                ? "10XXXXXXXXX (persona natural)"
+                : "20XXXXXXXXX (persona jurídica)"
             }
             radius="xl"
-            maxLength={tipoEntidad === TipoEntidad.Natural ? 8 : 11}
+            maxLength={11}
             value={identificacion}
             onChange={(e) => {
               setIdentificacion(e.target.value.replace(/\D/g, ""));

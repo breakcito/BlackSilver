@@ -15,7 +15,11 @@ import {
   Table,
   Text,
   TextInput,
+  type ComboboxData,
+  type ComboboxItem,
 } from "@mantine/core";
+import { DateTimePicker } from "@mantine/dates";
+import "@mantine/dates/styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
@@ -57,6 +61,15 @@ interface Props {
   opened: boolean;
   onClose: () => void;
   onGuardado: (item: ZarandeoCarbonItem) => void;
+  /**
+   * Zarandeo a editar. Cuando viene, el modal trabaja en modo edicion: no
+   * se pueden cambiar el almacen, el tipo de carbon ni la calidad (definen
+   * QUE se zarandeo y a que grupo de cargas pertenece), pero si la cantidad
+   * zarandeada, las variantes extraidas y la fecha. El backend revierte el
+   * movimiento de stock anterior y vuelve a aplicarlo con los valores
+   * nuevos, asi que el stock queda recalculado.
+   */
+  zarandeo?: ZarandeoCarbonItem | null;
 }
 
 const estilitos = {
@@ -72,12 +85,47 @@ const estilitos = {
 // id sin importar lo que se envie, asi que aqui no hay nada que elegir.
 const SUPERVISOR_FIJO_NOMBRE = "Dember Michael";
 
+/**
+ * Tipos de carbon que mas se zarandean: Mixto (2), Chungo (3) y Tipo A (4).
+ *
+ * NO es el mismo grupo que los "tipos principales" de compra (Cisco y Tipo A,
+ * ver `shared/functions/tipos-carbon-principales.ts`): aqui se trata de lo
+ * que sale de la zaranda, asi que se listan primero y en su propio grupo en
+ * los selectores de tipo a zarandear y de variante extraida.
+ */
+const TIPOS_CARBON_ZARANDEO_PRINCIPALES = [2, 3, 4];
+
+/** Etiqueta de un tipo de carbon: nombre + codigo entre parentesis. */
+const etiquetaTipoCarbon = (t: RES_TipoCarbon): string =>
+  `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`;
+
+/** Grupo de opciones para un Select con grupos de Mantine. */
+interface GrupoOpciones<T> {
+  group: string;
+  items: T[];
+}
+
+/**
+ * Convierte grupos de opciones en el formato de `Select` de Mantine,
+ * descartando los grupos que quedaron vacios.
+ */
+const agruparOpciones = <T extends ComboboxItem>(
+  grupos: GrupoOpciones<T>[],
+): ComboboxData =>
+  grupos
+    .filter((g) => g.items.length > 0)
+    .map((g) => ({ group: g.group, items: g.items }));
+
 export const ModalRegistrarZarandeo = ({
   opened,
   onClose,
   onGuardado,
+  zarandeo = null,
 }: Props) => {
   const { notifySuccess, notifyError } = useNotify();
+
+  /** Modo edicion: se edita un zarandeo ya registrado. */
+  const editando = Boolean(zarandeo);
 
   // Masters
   const [almacenes, setAlmacenes] = useState<RES_Almacen[]>([]);
@@ -94,8 +142,10 @@ export const ModalRegistrarZarandeo = ({
   const [idTipoPadre, setIdTipoPadre] = useState<string | null>(null);
   const [calidad, setCalidad] = useState<string | null>(null);
   const [cantidadTamizada, setCantidadTamizada] = useState<number | string>("");
-  const [fechaHora, setFechaHora] = useState(
-    dayjs().format("YYYY-MM-DD HH:mm"),
+  // Mantine v8 maneja el DateTimePicker con cadenas "YYYY-MM-DD HH:mm:ss",
+  // que es justo el formato que espera la columna DATETIME del backend.
+  const [fechaHora, setFechaHora] = useState<string>(
+    dayjs().format("YYYY-MM-DD HH:mm:ss"),
   );
   const [archivos, setArchivos] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +153,7 @@ export const ModalRegistrarZarandeo = ({
   // Búsquedas controladas de los selects sobre catálogo
   const [almacenBusqueda, setAlmacenBusqueda] = useState("");
   const [tipoBusqueda, setTipoBusqueda] = useState("");
+  const [varianteBusqueda, setVarianteBusqueda] = useState("");
 
   // Variantes registradas en el catálogo para el tipo padre
   const [catalogoVariantes, setCatalogoVariantes] = useState<
@@ -152,9 +203,25 @@ export const ModalRegistrarZarandeo = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened]);
 
-  // Solo se pueden zarandear tipos que tienen variantes configuradas
-  const tiposConVariantes = useMemo(
-    () => tiposCarbon.filter((t) => (t.cantidad_variantes ?? 0) > 0),
+  // Todos los tipos de carbon pueden zarandearse: las variantes se indican al
+  // registrar el zarandeo, asi que no se filtra por los que ya tienen
+  // variantes configuradas. Los principales (Mixto, Chungo, Tipo A) van
+  // primero porque son los de mayor rotacion.
+  const tiposCarbonOrdenados = useMemo(
+    () =>
+      [...tiposCarbon].sort((a, b) => {
+        const pa = TIPOS_CARBON_ZARANDEO_PRINCIPALES.includes(a.id_tipo_carbon) ? 0 : 1;
+        const pb = TIPOS_CARBON_ZARANDEO_PRINCIPALES.includes(b.id_tipo_carbon) ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return a.nombre.localeCompare(b.nombre);
+      }),
+    [tiposCarbon],
+  );
+
+  /** Nombre de un tipo de carbon, para resolverlo en la tabla de variantes. */
+  const nombreTipoCarbon = useCallback(
+    (id: number): string =>
+      tiposCarbon.find((t) => t.id_tipo_carbon === id)?.nombre ?? "—",
     [tiposCarbon],
   );
 
@@ -163,7 +230,9 @@ export const ModalRegistrarZarandeo = ({
   // opcionales, así que sin ellos devuelve los grupos de TODOS los almacenes
   // y tipos, que no corresponden a la selección y se muestran en el selector.
   const cargarGrupos = useCallback(async () => {
-    if (!idAlmacen || !idTipoPadre) {
+    // En edicion las cargas ya estan asignadas y no se reasignan: no hace
+    // falta consultar los grupos pendientes.
+    if (editando || !idAlmacen || !idTipoPadre) {
       setGrupos([]);
       setLoadingGrupos(false);
       return;
@@ -184,7 +253,7 @@ export const ModalRegistrarZarandeo = ({
     } finally {
       if (req === reqGrupos.current) setLoadingGrupos(false);
     }
-  }, [idAlmacen, idTipoPadre]);
+  }, [idAlmacen, idTipoPadre, editando]);
 
   useEffect(() => {
     if (!opened) return;
@@ -225,7 +294,8 @@ export const ModalRegistrarZarandeo = ({
   useEffect(() => {
     if (!idTipoPadre) {
       setCatalogoVariantes([]);
-      setVariantes([]);
+      // En edicion las variantes son las ya registradas: no se pisan.
+      if (!editando) setVariantes([]);
       setTipoCatalogoCargado(null);
       setLoadingVariantes(false);
       return;
@@ -238,25 +308,50 @@ export const ModalRegistrarZarandeo = ({
         if (req !== reqVariantes.current) return;
         const lista = resp.success && resp.data ? resp.data : [];
         setCatalogoVariantes(lista);
-        setVariantes(
-          lista.map((v) => ({
-            id_tipo_variante: String(v.id_tipo_variante),
-            porcentaje_extraccion: Number(v.porcentaje_extraccion) || 0,
-          })),
-        );
+        if (!editando) {
+          setVariantes(
+            lista.map((v) => ({
+              id_tipo_variante: String(v.id_tipo_variante),
+              porcentaje_extraccion: Number(v.porcentaje_extraccion) || 0,
+            })),
+          );
+        }
         setTipoCatalogoCargado(idTipoPadre);
       } catch (err) {
         if (req !== reqVariantes.current) return;
         console.error("Error al cargar variantes del carbón", err);
         setCatalogoVariantes([]);
-        setVariantes([]);
+        if (!editando) setVariantes([]);
         setTipoCatalogoCargado(idTipoPadre);
       } finally {
         if (req === reqVariantes.current) setLoadingVariantes(false);
       }
     };
     fetchVariantes();
-  }, [idTipoPadre]);
+  }, [idTipoPadre, editando]);
+
+  // Modo edicion: se cargan los datos del zarandeo a corregir. Lo editable es
+  // la cantidad zarandeada, las variantes extraidas y la fecha; el almacen, el
+  // tipo de carbon y la calidad quedan fijados porque definen que se
+  // zarandeo y a que grupo de cargas pertenece.
+  useEffect(() => {
+    if (!opened || !zarandeo) return;
+
+    setIdAlmacen(String(zarandeo.id_almacen));
+    setIdTipoPadre(String(zarandeo.id_tipo_carbon));
+    setCalidad(zarandeo.calidad);
+    setCantidadTamizada(Number(zarandeo.cantidad_zarandeada) || 0);
+    setFechaHora(
+      dayjs(zarandeo.fecha_hora_zarandeo).format("YYYY-MM-DD HH:mm:ss"),
+    );
+    setVariantes(
+      (zarandeo.variantes ?? []).map((v) => ({
+        id_tipo_variante: String(v.id_tipo_variante),
+        porcentaje_extraccion: Number(v.porcentaje_extraccion) || 0,
+      })),
+    );
+    setTipoCatalogoCargado(String(zarandeo.id_tipo_carbon));
+  }, [opened, zarandeo]);
 
   // Carga en curso real o catálogo desactualizado respecto al tipo elegido
   const cargandoVariantes =
@@ -279,7 +374,7 @@ export const ModalRegistrarZarandeo = ({
       setIdTipoPadre(null);
       setCalidad(null);
       setCantidadTamizada("");
-      setFechaHora(dayjs().format("YYYY-MM-DD HH:mm"));
+      setFechaHora(dayjs().format("YYYY-MM-DD HH:mm:ss"));
       setArchivos([]);
       setCatalogoVariantes([]);
       setVariantes([]);
@@ -357,21 +452,87 @@ export const ModalRegistrarZarandeo = ({
     [variantes],
   );
 
-  // Opciones de variantes: las del catálogo del tipo padre menos las ya elegidas
-  const variantesDisponiblesOptions = useMemo(
+  // Opciones de variantes: TODOS los tipos de carbon pueden extraerse de un
+  // zarandeo. Se priorizan las variantes ya configuradas para el tipo padre
+  // (que traen su % de referencia) y despues los tipos principales.
+  interface OpcionVariante {
+    value: string;
+    label: string;
+    idTipo: number;
+    /** Viene del catalogo de variantes del tipo padre. */
+    delCatalogo: boolean;
+    principal: boolean;
+  }
+
+  const variantesDisponiblesPlanas = useMemo<OpcionVariante[]>(() => {
+    const yaElegidos = new Set(
+      variantes.map((v) => Number(v.id_tipo_variante)),
+    );
+    const idsCatalogo = new Set(
+      catalogoVariantes.map((v) => v.id_tipo_variante),
+    );
+
+    const items: OpcionVariante[] = [];
+
+    // 1. Las variantes ya configuradas del tipo padre.
+    catalogoVariantes.forEach((v) => {
+      if (yaElegidos.has(v.id_tipo_variante)) return;
+      items.push({
+        value: String(v.id_tipo_variante),
+        label: `${v.nombre}${v.codigo ? ` (${v.codigo})` : ""} · ${Number(v.porcentaje_extraccion) || 0}%`,
+        idTipo: v.id_tipo_variante,
+        delCatalogo: true,
+        principal: TIPOS_CARBON_ZARANDEO_PRINCIPALES.includes(v.id_tipo_variante),
+      });
+    });
+
+    // 2. Los demas tipos de carbon: primero los principales, luego el resto.
+    tiposCarbonOrdenados.forEach((t) => {
+      if (yaElegidos.has(t.id_tipo_carbon)) return;
+      if (idsCatalogo.has(t.id_tipo_carbon)) return;
+      items.push({
+        value: String(t.id_tipo_carbon),
+        label: etiquetaTipoCarbon(t),
+        idTipo: t.id_tipo_carbon,
+        delCatalogo: false,
+        principal: TIPOS_CARBON_ZARANDEO_PRINCIPALES.includes(t.id_tipo_carbon),
+      });
+    });
+
+    return items;
+  }, [catalogoVariantes, tiposCarbonOrdenados, variantes]);
+
+  // Búsqueda tolerante sobre el catálogo de variantes (Fuse + FlexSearch).
+  const variantesDisponiblesFiltradas = useMemo(() => {
+    const q = varianteBusqueda.trim();
+    if (!q) return variantesDisponiblesPlanas;
+    return getCoincidencias(variantesDisponiblesPlanas, q, {
+      keys: ["label"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [variantesDisponiblesPlanas, varianteBusqueda]);
+
+  const variantesDisponiblesOptions = useMemo<ComboboxData>(
     () =>
-      catalogoVariantes
-        .filter(
-          (v) =>
-            !variantes.some(
-              (f) => Number(f.id_tipo_variante) === v.id_tipo_variante,
-            ),
-        )
-        .map((v) => ({
-          value: String(v.id_tipo_variante),
-          label: `${v.nombre}${v.codigo ? ` (${v.codigo})` : ""}`,
-        })),
-    [catalogoVariantes, variantes],
+      agruparOpciones<OpcionVariante>([
+        {
+          group: "Variantes configuradas",
+          items: variantesDisponiblesFiltradas.filter((v) => v.delCatalogo),
+        },
+        {
+          group: "Tipos principales",
+          items: variantesDisponiblesFiltradas.filter(
+            (v) => !v.delCatalogo && v.principal,
+          ),
+        },
+        {
+          group: "Otros tipos de carbón",
+          items: variantesDisponiblesFiltradas.filter(
+            (v) => !v.delCatalogo && !v.principal,
+          ),
+        },
+      ]),
+    [variantesDisponiblesFiltradas],
   );
 
   const gruposOptions = useMemo(
@@ -449,9 +610,11 @@ export const ModalRegistrarZarandeo = ({
     }
     if (!calidad) {
       notifyError(
-        origen === "carga"
-          ? "Debe seleccionar el grupo de cargas a zarandear"
-          : "Debe seleccionar la calidad del stock a zarandear",
+        editando
+          ? "El zarandeo debe tener una calidad"
+          : origen === "carga"
+            ? "Debe seleccionar el grupo de cargas a zarandear"
+            : "Debe seleccionar la calidad del stock a zarandear",
       );
       return;
     }
@@ -459,7 +622,10 @@ export const ModalRegistrarZarandeo = ({
       notifyError("La cantidad a zarandear debe ser mayor a cero");
       return;
     }
-
+    if (!fechaHora) {
+      notifyError("Indique la fecha y hora del zarandeo");
+      return;
+    }
     const variantesValidas = variantes.filter(
       (v) => v.id_tipo_variante && Number(v.porcentaje_extraccion) > 0,
     );
@@ -483,23 +649,42 @@ export const ModalRegistrarZarandeo = ({
 
     setSubmitting(true);
     try {
-      const resp = await TamizajeCarbonService.registrarZarandeo({
-        id_almacen: Number(idAlmacen),
-        id_tipo_carbon: Number(idTipoPadre),
-        calidad,
-        id_cargas: idCargas,
-        cantidad_zarandeada: cantTamizadaNum,
-        es_rezarandeo: origen === "stock",
-        fecha_hora_zarandeo: fechaHora,
-        variantes: variantesValidas.map((v) => ({
-          id_tipo_variante: Number(v.id_tipo_variante),
-          porcentaje_extraccion: Number(v.porcentaje_extraccion) || 0,
-        })),
-        evidencias: archivos.length > 0 ? archivos : undefined,
-      });
+      const payloadVariantes = variantesValidas.map((v) => ({
+        id_tipo_variante: Number(v.id_tipo_variante),
+        porcentaje_extraccion: Number(v.porcentaje_extraccion) || 0,
+      }));
+
+      // En edicion se manda solo lo que cambia: el backend revierte el
+      // movimiento de stock anterior y lo vuelve a aplicar con estos valores.
+      const resp = editando
+        ? await TamizajeCarbonService.actualizarZarandeo(
+            zarandeo!.id_zarandeo_carbon,
+            {
+              id_tipo_carbon: Number(idTipoPadre),
+              calidad,
+              cantidad_zarandeada: cantTamizadaNum,
+              fecha_hora_zarandeo: fechaHora,
+              variantes: payloadVariantes,
+            },
+          )
+        : await TamizajeCarbonService.registrarZarandeo({
+            id_almacen: Number(idAlmacen),
+            id_tipo_carbon: Number(idTipoPadre),
+            calidad,
+            id_cargas: idCargas,
+            cantidad_zarandeada: cantTamizadaNum,
+            es_rezarandeo: origen === "stock",
+            fecha_hora_zarandeo: fechaHora,
+            variantes: payloadVariantes,
+            evidencias: archivos.length > 0 ? archivos : undefined,
+          });
 
       if (resp.success && resp.data) {
-        notifySuccess("Zarandeo registrado correctamente");
+        notifySuccess(
+          editando
+            ? "Zarandeo actualizado y stock recalculado"
+            : "Zarandeo registrado correctamente",
+        );
         onGuardado(resp.data);
         onClose();
       } else {
@@ -522,13 +707,39 @@ export const ModalRegistrarZarandeo = ({
     [almacenes],
   );
 
-  const tiposCarbonOptions = useMemo(
+  const tiposCarbonPlanos = useMemo(
     () =>
-      tiposConVariantes.map((t) => ({
+      tiposCarbonOrdenados.map((t) => ({
         value: String(t.id_tipo_carbon),
-        label: `${t.nombre}${t.codigo ? ` (${t.codigo})` : ""}`,
+        label: etiquetaTipoCarbon(t),
+        idTipo: t.id_tipo_carbon,
+        principal: TIPOS_CARBON_ZARANDEO_PRINCIPALES.includes(t.id_tipo_carbon),
       })),
-    [tiposConVariantes],
+    [tiposCarbonOrdenados],
+  );
+
+  const tiposCarbonFiltrados = useMemo(() => {
+    const q = tipoBusqueda.trim();
+    if (!q) return tiposCarbonPlanos;
+    return getCoincidencias(tiposCarbonPlanos, q, {
+      keys: ["label"],
+      fuseThreshold: 0.4,
+    }).map((r) => r.item);
+  }, [tiposCarbonPlanos, tipoBusqueda]);
+
+  const tiposCarbonOptions = useMemo<ComboboxData>(
+    () =>
+      agruparOpciones([
+        {
+          group: "Tipos principales",
+          items: tiposCarbonFiltrados.filter((t) => t.principal),
+        },
+        {
+          group: "Otros tipos de carbón",
+          items: tiposCarbonFiltrados.filter((t) => !t.principal),
+        },
+      ]),
+    [tiposCarbonFiltrados],
   );
 
   const almacenesVisibles = useMemo(() => {
@@ -544,7 +755,7 @@ export const ModalRegistrarZarandeo = ({
     <ModalEstandar
       opened={opened}
       close={onClose}
-      title="Registrar Zarandeo"
+      title={editando ? "Editar Zarandeo" : "Registrar Zarandeo"}
       size="xl"
       rightSection={
         <Group gap={12}>
@@ -558,6 +769,7 @@ export const ModalRegistrarZarandeo = ({
               setAlmacenBusqueda("");
             }}
             required
+            disabled={editando}
             searchable
             searchValue={almacenBusqueda}
             onSearchChange={setAlmacenBusqueda}
@@ -571,19 +783,21 @@ export const ModalRegistrarZarandeo = ({
             classNames={estilitos}
           />
 
-          <Select
-            label="Origen"
-            data={[
-              { value: "carga", label: "Cargas de carbón" },
-              { value: "stock", label: "Stock actual" },
-            ]}
-            value={origen}
-            onChange={handleOrigenChange}
-            allowDeselect={false}
-            radius="lg"
-            size="xs"
-            classNames={estilitos}
-          />
+          {!editando && (
+            <Select
+              label="Origen"
+              data={[
+                { value: "carga", label: "Cargas de carbón" },
+                { value: "stock", label: "Stock actual" },
+              ]}
+              value={origen}
+              onChange={handleOrigenChange}
+              allowDeselect={false}
+              radius="lg"
+              size="xs"
+              classNames={estilitos}
+            />
+          )}
         </Group>
       }
       validateClose
@@ -608,12 +822,14 @@ export const ModalRegistrarZarandeo = ({
                 setTipoBusqueda("");
               }}
               required
+              disabled={editando}
               searchable
               clearable
               searchValue={tipoBusqueda}
               onSearchChange={setTipoBusqueda}
+              filter={({ options }) => options}
               comboboxProps={{ withinPortal: true }}
-              nothingFoundMessage="No hay tipos con variantes configuradas"
+              nothingFoundMessage="No se encontraron tipos de carbón"
               radius="lg"
               size="xs"
               classNames={estilitos}
@@ -621,7 +837,29 @@ export const ModalRegistrarZarandeo = ({
           </div>
 
           <div className="col-span-1 md:col-span-2">
-            {origen === "carga" ? (
+            {editando ? (
+              // En edicion el origen y las cargas no cambian: se informa lo
+              // que ya quedo registrado.
+              <Paper className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-xl h-full">
+                <Stack gap={4}>
+                  <Text size="xs" fw={700} c="zinc.200">
+                    Operación registrada
+                  </Text>
+                  <Text size="xs" c="zinc.400">
+                    {zarandeo?.cantidad_cargas ?? 0} carga(s) ·{" "}
+                    {formatNumber(
+                      Number(zarandeo?.total_cargas_cantidad ?? 0),
+                    )}{" "}
+                    TN · calidad {zarandeo?.calidad ?? "—"}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Al guardar se revierte el stock del zarandeo anterior y se
+                    recalcula con las variantes nuevas. Las cargas no se
+                    reasignan.
+                  </Text>
+                </Stack>
+              </Paper>
+            ) : origen === "carga" ? (
               <Select
                 label="Grupo de cargas a zarandear"
                 placeholder={
@@ -795,13 +1033,15 @@ export const ModalRegistrarZarandeo = ({
             classNames={estilitos}
           />
 
-          <TextInput
+          <DateTimePicker
             label="Fecha y hora"
-            placeholder="YYYY-MM-DD HH:mm"
+            placeholder="Seleccione la fecha y hora"
+            valueFormat="DD/MM/YYYY HH:mm"
             value={fechaHora}
-            onChange={(e) => setFechaHora(e.currentTarget.value)}
+            onChange={(val) => setFechaHora(val ?? "")}
             leftSection={<CalendarDaysIcon className="w-4 h-4 text-zinc-500" />}
             required
+            popoverProps={{ withinPortal: true }}
             radius="lg"
             size="xs"
             classNames={estilitos}
@@ -830,18 +1070,17 @@ export const ModalRegistrarZarandeo = ({
                 data={variantesDisponiblesOptions}
                 value={null}
                 onChange={handleAgregarVariante}
-                disabled={
-                  !idTipoPadre ||
-                  cargandoVariantes ||
-                  variantesDisponiblesOptions.length === 0
-                }
+                disabled={!idTipoPadre || cargandoVariantes}
                 searchable
+                searchValue={varianteBusqueda}
+                onSearchChange={setVarianteBusqueda}
+                filter={({ options }) => options}
                 comboboxProps={{ withinPortal: true }}
-                nothingFoundMessage="No hay variantes disponibles"
+                nothingFoundMessage="No hay tipos de carbón disponibles"
                 leftSection={<PlusIcon className="w-3.5 h-3.5" />}
                 radius="lg"
                 size="xs"
-                w={210}
+                w={250}
                 classNames={estilitos}
               />
             </Group>
@@ -852,7 +1091,9 @@ export const ModalRegistrarZarandeo = ({
             catalogoVariantes.length === 0 && (
               <Paper className="bg-yellow-950/20 border border-yellow-800/40 p-2.5 rounded-lg mb-3">
                 <Text size="xs" c="yellow.4" fw={500}>
-                  Este tipo de carbón no tiene variantes configuradas.
+                  Este tipo de carbón no tiene variantes configuradas. Puedes
+                  agregar cualquier otro tipo de carbón como variante extraída
+                  e indicar su porcentaje.
                 </Text>
               </Paper>
             )}
@@ -908,6 +1149,15 @@ export const ModalRegistrarZarandeo = ({
                     </Text>
                   </Table.Td>
                 </Table.Tr>
+              ) : variantes.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={4} ta="center" py="lg">
+                    <Text size="xs" c="zinc.500">
+                      Agrega al menos una variante extraída desde el selector
+                      superior.
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
               ) : (
                 variantes.map((v, idx) => {
                   const pct = Number(v.porcentaje_extraccion) || 0;
@@ -917,10 +1167,16 @@ export const ModalRegistrarZarandeo = ({
                     <Table.Tr key={idx}>
                       <Table.Td pl={24}>
                         <Text size="xs" fw={600} c="zinc.200">
-                          {catalogoVariantes.find(
-                            (c) =>
-                              c.id_tipo_variante === Number(v.id_tipo_variante),
-                          )?.nombre ?? "—"}
+                          {(() => {
+                            const idVariante = Number(v.id_tipo_variante);
+                            const deCatalogo = catalogoVariantes.find(
+                              (c) => c.id_tipo_variante === idVariante,
+                            );
+                            return (
+                              deCatalogo?.nombre ??
+                              nombreTipoCarbon(idVariante)
+                            );
+                          })()}
                         </Text>
                       </Table.Td>
                       <Table.Td>
@@ -973,18 +1229,31 @@ export const ModalRegistrarZarandeo = ({
           {/* Resumen de Balance */}
           <Paper className="bg-zinc-950/70 border border-zinc-800 p-2.5 rounded-lg">
             <Group grow>
-              {/* Evidencias */}
-              <FileInput
-                label="Evidencias / Fotos / Tickets de balanza"
-                placeholder="Seleccionar archivos..."
-                multiple
-                value={archivos}
-                onChange={setArchivos}
-                clearable
-                radius="lg"
-                size="xs"
-                classNames={estilitos}
-              />
+              {/* Evidencias: en edicion no se reemplazan, se conservan las
+                  que ya tiene el zarandeo. */}
+              {editando ? (
+                <Stack gap={2}>
+                  <Text size="xs" c="dimmed">
+                    Evidencias / Fotos / Tickets de balanza
+                  </Text>
+                  <Text size="xs" c="zinc.400">
+                    {zarandeo?.evidencias?.length ?? 0} archivo(s) registrado(s).
+                    No se modifican al editar.
+                  </Text>
+                </Stack>
+              ) : (
+                <FileInput
+                  label="Evidencias / Fotos / Tickets de balanza"
+                  placeholder="Seleccionar archivos..."
+                  multiple
+                  value={archivos}
+                  onChange={setArchivos}
+                  clearable
+                  radius="lg"
+                  size="xs"
+                  classNames={estilitos}
+                />
+              )}
               <div className="text-right">
                 <Text size="xs" c="dimmed">
                   Total Extraído
@@ -1018,7 +1287,7 @@ export const ModalRegistrarZarandeo = ({
             size="xs"
             className="font-semibold shadow-md shadow-teal-950/40"
           >
-            Registrar Zarandeo
+            {editando ? "Guardar cambios" : "Registrar Zarandeo"}
           </Button>
         </Group>
       </Stack>

@@ -56,12 +56,8 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
-            label="RUC o DNI (opc)"
-            placeholder={
-              payload.tipo_entidad === TipoEntidad.Natural
-                ? "RUC 10xxxxxxxxx o DNI 8 dígitos"
-                : "RUC 20xxxxxxxxx o DNI 8 dígitos"
-            }
+            label="RUC (opc)"
+            placeholder={"10xxxxxxxxx"}
             radius="xl"
             maxLength={11}
             value={documento}
@@ -75,8 +71,16 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
         </Grid.Col>
         <Grid.Col span={{ base: 12 }}>
           <TextInput
-            label={payload.tipo_entidad === TipoEntidad.Natural ? "Nombre Completo" : "Razón Social"}
-            placeholder={payload.tipo_entidad === TipoEntidad.Natural ? "Ej. Juan Perez" : "Ej. Comercializadora XYZ S.A.C."}
+            label={
+              payload.tipo_entidad === TipoEntidad.Natural
+                ? "Nombre Completo"
+                : "Razón Social"
+            }
+            placeholder={
+              payload.tipo_entidad === TipoEntidad.Natural
+                ? "Ej. Juan Perez"
+                : "Ej. Comercializadora XYZ S.A.C."
+            }
             radius="xl"
             withAsterisk
             value={payload.razon_social || ""}
@@ -140,12 +144,15 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
                 ¿Es para mantenimiento?
               </span>
               <span className="text-zinc-400 text-xs">
-                Si se confirma, este proveedor se listará en el módulo de mantenimiento.
+                Si se confirma, este proveedor se listará en el módulo de
+                mantenimiento.
               </span>
             </div>
             <Switch
               checked={payload.para_mantenimiento}
-              onChange={(e) => handleChange("para_mantenimiento", e.currentTarget.checked)}
+              onChange={(e) =>
+                handleChange("para_mantenimiento", e.currentTarget.checked)
+              }
               color="indigo"
               size="md"
               className="cursor-pointer"
@@ -159,12 +166,15 @@ export const RegistroProveedor = ({ onCancel, onSuccess }: Props) => {
                 ¿Es para transporte?
               </span>
               <span className="text-zinc-400 text-xs">
-                Si se confirma, este proveedor se listará en las opciones de despacho/entrega.
+                Si se confirma, este proveedor se listará en las opciones de
+                despacho/entrega.
               </span>
             </div>
             <Switch
               checked={payload.para_transporte}
-              onChange={(e) => handleChange("para_transporte", e.currentTarget.checked)}
+              onChange={(e) =>
+                handleChange("para_transporte", e.currentTarget.checked)
+              }
               color="indigo"
               size="md"
               className="cursor-pointer"

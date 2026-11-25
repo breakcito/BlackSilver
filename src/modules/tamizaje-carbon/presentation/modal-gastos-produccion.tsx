@@ -1,9 +1,11 @@
 import {
+  ActionIcon,
   Badge,
   Button,
   Collapse,
   Divider,
   Group,
+  Modal,
   NumberInput,
   Paper,
   Select,
@@ -14,15 +16,12 @@ import {
   TextInput,
   Textarea,
   Tooltip,
-  ActionIcon,
 } from "@mantine/core";
-import { TimeInput } from "@mantine/dates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
-  ChevronDownIcon,
   CheckCircleIcon,
-  ClockIcon,
+  ChevronDownIcon,
   PlusIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -34,36 +33,41 @@ import {
   TipoGastoZarandeo,
   esGastoPorHoras,
 } from "../../../shared/enums/carbon/tipo-gasto-zarandeo";
+import { MedioPagoGastoProduccion } from "../../../shared/enums/carbon/medio-pago-gasto-produccion";
+import { TipoOperacionGrupoGastos } from "../../../shared/enums/carbon/tipo-operacion-grupo-gastos";
 import { AuxService } from "../../../service/auxiliar.service";
 import { TamizajeCarbonService } from "../service/tamizaje-carbon.service";
 import { ModalEstandar } from "../../../presentation/utils/modal-estandar";
 import { CustomDatePicker } from "../../../presentation/utils/date-picker-input";
+import { FormProveedor } from "../../../presentation/utils/form-proveedor";
 import type { RES_Proveedor } from "../../../service/responses/proveedor";
 import type { GastoZarandeoItem } from "../service/tamizaje-carbon.responses";
-
-/**
- * Destino del gasto de produccion: un zarandeo o un blending.
- *
- * Los gastos de produccion son el mismo concepto en los dos casos (pala,
- * lanza, agua, escogedores, otro): lo unico que cambia es la operacion a la
- * que se cargan.
- */
-export type DestinoGastoProduccion =
-  | { tipo: "zarandeo"; id: number }
-  | { tipo: "blending"; id: number };
 
 interface Props {
   opened: boolean;
   onClose: () => void;
-  /** Operacion a la que se cargan los gastos. */
-  destino: DestinoGastoProduccion;
-  /** Titulo del destino, para contextualizar el modal. */
-  tituloDestino?: string;
+  /**
+   * Tipo de operacion: los gastos de zarandear y los de mezclar son
+   * operaciones distintas e independientes.
+   */
+  tipo: TipoOperacionGrupoGastos;
+  /** Operacion ya agrupada (opcional): se cargan sus gastos. */
+  idGrupoInicial?: number | null;
+  /**
+   * Operaciones elegidas en el listado para esta operacion (opcional). Se
+   * agrupan solas en el momento de registrar el primer gasto.
+   */
+  idsMiembrosIniciales?: number[];
   /**
    * Se llama cuando se registra un gasto. Recibe el gasto ya persistido para
    * que el panel actualice sus contadores sin volver a consultar la lista.
    */
   onGuardado?: (gasto: GastoZarandeoItem) => void;
+  /**
+   * Se llama al cerrar el modal: el panel recarga el listado y limpia la
+   * seleccion.
+   */
+  onCerrar?: () => void;
 }
 
 const estilitos = {
@@ -82,15 +86,36 @@ const COLOR_POR_GASTO: Record<string, string> = {
   [TipoGastoZarandeo.Otro]: "gray",
 };
 
+/**
+ * Gastos de produccion de carbon.
+ *
+ * El usuario llega aqui desde el listado: marca varias operaciones (zarandeos
+ * o blendings) de una misma operacion y registra los gastos de esa operacion
+ * completa: pala, lanza, agua, escogedores.
+ *
+ * El agrupamiento es un detalle interno: el usuario nunca crea un "grupo",
+ * solo agrupa operaciones para registrar sus gastos juntos.
+ */
 export const ModalGastosProduccion = ({
   opened,
   onClose,
-  destino,
-  tituloDestino,
+  tipo,
+  idGrupoInicial = null,
+  idsMiembrosIniciales = [],
   onGuardado,
+  onCerrar,
 }: Props) => {
   const { notifySuccess, notifyError } = useNotify();
 
+  /**
+   * Operacion agrupada. Es null mientras el usuario no ha registrado ningun
+   * gasto: en ese momento las operaciones elegidas todavia no se agruparon.
+   */
+  const [idGrupo, setIdGrupo] = useState<number | null>(idGrupoInicial);
+  /** Operaciones elegidas que aun no forman parte de una operacion agrupada. */
+  const [idsMiembros, setIdsMiembros] = useState<string[]>(
+    idsMiembrosIniciales.map(String),
+  );
   const [gastos, setGastos] = useState<GastoZarandeoItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -103,28 +128,32 @@ export const ModalGastosProduccion = ({
   const [descripcion, setDescripcion] = useState("");
   const [numeroReporte, setNumeroReporte] = useState("");
   const [fecha, setFecha] = useState<Date | null>(new Date());
-  const [horaInicio, setHoraInicio] = useState("");
-  const [horaFin, setHoraFin] = useState("");
   const [cantidad, setCantidad] = useState<number | string>(0);
   const [precioUnitario, setPrecioUnitario] = useState<number | string>(0);
   const [proveedorBusqueda, setProveedorBusqueda] = useState("");
-  // El formulario de alta se despliega bajo demanda (accordion).
+  /** El formulario de alta se despliega bajo demanda (accordion). */
   const [formAbierto, setFormAbierto] = useState(false);
+
+  // Crear proveedor desde el formulario de gasto.
+  const [openNuevoProveedor, setOpenNuevoProveedor] = useState(false);
 
   // Confirmacion del pago de un gasto: se despliega bajo la fila que se
   // esta pagando.
   const [gastoAPagar, setGastoAPagar] = useState<number | null>(null);
   const [fechaPago, setFechaPago] = useState<Date | null>(null);
+  const [medioPago, setMedioPago] = useState<MedioPagoGastoProduccion>(
+    MedioPagoGastoProduccion.Efectivo,
+  );
   const [guardandoPago, setGuardandoPago] = useState(false);
 
   const cargarGastos = useCallback(async () => {
-    if (!destino.id) return;
+    if (!idGrupo) {
+      setGastos([]);
+      return;
+    }
     setLoading(true);
     try {
-      const resp =
-        destino.tipo === "blending"
-          ? await TamizajeCarbonService.getGastosBlending(destino.id)
-          : await TamizajeCarbonService.getGastos(destino.id);
+      const resp = await TamizajeCarbonService.getGastosGrupo(idGrupo);
       setGastos(resp.success && resp.data ? resp.data : []);
     } catch (err) {
       console.error(err);
@@ -132,7 +161,7 @@ export const ModalGastosProduccion = ({
     } finally {
       setLoading(false);
     }
-  }, [destino]);
+  }, [idGrupo]);
 
   // Estado inicial del formulario al abrir el modal.
   const resetFormulario = useCallback(() => {
@@ -142,29 +171,30 @@ export const ModalGastosProduccion = ({
     setDescripcion("");
     setNumeroReporte("");
     setFecha(new Date());
-    setHoraInicio("");
-    setHoraFin("");
     setCantidad(0);
     setPrecioUnitario(0);
   }, []);
 
-  // Mantiene el mismo criterio de orden que el backend (fecha ASC, id ASC)
-  // para que la lista local coincida con la que devuelve el listado.
-  const ordenarGastos = (lista: GastoZarandeoItem[]) =>
-    [...lista].sort((a, b) => {
-      if (a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
-      return a.id_gasto_produccion_carbon - b.id_gasto_produccion_carbon;
-    });
+  useEffect(() => {
+    if (!opened) return;
+    setIdGrupo(idGrupoInicial);
+    setIdsMiembros(idsMiembrosIniciales.map(String));
+    setGastos([]);
+    resetFormulario();
+    // Al llegar desde el agrupamiento, el formulario viene desplegado: el
+    // usuario ya eligio las operaciones y solo falta registrar el gasto.
+    // Al abrir una operacion existente, arranca cerrado.
+    setFormAbierto(idsMiembrosIniciales.length > 0);
+    setGastoAPagar(null);
+    setFechaPago(null);
+    setMedioPago(MedioPagoGastoProduccion.Efectivo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
 
   useEffect(() => {
     if (!opened) return;
     cargarGastos();
-    resetFormulario();
-    setFormAbierto(false);
-  }, [opened, cargarGastos, resetFormulario]);
-
-  /** Id del destino: el gasto se carga a una operacion o a la otra. */
-  const idDestino = destino.id;
+  }, [opened, cargarGastos]);
 
   useEffect(() => {
     if (!opened) return;
@@ -180,21 +210,12 @@ export const ModalGastosProduccion = ({
 
   const esPorHoras = esGastoPorHoras(gasto);
 
-  // Cantidad y total: para pala/lanza la cantidad sale de las horas.
-  const cantidadCalculada = useMemo(() => {
-    if (!esPorHoras) return Number(cantidad) || 0;
-    if (!horaInicio || !horaFin) return 0;
-    const [hi, mi] = horaInicio.split(":").map(Number);
-    const [hf, mf] = horaFin.split(":").map(Number);
-    if ([hi, mi, hf, mf].some((n) => Number.isNaN(n))) return 0;
-    const minutos = Math.abs(hf * 60 + mf - (hi * 60 + mi));
-    return Math.round((minutos / 60) * 10000) / 10000;
-  }, [esPorHoras, cantidad, horaInicio, horaFin]);
-
   const total = useMemo(
     () =>
-      Math.round(cantidadCalculada * (Number(precioUnitario) || 0) * 100) / 100,
-    [cantidadCalculada, precioUnitario],
+      Math.round(
+        (Number(cantidad) || 0) * (Number(precioUnitario) || 0) * 100,
+      ) / 100,
+    [cantidad, precioUnitario],
   );
 
   const totalGastos = useMemo(
@@ -227,19 +248,8 @@ export const ModalGastosProduccion = ({
     return getCoincidencias(proveedoresOptions, q, {
       keys: ["label"],
       fuseThreshold: 0.4,
-    }).map(
-      (r) => r.item,
-    );
+    }).map((r) => r.item);
   }, [proveedoresOptions, proveedorBusqueda]);
-
-  const handleGastoChange = (value: string | null) => {
-    const next = (value as TipoGastoZarandeo) || TipoGastoZarandeo.Pala;
-    setGasto(next);
-    if (!esGastoPorHoras(next)) {
-      setHoraInicio("");
-      setHoraFin("");
-    }
-  };
 
   /** El gasto ya esta pagado: no se puede volver a confirmar. */
   const estaPagado = (g: GastoZarandeoItem): boolean =>
@@ -259,7 +269,7 @@ export const ModalGastosProduccion = ({
     setFechaPago(null);
   };
 
-  /** Confirma el pago del gasto con la fecha indicada. */
+  /** Confirma el pago del gasto con la fecha y el medio indicados. */
   const handleGuardarPago = async () => {
     if (gastoAPagar === null) return;
     if (!fechaPago) {
@@ -272,6 +282,7 @@ export const ModalGastosProduccion = ({
       const resp = await TamizajeCarbonService.confirmarPagoGasto(
         gastoAPagar,
         dayjs(fechaPago).format("YYYY-MM-DD"),
+        medioPago,
       );
 
       if (resp.success && resp.data) {
@@ -283,6 +294,7 @@ export const ModalGastosProduccion = ({
                   ...g,
                   esta_pagado: 1,
                   fecha_pago: dayjs(fechaPago).format("YYYY-MM-DD"),
+                  medio_pago: medioPago,
                 }
               : g,
           ),
@@ -299,48 +311,69 @@ export const ModalGastosProduccion = ({
     }
   };
 
-  const handleSubmit = async () => {    if (gasto === TipoGastoZarandeo.Otro && !otroGasto.trim()) {
-      notifyError("Describa el concepto");
+  const handleSubmit = async () => {
+    // Sin operacion agrupada todavia: se toman las operaciones que el
+    // usuario eligio en el listado.
+    if (!idGrupo && idsMiembros.length === 0) {
+      notifyError(
+        "Selecciona al menos una operación para registrar sus gastos",
+      );
       return;
     }
-    if (esPorHoras && (!horaInicio || !horaFin)) {
-      notifyError("Indique la hora de inicio y la hora de fin");
+    if (gasto === TipoGastoZarandeo.Otro && !otroGasto.trim()) {
+      notifyError("Describa el concepto");
       return;
     }
     if (!fecha) {
       notifyError("Indique la fecha del gasto");
       return;
     }
-    if (cantidadCalculada <= 0) {
-      notifyError("La cantidad debe ser mayor a cero");
+    if ((Number(cantidad) || 0) <= 0) {
+      notifyError(
+        esPorHoras
+          ? "Indique cuántas horas se trabajaron"
+          : "La cantidad debe ser mayor a cero",
+      );
       return;
     }
 
     setSubmitting(true);
     try {
+      // La primera vez, las operaciones elegidas se agrupan solas: el usuario
+      // nunca ve ni tiene que crear un "grupo".
+      let idGrupoGastos = idGrupo;
+      if (!idGrupoGastos) {
+        const creado = await TamizajeCarbonService.crearGrupoGastos({
+          tipo,
+          ids_miembros: idsMiembros.map(Number).filter((n) => n > 0),
+        });
+        if (!creado.success || !creado.data) {
+          notifyError(
+            creado.message || "No se pudo registrar el gasto de la operación",
+          );
+          return;
+        }
+        idGrupoGastos = Number(creado.data);
+        setIdGrupo(idGrupoGastos);
+      }
+
       const resp = await TamizajeCarbonService.registrarGasto({
-        id_zarandeo_carbon: destino.tipo === "zarandeo" ? idDestino : undefined,
-        id_blending_carbon: destino.tipo === "blending" ? idDestino : undefined,
+        id_grupo_gastos: idGrupoGastos,
         gasto,
         otro_gasto: gasto === TipoGastoZarandeo.Otro ? otroGasto.trim() : null,
         id_proveedor: idProveedor ? Number(idProveedor) : null,
         descripcion: descripcion.trim() || null,
         fecha: dayjs(fecha).format("YYYY-MM-DD"),
         numero_reporte: numeroReporte.trim() || null,
-        hora_inicio: esPorHoras ? horaInicio : null,
-        hora_fin: esPorHoras ? horaFin : null,
-        cantidad: cantidadCalculada,
+        cantidad: Number(cantidad) || 0,
         precio_unitario: Number(precioUnitario) || 0,
       });
 
       if (resp.success && resp.data) {
         notifySuccess("Gasto de producción registrado");
-        // El backend devuelve el gasto ya persistido con la misma forma que
-        // el listado: se inserta en la lista local, sin volver a consultar.
-        setGastos((prev) => ordenarGastos([...prev, resp.data]));
+        setGastos((prev) => [...prev, resp.data]);
         onGuardado?.(resp.data);
         resetFormulario();
-        setFormAbierto(false);
       } else {
         notifyError(resp.message || "No se pudo registrar el gasto");
       }
@@ -352,10 +385,16 @@ export const ModalGastosProduccion = ({
     }
   };
 
+  /** Cierra el modal y avisa al panel para que recargue el listado. */
+  const handleCerrar = () => {
+    onClose();
+    onCerrar?.();
+  };
+
   return (
     <ModalEstandar
       opened={opened}
-      close={onClose}
+      close={handleCerrar}
       title="Gastos de Producción"
       size="55rem"
       validateClose
@@ -363,22 +402,19 @@ export const ModalGastosProduccion = ({
         <Group gap={6}>
           <Badge
             variant="light"
-            color={destino.tipo === "blending" ? "cyan" : "teal"}
+            color={tipo === TipoOperacionGrupoGastos.Blending ? "cyan" : "teal"}
             radius="xl"
             size="sm"
           >
-            {destino.tipo === "blending" ? "Blending" : "Zarandeo"}
+            {tipo === TipoOperacionGrupoGastos.Blending
+              ? "Blending"
+              : "Zarandeo"}
           </Badge>
-          {tituloDestino && (
-            <Text size="xs" c="gray" fw={600}>
-              {tituloDestino}
-            </Text>
-          )}
         </Group>
       }
     >
       <Stack gap="md">
-        {/* Alta de gasto */}
+        {/* ── ALTA DE GASTO ───────────────────────────────────────────── */}
         <Paper className="bg-zinc-900/60 border border-zinc-800 p-2.5 rounded-xl">
           <Group justify="space-between" align="center" wrap="nowrap">
             <Button
@@ -428,7 +464,11 @@ export const ModalGastosProduccion = ({
                 <Select
                   data={gastosOptions}
                   value={gasto}
-                  onChange={handleGastoChange}
+                  onChange={(val) =>
+                    setGasto(
+                      (val as TipoGastoZarandeo) || TipoGastoZarandeo.Pala,
+                    )
+                  }
                   allowDeselect={false}
                   radius="lg"
                   size="xs"
@@ -450,25 +490,39 @@ export const ModalGastosProduccion = ({
                   classNames={estilitos}
                 />
               )}
-              <Select
-                label="Proveedor (opcional)"
-                placeholder="Seleccione proveedor"
-                data={proveedoresVisibles}
-                value={idProveedor}
-                onChange={(val) => {
-                  setIdProveedor(val);
-                  setProveedorBusqueda("");
-                }}
-                clearable
-                searchable
-                searchValue={proveedorBusqueda}
-                onSearchChange={setProveedorBusqueda}
-                comboboxProps={{ withinPortal: true }}
-                nothingFoundMessage="No se encontraron proveedores"
-                radius="lg"
-                size="xs"
-                classNames={estilitos}
-              />
+              <div className="flex items-end gap-1">
+                <Select
+                  label="Proveedor (opcional)"
+                  placeholder="Seleccione proveedor"
+                  data={proveedoresVisibles}
+                  value={idProveedor}
+                  onChange={(val) => {
+                    setIdProveedor(val);
+                    setProveedorBusqueda("");
+                  }}
+                  clearable
+                  searchable
+                  searchValue={proveedorBusqueda}
+                  onSearchChange={setProveedorBusqueda}
+                  filter={({ options }) => options}
+                  comboboxProps={{ withinPortal: true }}
+                  nothingFoundMessage="No se encontraron proveedores"
+                  radius="lg"
+                  size="xs"
+                  classNames={estilitos}
+                  style={{ flex: 1 }}
+                />
+                <Tooltip label="Registrar un nuevo proveedor" withArrow>
+                  <ActionIcon
+                    variant="light"
+                    color="indigo"
+                    onClick={() => setOpenNuevoProveedor(true)}
+                    disabled={submitting}
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                  </ActionIcon>
+                </Tooltip>
+              </div>
               <TextInput
                 label="Número de reporte (opcional)"
                 placeholder="Ej: REP-0042"
@@ -496,49 +550,14 @@ export const ModalGastosProduccion = ({
               classNames={estilitos}
             />
 
-            <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="sm" mt="sm">
-              <TimeInput
-                label="Hora de inicio"
-                placeholder="08:00"
-                leftSection={<ClockIcon className="w-4 h-4 text-zinc-500" />}
-                value={horaInicio || undefined}
-                onChange={(e) =>
-                  setHoraInicio(
-                    /^(\d{2}):(\d{2})/.test(e.currentTarget.value)
-                      ? e.currentTarget.value.slice(0, 5)
-                      : "",
-                  )
-                }
-                radius="lg"
-                size="xs"
-                disabled={!esPorHoras}
-                classNames={estilitos}
-              />
-              <TimeInput
-                label="Hora de fin"
-                placeholder="17:00"
-                leftSection={<ClockIcon className="w-4 h-4 text-zinc-500" />}
-                value={horaFin || undefined}
-                onChange={(e) =>
-                  setHoraFin(
-                    /^(\d{2}):(\d{2})/.test(e.currentTarget.value)
-                      ? e.currentTarget.value.slice(0, 5)
-                      : "",
-                  )
-                }
-                radius="lg"
-                size="xs"
-                disabled={!esPorHoras}
-                classNames={estilitos}
-              />
+            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm" mt="sm">
               <NumberInput
-                label={"Cantidad"}
+                label={esPorHoras ? "Horas trabajadas" : "Cantidad"}
                 placeholder="0.00"
-                value={esPorHoras ? cantidadCalculada : cantidad}
+                value={cantidad}
                 onChange={setCantidad}
                 hideControls
                 radius="lg"
-                readOnly={esPorHoras}
                 size="xs"
                 classNames={estilitos}
               />
@@ -553,286 +572,345 @@ export const ModalGastosProduccion = ({
                 size="xs"
                 classNames={estilitos}
               />
+              <div className="flex items-end justify-end pb-1">
+                <Text size="xs" fw={600} c="dimmed">
+                  Total:{" "}
+                  <span className="text-indigo-300 font-mono">
+                    S/ {formatNumber(total)}
+                  </span>
+                </Text>
+              </div>
             </SimpleGrid>
 
-            <Group justify="space-between" mt={24}>
-              <Group ml={4} gap={"xs"}>
-                <Text size="xs" fw={600}>
-                  Total:
-                </Text>
-                <TextInput
-                  value={formatNumber(total)}
-                  readOnly
-                  classNames={{
-                    ...estilitos,
-                    input: `${estilitos.input} font-semibold text-indigo-300`,
-                  }}
-                  radius="lg"
-                  size="xs"
-                />
-              </Group>
-              <Group justify="flex-end" gap="xs">
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    resetFormulario();
-                    setFormAbierto(false);
-                  }}
-                  disabled={submitting}
-                  leftSection={<XMarkIcon className="w-4 h-4" />}
-                  radius="lg"
-                  size="xs"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  color="indigo"
-                  onClick={handleSubmit}
-                  loading={submitting}
-                  leftSection={<PlusIcon className="w-4 h-4" />}
-                  radius="lg"
-                  size="xs"
-                >
-                  Registrar gasto
-                </Button>
-              </Group>
+            <Group justify="flex-end" mt={24}>
+              <Button
+                variant="default"
+                onClick={() => {
+                  resetFormulario();
+                  setFormAbierto(false);
+                }}
+                disabled={submitting}
+                leftSection={<XMarkIcon className="w-4 h-4" />}
+                radius="lg"
+                size="xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                color="indigo"
+                onClick={handleSubmit}
+                loading={submitting}
+                leftSection={<PlusIcon className="w-4 h-4" />}
+                radius="lg"
+                size="xs"
+              >
+                Registrar gasto
+              </Button>
             </Group>
           </Collapse>
         </Paper>
 
-        {/* Listado de gastos */}
-        <Paper className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-xl">
-          <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={700} className="text-white">
-              Gastos registrados
-            </Text>
-            <Badge color="indigo" variant="light" radius="xl">
-              Total: S/ {formatNumber(totalGastos)}
-            </Badge>
-          </Group>
+        {/* ── LISTADO DE GASTOS ───────────────────────────────────────── */}
+        {idGrupo && (
+          <Paper className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-xl">
+            <Group justify="space-between" mb="xs">
+              <Text size="sm" fw={700} className="text-white">
+                Gastos de la operación
+              </Text>
+              <Badge color="indigo" variant="light" radius="xl">
+                Total: S/ {formatNumber(totalGastos)}
+              </Badge>
+            </Group>
 
-          {loading ? (
-            <Text size="xs" c="dimmed">
-              Cargando gastos...
-            </Text>
-          ) : gastos.length === 0 ? (
-            <Text size="xs" c="dimmed" className="italic">
-              Todavía no se han registrado gastos.
-            </Text>
-          ) : (
-            <Table
-              highlightOnHover
-              withTableBorder={false}
-              verticalSpacing="xs"
-            >
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th
-                    ta={"center"}
-                    className="text-zinc-400 text-xs font-semibold"
-                  >
-                    Fecha
-                  </Table.Th>
-                  <Table.Th
-                    ta={"center"}
-                    className="text-zinc-400 text-xs font-semibold"
-                    w={150}
-                  >
-                    Gasto
-                  </Table.Th>
-                  <Table.Th
-                    ta={"center"}
-                    className="text-zinc-400 text-xs font-semibold"
-                    w={150}
-                  >
-                    Proveedor
-                  </Table.Th>
-                  <Table.Th
-                    ta={"center"}
-                    className="text-zinc-400 text-xs font-semibold"
-                  >
-                    Reporte
-                  </Table.Th>
-
-                  <Table.Th
-                    ta={"center"}
-                    className="text-zinc-400 text-xs font-semibold"
-                  >
-                    Cantidad
-                  </Table.Th>
-                  <Table.Th
-                    className="text-zinc-400 text-xs font-semibold"
-                    ta={"center"}
-                  >
-                    Total
-                  </Table.Th>
-                  <Table.Th
-                    className="text-zinc-400 text-xs font-semibold"
-                    ta={"center"}
-                    w={170}
-                  >
-                    Condición
-                  </Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {gastos.map((g) => (
-                  <Table.Tr key={g.id_gasto_produccion_carbon}>
-                    <Table.Td ta={"center"}>
-                      <Text size="xs" c="gray">
-                        {g.fecha}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td ta={"center"} w={150}>
-                      <Stack gap={5} justify="center" align="center" w={150}>
-                        <Badge
-                          color={COLOR_POR_GASTO[g.gasto] ?? "gray"}
-                          variant="light"
-                          radius="xl"
-                          size="sm"
-                        >
-                          {g.gasto === TipoGastoZarandeo.Otro
-                            ? (g.otro_gasto ?? "Otro")
-                            : g.gasto}
-                        </Badge>
-                        <Tooltip
-                          label={g.descripcion || ""}
-                          multiline
-                          w={280}
-                          withArrow
-                          position="top"
-                        >
-                          <Text
-                            size="xs"
-                            lineClamp={3}
-                            style={{ width: "100%", cursor: "help" }}
+            {loading ? (
+              <Text size="xs" c="dimmed">
+                Cargando gastos...
+              </Text>
+            ) : gastos.length === 0 ? (
+              <Text size="xs" c="dimmed" className="italic">
+                Todavía no se han registrado gastos en esta operación.
+              </Text>
+            ) : (
+              <Table
+                highlightOnHover
+                withTableBorder={false}
+                verticalSpacing="xs"
+                layout="fixed"
+                horizontalSpacing="xs"
+              >
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold"
+                      w={105}
+                    >
+                      Fecha
+                    </Table.Th>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold text-center"
+                      w={100}
+                    >
+                      Gasto
+                    </Table.Th>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold"
+                      miw={180}
+                    >
+                      Proveedor
+                    </Table.Th>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold"
+                      w={95}
+                    >
+                      Reporte
+                    </Table.Th>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold"
+                      w={85}
+                    >
+                      Cantidad
+                    </Table.Th>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold"
+                      w={115}
+                    >
+                      Total
+                    </Table.Th>
+                    <Table.Th
+                      ta="center"
+                      className="text-zinc-400 text-xs font-semibold"
+                      w={155}
+                    >
+                      Condición
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {gastos.map((g) => (
+                    <Table.Tr key={g.id_gasto_produccion_carbon}>
+                      <Table.Td ta={"center"}>
+                        <Text size="xs" c="gray">
+                          {g.fecha}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td ta={"center"} w={150}>
+                        <Stack gap={5} justify="center" align="center">
+                          <Badge
+                            color={COLOR_POR_GASTO[g.gasto] ?? "gray"}
+                            variant="light"
+                            radius="xl"
+                            size="sm"
                           >
-                            {g.descripcion || ""}
-                          </Text>
-                        </Tooltip>
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td ta={"center"}>
-                      <Text size="xs" c="zinc.300">
-                        {g.proveedor_razon_social || "—"}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td ta={"center"}>
-                      <Text size="xs" c="zinc.300">
-                        {g.numero_reporte || "—"}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td ta={"center"}>
-                      <Stack gap={4} justify="center" align="center">
+                            {g.gasto === TipoGastoZarandeo.Otro
+                              ? (g.otro_gasto ?? "Otro")
+                              : g.gasto}
+                          </Badge>
+                          <Tooltip
+                            label={g.descripcion || ""}
+                            multiline
+                            w={280}
+                            withArrow
+                            position="top"
+                          >
+                            <Text
+                              size="xs"
+                              lineClamp={3}
+                              style={{ width: "100%", cursor: "help" }}
+                            >
+                              {g.descripcion || ""}
+                            </Text>
+                          </Tooltip>
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td ta={"center"}>
+                        <Text size="xs" c="zinc.300">
+                          {g.proveedor_razon_social || "—"}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td ta={"center"}>
+                        <Text size="xs" c="zinc.300">
+                          {g.numero_reporte || "—"}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td ta={"center"}>
                         <Text size="xs" c="zinc.300">
                           {formatNumber(g.cantidad)}
                         </Text>
-                        {/* El rango de horas solo se muestra si el gasto
-                            las tiene: si no, el badge queda vacio. */}
-                        {g.hora_inicio && g.hora_fin && (
-                          <Badge size="sm" color="grape" variant="filled">
-                            {`${dayjs(`1970-01-01 ${g.hora_inicio}`).format("HH:mm")} - ${dayjs(`1970-01-01 ${g.hora_fin}`).format("HH:mm")}`}
-                          </Badge>
-                        )}
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td ta={"center"}>
-                      <Text size="xs" fw={700} c="red">
-                        S/ {formatNumber(g.total)}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td ta={"center"} w={170}>
-                      <Stack gap={4} justify="center" align="center" w={170}>
-                        {estaPagado(g) ? (
-                          <Group gap={6} justify="center" wrap="nowrap">
-                            <Badge
-                              size="sm"
-                              color="green"
-                              variant="light"
-                              radius="xl"
-                            >
-                              PAGADO
-                            </Badge>
-                            <Text size="10px" c="gray" fw={600}>
-                              {g.fecha_pago
-                                ? dayjs(g.fecha_pago).format("DD/MM/YYYY")
-                                : ""}
-                            </Text>
-                          </Group>
-                        ) : (
-                          <Group gap={8} justify="center" wrap="nowrap">
-                            <Badge
-                              size="sm"
-                              color="yellow"
-                              variant="light"
-                              radius="xl"
-                            >
-                              PENDIENTE
-                            </Badge>
-                            <Tooltip
-                              label="Confirmar el pago de este gasto"
-                              withArrow
-                            >
-                              <ActionIcon
-                                variant="filled"
+                      </Table.Td>
+                      <Table.Td ta={"center"}>
+                        <Text size="xs" fw={700} c="red">
+                          S/ {formatNumber(g.total)}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td ta={"center"} w={170}>
+                        <Stack gap={4} justify="center" align="center" w={170}>
+                          {estaPagado(g) ? (
+                            <Group gap={6} justify="center" wrap="nowrap">
+                              <Badge
+                                size="sm"
                                 color="green"
-                                onClick={() =>
-                                  handleAbrirPago(g.id_gasto_produccion_carbon)
-                                }
-                                disabled={guardandoPago}
+                                variant="light"
+                                radius="xl"
                               >
-                                <CheckCircleIcon className="size-5 text-white" />
-                              </ActionIcon>
-                            </Tooltip>
-                          </Group>
-                        )}
-
-                        {/* Confirmacion del pago: se despliega bajo la celda */}
-                        <Collapse
-                          in={gastoAPagar === g.id_gasto_produccion_carbon}
-                          transitionDuration={200}
-                        >
-                          <Stack gap={4} mt={4} w={160}>
-                            <CustomDatePicker
-                              label="Fecha de pago"
-                              value={fechaPago}
-                              onChange={setFechaPago}
-                              radius="lg"
-                              size="xs"
-                              required
-                            />
-                            <Group gap={4} justify="center" wrap="nowrap">
-                              <Button
-                                variant="default"
-                                radius="lg"
-                                size="xs"
-                                onClick={handleCancelarPago}
-                                disabled={guardandoPago}
-                              >
-                                Cancelar
-                              </Button>
-                              <Button
-                                color="green"
-                                radius="lg"
-                                size="xs"
-                                onClick={handleGuardarPago}
-                                loading={guardandoPago}
-                                disabled={!fechaPago}
-                              >
-                                Pagar
-                              </Button>
+                                PAGADO
+                              </Badge>
+                              <Text size="10px" c="gray" fw={600}>
+                                {g.fecha_pago
+                                  ? dayjs(g.fecha_pago).format("DD/MM/YYYY")
+                                  : ""}
+                              </Text>
+                              {g.medio_pago && (
+                                <Badge
+                                  size="sm"
+                                  color="teal"
+                                  variant="light"
+                                  radius="xl"
+                                >
+                                  {g.medio_pago}
+                                </Badge>
+                              )}
                             </Group>
-                          </Stack>
-                        </Collapse>
-                      </Stack>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          )}
-        </Paper>
+                          ) : (
+                            <Group gap={8} justify="center" wrap="nowrap">
+                              <Badge
+                                size="sm"
+                                color="yellow"
+                                variant="light"
+                                radius="xl"
+                              >
+                                PENDIENTE
+                              </Badge>
+                              <Tooltip
+                                label="Confirmar el pago de este gasto"
+                                withArrow
+                              >
+                                <ActionIcon
+                                  variant="filled"
+                                  color="green"
+                                  onClick={() =>
+                                    handleAbrirPago(
+                                      g.id_gasto_produccion_carbon,
+                                    )
+                                  }
+                                  disabled={guardandoPago}
+                                >
+                                  <CheckCircleIcon className="size-5 text-white" />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          )}
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
+          </Paper>
+        )}
       </Stack>
+
+      {/* Modal: confirmar el pago de un gasto */}
+      <Modal
+        opened={gastoAPagar !== null}
+        onClose={handleCancelarPago}
+        title={
+          <Text fw={700} size="sm" className="text-white">
+            Confirmar pago del gasto
+          </Text>
+        }
+        centered
+        size="sm"
+        classNames={{
+          content: "bg-zinc-950 border border-zinc-800",
+          header: "bg-zinc-950 border-b border-zinc-800 text-white",
+        }}
+      >
+        <Stack gap="sm" mt={16}>
+          <Text size="xs" c="gray">
+            {gastoAPagar
+              ? `${gastos.find((g) => g.id_gasto_produccion_carbon === gastoAPagar)?.gasto ?? ""} · S/ ${formatNumber(
+                  Number(
+                    gastos.find(
+                      (g) => g.id_gasto_produccion_carbon === gastoAPagar,
+                    )?.total ?? 0,
+                  ),
+                )}`
+              : ""}
+          </Text>
+
+          <Group gap={"xs"} grow>
+            <CustomDatePicker
+              label="Fecha de pago"
+              value={fechaPago}
+              onChange={setFechaPago}
+              radius="lg"
+              size="xs"
+              required
+            />
+
+            <Select
+              label="Medio de pago"
+              data={Object.values(MedioPagoGastoProduccion)}
+              value={medioPago}
+              onChange={(val) =>
+                setMedioPago(
+                  (val as MedioPagoGastoProduccion) ||
+                    MedioPagoGastoProduccion.Efectivo,
+                )
+              }
+              allowDeselect={false}
+              radius="lg"
+              size="xs"
+            />
+          </Group>
+          <Group justify="flex-end" mt="xs">
+            <Button
+              variant="default"
+              radius="lg"
+              size="xs"
+              onClick={handleCancelarPago}
+              disabled={guardandoPago}
+            >
+              Cancelar
+            </Button>
+            <Button
+              color="green"
+              radius="lg"
+              size="xs"
+              onClick={handleGuardarPago}
+              loading={guardandoPago}
+              disabled={!fechaPago}
+            >
+              Pagar
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal: registrar un nuevo proveedor desde el formulario de gasto */}
+      <ModalEstandar
+        opened={openNuevoProveedor}
+        close={() => setOpenNuevoProveedor(false)}
+        title="Nuevo Proveedor"
+        size="md"
+        validateClose
+      >
+        <FormProveedor
+          onSuccess={(prov) => {
+            setOpenNuevoProveedor(false);
+            setProveedores((prev) => [...prev, prov]);
+            setIdProveedor(String(prov.id_proveedor));
+          }}
+          onCancel={() => setOpenNuevoProveedor(false)}
+        />
+      </ModalEstandar>
     </ModalEstandar>
   );
 };

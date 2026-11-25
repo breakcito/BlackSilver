@@ -586,7 +586,7 @@ export const RegistroCompraCarbon = ({
           />
 
           <Select
-            label="Cuenta del proveedor"
+            label="Cuenta del proveedor (opc.)"
             placeholder={
               idProveedor ? "Seleccione cuenta" : "Elija primero el proveedor"
             }

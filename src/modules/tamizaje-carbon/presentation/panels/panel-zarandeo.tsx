@@ -4,7 +4,6 @@ import {
   Button,
   Divider,
   Group,
-  Loader,
   Modal,
   Paper,
   Select,
@@ -23,8 +22,10 @@ import {
   BuildingStorefrontIcon,
   CalendarDaysIcon,
   ClockIcon,
+  CurrencyDollarIcon,
   DocumentIcon,
   MagnifyingGlassIcon,
+  PencilSquareIcon,
   PlusIcon,
   ScaleIcon,
   EyeIcon,
@@ -32,9 +33,9 @@ import {
 import type { DataTableColumn } from "mantine-datatable";
 
 import { useNotify } from "../../../../hooks/useNotify";
-import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
 import { BotonRecargar } from "../../../../presentation/utils/boton-recargar";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
+import { TipoOperacionGrupoGastos } from "../../../../shared/enums/carbon/tipo-operacion-grupo-gastos";
 import { colorCalidadCarbon } from "../../../../shared/functions/calidad-carbon";
 import { cn } from "../../../../shared/functions/cn";
 import { MESES } from "../../../../shared/variables/meses";
@@ -45,10 +46,12 @@ import { useExportarGastosProduccion } from "../../hooks/useExportarGastosProduc
 import { ModalAjustarStock } from "../modal-ajustar-stock";
 import { ModalRegistrarZarandeo } from "../modal-registrar-zarandeo";
 import { ModalGastosProduccion } from "../modal-gastos-produccion";
+import { OperacionesAgrupadas } from "../components/operaciones-agrupadas";
 import { ModalEvidenciasZarandeo } from "../modal-evidencias-zarandeo";
 import { ModalRangoFechasExportar } from "../modal-rango-fechas-exportar";
 import type {
   CargaZarandeoItem,
+  GrupoGastosItem,
   StockCarbonItem,
   ZarandeoCarbonItem,
 } from "../../service/tamizaje-carbon.responses";
@@ -82,8 +85,16 @@ const estilitos = {
  * Muestra el stock por tipo de carbon (con su desglose por calidad) y el
  * historial de zarandeos del periodo filtrado.
  */
-export const PanelZarandeo = () => {
-  const { notifyError } = useNotify();
+interface PanelZarandeoProps {
+  /**
+   * Selector de vista. Se muestra como primer elemento de la barra de
+   * filtros, a la izquierda del resto.
+   */
+  selector?: React.ReactNode;
+}
+
+export const PanelZarandeo = ({ selector }: PanelZarandeoProps) => {
+  const { notifyError, notifyInfo } = useNotify();
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -109,15 +120,30 @@ export const PanelZarandeo = () => {
   // Modals state
   const [stockToEdit, setStockToEdit] = useState<StockCarbonItem | null>(null);
   const [openNuevoTamizaje, setOpenNuevoTamizaje] = useState(false);
-  const [openExportarGastos, setOpenExportarGastos] = useState(false);
-  const {
-    exportarPorRango,
-    exportarZarandeo,
-    exportando,
-    idExportando,
-  } = useExportarGastosProduccion();
-  const [zarandeoGastos, setZarandeoGastos] =
+  /** Zarandeo a editar: el stock se recalcula al guardar. */
+  const [zarandeoEditar, setZarandeoEditar] =
     useState<ZarandeoCarbonItem | null>(null);
+  /**
+   * Zarandeos marcados en la tabla. Los gastos de produccion se registran
+   * para un GRUPO de zarandeos, nunca para uno solo: se seleccionan varias
+   * filas y se agrupan.
+   */
+  const [zarandeosSeleccionados, setZarandeosSeleccionados] = useState<
+    ZarandeoCarbonItem[]
+  >([]);
+  const [openExportarGastos, setOpenExportarGastos] = useState(false);
+  /** Grupos de gastos: cada uno agrupa sus operaciones. */
+  const [gruposGastos, setGruposGastos] = useState<GrupoGastosItem[]>([]);
+  const { exportarPorRango, exportando } = useExportarGastosProduccion();
+  /**
+   * Gastos de producción por grupo. Los gastos no se registran contra un
+   * zarandeo suelto: se registran contra un grupo que reune varios zarandeos
+   * de la misma operacion.
+   */
+  const [gastosModal, setGastosModal] = useState<{
+    idGrupo: number | null;
+    idsMiembros: number[];
+  } | null>(null);
   const [historialStockModal, setHistorialStockModal] = useState<{
     titulo: string;
     logs: RES_CambiosLog[];
@@ -131,6 +157,23 @@ export const PanelZarandeo = () => {
     titulo: string;
     cargas: CargaZarandeoItem[];
   } | null>(null);
+
+  // Grupos de gastos: alimentan los containers de operaciones agrupadas.
+  const cargarGruposGastos = useCallback(async () => {
+    try {
+      const resp = await TamizajeCarbonService.getGruposGastos({
+        tipo: TipoOperacionGrupoGastos.Zarandeo,
+      });
+      setGruposGastos(resp.success && resp.data ? resp.data : []);
+    } catch (err) {
+      console.error(err);
+      setGruposGastos([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarGruposGastos();
+  }, [cargarGruposGastos]);
 
   // Load masters
   useEffect(() => {
@@ -209,8 +252,12 @@ export const PanelZarandeo = () => {
 
   // Reload everything
   const recargarTodo = useCallback(async () => {
-    await Promise.all([cargarStocks(), cargarTamizajes()]);
-  }, [cargarStocks, cargarTamizajes]);
+    await Promise.all([
+      cargarStocks(),
+      cargarTamizajes(),
+      cargarGruposGastos(),
+    ]);
+  }, [cargarStocks, cargarTamizajes, cargarGruposGastos]);
 
   // Options for selects
   const almacenesOptions = useMemo(
@@ -330,15 +377,22 @@ export const PanelZarandeo = () => {
     return tamizajes.filter((t) => t.id_tipo_carbon === Number(idTipoCarbon));
   }, [tamizajes, idTipoCarbon]);
 
+  // Si el filtro deja fuera un zarandeo marcado, se quita de la seleccion:
+  // agrupar una operacion que no esta en pantalla no tiene sentido.
+  useEffect(() => {
+    setZarandeosSeleccionados((prev) => {
+      if (prev.length === 0) return prev;
+      const visibles = new Set(
+        tamizajesFiltrados.map((z) => z.id_zarandeo_carbon),
+      );
+      const filtrados = prev.filter((z) => visibles.has(z.id_zarandeo_carbon));
+      return filtrados.length === prev.length ? prev : filtrados;
+    });
+  }, [tamizajesFiltrados]);
+
   // Table columns for Zarandeos
   const tamizajeColumns: DataTableColumn<ZarandeoCarbonItem>[] = useMemo(
     () => [
-      {
-        accessor: "index",
-        title: "#",
-        textAlign: "center",
-        width: 50,
-      },
       {
         accessor: "fecha_hora_zarandeo",
         title: "Fecha y Hora",
@@ -359,7 +413,7 @@ export const PanelZarandeo = () => {
         accessor: "almacen_nombre",
         title: "Almacén",
         textAlign: "center",
-        width: 120,
+        width: 150,
         render: (r) => (
           <Text size="xs" fw={600}>
             {r.almacen_nombre}
@@ -369,7 +423,7 @@ export const PanelZarandeo = () => {
       {
         accessor: "tipo_carbon_nombre",
         title: "Carbón Procesado",
-        width: 120,
+        width: 150,
         textAlign: "center",
         render: (r) => (
           <Stack gap={6} justify="center" align="center">
@@ -509,56 +563,6 @@ export const PanelZarandeo = () => {
         },
       },
       {
-        accessor: "gastos",
-        title: "Gastos",
-        width: 120,
-        textAlign: "center",
-        render: (r) => (
-          <Group gap={8} justify="center" wrap="nowrap">
-            <Stack gap={0} align="end">
-              <Text size="sm" c="red" fw={700} className="font-mono">
-                S/ {formatNumber(r.gastos_total)}
-              </Text>
-              <Text size="11px" fw={600} c="gray">
-                {r.gastos_cantidad} gasto{r.gastos_cantidad === 1 ? "" : "s"}
-              </Text>
-            </Stack>
-            <Tooltip label="Ver detalle de gastos" withArrow>
-              <ActionIcon
-                variant="light"
-                color="indigo"
-                size="md"
-                radius="md"
-                onClick={() => setZarandeoGastos(r)}
-              >
-                <EyeIcon className="w-4 h-4" />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip
-              label="Exportar los gastos de este zarandeo a Excel"
-              withArrow
-            >
-              <ActionIcon
-                variant="light"
-                color="green"
-                size="md"
-                radius="md"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  exportarZarandeo(r.id_zarandeo_carbon);
-                }}
-              >
-                {idExportando === r.id_zarandeo_carbon ? (
-                  <Loader size={14} color="green" />
-                ) : (
-                  <ArrowDownTrayIcon className="w-4 h-4" />
-                )}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        ),
-      },
-      {
         accessor: "evidencias",
         title: "Evidencias",
         width: 160,
@@ -619,14 +623,109 @@ export const PanelZarandeo = () => {
           </Stack>
         ),
       },
+      {
+        accessor: "acciones",
+        title: "",
+        width: 60,
+        textAlign: "center",
+        render: (r) => (
+          <Tooltip label="Editar zarandeo (recalcula el stock)" withArrow>
+            <ActionIcon
+              variant="light"
+              color="teal"
+              size="md"
+              radius="md"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZarandeoEditar(r);
+              }}
+            >
+              <PencilSquareIcon className="w-4 h-4" />
+            </ActionIcon>
+          </Tooltip>
+        ),
+      },
     ],
-    [exportarZarandeo, idExportando],
+    [],
   );
+
+  /**
+   * Barra de seleccion: aparece cuando hay operaciones marcadas. Es el unico
+   * lugar desde donde se registran los gastos, y solo existen para el
+   * conjunto de operaciones marcado.
+   */
+  const barraSeleccionZarandeos =
+    zarandeosSeleccionados.length > 0 ? (
+      <Group
+        justify="space-between"
+        px="md"
+        py="sm"
+        wrap="nowrap"
+        className="bg-zinc-950/70 border border-zinc-800 rounded-xl"
+      >
+        <Group gap="xs" wrap="nowrap">
+          <Badge color="teal" variant="light" radius="xl" size="sm">
+            {zarandeosSeleccionados.length} seleccionado
+            {zarandeosSeleccionados.length === 1 ? "" : "s"}
+          </Badge>
+          <Text size="xs" c="dimmed">
+            Se agruparán en una sola operación para registrar sus gastos juntos.
+          </Text>
+        </Group>
+
+        <Group gap="xs" wrap="nowrap">
+          <Button
+            variant="subtle"
+            color="gray"
+            size="compact-xs"
+            onClick={() => setZarandeosSeleccionados([])}
+          >
+            Quitar selección
+          </Button>
+          <Button
+            color="teal"
+            size="xs"
+            radius="lg"
+            leftSection={<CurrencyDollarIcon className="w-4 h-4" />}
+            onClick={() => {
+              // Solo se agrupan las operaciones que aun no tienen grupo: las
+              // demas ya son parte de otra operacion agrupada.
+              const sinGrupo = zarandeosSeleccionados.filter(
+                (z) => !z.id_grupo_gastos,
+              );
+              const yaAgrupados =
+                zarandeosSeleccionados.length - sinGrupo.length;
+
+              if (yaAgrupados > 0) {
+                notifyInfo(
+                  `${yaAgrupados} zarandeo(s) ya pertenecen a un grupo y no se vuelven a agrupar.`,
+                );
+              }
+              if (sinGrupo.length === 0) {
+                notifyError(
+                  "Los zarandeos seleccionados ya pertenecen a un grupo",
+                );
+                return;
+              }
+
+              setGastosModal({
+                idGrupo: null,
+                idsMiembros: sinGrupo.map((z) => z.id_zarandeo_carbon),
+              });
+            }}
+          >
+            Gastos de producción
+          </Button>
+        </Group>
+      </Group>
+    ) : null;
 
   return (
     <div className="space-y-5 text-zinc-100">
       {/* 1. Barra de Filtros + Botón Recargar + Botón de Registro */}
       <div className="flex flex-col md:flex-row items-end gap-3 w-full flex-wrap">
+        {selector}
+
         {/* Almacén */}
         <div className="w-full sm:w-56 md:w-52">
           <Select
@@ -950,16 +1049,26 @@ export const PanelZarandeo = () => {
         )}
       </div>
 
-      {/* 3. DataTable con el historial de zarandeos */}
-      <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
-        <DataTableEstandar
-          records={tamizajesFiltrados}
+      {/* Operaciones agrupadas: un container por operacion, con el total de
+          sus gastos arriba. Al final, las que todavia no se agruparon. */}
+      <div className="relative -top-3">
+        <OperacionesAgrupadas
+          grupos={gruposGastos}
+          sinAgrupar={tamizajesFiltrados}
           columns={tamizajeColumns}
-          idAccessor="id_zarandeo_carbon"
           loading={loadingTamizajes}
+          idAccessor="id_zarandeo_carbon"
           noRecordsText="No se encontraron operaciones de zarandeo registradas."
+          tituloSinAgrupar="Operaciones sin gastos"
+          tituloOperacion=""
+          selectedRecords={zarandeosSeleccionados}
+          onSelectedRecordsChange={setZarandeosSeleccionados}
+          onVerGastos={(idGrupo) =>
+            setGastosModal({ idGrupo, idsMiembros: [] })
+          }
+          barraSeleccion={barraSeleccionZarandeos}
         />
-      </Paper>
+      </div>
 
       {/* Modal Ajustar Stock */}
       {stockToEdit && (
@@ -987,43 +1096,44 @@ export const PanelZarandeo = () => {
 
       {/* Modal Registrar Zarandeo */}
       <ModalRegistrarZarandeo
-        opened={openNuevoTamizaje}
-        onClose={() => setOpenNuevoTamizaje(false)}
+        opened={openNuevoTamizaje || Boolean(zarandeoEditar)}
+        zarandeo={zarandeoEditar}
+        onClose={() => {
+          setOpenNuevoTamizaje(false);
+          setZarandeoEditar(null);
+        }}
         onGuardado={(nuevoTamizaje) => {
-          setTamizajes((prev) => [nuevoTamizaje, ...prev]);
+          setTamizajes((prev) =>
+            zarandeoEditar
+              ? prev.map((t) =>
+                  t.id_zarandeo_carbon === nuevoTamizaje.id_zarandeo_carbon
+                    ? nuevoTamizaje
+                    : t,
+                )
+              : [nuevoTamizaje, ...prev],
+          );
+          setZarandeoEditar(null);
           cargarStocks();
-          // Se abre el detalle de gastos para cargarlo de inmediato, que es
-          // cuando el usuario aun tiene el contexto fresco de la operacion.
-          setZarandeoGastos(nuevoTamizaje);
         }}
       />
 
-      {/* Modal Gastos de Producción */}
-      {zarandeoGastos && (
+      {/* Modal Gastos de Producción (por grupo de zarandeos) */}
+      {gastosModal && (
         <ModalGastosProduccion
-          opened={Boolean(zarandeoGastos)}
-          onClose={() => setZarandeoGastos(null)}
-          destino={{
-            tipo: "zarandeo",
-            id: zarandeoGastos.id_zarandeo_carbon,
+          opened
+          onClose={() => setGastosModal(null)}
+          tipo={TipoOperacionGrupoGastos.Zarandeo}
+          idGrupoInicial={gastosModal.idGrupo}
+          idsMiembrosIniciales={gastosModal.idsMiembros}
+          onGuardado={() => {
+            // Solo cambian los grupos (y de paso, que operacion quedo
+            // agrupada): no se recarga el stock ni el resto de la vista.
+            cargarGruposGastos();
+            cargarTamizajes();
           }}
-          tituloDestino={`${zarandeoGastos.tipo_carbon_nombre} · ${zarandeoGastos.calidad ?? "Sin calidad"} · ${formatTN(zarandeoGastos.cantidad_zarandeada)} · ${formatDateTime(zarandeoGastos.fecha_hora_zarandeo)}`}
-          onGuardado={(gasto) => {
-            // El contador de gastos de la fila se actualiza en local: no
-            // hace falta volver a listar todo el periodo.
-            setTamizajes((prev) =>
-              prev.map((t) =>
-                t.id_zarandeo_carbon === gasto.id_zarandeo_carbon
-                  ? {
-                      ...t,
-                      gastos_cantidad: (t.gastos_cantidad ?? 0) + 1,
-                      gastos_total:
-                        (Number(t.gastos_total) || 0) +
-                        (Number(gasto.total) || 0),
-                    }
-                  : t,
-              ),
-            );
+          onCerrar={() => {
+            // Cerrar el modal no recarga nada: solo se limpia la seleccion.
+            setZarandeosSeleccionados([]);
           }}
         />
       )}

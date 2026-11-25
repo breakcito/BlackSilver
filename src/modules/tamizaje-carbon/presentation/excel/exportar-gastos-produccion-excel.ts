@@ -121,6 +121,11 @@ const COLUMNAS: Columna[] = [
     valor: (f) => fechaPagoTexto(f.fecha_pago),
   },
   {
+    titulo: "MEDIO DE PAGO",
+    ancho: 15,
+    valor: (f) => f.medio_pago || "",
+  },
+  {
     titulo: "MES",
     ancho: 11,
     valor: (f) =>

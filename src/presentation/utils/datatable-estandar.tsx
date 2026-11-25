@@ -14,7 +14,7 @@ const generateUUID = () =>
 // Tipos flexibles: hacen `accessor` e `id` opcionales a nivel de API pública.
 // El componente asigna UUIDs automáticamente cuando faltan.
 type FlexibleColumn = Omit<DataTableColumn<any>, "accessor" | "id"> & {
-  accessor?: string;
+  accessor?: DataTableColumn<any>["accessor"];
   id?: string;
 };
 type FlexibleGroup = Omit<DataTableColumnGroup<any>, "id"> & { id?: string };

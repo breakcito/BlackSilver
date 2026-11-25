@@ -2,6 +2,7 @@ import type { RES_CambiosLog } from "../../../service/responses/_generic/cambios
 import type { IArchivo } from "../../../shared/interfaces/archivo";
 import type { TipoCalidadCarbon } from "../../../shared/enums/carbon/tipo-calidad-carbon";
 import type { TipoGastoZarandeo } from "../../../shared/enums/carbon/tipo-gasto-zarandeo";
+import type { TipoOperacionGrupoGastos } from "../../../shared/enums/carbon/tipo-operacion-grupo-gastos";
 
 export interface StockCarbonItem {
   id_stock_carbon: number;
@@ -42,6 +43,8 @@ export interface CargaZarandeoItem {
 
 export interface ZarandeoCarbonItem {
   id_zarandeo_carbon: number;
+  /** Grupo de gastos al que pertenece (null si todavia no esta agrupado). */
+  id_grupo_gastos?: number | null;
   id_almacen: number;
   almacen_nombre: string;
   id_empleado_registro: number;
@@ -76,14 +79,15 @@ export interface GrupoCargasItem {
   tipo_carbon_codigo?: string | null;
   calidad: TipoCalidadCarbon | null;
   cantidad_cargas: number;
+
   cantidad_total: number;
   cargas: CargaZarandeoItem[];
 }
 
 export interface GastoZarandeoItem {
   id_gasto_produccion_carbon: number;
-  id_zarandeo_carbon: number | null;
-  id_blending_carbon: number | null;
+  /** Grupo de gastos al que pertenece (zarandeo o blending). */
+  id_grupo_gastos: number | null;
   id_empleado_registro: number;
   empleado_registro: string;
   id_proveedor?: number | null;
@@ -102,7 +106,26 @@ export interface GastoZarandeoItem {
   esta_pagado?: number | boolean;
   /** Fecha en la que se pago (puede ser retroactiva). */
   fecha_pago?: string | null;
+  /** Efectivo | Transferencia | Yape. */
+  medio_pago?: string | null;
   created_at?: string;
+}
+
+/**
+ * Resumen de una operacion agrupada: sus gastos y el total.
+ */
+export interface GrupoGastosItem {
+  id_grupo_gastos: number;
+  /** 'zarandeo' | 'blending' */
+  tipo: TipoOperacionGrupoGastos;
+  /** Fecha de la operacion agrupada. */
+  fecha_inicio?: string | null;
+  /** Cantidad de gastos registrados. */
+  gastos_cantidad: number;
+  /** Suma de los totales de los gastos. */
+  gastos_total: number | string;
+  /** Suma de los gastos que aun no se han pagado. */
+  gastos_pendientes: number | string;
 }
 
 /**
@@ -114,11 +137,13 @@ export interface GastoZarandeoItem {
  */
 export interface RES_GastoProduccionExport {
   id_gasto_produccion_carbon: number;
+  /** Operacion agrupada a la que pertenece el gasto. */
+  id_grupo_gastos?: number | null;
   /** Zarandeo o blending. */
   origen: "zarandeo" | "blending";
-  /** Correlativo del blending o "Zarandeo #id". */
+  /** Operaciones agrupadas: "Zarandeo #3, Zarandeo #4" o los correlativos. */
   registro: string | null;
-  /** Fecha y hora del zarandeo o del blending al que se carga el gasto. */
+  /** Fecha y hora de la operacion agrupada. */
   fecha_inicio: string | null;
   gasto: TipoGastoZarandeo;
   otro_gasto?: string | null;
@@ -134,6 +159,7 @@ export interface RES_GastoProduccionExport {
   total: number;
   esta_pagado?: number | boolean;
   fecha_pago?: string | null;
+  medio_pago?: string | null;
 }
 
 /**
@@ -159,6 +185,8 @@ export interface BlendingDetalleItem {
 
 export interface BlendingCarbonItem {
   id_blending_carbon: number;
+  /** Grupo de gastos al que pertenece (null si todavia no esta agrupado). */
+  id_grupo_gastos?: number | null;
   correlativo: string;
   numero_correlativo: number;
   id_almacen: number;

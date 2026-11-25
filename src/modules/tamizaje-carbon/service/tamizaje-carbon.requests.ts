@@ -1,4 +1,5 @@
 import type { TipoGastoZarandeo } from "../../../shared/enums/carbon/tipo-gasto-zarandeo";
+import type { TipoOperacionGrupoGastos } from "../../../shared/enums/carbon/tipo-operacion-grupo-gastos";
 
 export interface ActualizarStockManualRequest {
   stock_actual: number;
@@ -22,6 +23,20 @@ export interface RegistrarZarandeoRequest {
   fecha_hora_zarandeo: string;
   variantes: RegistrarZarandeoVariantePayload[];
   evidencias?: File[];
+}
+
+/**
+ * Edita un zarandeo existente.
+ *
+ * El backend revierte el movimiento de stock anterior y vuelve a aplicarlo
+ * con estos valores, asi que el stock queda recalculado.
+ */
+export interface ActualizarZarandeoRequest {
+  id_tipo_carbon: number;
+  calidad: string;
+  cantidad_zarandeada: number;
+  fecha_hora_zarandeo: string;
+  variantes: RegistrarZarandeoVariantePayload[];
 }
 
 /**
@@ -50,19 +65,30 @@ export interface RegistrarBlendingRequest {
 export type ActualizarBlendingRequest = RegistrarBlendingRequest;
 
 /**
- * Gasto de produccion: apunta a un zarandeo O a un blending (solo uno).
+ * Gasto de produccion: se cuelga de un GRUPO de gastos (que reune varios
+ * zarandeos o varios blendings de una misma operacion).
  */
 export interface RegistrarGastoZarandeoPayload {
-  id_zarandeo_carbon?: number;
-  id_blending_carbon?: number;
+  id_grupo_gastos: number;
   gasto: TipoGastoZarandeo;
   otro_gasto?: string | null;
   id_proveedor?: number | null;
   descripcion?: string | null;
   fecha: string;
   numero_reporte?: string | null;
-  hora_inicio?: string | null;
-  hora_fin?: string | null;
-  cantidad?: number;
+  /** Cantidad: horas (pala/lanza) o unidades del gasto. */
+  cantidad: number;
   precio_unitario: number;
+}
+
+/**
+ * Crea un grupo de gastos y le asigna las operaciones indicadas.
+ *
+ * El grupo no lleva fecha ni descripcion: el periodo y la composicion los
+ * define el conjunto de operaciones que se agrupan.
+ */
+export interface CrearGrupoGastosRequest {
+  /** 'zarandeo' | 'blending' */
+  tipo: TipoOperacionGrupoGastos;
+  ids_miembros: number[];
 }

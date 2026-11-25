@@ -53,6 +53,11 @@ export interface ActualizarCargaRequest {
   porcentaje_humedad?: number;
   precio_unitario?: number;
   costo_flete_por_tonelada?: number;
+  /**
+   * Indica si la carga entra al flujo de zarandeo. Si es `false`, la carga no
+   * se ofrece en el modulo de produccion.
+   */
+  sera_zarandeado?: boolean;
 }
 
 export interface CargaFormItem {
@@ -75,6 +80,11 @@ export interface CargaFormItem {
   porcentaje_humedad?: number;
   precio_unitario: number;
   id_tarifa_carbon?: number | null;
+  /**
+   * Si la carga se zarandeara en planta. Por defecto `true`: solo las cargas
+   * marcadas como `false` quedan fuera del listado de zarandeo.
+   */
+  sera_zarandeado?: boolean;
   archivos?: File[];
 }
 

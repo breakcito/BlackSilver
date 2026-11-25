@@ -63,8 +63,8 @@ export interface CompraCarbonResumen {
   total_real_subtotal: number;
   /** Suma del neto_a_pagar de las cargas. */
   total_real_neto: number;
-  /** Suma del flete_neto_a_pagar de las cargas. */
-  total_real_flete_neto: number;
+  /** Suma del flete_total_a_pagar de las cargas. */
+  total_real_flete_total: number;
   log_cambios?: RES_CambiosLog[] | null;
 }
 
@@ -108,6 +108,8 @@ export interface CargaCompraCarbonItem {
   guia_transportista: string | null;
   pagar_flete: boolean;
   codigo_ticket_balanza: string;
+  /** Si la carga entra al flujo de zarandeo. */
+  sera_zarandeado: boolean | number;
   cantidad: number;
   porcentaje_ceniza: number;
   /** Calidad deducida del % de ceniza: Baja | Intermedia | Alta. */

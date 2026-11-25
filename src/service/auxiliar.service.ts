@@ -729,12 +729,14 @@ export const AuxService = {
 
   /**
    * Crea un transportista en el catalogo. Pensado para el boton "+".
+   *
+   * El transportista se identifica SIEMPRE con RUC: persona juridica (prefijo
+   * 20) o natural (prefijo 10). El DNI no se usa en este catalogo.
    */
   crear_transportista: async (nuevoTransportista: {
     tipo_entidad: TipoEntidad;
     razon_social: string;
-    ruc?: string | null;
-    dni?: string | null;
+    ruc: string;
     telefono?: string | null;
   }): Promise<IRespuesta<RES_Transportista>> => {
     const { data } = await api.post<IRespuesta<RES_Transportista>>(

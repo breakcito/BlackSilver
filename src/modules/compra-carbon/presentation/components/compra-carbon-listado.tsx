@@ -100,17 +100,15 @@ const MOSTRAR_HISTORIAL_CAMBIOS = false;
  * con el del comprobante. Se muestra el del comprobante, que es el que se
  * paga.
  */
-const calcularNetoReal = (compra: CompraCarbonResumen): number => {
+
+const calcularTotalReal = (compra: CompraCarbonResumen): number => {
   const subtotal = Number(compra.total_real_subtotal || 0);
   const pctIgv = Number(compra.porcentaje_igv || 0);
-  const pctDetraccion = Number(compra.porcentaje_detraccion || 0);
 
   const igv = pctIgv > 0 ? round2((subtotal * pctIgv) / 100) : 0;
   const total = round2(subtotal + igv);
-  const detraccion =
-    pctDetraccion > 0 ? Math.round((total * pctDetraccion) / 100) : 0;
 
-  return round2(total - detraccion);
+  return round2(total);
 };
 
 /**
@@ -699,11 +697,11 @@ export const CompraCarbonListado = ({
             {formatNumber(Number(r.total_toneladas_reales), 2)} TN
           </Text>
           <Text size="xs" c="white" className="font-mono" fw={800}>
-            Neto: S/. {formatNumber(calcularNetoReal(r))}
+            Total: S/. {formatNumber(calcularTotalReal(r))}
           </Text>
           {(r.cantidad_cargas_con_flete ?? 0) > 0 && (
             <Text size="10px" c="blue.4" className="font-mono" fw={700}>
-              Flete: S/. {formatNumber(r.total_real_flete_neto)}
+              Flete: S/. {formatNumber(r.total_real_flete_total)}
             </Text>
           )}
         </Stack>
@@ -1016,7 +1014,6 @@ export const CompraCarbonListado = ({
           ),
         }}
       />
-
 
       {/* Modal Registrar Cargas */}
       {modalCargas && (

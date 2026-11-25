@@ -10,10 +10,11 @@ import type { RES_GastoProduccionExport } from "../service/tamizaje-carbon.respo
 /**
  * Exportacion de los gastos de produccion.
  *
- * Dos Modalidades:
+ * Dos modalidades:
  *  - general: todos los gastos (de zarandeo y de blending) del periodo
  *    elegido,
- *  - individual: los gastos de un solo zarandeo o de un solo blending.
+ *  - por grupo: los gastos de un grupo de operaciones (un zarandeo y sus
+ *    gastos comparten grupo).
  *
  * El archivo se encola al portal global de Excel: la generacion no bloquea
  * el hilo principal porque el reporte puede traer muchas filas.
@@ -90,15 +91,13 @@ export const useExportarGastosProduccion = () => {
     [generar, notifyError],
   );
 
-  /** Export individual: los gastos de un solo zarandeo. */
-  const exportarZarandeo = useCallback(
-    async (idZarandeo: number, registro?: string) => {
-      setIdExportando(idZarandeo);
+  /** Export de un grupo de gastos (el de un zarandeo o de un blending). */
+  const exportarGrupo = useCallback(
+    async (idGrupo: number, registro?: string) => {
+      setIdExportando(idGrupo);
       setExportando(true);
       try {
-        const resp = await TamizajeCarbonService.getGastosExportarZarandeo(
-          idZarandeo,
-        );
+        const resp = await TamizajeCarbonService.getGastosExportarGrupo(idGrupo);
         if (!resp.success || !resp.data) {
           notifyError(resp.message || "No se pudieron cargar los gastos");
           return;
@@ -107,39 +106,8 @@ export const useExportarGastosProduccion = () => {
         generar(
           resp.data,
           "GASTOS DE PRODUCCIÓN",
-          registro ? `Zarandeo ${registro}` : `Zarandeo #${idZarandeo}`,
-          `Gastos_produccion_zarandeo_${registro ?? idZarandeo}`,
-        );
-      } catch (error) {
-        console.error(error);
-        notifyError("Ocurrió un error al generar el Excel de gastos");
-      } finally {
-        setExportando(false);
-        setIdExportando(null);
-      }
-    },
-    [generar, notifyError],
-  );
-
-  /** Export individual: los gastos de un solo blending. */
-  const exportarBlending = useCallback(
-    async (idBlending: number, registro?: string) => {
-      setIdExportando(idBlending);
-      setExportando(true);
-      try {
-        const resp = await TamizajeCarbonService.getGastosExportarBlending(
-          idBlending,
-        );
-        if (!resp.success || !resp.data) {
-          notifyError(resp.message || "No se pudieron cargar los gastos");
-          return;
-        }
-
-        generar(
-          resp.data,
-          "GASTOS DE PRODUCCIÓN",
-          registro ? `Blending ${registro}` : `Blending #${idBlending}`,
-          `Gastos_produccion_blending_${registro ?? idBlending}`,
+          registro ? `Grupo ${registro}` : `Grupo #${idGrupo}`,
+          `Gastos_produccion_grupo_${registro ?? idGrupo}`,
         );
       } catch (error) {
         console.error(error);
@@ -154,8 +122,7 @@ export const useExportarGastosProduccion = () => {
 
   return {
     exportarPorRango,
-    exportarZarandeo,
-    exportarBlending,
+    exportarGrupo,
     exportando,
     idExportando,
   };

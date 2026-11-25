@@ -93,8 +93,6 @@ export interface TotalesLiquidacion {
   detraccionADepositar: number;
   detraccionDepositada: number;
   detraccionPendiente: number;
-  /** Cargas todavia no facturadas al proveedor. */
-  cargasPendientes: number;
   aplicaIgv: boolean;
   pctIgv: number;
   pctDetraccion: number;
@@ -205,10 +203,6 @@ export const calcularTotalesLiquidacion = (
     Math.max(0, detraccionADepositar - detraccionDepositada),
   );
 
-  const pendientes = cargas.filter(
-    (c) => !c.id_comprobante_compra_carbon && c.estado !== "Anulado",
-  );
-
   return {
     totalTM: round2(totalTM),
     subtotal,
@@ -223,7 +217,6 @@ export const calcularTotalesLiquidacion = (
     detraccionADepositar,
     detraccionDepositada,
     detraccionPendiente,
-    cargasPendientes: pendientes.length,
     aplicaIgv,
     pctIgv,
     pctDetraccion,
@@ -580,28 +573,6 @@ export const pintarLiquidacionEnHoja = (
     };
     detPendRow.getCell(21).numFmt = "S/ #,##0.00";
     detPendRow.getCell(21).border = borderThin;
-  }
-
-  // Cargas que todavia no se han facturado al proveedor.
-  if (t.cargasPendientes > 0) {
-    linea += 2;
-    const pendRow = ws.getRow(linea);
-    ws.mergeCells(linea, 19, linea, 20);
-    pendRow.getCell(19).value = "CARGAS PENDIENTES DE FACTURAR:";
-    pendRow.getCell(19).font = {
-      ...fontHeader,
-      size: 9,
-      color: { argb: "FF9C5700" },
-    };
-    pendRow.getCell(19).alignment = { vertical: "middle", horizontal: "right" };
-    pendRow.getCell(19).border = borderThin;
-    pendRow.getCell(21).value = t.cargasPendientes;
-    pendRow.getCell(21).font = {
-      ...fontHeader,
-      size: 9,
-      color: { argb: "FF9C5700" },
-    };
-    pendRow.getCell(21).border = borderThin;
   }
 
   return linea;

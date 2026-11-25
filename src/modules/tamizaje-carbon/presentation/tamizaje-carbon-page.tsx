@@ -19,38 +19,45 @@ export const TamizajeCarbonPage = () => {
 
   const [vista, setVista] = useState<"zarandeo" | "blending">("zarandeo");
 
+  /** Selector de vista: se muestra a la izquierda de los filtros. */
+  const selectorVista = (
+    <SegmentedControl
+      value={vista}
+      onChange={(valor) => setVista(valor as "zarandeo" | "blending")}
+      size="xs"
+      radius="lg"
+      data={[
+        {
+          value: "zarandeo",
+          label: (
+            <span className="flex items-center gap-1.5">
+              <IconScale size={14} />
+              Zarandeo
+            </span>
+          ),
+        },
+        {
+          value: "blending",
+          label: (
+            <span className="flex items-center gap-1.5">
+              <IconStack2 size={14} />
+              Blending
+            </span>
+          ),
+        },
+      ]}
+    />
+  );
+
   return (
     <div className="space-y-5 animate-fade-in text-zinc-100">
-      <div className="flex items-center justify-center">
-        <SegmentedControl
-          value={vista}
-          onChange={(valor) => setVista(valor as "zarandeo" | "blending")}
-          size="xs"
-          radius="lg"
-          data={[
-            {
-              value: "zarandeo",
-              label: (
-                <span className="flex items-center gap-1.5">
-                  <IconScale size={14} />
-                  Zarandeo
-                </span>
-              ),
-            },
-            {
-              value: "blending",
-              label: (
-                <span className="flex items-center gap-1.5">
-                  <IconStack2 size={14} />
-                  Blending
-                </span>
-              ),
-            },
-          ]}
-        />
-      </div>
-
-      {vista === "zarandeo" ? <PanelZarandeo /> : <PanelBlending />}
+      {/* El selector de vista va como primer elemento de la barra de filtros
+          de cada panel: asi queda a la izquierda de los filtros. */}
+      {vista === "zarandeo" ? (
+        <PanelZarandeo selector={selectorVista} />
+      ) : (
+        <PanelBlending selector={selectorVista} />
+      )}
     </div>
   );
 };

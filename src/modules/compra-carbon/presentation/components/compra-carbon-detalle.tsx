@@ -88,7 +88,7 @@ export const CompraCarbonDetalle = ({
   const cargas = detalle.cargas;
 
   return (
-    <div className="space-y-2 p-4">
+    <div className="space-y-2 p-2 mb-16">
       <Group justify="space-between" align="center" mb="xs">
         <Group gap="xs">
           <Text
@@ -127,7 +127,7 @@ export const CompraCarbonDetalle = ({
               <tr>
                 <th className="px-3 py-2 text-center w-8">#</th>
                 <th className="py-2 text-center w-24">Tipo</th>
-                <th className="px-3 py-2 text-center w-16">Ticket</th>
+                <th className="px-3 py-2 text-center w-24">Vehículo</th>
                 <th className="px-3 py-2 text-center w-28">Lugar Ext.</th>
                 <th className="px-3 py-2 text-center w-32">Transportista</th>
                 <th className="px-3 py-2 text-center w-24">GR / GT</th>
@@ -135,9 +135,8 @@ export const CompraCarbonDetalle = ({
                 <th className="px-3 py-2 text-center w-24">Toneladas</th>
                 <th className="px-3 py-2 text-center w-24">Flete x TN</th>
                 <th className="px-3 py-2 text-center w-24">Subtotal</th>
-                <th className="px-3 py-2 text-center w-24">IGV</th>
-                <th className="px-3 py-2 text-center w-24">Detr.</th>
-                <th className="px-3 py-2 text-center w-24">Neto</th>
+                <th className="px-3 py-2 text-center w-24">Total</th>
+                <th className="px-3 py-2 text-center w-24">Neto / Detr.</th>
                 <th className="px-3 py-2 text-center w-32">Estado</th>
               </tr>
             </thead>
@@ -167,8 +166,40 @@ export const CompraCarbonDetalle = ({
                       )}
                     </Stack>
                   </td>
-                  <td className="px-3 py-2 font-mono text-zinc-300 text-center">
-                    {d.codigo_ticket_balanza || <Text c="dimmed">—</Text>}
+                  <td className="px-3 py-2 text-center">
+                    <Stack gap={3}>
+                      <Text c="indigo.3" fw={700} size="xs">
+                        <span className="text-gray-300">Placa:</span>{" "}
+                        {d.placa || "—"}
+                      </Text>
+                      <Text c="pink" fw={700} size="xs">
+                        <span className="text-gray-300">Ticket:</span>{" "}
+                        {d.codigo_ticket_balanza || "—"}
+                      </Text>
+                      {/* Indica si la carga entra al flujo de zarandeo en
+                        planta: las que no, no se ofrecen en produccion. */}
+                      {Number(d.sera_zarandeado) === 0 ? (
+                        <Badge
+                          size="sm"
+                          variant="light"
+                          color="gray"
+                          radius="sm"
+                          mt={2}
+                        >
+                          No se zarandea
+                        </Badge>
+                      ) : (
+                        <Badge
+                          size="sm"
+                          variant="light"
+                          color="teal"
+                          radius="sm"
+                          mt={2}
+                        >
+                          Sí se zarandea
+                        </Badge>
+                      )}
+                    </Stack>
                   </td>
                   <td className="px-3 py-2 text-center text-zinc-300">
                     {d.lugar_extraccion_direccion || <Text c="dimmed">—</Text>}
@@ -241,22 +272,25 @@ export const CompraCarbonDetalle = ({
                     </Text>
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <Text size="xs" fw={700} c={"gray.4"}>
-                      {formatPEN(Number(d.monto_igv))}
+                    <Text size="xs" c={"teal"} fw={800}>
+                      {formatNumber(Number(d.total))} TN
+                    </Text>
+                    <Text size="11px" mt={5} c={"yellow"} fw={600}>
+                      IGV: {formatPEN(Number(d.monto_igv))}
                     </Text>
                   </td>
                   <td className="px-3 py-2 text-center">
+                    <Text size="xs" c={"teal"} fw={800}>
+                      {formatNumber(Number(d.neto_a_pagar))} TN
+                    </Text>
                     <Text size="xs" fw={700} c={"orange.4"}>
                       {formatPEN(Number(d.monto_detraccion))}
                     </Text>
                   </td>
-                  <td className="px-3 py-2 text-center font-mono text-emerald-400 font-bold">
-                    {formatPEN(Number(d.neto_a_pagar))}
-                  </td>
                   <td className="px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       <Badge
-                        size="xs"
+                        size="sm"
                         variant="light"
                         color={
                           d.estado === "Pagado"
@@ -271,11 +305,7 @@ export const CompraCarbonDetalle = ({
                       {/* Lapicito para editar la carga individual. Solo
                           se muestra si la cabecera y la carga lo permiten. */}
                       {puedeEditarCarga(d, detalle.cabecera) && (
-                        <Tooltip
-                          label="Editar carga"
-                          withArrow
-                          position="top"
-                        >
+                        <Tooltip label="Editar carga" withArrow position="top">
                           <ActionIcon
                             variant="subtle"
                             color="indigo"

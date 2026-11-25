@@ -136,20 +136,18 @@ export const FormProveedor = ({
         <Grid.Col span={{ base: 12, md: 6 }}>
           <TextInput
             withAsterisk
-            label={tipoEntidad === TipoEntidad.Natural ? "DNI" : "RUC"}
+            label={"RUC"}
             placeholder={
-              tipoEntidad === TipoEntidad.Natural ? "12345678" : "20345678901"
+              tipoEntidad === TipoEntidad.Natural
+                ? "10345678901"
+                : "20345678901"
             }
             radius="xl"
-            maxLength={tipoEntidad === TipoEntidad.Natural ? 8 : 11}
-            value={tipoEntidad === TipoEntidad.Natural ? dni : ruc}
+            maxLength={11}
+            value={ruc}
             onChange={(e) => {
               const val = e.target.value.replace(/\D/g, "");
-              if (tipoEntidad === TipoEntidad.Natural) {
-                setDni(val);
-              } else {
-                setRuc(val);
-              }
+              setRuc(val);
               if (error) setError(null);
             }}
             classNames={inputClasses}

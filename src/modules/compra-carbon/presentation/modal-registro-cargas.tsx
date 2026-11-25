@@ -26,8 +26,6 @@ import {
   IconScale,
   IconReceipt,
   IconCoins,
-  IconAlertTriangle,
-  IconEye,
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
 
@@ -154,20 +152,18 @@ const calcularCostosCarga = (
   const montoIgv = pctIgv > 0 ? round2((subtotalCarga * pctIgv) / 100) : 0;
   const totalCarga = round2(subtotalCarga + montoIgv);
   const montoDetraccion =
-    pctDetraccion > 0 ? round2((totalCarga * pctDetraccion) / 100) : 0;
+    pctDetraccion > 0 ? Math.round((totalCarga * pctDetraccion) / 100) : 0;
   const netoAPagar = round2(totalCarga - montoDetraccion);
 
   // ── COSTOS DE TRANSPORTE ───────────────────────────────────────
-  const fleteSubtotal = carga.pagar_flete
-    ? round2(cantidad * costoFleteTn)
-    : 0;
+  const fleteSubtotal = carga.pagar_flete ? round2(cantidad * costoFleteTn) : 0;
   const fleteIgv =
     pctIgvFlete > 0 ? round2((fleteSubtotal * pctIgvFlete) / 100) : 0;
   const fleteTotal = round2(fleteSubtotal + fleteIgv);
-  const fleteMontoDetraccion =
-    pctDetraccionFlete > 0
-      ? round2((fleteTotal * pctDetraccionFlete) / 100)
-      : 0;
+const fleteMontoDetraccion =
+  pctDetraccionFlete > 0
+    ? Math.round((fleteTotal * pctDetraccionFlete) / 100)
+    : 0;
   const fleteNetoAPagar = round2(fleteTotal - fleteMontoDetraccion);
 
   return {
@@ -203,11 +199,7 @@ const FilaCosto = ({
   color?: string;
 }) => (
   <Group justify="space-between" gap="xs" wrap="nowrap">
-    <Text
-      size="xs"
-      c={destacado ? "zinc.300" : "dimmed"}
-      fw={destacado ? 700 : 500}
-    >
+    <Text size="xs" c={"gray.4"} fw={destacado ? 700 : 500}>
       {etiqueta}
     </Text>
     <Text size="xs" fw={destacado ? 800 : 700} c={color} className="font-mono">
@@ -270,7 +262,8 @@ export const ModalRegistroCargas = ({
       return [
         {
           id_tipo_carbon: cargaInicial.id_tipo_carbon,
-          tipo_despacho: (cargaInicial.tipo_despacho as "Envio" | "Recojo") || "Envio",
+          tipo_despacho:
+            (cargaInicial.tipo_despacho as "Envio" | "Recojo") || "Envio",
           id_almacen_tipo_destino: tipoDestino,
           id_almacen_empresa_llegada: cargaInicial.id_almacen_empresa_llegada
             ? Number(cargaInicial.id_almacen_empresa_llegada)
@@ -299,10 +292,16 @@ export const ModalRegistroCargas = ({
           id_transportista: cargaInicial.id_transportista
             ? Number(cargaInicial.id_transportista)
             : null,
-          costo_flete_por_tonelada: Number(cargaInicial.costo_flete_por_tonelada) || 0,
+          costo_flete_por_tonelada:
+            Number(cargaInicial.costo_flete_por_tonelada) || 0,
           id_tarifa_carbon: cargaInicial.id_tarifa_carbon
             ? Number(cargaInicial.id_tarifa_carbon)
             : null,
+          sera_zarandeado:
+            cargaInicial.sera_zarandeado === undefined ||
+            cargaInicial.sera_zarandeado === null
+              ? true
+              : Boolean(cargaInicial.sera_zarandeado),
           archivos: [],
         },
       ];
@@ -329,6 +328,7 @@ export const ModalRegistroCargas = ({
         id_transportista: null,
         costo_flete_por_tonelada: 0,
         id_tarifa_carbon: null,
+        sera_zarandeado: true,
         archivos: [],
       },
     ];
@@ -470,6 +470,7 @@ export const ModalRegistroCargas = ({
         id_transportista: null,
         costo_flete_por_tonelada: 0,
         id_tarifa_carbon: null,
+        sera_zarandeado: true,
         archivos: [],
       },
     ]);
@@ -597,6 +598,7 @@ export const ModalRegistroCargas = ({
         id_tarifa_carbon: c.id_tarifa_carbon
           ? Number(c.id_tarifa_carbon)
           : null,
+        sera_zarandeado: c.sera_zarandeado !== false,
         archivos: c.archivos,
       }));
 
@@ -625,6 +627,7 @@ export const ModalRegistroCargas = ({
           porcentaje_humedad: c.porcentaje_humedad,
           precio_unitario: c.precio_unitario,
           costo_flete_por_tonelada: c.costo_flete_por_tonelada,
+          sera_zarandeado: c.sera_zarandeado !== false,
         };
         const res = await CompraCarbonService.actualizarCarga(
           compra.id_compra_carbon,
@@ -699,9 +702,7 @@ export const ModalRegistroCargas = ({
 
     carbon.total = round2(carbon.total);
     carbon.detraccion =
-      pctDetraccion > 0
-        ? Math.round((carbon.total * pctDetraccion) / 100)
-        : 0;
+      pctDetraccion > 0 ? Math.round((carbon.total * pctDetraccion) / 100) : 0;
     carbon.neto = round2(carbon.total - carbon.detraccion);
 
     transporte.total = round2(transporte.total);
@@ -718,7 +719,7 @@ export const ModalRegistroCargas = ({
   const hayFlete = cargas.some((c) => c.pagar_flete);
 
   return (
-    <Stack gap="md">
+    <Stack gap="xs">
       {/* Impuestos de la orden: se leen de la compra a la que pertenece la
           carga. No son un parametro del registro. */}
       <Group justify="space-between">
@@ -800,6 +801,44 @@ export const ModalRegistroCargas = ({
                     Carga #{index + 1}
                   </Badge>
                   <Divider orientation="vertical" size="xs" />
+
+                  {/* El zarandeo se decide al ingresar la carga: solo las
+                      cargas marcadas como "se zarandea" se ofrecen luego en
+                      el modulo de produccion. */}
+                  <Tooltip
+                    label={
+                      carga.sera_zarandeado
+                        ? "Esta carga se ofrecera para zarandear en produccion. Desactivalo si el carbon se vendera tal cual."
+                        : "Esta carga NO se ofrecera para zarandear en produccion."
+                    }
+                    withArrow
+                    position="top"
+                    multiline
+                    w={260}
+                  >
+                    <Switch
+                      size="xs"
+                      color="teal"
+                      checked={carga.sera_zarandeado}
+                      onChange={(e) =>
+                        handleChangeCarga(
+                          index,
+                          "sera_zarandeado",
+                          e.currentTarget.checked,
+                        )
+                      }
+                      label={
+                        <Text
+                          size="xs"
+                          c="gray"
+                          style={{ cursor: "pointer" }}
+                        >
+                          Se zarandea
+                        </Text>
+                      }
+                      labelPosition="left"
+                    />
+                  </Tooltip>
 
                   <div className="flex items-center gap-2">
                     <Text
@@ -1185,68 +1224,58 @@ export const ModalRegistroCargas = ({
                     radius="lg"
                   />
                   {/* Indicador de Tarifa aplicada según % de ceniza */}
-                  {carga.id_tipo_carbon &&
-                    Number(carga.porcentaje_ceniza) > 0 && (
-                      <div className="flex items-center gap-2 flex-wrap pt-1">
-                        {(() => {
-                          const tarifa = tarifaPara(
-                            Number(carga.id_tipo_carbon),
-                            Number(carga.porcentaje_ceniza),
-                          );
-                          if (tarifa) {
-                            return (
-                              <Badge
-                                color="teal"
-                                variant="light"
-                                size="sm"
-                                radius="md"
-                              >
-                                {`${tarifa.inicio_porcentaje_ceniza}% - ${tarifa.fin_porcentaje_ceniza}% · S/ ${formatNumber(
-                                  Number(tarifa.precio_unitario),
-                                )}`}
-                              </Badge>
+                  <div className="flex items-center gap-2 flex-wrap pt-1 flex-row">
+                    {carga.id_tipo_carbon &&
+                      Number(carga.porcentaje_ceniza) > 0 && (
+                        <>
+                          {(() => {
+                            const tarifa = tarifaPara(
+                              Number(carga.id_tipo_carbon),
+                              Number(carga.porcentaje_ceniza),
                             );
-                          }
-                          return (
-                            <>
+                            if (tarifa) {
+                              return (
+                                <Badge
+                                  color="teal"
+                                  variant="light"
+                                  size="sm"
+                                  radius="md"
+                                >
+                                  {`${tarifa.inicio_porcentaje_ceniza}% - ${tarifa.fin_porcentaje_ceniza}% · S/ ${formatNumber(
+                                    Number(tarifa.precio_unitario),
+                                  )}`}
+                                </Badge>
+                              );
+                            }
+                            return (
                               <Badge
                                 color="yellow"
                                 variant="light"
                                 size="sm"
                                 radius="md"
-                                leftSection={
-                                  <IconAlertTriangle
-                                    size={12}
-                                    className="text-yellow-400"
-                                  />
-                                }
                               >
-                                {`Sin tarifa - ${formatNumber(Number(carga.porcentaje_ceniza))}% de ceniza`}
+                                {`Sin tarifa`}
                               </Badge>
-                              <Tooltip
-                                label="Ver tarifas registradas"
-                                withArrow
-                              >
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="indigo"
-                                  size="sm"
-                                  radius="lg"
-                                  onClick={() => {
-                                    setTargetTarifasListadoIdx(index);
-                                    setOpenListadoTarifas(true);
-                                  }}
-                                  className="font-semibold"
-                                  disabled={saving}
-                                >
-                                  <IconEye size={16} />
-                                </ActionIcon>
-                              </Tooltip>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
+                            );
+                          })()}
+                        </>
+                      )}
+                    <Tooltip label="Ver tarifas registradas" withArrow>
+                      <Button
+                        variant="light"
+                        color="indigo"
+                        size="xs"
+                        radius="lg"
+                        onClick={() => {
+                          setTargetTarifasListadoIdx(index);
+                          setOpenListadoTarifas(true);
+                        }}
+                        disabled={saving}
+                      >
+                        Ver Tarifas
+                      </Button>
+                    </Tooltip>
+                  </div>
                 </div>
               </SimpleGrid>
 
@@ -1410,7 +1439,7 @@ export const ModalRegistroCargas = ({
                       >
                         Costos del carbón
                       </Text>
-                      <Text size="10px" c="gray">
+                      <Text size="10px" c="gray" fw={700}>
                         IGV {formatNumber(pctIgv)}%
                       </Text>
                     </Group>
@@ -1449,7 +1478,7 @@ export const ModalRegistroCargas = ({
                         >
                           Costos de transporte
                         </Text>
-                        <Text size="10px" c="gray">
+                        <Text size="10px" c="gray" fw={700}>
                           IGV {formatNumber(pctIgvFlete)}%
                         </Text>
                       </Group>
@@ -1488,13 +1517,9 @@ export const ModalRegistroCargas = ({
       </Stack>
 
       {/* Resumen agregado de los montos de todas las cargas */}
-      <Paper
-        p="md"
-        radius="lg"
-        className="bg-zinc-900/60 border border-zinc-800"
-      >
-        <Group justify="space-between" mb="xs">
-          <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+      <div className="mt-2">
+        <Group justify="space-between" mb="5px">
+          <Text size="xs" fw={700} c="gray" tt="uppercase">
             Resumen de las cargas
           </Text>
           <Badge color="indigo" variant="light" size="sm">
@@ -1508,14 +1533,18 @@ export const ModalRegistroCargas = ({
             className="bg-zinc-950/60 border border-zinc-800"
           >
             <Text
-              size="10px"
+              size="11px"
               fw={800}
-              c="zinc.400"
-              className="uppercase tracking-wider"
+              c="lime"
+              className="uppercase tracking-wider mb-1.5"
             >
               Costos del carbón
             </Text>
-            <FilaCosto etiqueta="Total" valor={resumen.carbon.total} destacado />
+            <FilaCosto
+              etiqueta="Total"
+              valor={resumen.carbon.total}
+              destacado
+            />
             <FilaCosto
               etiqueta="Monto de detracción"
               valor={resumen.carbon.detraccion}
@@ -1535,10 +1564,10 @@ export const ModalRegistroCargas = ({
               className="bg-zinc-950/60 border border-blue-900/40"
             >
               <Text
-                size="10px"
+                size="11px"
                 fw={800}
                 c="blue.3"
-                className="uppercase tracking-wider"
+                className="uppercase tracking-wider mb-1.5"
               >
                 Costos de transporte
               </Text>
@@ -1561,7 +1590,7 @@ export const ModalRegistroCargas = ({
             </Paper>
           )}
         </SimpleGrid>
-      </Paper>
+      </div>
 
       {/* Los errores de validacion se muestran al pie del modal, junto a los
           botones: son el ultimo dato que el usuario lee antes de corregir. */}
@@ -1587,7 +1616,9 @@ export const ModalRegistroCargas = ({
           loading={saving}
           size="xs"
           radius="lg"
-          leftSection={esEdicionCarga ? <IconPencil size={16} /> : <IconPlus size={16} />}
+          leftSection={
+            esEdicionCarga ? <IconPencil size={16} /> : <IconPlus size={16} />
+          }
         >
           {esEdicionCarga
             ? "Guardar cambios de la carga"

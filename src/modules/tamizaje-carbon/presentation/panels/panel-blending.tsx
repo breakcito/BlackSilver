@@ -28,10 +28,10 @@ import {
 import type { DataTableColumn } from "mantine-datatable";
 
 import { useNotify } from "../../../../hooks/useNotify";
-import { DataTableEstandar } from "../../../../presentation/utils/datatable-estandar";
 import { BotonRecargar } from "../../../../presentation/utils/boton-recargar";
 import { ModalEstandar } from "../../../../presentation/utils/modal-estandar";
 import { formatNumber } from "../../../../shared/functions/formatNumber";
+import { TipoOperacionGrupoGastos } from "../../../../shared/enums/carbon/tipo-operacion-grupo-gastos";
 import { colorCalidadCarbon } from "../../../../shared/functions/calidad-carbon";
 import { getCoincidencias } from "../../../../shared/functions/get-coincidencias";
 import { MESES } from "../../../../shared/variables/meses";
@@ -42,9 +42,13 @@ import { useExportarGastosProduccion } from "../../hooks/useExportarGastosProduc
 import { ModalRegistrarBlending } from "../modal-registrar-blending";
 import { ModalAgregarStockBlending } from "../modal-agregar-stock-blending";
 import { ModalGastosProduccion } from "../modal-gastos-produccion";
+import { OperacionesAgrupadas } from "../components/operaciones-agrupadas";
 import { ModalEvidenciasBlending } from "../modal-evidencias-blending";
 import { ModalRangoFechasExportar } from "../modal-rango-fechas-exportar";
-import type { BlendingCarbonItem } from "../../service/tamizaje-carbon.responses";
+import type {
+  BlendingCarbonItem,
+  GrupoGastosItem,
+} from "../../service/tamizaje-carbon.responses";
 import type { RES_Almacen } from "../../../../service/responses/almacen";
 import type { RES_TipoCarbon } from "../../../tipo-carbon/service/tipo-carbon.responses";
 
@@ -66,8 +70,16 @@ const estilitos = {
  * tienen disponible y las acciones para editarlo, agregarle mas stock o
  * cargarle gastos de produccion.
  */
-export const PanelBlending = () => {
-  const { notifyError } = useNotify();
+interface PanelBlendingProps {
+  /**
+   * Selector de vista. Se muestra como primer elemento de la barra de
+   * filtros, a la izquierda del resto.
+   */
+  selector?: React.ReactNode;
+}
+
+export const PanelBlending = ({ selector }: PanelBlendingProps) => {
+  const { notifyError, notifyInfo } = useNotify();
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -86,9 +98,11 @@ export const PanelBlending = () => {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [openExportarGastos, setOpenExportarGastos] = useState(false);
+  /** Grupos de gastos: cada uno agrupa sus operaciones. */
+  const [gruposGastos, setGruposGastos] = useState<GrupoGastosItem[]>([]);
   const {
     exportarPorRango,
-    exportarBlending,
+    exportarGrupo,
     exportando,
     idExportando,
   } = useExportarGastosProduccion();
@@ -96,13 +110,55 @@ export const PanelBlending = () => {
     useState<BlendingCarbonItem | null>(null);
   const [blendingStock, setBlendingStock] =
     useState<BlendingCarbonItem | null>(null);
-  const [blendingGastos, setBlendingGastos] =
-    useState<BlendingCarbonItem | null>(null);
+  /**
+   * Gastos de producción por grupo. Los gastos no se registran contra un
+   * blending suelto: se registran contra un grupo que reune varios
+   * blendings de la misma operacion.
+   */
+  const [gastosModal, setGastosModal] = useState<{
+    idGrupo: number | null;
+    idsMiembros: number[];
+  } | null>(null);
+  /**
+   * Blendings marcados en la tabla: se agrupan de una sola vez para registrar
+   * los gastos de toda la operacion.
+   */
+  const [blendingsSeleccionados, setBlendingsSeleccionados] = useState<
+    BlendingCarbonItem[]
+  >([]);
   const [detalleModal, setDetalleModal] = useState<BlendingCarbonItem | null>(
     null,
   );
   const [blendingEvidencias, setBlendingEvidencias] =
     useState<BlendingCarbonItem | null>(null);
+
+  // Si el filtro deja fuera un blending marcado, se quita de la seleccion:
+  // agrupar una operacion que no esta en pantalla no tiene sentido.
+  // Grupos de gastos: alimentan los containers de operaciones agrupadas.
+  const cargarGruposGastos = useCallback(async () => {
+    try {
+      const resp = await TamizajeCarbonService.getGruposGastos({
+        tipo: TipoOperacionGrupoGastos.Blending,
+      });
+      setGruposGastos(resp.success && resp.data ? resp.data : []);
+    } catch (err) {
+      console.error(err);
+      setGruposGastos([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarGruposGastos();
+  }, [cargarGruposGastos]);
+
+  useEffect(() => {
+    setBlendingsSeleccionados((prev) => {
+      if (prev.length === 0) return prev;
+      const visibles = new Set(blendings.map((b) => b.id_blending_carbon));
+      const filtrados = prev.filter((b) => visibles.has(b.id_blending_carbon));
+      return filtrados.length === prev.length ? prev : filtrados;
+    });
+  }, [blendings]);
 
   useEffect(() => {
     const fetchMaestros = async () => {
@@ -144,9 +200,19 @@ export const PanelBlending = () => {
     }
   }, [idAlmacen, idTipoCarbon, mes, anio, busquedaDebounced, notifyError]);
 
+  /** Recarga los blendings y los grupos de gastos (los totales cambian). */
+  const recargarTodo = useCallback(async () => {
+    await Promise.all([cargarBlendings(), cargarGruposGastos()]);
+  }, [cargarBlendings, cargarGruposGastos]);
+
   useEffect(() => {
     cargarBlendings();
   }, [cargarBlendings]);
+
+  // Los grupos de gastos se releen cada vez que cambian los blendings: puede
+  // haberse creado un grupo o haber quedado con gastos nuevos.
+  useEffect(() => {
+  }, [blendings]);
 
   const almacenesOptions = useMemo(
     () =>
@@ -363,59 +429,6 @@ export const PanelBlending = () => {
         },
       },
       {
-        accessor: "gastos",
-        title: "Gastos",
-        textAlign: "center",
-        width: 120,
-        render: (r) => (
-          <Group gap={8} justify="center" wrap="nowrap">
-            <Stack gap={0} align="end">
-              <Text size="sm" c="red" fw={700} className="font-mono">
-                S/ {formatNumber(r.gastos_total)}
-              </Text>
-              <Text size="11px" fw={600} c="gray">
-                {r.gastos_cantidad} gasto{r.gastos_cantidad === 1 ? "" : "s"}
-              </Text>
-            </Stack>
-            <Tooltip label="Ver detalle de gastos" withArrow>
-              <ActionIcon
-                variant="light"
-                color="indigo"
-                size="md"
-                radius="md"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setBlendingGastos(r);
-                }}
-              >
-                <CurrencyDollarIcon className="w-4 h-4" />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip
-              label="Exportar los gastos de este blending a Excel"
-              withArrow
-            >
-              <ActionIcon
-                variant="light"
-                color="green"
-                size="md"
-                radius="md"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  exportarBlending(r.id_blending_carbon, r.correlativo);
-                }}
-              >
-                {idExportando === r.id_blending_carbon ? (
-                  <Loader size={14} color="green" />
-                ) : (
-                  <ArrowDownTrayIcon className="w-4 h-4" />
-                )}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        ),
-      },
-      {
         accessor: "responsables",
         title: "Responsables",
         textAlign: "center",
@@ -495,17 +508,117 @@ export const PanelBlending = () => {
                 <PencilSquareIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
+            <Tooltip
+              label={
+                r.id_grupo_gastos
+                  ? "Exportar los gastos del grupo a Excel"
+                  : "Este blending todavía no pertenece a un grupo de gastos"
+              }
+              withArrow
+            >
+              <ActionIcon
+                variant="light"
+                color="green"
+                size="md"
+                radius="md"
+                disabled={!r.id_grupo_gastos}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (r.id_grupo_gastos) exportarGrupo(r.id_grupo_gastos);
+                }}
+              >
+                {idExportando === r.id_grupo_gastos ? (
+                  <Loader size={14} color="green" />
+                ) : (
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                )}
+              </ActionIcon>
+            </Tooltip>
           </Group>
         ),
       },
     ],
-    [exportarBlending, idExportando],
+    [exportarGrupo, idExportando],
   );
+
+  /**
+   * Barra de seleccion: aparece cuando hay operaciones marcadas. Es el unico
+   * lugar desde donde se registran los gastos, y solo existen para el
+   * conjunto de operaciones marcado.
+   */
+  const barraSeleccionBlendings =
+    blendingsSeleccionados.length > 0 ? (
+      <Group
+        justify="space-between"
+        px="md"
+        py="sm"
+        wrap="nowrap"
+        className="bg-zinc-950/70 border border-zinc-800 rounded-xl"
+      >
+        <Group gap="xs" wrap="nowrap">
+          <Badge color="cyan" variant="light" radius="xl" size="sm">
+            {blendingsSeleccionados.length} seleccionado
+            {blendingsSeleccionados.length === 1 ? "" : "s"}
+          </Badge>
+          <Text size="xs" c="dimmed">
+            Se agruparán en una sola operación para registrar sus gastos
+            juntos.
+          </Text>
+        </Group>
+
+        <Group gap="xs" wrap="nowrap">
+          <Button
+            variant="subtle"
+            color="gray"
+            size="compact-xs"
+            onClick={() => setBlendingsSeleccionados([])}
+          >
+            Quitar selección
+          </Button>
+          <Button
+            color="cyan"
+            size="xs"
+            radius="lg"
+            leftSection={<CurrencyDollarIcon className="w-4 h-4" />}
+            onClick={() => {
+              // Solo se agrupan las operaciones que aun no tienen grupo: las
+              // demas ya son parte de otra operacion agrupada.
+              const sinGrupo = blendingsSeleccionados.filter(
+                (b) => !b.id_grupo_gastos,
+              );
+              const yaAgrupados =
+                blendingsSeleccionados.length - sinGrupo.length;
+
+              if (yaAgrupados > 0) {
+                notifyInfo(
+                  `${yaAgrupados} blending(s) ya pertenecen a un grupo y no se vuelven a agrupar.`,
+                );
+              }
+              if (sinGrupo.length === 0) {
+                notifyError(
+                  "Los blendings seleccionados ya pertenecen a un grupo",
+                );
+                return;
+              }
+
+              setGastosModal({
+                idGrupo: null,
+                idsMiembros: sinGrupo.map((b) => b.id_blending_carbon),
+              });
+            }}
+          >
+            Gastos de producción
+          </Button>
+        </Group>
+      </Group>
+    ) : null;
 
   return (
     <div className="space-y-5 text-zinc-100">
       {/* Filtros + acciones */}
       <div className="flex flex-col md:flex-row items-end gap-3 w-full flex-wrap">
+        {selector}
+
         <div className="w-full sm:w-56 md:w-52">
           <Select
             label="Almacén"
@@ -604,7 +717,7 @@ export const PanelBlending = () => {
 
         <div className="flex items-center gap-2 shrink-0">
           <BotonRecargar
-            onReload={cargarBlendings}
+            onReload={recargarTodo}
             loading={loading}
             tooltip="Recargar los blendings"
           />
@@ -632,16 +745,24 @@ export const PanelBlending = () => {
         </div>
       </div>
 
-      {/* Listado */}
-      <Paper className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
-        <DataTableEstandar
-          records={blendings}
-          columns={columns}
-          idAccessor="id_blending_carbon"
-          loading={loading}
-          noRecordsText="No se encontraron blendings en el periodo seleccionado."
-        />
-      </Paper>
+      {/* Operaciones agrupadas: un container por operacion, con el total de
+          sus gastos arriba. Al final, las que todavia no se agruparon. */}
+      <OperacionesAgrupadas
+        grupos={gruposGastos}
+        sinAgrupar={blendings}
+        columns={columns}
+        loading={loading}
+        idAccessor="id_blending_carbon"
+        noRecordsText="No se encontraron blendings en el periodo seleccionado."
+        tituloSinAgrupar="Operaciones sin agrupar"
+        tituloOperacion=""
+        selectedRecords={blendingsSeleccionados}
+        onSelectedRecordsChange={setBlendingsSeleccionados}
+        onVerGastos={(idGrupo) =>
+          setGastosModal({ idGrupo, idsMiembros: [] })
+        }
+        barraSeleccion={barraSeleccionBlendings}
+      />
 
       {/* Modal Exportar gastos por periodo */}
       {openExportarGastos && (
@@ -658,7 +779,8 @@ export const PanelBlending = () => {
       )}
 
       {/* Modal Nuevo / Editar Blending */}
-      <ModalRegistrarBlending        opened={openNuevo || Boolean(blendingEditar)}
+      <ModalRegistrarBlending
+        opened={openNuevo || Boolean(blendingEditar)}
         blending={blendingEditar}
         onClose={() => {
           setOpenNuevo(false);
@@ -684,31 +806,23 @@ export const PanelBlending = () => {
         />
       )}
 
-      {/* Modal Gastos de Producción */}
-      {blendingGastos && (
+      {/* Modal Gastos de Producción (por grupo de blendings) */}
+      {gastosModal && (
         <ModalGastosProduccion
-          opened={Boolean(blendingGastos)}
-          onClose={() => setBlendingGastos(null)}
-          destino={{
-            tipo: "blending",
-            id: blendingGastos.id_blending_carbon,
+          opened
+          onClose={() => setGastosModal(null)}
+          tipo={TipoOperacionGrupoGastos.Blending}
+          idGrupoInicial={gastosModal.idGrupo}
+          idsMiembrosIniciales={gastosModal.idsMiembros}
+          onGuardado={() => {
+            // Solo cambian los grupos (y de paso, que operacion quedo
+            // agrupada): no se recarga el stock ni el resto de la vista.
+            cargarGruposGastos();
+            cargarBlendings();
           }}
-          tituloDestino={`${blendingGastos.correlativo} · ${blendingGastos.tipo_carbon_nombre ?? "—"} · ${formatTN(blendingGastos.stock_actual)}`}
-          onGuardado={(gasto) => {
-            // El contador de gastos de la fila se actualiza en local: no
-            // hace falta volver a listar todo el periodo.
-            setBlendings((prev) =>
-              prev.map((b) =>
-                b.id_blending_carbon === gasto.id_blending_carbon
-                  ? {
-                      ...b,
-                      gastos_cantidad: (b.gastos_cantidad ?? 0) + 1,
-                      gastos_total:
-                        (Number(b.gastos_total) || 0) + (Number(gasto.total) || 0),
-                    }
-                  : b,
-              ),
-            );
+          onCerrar={() => {
+            // Cerrar el modal no recarga nada: solo se limpia la seleccion.
+            setBlendingsSeleccionados([]);
           }}
         />
       )}
