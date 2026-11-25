@@ -17,7 +17,8 @@ import {
   ChartPieIcon,
   WrenchIcon,
   ChartBarIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  PresentationChartLineIcon
 } from "@heroicons/react/24/outline";
 
 // Normaliza un nombre a slug estable (lowercase, sin acentos, guiones).
@@ -132,6 +133,9 @@ export const iconos_menu_navegacion: IconoMenuEntrada[] = [
 
   // Balances
   { path: "balances", icono: ChartPieIcon },
+
+  // Dashboard
+  { path: "dashboard", icono: PresentationChartLineIcon },
 ];
 
 // Lookup hibrido:

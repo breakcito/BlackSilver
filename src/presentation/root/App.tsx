@@ -5,7 +5,7 @@ import { ProtectedRoute } from "./protectedRoute.tsx";
 import { PublicRoute } from "./publicRoute.tsx";
 import { LoginPage } from "../../modules/login/presentation/login.page.tsx";
 import { HomePage } from "../pages/home/home.page.tsx";
-import { ConcesionesPage } from "../../modules/concesiones/presentation/concesiones.page.tsx";
+import { DashboardPage } from "../../modules/dashboard/presentation/dashboard.page.tsx";import { ConcesionesPage } from "../../modules/concesiones/presentation/concesiones.page.tsx";
 import { MinasPage } from "../../modules/minas-labores/presentation/minas.page.tsx";
 import { EmpresasPage } from "../../modules/empresas/presentation/empresas.page.tsx";
 import { CategoriasPage } from "../../modules/categorias/presentation/categorias.page.tsx";
@@ -95,6 +95,9 @@ export const App = () => {
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/perfil" element={<PerfilPage />} />
+
+        {/* Dashboard (indicadores) */}
+        <Route path="/dashboard" element={<DashboardPage />} />
 
         {/* Configuracion (rutas planas) */}
         <Route path="/trabajadores" element={<PersonalPage />} />
