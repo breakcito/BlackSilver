@@ -72,50 +72,24 @@ const Chip = ({ texto, tono }: { texto: string; tono: ITonoDashboard }) => (
 /**
  * Fila de cifras clave del dashboard.
  *
- * Las cuatro fichas son CONTEOS (no montos): soles y dolares no se suman
+ * Las tres fichas son CONTEOS (no montos): soles y dolares no se suman
  * nunca, asi que el dinero vive en su propio bloque, el balance.
+ *
+ * Cada ficha es el resumen GENERAL de su indicador. Los bloques de abajo
+ * desglosan el mismo dato y lo filtran: aqui se responde "cuanto hay", alla
+ * "de donde".
  */
 export const DashboardKpis = ({ datos, loading = false }: Props) => {
-  const alertas = datos.alertas;
   const stock = datos.stock_critico.resumen;
   const mantenimiento = datos.mantenimiento_alertas.resumen;
   const cobros = datos.cobros_pendientes.resumen;
 
-  const totalAlertas = alertas.total;
-  const tonoAlertas = totalAlertas > 0 ? TONOS.red : TONOS.teal;
-
   return (
     <div
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${
+      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${
         loading ? "opacity-40" : ""
       } transition-opacity`}
     >
-      <Kpi
-        titulo="Alertas abiertas"
-        tono={tonoAlertas}
-        valor={totalAlertas}
-        detalle={
-          totalAlertas > 0
-            ? "Pendientes que piden una accion"
-            : "Nada pendiente de atencion"
-        }
-        pie={
-          <div className="flex flex-wrap gap-1.5">
-            <Chip texto={`Stock ${alertas.por_bloque.stock_critico}`} tono={TONOS.yellow} />
-            <Chip texto={`Mant. ${alertas.por_bloque.mantenimiento}`} tono={TONOS.yellow} />
-            <Chip
-              texto={`Compras ${alertas.por_bloque.compras_pendientes}`}
-              tono={TONOS.indigo}
-            />
-            <Chip texto={`Cobros ${alertas.por_bloque.cobros_pendientes}`} tono={TONOS.pink} />
-            <Chip
-              texto={`Logistica ${alertas.por_bloque.pendientes_atencion}`}
-              tono={TONOS.violet}
-            />
-          </div>
-        }
-      />
-
       <Kpi
         titulo="Stock critico"
         tono={stock.sin_stock > 0 ? TONOS.red : TONOS.yellow}
@@ -133,16 +107,6 @@ export const DashboardKpis = ({ datos, loading = false }: Props) => {
         tono={mantenimiento.vencidos > 0 ? TONOS.red : TONOS.yellow}
         valor={mantenimiento.vencidos + mantenimiento.criticos}
         detalle={`${mantenimiento.vencidos} vencidos · ${mantenimiento.criticos} criticos · ${mantenimiento.proximos} proximos`}
-        pie={
-          mantenimiento.umbrales_obsoletos > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              <Chip
-                texto={`${mantenimiento.umbrales_obsoletos} umbral obsoleto`}
-                tono={TONOS.indigo}
-              />
-            </div>
-          ) : undefined
-        }
       />
 
       <Kpi

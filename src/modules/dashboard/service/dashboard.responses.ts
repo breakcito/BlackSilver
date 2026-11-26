@@ -1,20 +1,10 @@
-/** Periodo medido y periodo contra el que se compara. */
+/** Periodo de un indicador de flujo, con su comparativo. */
 export interface RES_PeriodoDashboard {
   fecha_inicio: string;
   fecha_fin: string;
   dias: number;
-}
-
-/** Contador global de alertas abiertas. */
-export interface RES_AlertasDashboard {
-  total: number;
-  por_bloque: {
-    stock_critico: number;
-    mantenimiento: number;
-    compras_pendientes: number;
-    cobros_pendientes: number;
-    pendientes_atencion: number;
-  };
+  comparativo_inicio: string;
+  comparativo_fin: string;
 }
 
 /* ── Indicador 1: stock critico por almacen ─────────────────────────── */
@@ -57,6 +47,20 @@ export interface RES_StockCritico {
 
 /* ── Indicador 2: alertas de mantenimiento ──────────────────────────── */
 
+/** Una dimension de control de un activo (horometro, odometro o vueltas). */
+export interface RES_DimensionMantenimiento {
+  /** "horas" | "kilometros" | "vueltas". */
+  dimension: string;
+  total: number;
+  /** Lectura en la que toca el proximo servicio. */
+  servicio: number;
+  /** Unidades que faltan para el servicio (negativo = vencido). */
+  restantes: number;
+  porcentaje_restante: number;
+  /** "Vencido" | "Crítico" | "Próximo" | "OK". */
+  nivel: string;
+}
+
 export interface RES_ItemMantenimiento {
   id_activo_fijo: number;
   codigo: string | null;
@@ -65,17 +69,15 @@ export interface RES_ItemMantenimiento {
   estado_activo: string;
   id_almacen: number | null;
   almacen: string | null;
-  /** "horas" | "kilometros" | "vueltas". */
+  id_mina: number | null;
+  mina: string | null;
+  /** Todas las dimensiones de control del activo, con su estado propio. */
+  dimensiones: RES_DimensionMantenimiento[];
+  /** Dimension que dispara la alerta. */
   dimension: string;
-  total: number;
-  umbral: number;
-  intervalo: number;
-  restantes: number;
-  porcentaje_restante: number;
-  /** "Vencido" | "Crítico" | "Próximo". */
+  /** Peor nivel entre las dimensiones. */
   nivel: string;
-  /** El contador ya paso el intervalo pero el umbral no se reprogramo. */
-  umbral_obsoleto: boolean;
+  porcentaje_restante: number;
 }
 
 export interface RES_MantenimientoAlertas {
@@ -84,7 +86,6 @@ export interface RES_MantenimientoAlertas {
     vencidos: number;
     criticos: number;
     proximos: number;
-    umbrales_obsoletos: number;
     evaluados: number;
   };
   error?: string;
@@ -110,6 +111,10 @@ export interface RES_BalanceDashboard {
     tipo: string;
     moneda: string;
     monto: number;
+    /** Monto del periodo anterior (0 si no hubo actividad). */
+    anterior: number;
+    /** Variacion porcentual contra el periodo anterior (null si no hubo). */
+    variacion: number | null;
   }[];
   ambitos: {
     ambito: string;
@@ -131,6 +136,10 @@ export interface RES_ItemCompra {
   es_auditable: boolean;
   cantidad_requerida: number;
   cantidad_requerida_base: number;
+  /** Lo ya recibido en las recepciones de la orden. */
+  cantidad_recibida_base: number;
+  /** Lo que falta por recibir: lo pedido menos lo recibido. */
+  cantidad_pendiente_base: number;
   contenido_por_presentacion: number;
   precio_unitario_base: number;
   estado: string;
@@ -151,7 +160,10 @@ export interface RES_OrdenCompraPendiente {
   estado: string;
   dias_antiguedad: number;
   items_total: number;
+  /** Items que aun tienen algo por recibir. */
   items_pendientes: number;
+  /** Suma de lo que falta por recibir en toda la orden. */
+  cantidad_pendiente_base: number;
   pago_vencido: boolean;
   items: RES_ItemCompra[];
 }
@@ -162,6 +174,8 @@ export interface RES_ComprasPendientes {
   resumen: {
     total_ocs: number;
     items_pendientes: number;
+    /** Suma de lo que falta por recibir en todas las ordenes. */
+    cantidad_pendiente_base: number;
     por_moneda: { moneda: string; monto: number; ocs: number }[];
     antiguedad_max_dias: number;
     transferencias_en_transito: number;
@@ -214,7 +228,13 @@ export interface RES_CobrosPendientes {
 /* ── Indicador 8: pendientes de atencion ────────────────────────────── */
 
 export interface RES_PendientesAtencion {
-  etapas: { tipo: string; etapa: string; cantidad: number }[];
+  etapas: {
+    tipo: string;
+    etapa: string;
+    id_almacen: number | null;
+    almacen: string | null;
+    cantidad: number;
+  }[];
   vencidos: {
     tipo: string;
     correlativo: string | null;
@@ -273,10 +293,13 @@ export interface RES_CostoMantenimiento {
 /* ── Payload completo ───────────────────────────────────────────────── */
 
 export interface RES_Dashboard {
-  periodo: RES_PeriodoDashboard;
-  comparativo: RES_PeriodoDashboard;
-  filtros: { id_almacen: number | null };
-  alertas: RES_AlertasDashboard;
+  /** Periodo de cada indicador con fecha. */
+  periodos: {
+    balance: RES_PeriodoDashboard;
+    cobros: RES_PeriodoDashboard;
+    costo: RES_PeriodoDashboard;
+    compras: RES_PeriodoDashboard;
+  };
   stock_critico: RES_StockCritico;
   mantenimiento_alertas: RES_MantenimientoAlertas;
   balance: RES_BalanceDashboard;

@@ -167,21 +167,6 @@ export const aplicarModoAuditoria = (
 
   return {
     ...data,
-    alertas: {
-      ...data.alertas,
-      total:
-        stockItems.length +
-        data.mantenimiento_alertas.resumen.vencidos +
-        data.mantenimiento_alertas.resumen.criticos +
-        ocs.length +
-        data.cobros_pendientes.resumen.total_comprobantes +
-        data.pendientes_atencion.resumen.total,
-      por_bloque: {
-        ...data.alertas.por_bloque,
-        stock_critico: stockItems.length,
-        compras_pendientes: ocs.length,
-      },
-    },
     stock_critico: {
       ...data.stock_critico,
       items: stockItems,

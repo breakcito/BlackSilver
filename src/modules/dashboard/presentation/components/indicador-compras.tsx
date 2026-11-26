@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge, Text } from "@mantine/core";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 
 import { TONOS, TONO_NEUTRO, TONO_PRIMARIO, tonoRecepcion } from "../dashboard-paleta";
 import { formatearCantidad, formatearMonto } from "../dashboard-calculos";
 import { DashboardVacio } from "./dashboard-ui";
+import {
+  DashboardFiltroAlmacen,
+  agruparPorAlmacen,
+  type IOpcionAlmacen,
+} from "./dashboard-filtro-almacen";
 import type { RES_ComprasPendientes } from "../../service/dashboard.responses";
 
 interface Props {
@@ -19,20 +24,99 @@ const LIMITE_INICIAL = 6;
  * El capital comprometido no es del todo perdida, pero mientras la mercaderia
  * no llega el almacen trabaja con menos. Por eso la antiguedad y el vencimiento
  * del pago se muestran al lado del monto.
+ *
+ * El filtro es por almacen RECEPTOR: una orden puede recepcionar en varios
+ * almacenes, asi que al filtrar solo quedan las ordenes con items en ese
+ * almacen y se muestran unicamente esos items.
  */
 export const IndicadorCompras = ({ compras }: Props) => {
   const [verTodos, setVerTodos] = useState(false);
   const [abierta, setAbierta] = useState<number | null>(null);
+  const [almacenActivo, setAlmacenActivo] = useState<number | null>(null);
+
+  const opciones = useMemo<IOpcionAlmacen[]>(
+    () =>
+      agruparPorAlmacen(
+        compras.items
+          .filter((item) => item.id_almacen_recepcionista !== null)
+          .map((item) => ({
+            id_almacen: item.id_almacen_recepcionista as number,
+            almacen: item.almacen,
+          })),
+        (items) => items.length,
+      ).map((opcion) => ({ ...opcion, sufijo: "items" })),
+    [compras.items],
+  );
+
+  const ocsFiltradas = useMemo(() => {
+    if (almacenActivo === null) return compras.ocs;
+
+    return compras.ocs
+      .map((oc) => ({
+        ...oc,
+        items: oc.items.filter(
+          (item) => item.id_almacen_recepcionista === almacenActivo,
+        ),
+      }))
+      .filter((oc) => oc.items.length > 0);
+  }, [compras.ocs, almacenActivo]);
+
+  const resumen = useMemo(() => {
+    if (almacenActivo === null) return compras.resumen;
+
+    const itemsPendientes = ocsFiltradas.reduce(
+      (suma, oc) =>
+        suma +
+        oc.items.filter((item) => item.estado !== "Recepción Completa").length,
+      0,
+    );
+
+    const antiguedad = ocsFiltradas.reduce(
+      (maximo, oc) => Math.max(maximo, oc.dias_antiguedad),
+      0,
+    );
+
+    const porMoneda = new Map<string, { moneda: string; monto: number; ocs: number }>();
+
+    ocsFiltradas.forEach((oc) => {
+      const actual = porMoneda.get(oc.moneda) ?? {
+        moneda: oc.moneda,
+        monto: 0,
+        ocs: 0,
+      };
+      actual.monto += oc.total;
+      actual.ocs += 1;
+      porMoneda.set(oc.moneda, actual);
+    });
+
+    return {
+      ...compras.resumen,
+      total_ocs: ocsFiltradas.length,
+      items_pendientes: itemsPendientes,
+      antiguedad_max_dias: antiguedad,
+      por_moneda: Array.from(porMoneda.values()).map((moneda) => ({
+        ...moneda,
+        monto: Math.round(moneda.monto * 100) / 100,
+      })),
+    };
+  }, [compras.resumen, ocsFiltradas, almacenActivo]);
 
   if (compras.resumen.total_ocs === 0) {
     return <DashboardVacio texto="No hay ordenes de compra sin recepcion" />;
   }
 
-  const visibles = verTodos ? compras.ocs : compras.ocs.slice(0, LIMITE_INICIAL);
-  const resumen = compras.resumen;
+  const visibles = verTodos ? ocsFiltradas : ocsFiltradas.slice(0, LIMITE_INICIAL);
 
   return (
     <div className="space-y-3">
+      {/* Filtro por almacen receptor */}
+      <DashboardFiltroAlmacen
+        opciones={opciones}
+        seleccionado={almacenActivo}
+        onSeleccionar={setAlmacenActivo}
+        sustantivo="items"
+      />
+
       {/* Resumen */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
@@ -46,10 +130,13 @@ export const IndicadorCompras = ({ compras }: Props) => {
 
         <div>
           <Text size="9px" fw={700} className="uppercase tracking-wider text-zinc-500">
-            Items pendientes
+            Por recibir
           </Text>
           <Text size="lg" fw={800} className="tabular-nums text-zinc-100">
             {resumen.items_pendientes}
+          </Text>
+          <Text size="10px" className="tabular-nums text-zinc-500">
+            {formatearCantidad(resumen.cantidad_pendiente_base)} und. base
           </Text>
         </div>
 
@@ -98,9 +185,7 @@ export const IndicadorCompras = ({ compras }: Props) => {
               <span className="font-bold tabular-nums text-indigo-300">
                 {formatearMonto(moneda.moneda, moneda.monto)}
               </span>
-              <span className="text-[10px] text-zinc-500">
-                {moneda.ocs} OC
-              </span>
+              <span className="text-[10px] text-zinc-500">{moneda.ocs} OC</span>
             </span>
           ))}
         </div>
@@ -152,8 +237,8 @@ export const IndicadorCompras = ({ compras }: Props) => {
                   </div>
 
                   <Text size="xs" className="mt-0.5 truncate text-zinc-500">
-                    {oc.proveedor ?? "Sin proveedor"} · {oc.items_pendientes} de{" "}
-                    {oc.items_total} items pendientes · {oc.dias_antiguedad} d
+                    {oc.proveedor ?? "Sin proveedor"} · {oc.cantidad_pendiente_base}{" "}
+                    por recibir · {oc.dias_antiguedad} d
                   </Text>
                 </div>
 
@@ -170,6 +255,8 @@ export const IndicadorCompras = ({ compras }: Props) => {
                 <div className="space-y-1.5 border-t border-zinc-800 px-3 py-2.5">
                   {oc.items.map((item) => {
                     const tono = tonoRecepcion(item.estado);
+                    const unidad = item.unidad ?? "und";
+                    const pendiente = item.cantidad_pendiente_base;
 
                     return (
                       <div
@@ -181,20 +268,31 @@ export const IndicadorCompras = ({ compras }: Props) => {
                             {item.producto}
                           </Text>
                           <Text size="10px" className="truncate text-zinc-600">
+                            {formatearCantidad(item.cantidad_recibida_base)} de{" "}
                             {formatearCantidad(item.cantidad_requerida_base)}{" "}
-                            {item.unidad ?? "und"} · {item.almacen ?? "Sin almacen"}
+                            {unidad} recibidos · {item.almacen ?? "Sin almacen"}
                           </Text>
                         </div>
 
-                        <Badge
-                          size="xs"
-                          radius="sm"
-                          variant="light"
-                          color={tono.chip}
-                          className="shrink-0"
-                        >
-                          {item.estado}
-                        </Badge>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {pendiente > 0 && (
+                            <Text
+                              size="xs"
+                              fw={700}
+                              className="tabular-nums text-yellow-300"
+                            >
+                              Faltan {formatearCantidad(pendiente)} {unidad}
+                            </Text>
+                          )}
+                          <Badge
+                            size="xs"
+                            radius="sm"
+                            variant="light"
+                            color={tono.chip}
+                          >
+                            {item.estado}
+                          </Badge>
+                        </div>
                       </div>
                     );
                   })}
@@ -205,7 +303,7 @@ export const IndicadorCompras = ({ compras }: Props) => {
         })}
       </div>
 
-      {compras.ocs.length > LIMITE_INICIAL && (
+      {ocsFiltradas.length > LIMITE_INICIAL && (
         <button
           type="button"
           onClick={() => setVerTodos((v) => !v)}
@@ -213,7 +311,7 @@ export const IndicadorCompras = ({ compras }: Props) => {
             verTodos ? TONO_NEUTRO.texto : TONO_PRIMARIO.texto
           }`}
         >
-          {verTodos ? "Ver menos" : `Ver las ${compras.ocs.length} ordenes`}
+          {verTodos ? "Ver menos" : `Ver las ${ocsFiltradas.length} ordenes`}
         </button>
       )}
     </div>

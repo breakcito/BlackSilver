@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge, Text } from "@mantine/core";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 import { TONOS, TONO_NEUTRO, tonoMantenimiento } from "../dashboard-paleta";
 import { formatearCantidad } from "../dashboard-calculos";
-import { DashboardBarra, DashboardVacio } from "./dashboard-ui";
+import { DashboardVacio } from "./dashboard-ui";
+import {
+  DashboardFiltroAlmacen,
+  agruparPorAlmacen,
+  type IOpcionAlmacen,
+} from "./dashboard-filtro-almacen";
 import type { RES_MantenimientoAlertas } from "../../service/dashboard.responses";
 
 interface Props {
@@ -13,10 +17,67 @@ interface Props {
 
 const LIMITE_INICIAL = 8;
 
-const UNIDAD_DIMENSION: Record<string, string> = {
-  horas: "h",
-  kilometros: "km",
-  vueltas: "vueltas",
+/**
+ * Como se mide cada dimension de control.
+ *
+ * La misma maquinaria puede llevar horometro, odometro o contador de
+ * vueltas: el badge dice en cual de las tres se esta midiendo la alerta,
+ * porque "faltan 50" no significa lo mismo si son horas, kilometros o
+ * vueltas.
+ */
+const DIMENSION: Record<string, { etiqueta: string; unidad: string }> = {
+  horas: { etiqueta: "Horometro", unidad: "h" },
+  kilometros: { etiqueta: "Odometro", unidad: "km" },
+  vueltas: { etiqueta: "Vueltas", unidad: "vueltas" },
+};
+
+/**
+ * Fila de una dimension de control.
+ *
+ * La maquina puede medir su desgaste en horas, kilometros o vueltas: cada
+ * dimension se muestra con su propio estado, para que se vea cual es la que
+ * aprieta y cual todavia esta holgada.
+ */
+const FilaDimension = ({
+  dimension,
+  total,
+  servicio,
+  restantes,
+  nivel,
+}: {
+  dimension: string;
+  total: number;
+  servicio: number;
+  restantes: number;
+  nivel: string;
+}) => {
+  const tono = tonoMantenimiento(nivel);
+  const info = DIMENSION[dimension] ?? { etiqueta: dimension, unidad: dimension };
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+      <span className="flex w-[86px] shrink-0 items-center gap-1.5 text-zinc-300">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tono.punto}`} />
+        {info.etiqueta}
+      </span>
+
+      <span className="tabular-nums text-zinc-400">
+        Uso {formatearCantidad(total)} {info.unidad}
+      </span>
+
+      <span className="text-zinc-700">→</span>
+
+      <span className="tabular-nums text-zinc-500">
+        Servicio {formatearCantidad(servicio)} {info.unidad}
+      </span>
+
+      <span className={`font-semibold tabular-nums ${tono.texto}`}>
+        {restantes < 0
+          ? `Vencio hace ${formatearCantidad(Math.abs(restantes))} ${info.unidad}`
+          : `Faltan ${formatearCantidad(restantes)} ${info.unidad}`}
+      </span>
+    </div>
+  );
 };
 
 /**
@@ -28,6 +89,40 @@ const UNIDAD_DIMENSION: Record<string, string> = {
  */
 export const IndicadorMantenimiento = ({ mantenimiento }: Props) => {
   const [verTodos, setVerTodos] = useState(false);
+  const [almacenActivo, setAlmacenActivo] = useState<number | null>(null);
+
+  const opciones = useMemo<IOpcionAlmacen[]>(() => {
+    const base = agruparPorAlmacen(
+      mantenimiento.items,
+      (items) => items.length,
+    );
+
+    return base.map((opcion) => {
+      const vencidos = mantenimiento.items.filter(
+        (item) =>
+          item.id_almacen === opcion.id_almacen && item.nivel === "Vencido",
+      ).length;
+
+      return {
+        ...opcion,
+        sufijo: "maquinas",
+        extra:
+          vencidos > 0
+            ? { texto: `${vencidos} vencidos`, tono: TONOS.red }
+            : undefined,
+      };
+    });
+  }, [mantenimiento.items]);
+
+  const items = useMemo(
+    () =>
+      almacenActivo === null
+        ? mantenimiento.items
+        : mantenimiento.items.filter(
+            (item) => item.id_almacen === almacenActivo,
+          ),
+    [mantenimiento.items, almacenActivo],
+  );
 
   if (mantenimiento.items.length === 0) {
     return (
@@ -35,9 +130,7 @@ export const IndicadorMantenimiento = ({ mantenimiento }: Props) => {
     );
   }
 
-  const visibles = verTodos
-    ? mantenimiento.items
-    : mantenimiento.items.slice(0, LIMITE_INICIAL);
+  const visibles = verTodos ? items : items.slice(0, LIMITE_INICIAL);
 
   const resumen = [
     { texto: `${mantenimiento.resumen.vencidos} vencidos`, tono: TONOS.red },
@@ -47,6 +140,15 @@ export const IndicadorMantenimiento = ({ mantenimiento }: Props) => {
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <DashboardFiltroAlmacen
+          opciones={opciones}
+          seleccionado={almacenActivo}
+          onSeleccionar={setAlmacenActivo}
+          sustantivo="maquinas"
+        />
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {resumen.map((chip) => (
           <span
@@ -56,22 +158,19 @@ export const IndicadorMantenimiento = ({ mantenimiento }: Props) => {
             {chip.texto}
           </span>
         ))}
-
-        {mantenimiento.resumen.umbrales_obsoletos > 0 && (
-          <span
-            className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/10 px-2 py-0.5 text-[11px] font-bold text-indigo-300"
-            title="El contador ya supero el intervalo de mantenimiento pero el umbral nunca se reprogramo"
-          >
-            <ExclamationTriangleIcon className="h-3 w-3" />
-            {mantenimiento.resumen.umbrales_obsoletos} umbral obsoleto
-          </span>
-        )}
       </div>
 
       <div className="space-y-2">
         {visibles.map((activo) => {
           const tono = tonoMantenimiento(activo.nivel);
-          const unidad = UNIDAD_DIMENSION[activo.dimension] ?? activo.dimension;
+
+          // Solo se distinguir las dimensiones que disparan la alerta: las
+          // demas quedan en su fila con su propio color.
+          const enAlerta = activo.dimensiones.filter(
+            (dimension) => dimension.nivel !== "OK",
+          );
+
+          const ubicacion = activo.mina ?? activo.almacen ?? "Sin ubicacion";
 
           return (
             <div
@@ -84,53 +183,56 @@ export const IndicadorMantenimiento = ({ mantenimiento }: Props) => {
                     {activo.producto}
                   </Text>
                   <Text size="xs" className="truncate text-zinc-500">
-                    {activo.correlativo ?? activo.codigo ?? "Sin codigo"}
-                    {activo.almacen ? ` · ${activo.almacen}` : ""}
+                    {activo.correlativo ?? activo.codigo ?? "Sin codigo"} ·{" "}
+                    {ubicacion}
+                    {activo.estado_activo !== "En Uso"
+                      ? ` · ${activo.estado_activo}`
+                      : ""}
                   </Text>
                 </div>
 
-                <Badge
-                  size="xs"
-                  radius="sm"
-                  variant="light"
-                  color={tono.chip}
-                  className="shrink-0"
-                >
-                  {activo.nivel}
-                </Badge>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  {enAlerta.map((dimension) => (
+                    <Badge
+                      key={dimension.dimension}
+                      size="xs"
+                      radius="sm"
+                      variant="light"
+                      color="gray"
+                    >
+                      {DIMENSION[dimension.dimension]?.etiqueta ??
+                        dimension.dimension}
+                    </Badge>
+                  ))}
+                  <Badge
+                    size="xs"
+                    radius="sm"
+                    variant="light"
+                    color={tono.chip}
+                  >
+                    {activo.nivel}
+                  </Badge>
+                </div>
               </div>
 
-              <div className="mt-2">
-                <DashboardBarra
-                  valor={Math.min(activo.total, activo.umbral)}
-                  maximo={activo.umbral}
-                  tono={tono}
-                />
+              <div className="mt-2 space-y-1">
+                {activo.dimensiones.map((dimension) => (
+                  <FilaDimension
+                    key={dimension.dimension}
+                    dimension={dimension.dimension}
+                    total={dimension.total}
+                    servicio={dimension.servicio}
+                    restantes={dimension.restantes}
+                    nivel={dimension.nivel}
+                  />
+                ))}
               </div>
-
-              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
-                <span className="tabular-nums text-zinc-400">
-                  {formatearCantidad(activo.total)} /{" "}
-                  {formatearCantidad(activo.umbral)} {unidad}
-                </span>
-                <span className={`font-semibold tabular-nums ${tono.texto}`}>
-                  {activo.restantes < 0
-                    ? `Vencio hace ${formatearCantidad(Math.abs(activo.restantes))} ${unidad}`
-                    : `Faltan ${formatearCantidad(activo.restantes)} ${unidad}`}
-                </span>
-              </div>
-
-              {activo.umbral_obsoleto && (
-                <Text size="xs" className="mt-1 text-indigo-300">
-                  El umbral no se reprogramo: el contador ya supero el intervalo.
-                </Text>
-              )}
             </div>
           );
         })}
       </div>
 
-      {mantenimiento.items.length > LIMITE_INICIAL && (
+      {items.length > LIMITE_INICIAL && (
         <button
           type="button"
           onClick={() => setVerTodos((v) => !v)}
@@ -138,9 +240,7 @@ export const IndicadorMantenimiento = ({ mantenimiento }: Props) => {
             verTodos ? TONO_NEUTRO.texto : "text-indigo-300"
           }`}
         >
-          {verTodos
-            ? "Ver menos"
-            : `Ver las ${mantenimiento.items.length} maquinas`}
+          {verTodos ? "Ver menos" : `Ver las ${items.length} maquinas`}
         </button>
       )}
     </div>

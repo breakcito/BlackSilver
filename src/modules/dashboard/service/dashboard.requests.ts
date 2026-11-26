@@ -1,16 +1,22 @@
 /**
+ * Rango de fechas de un indicador de flujo (YYYY-MM-DD).
+ */
+export interface RangoFechasDashboard {
+  fecha_inicio: string;
+  fecha_fin: string;
+}
+
+/**
  * Parametros que pide el dashboard.
  *
- * El periodo solo afecta a los indicadores de FLUJO (balance, cobros y costo
- * de mantenimiento). Los indicadores de ESTADO (stock critico, mantenimiento
- * proximo y pendientes de atencion) son una foto del ahora: por eso el
- * backend no los filtra por periodo y aqui tampoco se les manda.
+ * Cada indicador con fecha tiene su propio periodo: el balance puede mirar
+ * un mes y las compras otro. Los indicadores de ESTADO (stock critico,
+ * mantenimiento y pendientes de atencion) no llevan periodo, porque son una
+ * foto del ahora.
  */
 export interface REQ_Dashboard {
-  /** Fecha inicial del periodo (YYYY-MM-DD). */
-  fecha_inicio: string;
-  /** Fecha final del periodo (YYYY-MM-DD). */
-  fecha_fin: string;
-  /** Limita los indicadores a un almacen. */
-  id_almacen?: number | null;
+  balance: RangoFechasDashboard;
+  cobros: RangoFechasDashboard;
+  costo: RangoFechasDashboard;
+  compras: RangoFechasDashboard;
 }

@@ -2,23 +2,14 @@ import { useMemo, useState } from "react";
 import { Badge, Text } from "@mantine/core";
 import { ArrowDownIcon, ArrowUpIcon } from "@heroicons/react/24/outline";
 
-import {
-  TONO_EGRESO,
-  TONO_INGRESO,
-  TONO_NEUTRO,
-} from "../dashboard-paleta";
-import {
-  etiquetaPeriodo,
-  formatearMonto,
-  variacion,
-} from "../dashboard-calculos";
-import { DashboardBarra, DashboardVacio } from "./dashboard-ui";
+import { TONO_EGRESO, TONO_INGRESO, TONO_NEUTRO } from "../dashboard-paleta";
+import { etiquetaPeriodo, formatearMonto } from "../dashboard-calculos";
 import type { RES_BalanceDashboard } from "../../service/dashboard.responses";
 
 interface Props {
   balance: RES_BalanceDashboard;
   periodo: { fecha_inicio: string; fecha_fin: string };
-  comparativo: { fecha_inicio: string; fecha_fin: string };
+  comparativo: { comparativo_inicio: string; comparativo_fin: string };
 }
 
 /** "CONSUMO_MINERAL" -> "Consumo mineral". */
@@ -27,6 +18,9 @@ const humanizar = (valor: string): string =>
     .toLowerCase()
     .replace(/_/g, " ")
     .replace(/^./, (letra) => letra.toUpperCase());
+
+const COLUMNAS =
+  "grid grid-cols-[minmax(0,1fr)_132px_132px_118px] gap-2 items-center";
 
 /**
  * Ficha de una moneda.
@@ -43,7 +37,6 @@ const FichaMoneda = ({
   comparativo,
   etiquetaActual,
   etiquetaAnterior,
-  origenes,
 }: {
   moneda: string;
   ingresos: number;
@@ -52,22 +45,19 @@ const FichaMoneda = ({
   comparativo: { ingresos: number; egresos: number; resultado: number };
   etiquetaActual: string;
   etiquetaAnterior: string;
-  origenes: RES_BalanceDashboard["origenes"];
 }) => {
-  const variacionResultado = variacion(resultado, comparativo.resultado);
+  const variacionResultado =
+    comparativo.resultado !== 0
+      ? ((resultado - comparativo.resultado) / Math.abs(comparativo.resultado)) * 100
+      : null;
   const favorable =
     variacionResultado === null || variacionResultado === 0
       ? null
       : variacionResultado > 0;
   const sinActividad = ingresos === 0 && egresos === 0;
 
-  const maxOrigen = useMemo(
-    () => Math.max(0, ...origenes.map((o) => o.monto)),
-    [origenes],
-  );
-
   return (
-    <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
       <div className="flex items-center justify-between gap-2">
         <Text size="10px" fw={700} className="uppercase tracking-[0.16em] text-zinc-300">
           {moneda}
@@ -153,40 +143,132 @@ const FichaMoneda = ({
           </Text>
         </div>
       </div>
+    </div>
+  );
+};
 
-      {origenes.length > 0 && (
-        <div className="mt-4 space-y-2 border-t border-zinc-800 pt-3">
-          <Text size="9px" fw={700} className="uppercase tracking-[0.14em] text-zinc-500">
-            Que origen explica el movimiento
-          </Text>
+/**
+ * Desglose de una moneda por origen.
+ *
+ * Es la misma grilla del modulo Balances: categoria, monto del periodo,
+ * monto del periodo anterior y variacion. Sin la comparacion no se puede
+ * leer si el movimiento crecio o cayo.
+ */
+const DesgloseMoneda = ({
+  origenes,
+  etiquetaActual,
+  etiquetaAnterior,
+}: {
+  origenes: RES_BalanceDashboard["origenes"];
+  etiquetaActual: string;
+  etiquetaAnterior: string;
+}) => {
+  const maxMonto = useMemo(
+    () => Math.max(0, ...origenes.map((o) => o.monto)),
+    [origenes],
+  );
 
-          {origenes.map((origen) => (
-            <div key={`${origen.origen}-${origen.tipo}`}>
-              <div className="flex items-baseline justify-between gap-2">
-                <Text size="xs" className="truncate text-zinc-300">
-                  {humanizar(origen.origen)}
-                </Text>
-                <Text
-                  size="xs"
-                  fw={700}
-                  className={`shrink-0 tabular-nums ${
-                    origen.tipo === "INGRESO" ? TONO_INGRESO.texto : TONO_EGRESO.texto
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50">
+      <div className={`${COLUMNAS} px-3 py-2 border-b border-zinc-800 bg-zinc-900/80`}>
+        <Text size="10px" fw={700} className="uppercase tracking-wider text-zinc-300">
+          Categoria
+        </Text>
+        <Text size="10px" fw={700} className="uppercase tracking-wider text-zinc-300 text-left">
+          {etiquetaActual}
+        </Text>
+        <Text size="10px" fw={700} className="uppercase tracking-wider text-zinc-300 text-left">
+          {etiquetaAnterior}
+        </Text>
+        <Text size="10px" fw={700} className="uppercase tracking-wider text-zinc-300 text-left">
+          Variacion
+        </Text>
+      </div>
+
+      {origenes.map((origen, indice) => {
+        const esIngreso = origen.tipo === "INGRESO";
+        const ancho = maxMonto > 0 ? (origen.monto / maxMonto) * 100 : 0;
+
+        // El color dice si el BALANCE mejora: mas ingreso o menos gasto.
+        const mejora = esIngreso
+          ? origen.monto > origen.anterior
+          : origen.monto < origen.anterior;
+
+        return (
+          <div
+            key={`${origen.origen}-${origen.tipo}`}
+            className={`${COLUMNAS} px-3 py-2.5 hover:bg-zinc-800/40 transition-colors ${
+              indice < origenes.length - 1 ? "border-b border-zinc-800/70" : ""
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  esIngreso ? "bg-teal-400" : "bg-red-400"
+                }`}
+              />
+              <Text size="xs" fw={600} className="text-zinc-100 truncate">
+                {humanizar(origen.origen)}
+              </Text>
+            </div>
+
+            <div className="flex flex-col gap-1 items-start">
+              <Text size="xs" fw={700} className="text-white tabular-nums leading-none">
+                {formatearMonto(origen.moneda, origen.monto)}
+              </Text>
+              <div className="mr-auto h-1.5 w-18 rounded-full bg-zinc-700/60 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    esIngreso ? "bg-teal-400" : "bg-red-400"
                   }`}
-                >
-                  {formatearMonto(origen.moneda, origen.monto)}
-                </Text>
-              </div>
-              <div className="mt-1">
-                <DashboardBarra
-                  valor={origen.monto}
-                  maximo={maxOrigen}
-                  tono={origen.tipo === "INGRESO" ? TONO_INGRESO : TONO_EGRESO}
+                  style={{ width: `${Math.max(4, ancho)}%` }}
                 />
               </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            <div className="text-left">
+              {origen.anterior === 0 ? (
+                <Text size="xs" className="text-zinc-400">
+                  Sin actividad
+                </Text>
+              ) : (
+                <Text size="xs" fw={600} className="text-zinc-200 tabular-nums">
+                  {formatearMonto(origen.moneda, origen.anterior)}
+                </Text>
+              )}
+            </div>
+
+            <div className="text-left flex flex-col items-start gap-0.5">
+              {origen.variacion === null ? (
+                <Text size="xs" className="text-zinc-400">
+                  —
+                </Text>
+              ) : (
+                <>
+                  <Text
+                    size="xs"
+                    fw={700}
+                    className={`tabular-nums leading-none ${
+                      origen.variacion === 0
+                        ? "text-zinc-200"
+                        : mejora
+                          ? "text-teal-400"
+                          : "text-red-400"
+                    }`}
+                  >
+                    {origen.variacion > 0 ? "+" : ""}
+                    {origen.variacion.toFixed(1)}%
+                  </Text>
+                  <Text size="xs" fw={600} className="text-zinc-400 tabular-nums">
+                    {origen.monto - origen.anterior > 0 ? "+" : ""}
+                    {formatearMonto(origen.moneda, origen.monto - origen.anterior)}
+                  </Text>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -199,42 +281,71 @@ const FichaMoneda = ({
  */
 export const IndicadorBalance = ({ balance, periodo, comparativo }: Props) => {
   const [verTodos, setVerTodos] = useState(false);
-  const MAX_ORIGENES = 6;
+  const MAX_ORIGENES = 8;
 
   const etiquetaActual = etiquetaPeriodo(periodo.fecha_inicio, periodo.fecha_fin);
   const etiquetaAnterior = etiquetaPeriodo(
-    comparativo.fecha_inicio,
-    comparativo.fecha_fin,
+    comparativo.comparativo_inicio,
+    comparativo.comparativo_fin,
   );
 
   if (balance.monedas.length === 0) {
-    return <DashboardVacio texto="Sin informacion de balance en este periodo" />;
+    return (
+      <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-8 text-center">
+        <Text size="xs" className="text-zinc-500">
+          Sin informacion de balance en este periodo
+        </Text>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
-        {balance.monedas.map((moneda) => {
-          const origenes = balance.origenes.filter((o) => o.moneda === moneda.moneda);
-          const visibles = verTodos
-            ? origenes
-            : origenes.slice(0, MAX_ORIGENES);
+        {balance.monedas.map((moneda) => (
+          <FichaMoneda
+            key={moneda.moneda}
+            moneda={moneda.moneda}
+            ingresos={moneda.ingresos}
+            egresos={moneda.egresos}
+            resultado={moneda.resultado}
+            comparativo={moneda.comparativo}
+            etiquetaActual={etiquetaActual}
+            etiquetaAnterior={etiquetaAnterior}
+          />
+        ))}
+      </div>
 
-          return (
-            <FichaMoneda
-              key={moneda.moneda}
-              moneda={moneda.moneda}
-              ingresos={moneda.ingresos}
-              egresos={moneda.egresos}
-              resultado={moneda.resultado}
-              comparativo={moneda.comparativo}
+      {/* Desglose por origen: una tabla por moneda */}
+      {balance.monedas.map((moneda) => {
+        const origenes = balance.origenes.filter(
+          (origen) => origen.moneda === moneda.moneda,
+        );
+
+        if (origenes.length === 0) return null;
+
+        const visibles = verTodos
+          ? origenes
+          : origenes.slice(0, MAX_ORIGENES);
+
+        return (
+          <div key={moneda.moneda}>
+            <Text
+              size="9px"
+              fw={700}
+              className="mb-1.5 uppercase tracking-[0.14em] text-zinc-500"
+            >
+              Que origen explica el movimiento · {moneda.moneda}
+            </Text>
+
+            <DesgloseMoneda
+              origenes={visibles}
               etiquetaActual={etiquetaActual}
               etiquetaAnterior={etiquetaAnterior}
-              origenes={visibles}
             />
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
 
       {balance.origenes.length > MAX_ORIGENES && (
         <button

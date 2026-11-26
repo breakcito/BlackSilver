@@ -7,14 +7,15 @@ import { TONOS, type ITonoDashboard } from "../dashboard-paleta";
  * Que filtros mueven un bloque.
  *
  * - `periodo`: el bloque se mide sobre el mes elegido.
- * - `almacen`: el bloque respeta el almacen seleccionado.
  * - `estado`: el bloque es una foto del ahora y NO depende del periodo.
+ *
+ * El alcance por almacen no aparece aqui: cada bloque con almacen muestra
+ * sus propios chips de filtro, que son a la vez el desglose y el filtro.
  */
-export type TAlcance = "periodo" | "almacen" | "estado";
+export type TAlcance = "periodo" | "estado";
 
 const ALCANCES: Record<TAlcance, { texto: string; tono: ITonoDashboard }> = {
   periodo: { texto: "Periodo", tono: TONOS.indigo },
-  almacen: { texto: "Almacén", tono: TONOS.teal },
   estado: { texto: "Estado actual", tono: TONOS.gray },
 };
 

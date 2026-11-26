@@ -78,12 +78,14 @@ export const tonoStock = (estado: string): ITonoDashboard =>
  * Tono de una alerta de mantenimiento.
  *
  * "Vencido" ya supero el umbral (rojo), "Critico" esta a punto (ambar) y
- * "Proximo" todavia tiene margen (azul informativo).
+ * "Proximo" todavia tiene margen (azul informativo). Una dimension que esta
+ * en "OK" es neutra: no compite visualmente con la que si aprieta.
  */
 export const tonoMantenimiento = (nivel: string): ITonoDashboard => {
   if (nivel === "Vencido") return TONOS.red;
   if (nivel === "Crítico") return TONOS.yellow;
-  return TONOS.indigo;
+  if (nivel === "Próximo") return TONOS.indigo;
+  return TONOS.gray;
 };
 
 /**
