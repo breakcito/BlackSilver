@@ -574,6 +574,7 @@ export const ModalRegistrarBlending = ({
               classNames={estilitos}
               size="xs"
               radius="lg"
+              clearable
               searchable
               nothingFoundMessage="Sin tipos de carbón"
               comboboxProps={{ withinPortal: true }}

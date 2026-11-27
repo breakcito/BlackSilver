@@ -748,8 +748,8 @@ export const ModalGastosProduccion = ({
                           S/ {formatNumber(g.total)}
                         </Text>
                       </Table.Td>
-                      <Table.Td ta={"center"} w={170}>
-                        <Stack gap={4} justify="center" align="center" w={170}>
+                      <Table.Td ta={"center"}>
+                        <Stack gap={4} justify="center" align="center">
                           {estaPagado(g) ? (
                             <>
                               <Badge

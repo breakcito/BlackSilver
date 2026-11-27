@@ -3,7 +3,6 @@ import {
   Badge,
   Button,
   Group,
-  Loader,
   Paper,
   Select,
   Stack,
@@ -102,9 +101,9 @@ export const PanelBlending = ({ selector }: PanelBlendingProps) => {
   const [gruposGastos, setGruposGastos] = useState<GrupoGastosItem[]>([]);
   const {
     exportarPorRango,
-    exportarGrupo,
+    // exportarGrupo,
     exportando,
-    idExportando,
+    // idExportando,
   } = useExportarGastosProduccion();
   const [blendingEditar, setBlendingEditar] =
     useState<BlendingCarbonItem | null>(null);
@@ -508,37 +507,11 @@ export const PanelBlending = ({ selector }: PanelBlendingProps) => {
                 <PencilSquareIcon className="w-4 h-4" />
               </ActionIcon>
             </Tooltip>
-            <Tooltip
-              label={
-                r.id_grupo_gastos
-                  ? "Exportar los gastos del grupo a Excel"
-                  : "Este blending todavía no pertenece a un grupo de gastos"
-              }
-              withArrow
-            >
-              <ActionIcon
-                variant="light"
-                color="green"
-                size="md"
-                radius="md"
-                disabled={!r.id_grupo_gastos}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (r.id_grupo_gastos) exportarGrupo(r.id_grupo_gastos);
-                }}
-              >
-                {idExportando === r.id_grupo_gastos ? (
-                  <Loader size={14} color="green" />
-                ) : (
-                  <ArrowDownTrayIcon className="w-4 h-4" />
-                )}
-              </ActionIcon>
-            </Tooltip>
           </Group>
         ),
       },
     ],
-    [exportarGrupo, idExportando],
+    [],
   );
 
   /**
