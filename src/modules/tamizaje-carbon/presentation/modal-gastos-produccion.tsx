@@ -751,7 +751,7 @@ export const ModalGastosProduccion = ({
                       <Table.Td ta={"center"} w={170}>
                         <Stack gap={4} justify="center" align="center" w={170}>
                           {estaPagado(g) ? (
-                            <Group gap={6} justify="center" wrap="nowrap">
+                            <>
                               <Badge
                                 size="sm"
                                 color="green"
@@ -760,7 +760,7 @@ export const ModalGastosProduccion = ({
                               >
                                 PAGADO
                               </Badge>
-                              <Text size="10px" c="gray" fw={600}>
+                              <Text size="xs" c="gray" fw={600}>
                                 {g.fecha_pago
                                   ? dayjs(g.fecha_pago).format("DD/MM/YYYY")
                                   : ""}
@@ -768,14 +768,14 @@ export const ModalGastosProduccion = ({
                               {g.medio_pago && (
                                 <Badge
                                   size="sm"
-                                  color="teal"
+                                  color="grape"
                                   variant="light"
                                   radius="xl"
                                 >
                                   {g.medio_pago}
                                 </Badge>
                               )}
-                            </Group>
+                            </>
                           ) : (
                             <Group gap={8} justify="center" wrap="nowrap">
                               <Badge
