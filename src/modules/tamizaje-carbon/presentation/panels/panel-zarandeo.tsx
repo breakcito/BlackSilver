@@ -1059,8 +1059,8 @@ export const PanelZarandeo = ({ selector }: PanelZarandeoProps) => {
           loading={loadingTamizajes}
           idAccessor="id_zarandeo_carbon"
           noRecordsText="No se encontraron operaciones de zarandeo registradas."
-          tituloSinAgrupar="Operaciones sin gastos"
-          tituloOperacion=""
+          tituloSinAgrupar="Zarandeos"
+          tituloOperacion="Zarandeos + Gastos"
           selectedRecords={zarandeosSeleccionados}
           onSelectedRecordsChange={setZarandeosSeleccionados}
           onVerGastos={(idGrupo) =>

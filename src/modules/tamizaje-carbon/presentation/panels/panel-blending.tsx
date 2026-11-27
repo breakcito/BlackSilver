@@ -754,8 +754,8 @@ export const PanelBlending = ({ selector }: PanelBlendingProps) => {
         loading={loading}
         idAccessor="id_blending_carbon"
         noRecordsText="No se encontraron blendings en el periodo seleccionado."
-        tituloSinAgrupar="Operaciones sin agrupar"
-        tituloOperacion=""
+        tituloSinAgrupar="Blendings"
+        tituloOperacion="Blendings + Gastos"
         selectedRecords={blendingsSeleccionados}
         onSelectedRecordsChange={setBlendingsSeleccionados}
         onVerGastos={(idGrupo) =>

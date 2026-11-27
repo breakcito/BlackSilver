@@ -163,7 +163,7 @@ export function OperacionesAgrupadas<
           <Text size="xs" fw={700} c="zinc.100">
             {tituloSinAgrupar}
           </Text>
-          <Badge size="xs" variant="light" color="zinc" radius="xl">
+          <Badge size="sm" variant="light" color="blue" radius="xl">
             {sinAgrupar.length} registro{sinAgrupar.length === 1 ? "" : "s"}
           </Badge>
         </Group>
